@@ -53,20 +53,20 @@ class Inferer(object):
         # Dataset directories
         self.data_dirs = {
             'kumar':{
-                'kumar_im':"../../../../datasets/H&E/nuclei_segmentation/exhaustive_annotations/Nucleisegmentation-Kumar/test/Images",
-                'kumar_gt':"../../../../datasets/H&E/nuclei_segmentation/exhaustive_annotations/Nucleisegmentation-Kumar/test/Labels",
+                'kumar_im':"../../../../datasets/Nucleisegmentation-Kumar/test/Images",
+                'kumar_gt':"../../../../datasets/Nucleisegmentation-Kumar/test/Labels",
                 'gt_sfx':'/*.mat',
                 'im_sfx':'/*.tif'
             },
             'consep':{
-                'consep_im':"../../../../datasets/H&E/nuclei_segmentation/exhaustive_annotations/Nucleisegmentation-CoNSeP/test/Images",
-                'consep_gt':"../../../../datasets/H&E/nuclei_segmentation/exhaustive_annotations/Nucleisegmentation-CoNSeP/test/Labels",
+                'consep_im':"../../../../datasets/Nucleisegmentation-CoNSeP/test/Images",
+                'consep_gt':"../../../../datasets/Nucleisegmentation-CoNSeP/test/Labels",
                 'gt_sfx':'/*.mat',
                 'im_sfx':'/*.png'
             },
             'pannuke': {
-                'pannuke_im':"../../../../datasets/H&E/nuclei_segmentation/exhaustive_annotations/Nucleisegmentation-PanNuke/test/Images",
-                'pannuke_gt':"../../../../datasets/H&E/nuclei_segmentation/exhaustive_annotations/Nucleisegmentation-PanNuke/test/Labels",
+                'pannuke_im':"../../../../datasets/Nucleisegmentation-PanNuke/test/Images",
+                'pannuke_gt':"../../../../datasets/Nucleisegmentation-PanNuke/test/Labels",
                 'gt_sfx':'/*.mat',
                 'im_sfx':'/*.png'
             }
@@ -377,7 +377,7 @@ class Inferer(object):
             fn = self._get_fn(path)
             self.metrics[f"{fn}_metrics"] = metrics[i]
             
-    
+        # Create pandas df of the result metrics
         score_df = pd.DataFrame(self.metrics).transpose()
         score_df.loc['averages for the test set'] = score_df.mean(axis=0)
         return score_df
