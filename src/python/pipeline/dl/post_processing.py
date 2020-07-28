@@ -45,8 +45,8 @@ def activation(prob_map, method='sigmoid'):
     return act
 
 
-def naive_thresh_new(prob_map, threshold=0.5):
-    # Threshold naively
+def naive_thresh_logits(prob_map, threshold=0.5):
+    # Threshold naively when values b/w [0,1]
     seg = prob_map.copy()
     seg = seg > threshold
     
@@ -59,7 +59,7 @@ def naive_thresh_new(prob_map, threshold=0.5):
 
 
 def naive_thresh(prob_map, threshold=2):
-    # Threshold naively
+    # Threshold naively 
     seg = prob_map.copy()
     seg[seg < np.amax(prob_map)/threshold] = 0
     seg[seg > np.amax(prob_map)/threshold] = 1
@@ -212,7 +212,7 @@ def inv_dist_watershed(inst_map, win_size=13):
     
     # remove small cells. Will enhance PQ a lot '(HACKish)'
     mask[mask > 0] = 1
-    mask = morph.remove_small_objects(mask.astype(bool), min_size=154)
+    mask = morph.remove_small_objects(mask.astype(bool), min_size=100)
     inst_map = ndi.label(mask)[0]
     
     return inst_map

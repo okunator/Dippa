@@ -7,11 +7,17 @@ import torch
 import scipy.io
 import numpy as np
 import sklearn.feature_extraction.image
+import pandas as pd
 import matplotlib.pyplot as plt
+
 from skimage.filters import difference_of_gaussians
 from skimage.exposure import histogram
 from collections import OrderedDict
 from multiprocessing import Pool
+from joblib import Parallel, delayed
+
+from .post_processing import *
+from .metrics import *
 
 
 class Inferer(object):
@@ -76,6 +82,9 @@ class Inferer(object):
         self.n_files = len(self.files)
 
         self.outputs = OrderedDict()
+        self.metrics = OrderedDict()
+        self.inst_maps = OrderedDict()
+           
             
     def _divide_batch(self, arr, batch_size):
         for i in range(0, arr.shape[0], batch_size):  
@@ -171,6 +180,10 @@ class Inferer(object):
         self.outputs.clear()
     
     
+    def _get_fn(self, path):
+        return path.split('/')[-1][:-4]
+    
+    
     def run(self):
         """
         Do inference on the given dataset, with the pytorch lightining model that has been used for training.
@@ -180,22 +193,23 @@ class Inferer(object):
         self.model.cuda()
         self.model.model.eval()
         
-        
         if len(self.outputs) > 0:
             print('Clearing previous predictions')
             clear_predictions()
                     
         for i, path in enumerate(self.files):
+            fn = self._get_fn(path)
             if self.verbose:
-                print(f"Prediction for: {path.split('/')[-1]}")
+                print(f"Prediction for: {fn}")
+                
             im = self._read_img(path)
             im_patches, patches_shape = self._extract_patches(im)
             pred_patches = self._predictions(im_patches)
             result_pred = self._create_prediction(pred_patches, im.shape, patches_shape)
             nuc_map = result_pred[..., 1]
             bg_map = result_pred[..., 0]
-            self.outputs[f"nuc_map_{i}"] = nuc_map
-            self.outputs[f"bg_map_{i}"] = bg_map
+            self.outputs[f"{fn}_nuc_map"] = nuc_map
+            self.outputs[f"{fn}_bg_map"] = bg_map
             
     
     def _rm_model(self):
@@ -210,11 +224,12 @@ class Inferer(object):
     
         fig, axes = plt.subplots(self.n_files, 3, figsize=(65, self.n_files*12))
         fig.tight_layout(w_pad=4, h_pad=4)
-        for i in range(self.n_files):
+        for i, path in enumerate(self.files):
+            fn = self._get_fn(path)
             gt = scipy.io.loadmat(self.gt_masks[i])
             gt = gt['inst_map']
-            nuc_map = self.outputs[f"nuc_map_{i}"]
-            bg_map = self.outputs[f"bg_map_{i}"]
+            nuc_map = self.outputs[f"{fn}_nuc_map"]
+            bg_map = self.outputs[f"{fn}_bg_map"]
             axes[i][0].imshow(nuc_map, interpolation='none')
             axes[i][0].axis('off')
 
@@ -233,8 +248,9 @@ class Inferer(object):
         
         figg, axes = plt.subplots(self.n_files//3, 4, figsize=(30,15))
         axes = axes.flatten()
-        for i in range(self.n_files):
-            nuc_map = self.outputs[f"nuc_map_{i}"]
+        for i, path in enumerate(self.files):
+            fn = self._get_fn(path)
+            nuc_map = self.outputs[f"{fn}_nuc_map"]
             hist, hist_centers = histogram(nuc_map)
             axes[i].plot(hist_centers, hist, lw=2)
             
@@ -251,20 +267,121 @@ class Inferer(object):
             output_dir (str) : path to the directory where predictions are saved.
         """
         assert len(self.outputs) != 0, "No predictions found"
-        for i, f in enumerate(self.files):
-            fn = f.split('/')[-1][:-4] + '_pred_map.mat'
-            print(fn)
-            nuc_map = self.outputs[f"nuc_map_{i}"]
-            # scipy.io.savemat(, mdict={'pred_map': nuc_map})
+        for i, path in enumerate(self.files):
+            fn = self._get_fn(path)
+            new_fn = fn + '_pred_map.mat'
+            print('saving: ', fn)
+            nuc_map = self.outputs[f"{fn}_nuc_map"]
+            # scipy.io.savemat(new_fn, mdict={'pred_map': nuc_map})
+            
+            
+    def plot_segmentations(self):
+        """
+        Plot the binary segmentations after running post_processing.
+        """
+        
+        assert any([key for key in self.outputs.keys() if key.endswith("inst_map")]), "Run post_processing first!"
+    
+        fig, axes = plt.subplots(self.n_files, 3, figsize=(65, self.n_files*12))
+        fig.tight_layout(w_pad=4, h_pad=4)
+        for i, path in enumerate(self.files):
+            fn = self._get_fn(path)
+            gt = scipy.io.loadmat(self.gt_masks[i])
+            gt = gt['inst_map']
+            inst_map = self.outputs[f"{fn}_inst_map"]
+            nuc_map = self.outputs[f"{fn}_nuc_map"]
+            
+            axes[i][0].imshow(nuc_map, interpolation='none')
+            axes[i][0].axis('off')
+            
+            axes[i][1].imshow(inst_map, interpolation='none')
+            axes[i][1].axis('off')
+
+            axes[i][2].imshow(gt, interpolation='none')
+            axes[i][2].axis('off')
             
     
-    def _post_process_pipeline(pass):
-        pass
+    def _post_process_pipeline(self, prob_map, thresh=2, postproc_func=inv_dist_watershed):
+        
+        if self.smoothen:
+            # Find the steepest drop in the histogram
+            hist, hist_centers = histogram(prob_map)
+            d = np.diff(hist)
+            b = d == np.min(d)
+            b = np.append(b, False) # append one ince np.diff loses one element in arr
+            thresh = hist_centers[b] + 0.05
+            mask = naive_thresh_logits(prob_map, thresh)
+        else:
+            mask = naive_thresh(prob_map, thresh)
+                
+        # post-processing after thresholding
+        mask = postproc_func(mask, 15)
+        mask[mask > 0] = 1
+        mask = ndi.binary_fill_holes(mask)
+        mask = ndi.label(mask)[0]        
+        return mask
+    
+    
+    def _compute_metrics(self, true, pred):
+        # Count scores for each file
+        pq = PQ(true, pred)
+        aji = AJI(true, pred)
+        aji_p = AJI_plus(true, pred)
+        dice2 = DICE2(true, pred)
+        return {
+            'AJI': aji, 
+            'AJI plus': aji_p, 
+            "DICE2": dice2, 
+            "PQ": pq['pq'], # panoptic quality
+            "SQ": pq['sq'], # segmentation quality
+            "DQ": pq['dq'], # Detection quality i.e. F1-score
+            "inst Sensitivity": pq['sensitivity'], # Sensitivity in detecting matching nucleis
+            "inst Precision": pq['precision']  # Specificity in detecting matching nucleis
+        }
+
             
-            
+
     def post_process(self):
+        """
+        Run post processing pipeline for all the predictions given by the network
+        """
+        assert len(self.outputs) != 0, "No predictions found"
+        self.model.cpu()
+        
+        preds = [self.outputs[key] for key in self.outputs.keys() if key.endswith("nuc_map")]
+        
+        segs = None
         with Pool() as pool:
-            pool.starmap(self._post_process_pipeline, params_list)
+            segs = pool.map(self._post_process_pipeline, preds)
+        
+        for i, path in enumerate(self.files):
+            fn = self._get_fn(path)
+            self.outputs[f"{fn}_inst_map"] = segs[i]
+            
+            
+    def benchmark(self, save=False):
+        """
+        Run benchmarking metrics for all of the files in the dataset
+        """
+        assert any([key for key in self.outputs.keys() if key.endswith("inst_map")]), "Run post_processing first!"
+        
+        inst_maps = [self.outputs[key] for key in self.outputs.keys() if key.endswith("inst_map")]
+        gts = [scipy.io.loadmat(f)['inst_map'].astype("uint32") for f in self.gt_masks]
+        params_list = list(zip(gts, inst_maps))
+        
+        metrics = None
+        with Pool() as pool:
+            metrics = pool.starmap(self._compute_metrics, params_list)
+        
+        for i, path in enumerate(self.files):
+            fn = self._get_fn(path)
+            self.metrics[f"{fn}_metrics"] = metrics[i]
+            
+    
+        score_df = pd.DataFrame(self.metrics).transpose()
+        score_df.loc['averages for the test set'] = score_df.mean(axis=0)
+        return score_df
+        
     
 
             
