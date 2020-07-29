@@ -1,0 +1,6 @@
+*.pyc
+databases/
+datasets/
+results/
+src/python/tests_and_tutorials/
+.ipynb_checkpoints

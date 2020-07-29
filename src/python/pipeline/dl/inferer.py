@@ -137,8 +137,13 @@ class Inferer(object):
         pred_patches = np.zeros((0, self.n_classes, self.patch_size, self.patch_size))
         for batch in self._divide_batch(im_patches, self.batch_size):
             # shape for pytorch and predict
-            batch_gpu = torch.from_numpy(batch.transpose(0, 3, 1, 2)).type('torch.cuda.FloatTensor')
-            pred_batch = self.model(batch_gpu) 
+            batch_d = torch.from_numpy(batch.transpose(0, 3, 1, 2))
+            if torch.cuda.is_available():
+                batch_d = batch_d.type('torch.cuda.FloatTensor')
+            else:
+                batch_d = batch_d.type('torch.FloatTensor')
+            
+            pred_batch = self.model(batch_d) 
             pred_batch = pred_batch.detach().cpu().numpy()
             
             if self.smoothen:
@@ -190,7 +195,7 @@ class Inferer(object):
         See lightning_model.py and Train_lightning.ipynb.
         """
         # Put SegModel to gpu
-        self.model.cuda()
+        self.model.cuda() if torch.cuda.is_available() else self.model.cpu()    
         self.model.model.eval()
         
         if len(self.outputs) > 0:
