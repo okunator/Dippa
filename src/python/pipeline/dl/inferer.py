@@ -39,7 +39,7 @@ class Inferer(object):
             verbose (bool)   : wether or not to print the progress of running inference
         """
         
-        assert dataset in ('kumar', 'consep', 'pannuke'), "set dataset param to one of ('kumar', 'consep', 'pannuke')"
+        assert dataset in ('kumar', 'consep', 'pannuke'), "dataset param not in ('kumar', 'consep', 'pannuke')"
         
         self.patch_size = patch_size
         self.batch_size = batch_size

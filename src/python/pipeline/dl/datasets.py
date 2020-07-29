@@ -54,7 +54,7 @@ class BinarySegmentationDataset(Dataset):
         
         # process the masks as in unet paper
         contour = instance_contours(mask)
-        mask, weight  = gen_unet_labels(mask)
+        mask, weight = gen_unet_labels(mask)
                 
         # Augment
         augmented = self.transforms(image=img, masks=[mask, weight, contour])

@@ -14,7 +14,7 @@ from .datasets import *
 
 
 class SegModel(pl.LightningModule):
-    def __init__(self, model, criterion, hparams, *args, **kwargs):
+    def __init__(self, model, criterion, hparams, dataset='kumar'):
         """
         Pytorch Lightning abstraction for any pytorch segmentation model architecture used in this project.
         
@@ -25,10 +25,9 @@ class SegModel(pl.LightningModule):
             haparams (dict) : hyperparameters for every component of the training process.
         """
         super(SegModel, self).__init__()
+        assert dataset in ('kumar', 'consep', 'pannuke'), "dataset param not in ('kumar', 'consep', 'pannuke')"
         self.model = model
         self.criterion = criterion
-        self.test_dir = hparams['dirs']['test_dir']
-        self.train_dir = hparams['dirs']['train_dir']
         self.edge_weight = hparams['loss_args']['edge_weight']
         self.batch_size = hparams['dataloader_args']['batch_size']
         self.n_classes = hparams['dataloader_args']['n_classes']
@@ -39,10 +38,30 @@ class SegModel(pl.LightningModule):
         self.factor = hparams['scheduler_args']['factor']
         self.patience = hparams['scheduler_args']['patience']
         self.save_hyperparameters(hparams)
+        
+        # HDF5 database directories
+        self.data_dirs = {
+            'kumar':{
+                'test_dir': "../../../../databases/Kumar/patch_224/test_Kumar.pytable",
+                'train_dir': "../../../../databases//Kumar/patch_224/train_Kumar.pytable"
+            },
+            'consep':{
+                'test_dir': "../../../../databases/ConSeP/patch_224/test_Kumar.pytable",
+                'train_dir': "../../../../databases/ConSeP/patch_224/train_Kumar.pytable"
+            },
+            'pannuke': {
+                'test_dir': "../../../../databases/PanNuke/patch_224/test_Kumar.pytable",
+                'train_dir': "../../../../databases/PanNuke/patch_224/train_Kumar.pytable"
+            }
+        }
+        
+        self.train_dir = self.data_dirs[self.dataset]["train_dir"]
+        self.test_dir = self.data_dirs[self.dataset]["test_dir"]
 
     # Lightning framework boilerplate:
     def forward(self, x):
         return self.model(x)
+    
     
     def training_step(self, train_batch, batch_idx) :
         x = train_batch['image']
