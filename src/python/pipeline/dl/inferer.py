@@ -87,6 +87,9 @@ class Inferer(object):
            
             
     def _divide_batch(self, arr, batch_size):
+        """
+        Divide image array into batches similarly to DataLoader in pytorch
+        """
         for i in range(0, arr.shape[0], batch_size):  
             yield arr[i:i + batch_size, ::] 
     
@@ -134,6 +137,7 @@ class Inferer(object):
     
     
     def _predictions(self, im_patches):
+        # Use model to predict batches
         pred_patches = np.zeros((0, self.n_classes, self.patch_size, self.patch_size))
         for batch in self._divide_batch(im_patches, self.batch_size):
             # shape for pytorch and predict
@@ -194,6 +198,7 @@ class Inferer(object):
         Do inference on the given dataset, with the pytorch lightining model that has been used for training.
         See lightning_model.py and Train_lightning.ipynb.
         """
+        
         # Put SegModel to gpu
         self.model.cuda() if torch.cuda.is_available() else self.model.cpu()    
         self.model.model.eval()
@@ -225,6 +230,7 @@ class Inferer(object):
         """
         Plot the probability maps after running inference.
         """
+        
         assert len(self.outputs) != 0, "No predictions found"
     
         fig, axes = plt.subplots(self.n_files, 3, figsize=(65, self.n_files*12))
@@ -249,6 +255,7 @@ class Inferer(object):
         """
         Plot the histograms of the probability maps after running inference.
         """
+        
         assert len(self.outputs) != 0, "No predictions found"
         
         figg, axes = plt.subplots(self.n_files//3, 4, figsize=(30,15))
@@ -271,7 +278,9 @@ class Inferer(object):
         Args:
             output_dir (str) : path to the directory where predictions are saved.
         """
+        
         assert len(self.outputs) != 0, "No predictions found"
+        
         for i, path in enumerate(self.files):
             fn = self._get_fn(path)
             new_fn = fn + '_pred_map.mat'
@@ -333,6 +342,8 @@ class Inferer(object):
         aji = AJI(true, pred)
         aji_p = AJI_plus(true, pred)
         dice2 = DICE2(true, pred)
+        splits, merges = split_and_merge(true, pred)
+        
         return {
             'AJI': aji, 
             'AJI plus': aji_p, 
@@ -341,15 +352,17 @@ class Inferer(object):
             "SQ": pq['sq'], # segmentation quality
             "DQ": pq['dq'], # Detection quality i.e. F1-score
             "inst Sensitivity": pq['sensitivity'], # Sensitivity in detecting matching nucleis
-            "inst Precision": pq['precision']  # Specificity in detecting matching nucleis
+            "inst Precision": pq['precision'],  # Specificity in detecting matching nucleis
+            "splits":splits,
+            "merges":merges
         }
 
             
-
     def post_process(self):
         """
         Run post processing pipeline for all the predictions given by the network
         """
+        
         assert len(self.outputs) != 0, "No predictions found"
         self.model.cpu()
         
@@ -368,6 +381,7 @@ class Inferer(object):
         """
         Run benchmarking metrics for all of the files in the dataset
         """
+        
         assert any([key for key in self.outputs.keys() if key.endswith("inst_map")]), "Run post_processing first!"
         
         inst_maps = [self.outputs[key] for key in self.outputs.keys() if key.endswith("inst_map")]

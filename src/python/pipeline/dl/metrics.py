@@ -1,10 +1,14 @@
-# Functions are from: https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
-# Some very minor naming changes done and comments added
+"""
+Most of the functions are from: https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
+Some very minor naming changes done and comments added
+"""
 
 import numpy as np
 import cv2
+
 from scipy import ndimage as ndi
 from scipy.optimize import linear_sum_assignment
+from skimage.metrics import variation_of_information
 
 # AJI This scores each predicted nuclei separately with IoU on the corresponding ground truth nuclei
 # This is copied from here: https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
@@ -365,3 +369,11 @@ def conventional_metrics(true, pred):
     sensitivity = TP/(TP+FN)
     specificity = TN/(TN+FP)
     return (DICE1, JACCARD, sensitivity, specificity)
+
+
+def split_and_merge(true, pred):
+    """
+    Split and merge for all the predicted nuclei instances vs gt nuclei instances
+    
+    """
+    return variation_of_information(true, pred)

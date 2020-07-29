@@ -12,7 +12,6 @@ from .augmentations import *
 from .datasets import *
 
 
-
 class SegModel(pl.LightningModule):
     def __init__(self, model, criterion, hparams, dataset='kumar'):
         """
@@ -25,7 +24,10 @@ class SegModel(pl.LightningModule):
             haparams (dict) : hyperparameters for every component of the training process.
         """
         super(SegModel, self).__init__()
+        
         assert dataset in ('kumar', 'consep', 'pannuke'), "dataset param not in ('kumar', 'consep', 'pannuke')"
+        
+        self.dataset = dataset
         self.model = model
         self.criterion = criterion
         self.edge_weight = hparams['loss_args']['edge_weight']
@@ -75,7 +77,8 @@ class SegModel(pl.LightningModule):
         yhat = self.forward(x)
         loss_matrix = self.criterion(yhat, y)
         loss = (loss_matrix * (self.edge_weight**y_weight)).mean()
-        
+        self.logger.experiment.add_scalars("losses", {"train_loss": loss})
+
         logs = {'train_loss': loss}
         return {'loss':loss, 'log': logs}
     
@@ -110,6 +113,9 @@ class SegModel(pl.LightningModule):
         TNR = torch.from_numpy(np.asarray(TNR))
         TPR = torch.from_numpy(np.asarray(TPR))
         accuracy = torch.from_numpy(np.asarray(accuracy))
+        
+        # plot to the same plot as train loss
+        self.logger.experiment.add_scalars("losses", {"val_loss": loss})
         
         logs = {'val_loss': loss, 'TN': TN, 'TP':TP, 'FP':FP, 'FN':FN, 'TNR':TNR, 'TPR':TPR, 'acc':accuracy}
         return {'val_loss': loss, 'accuracy':accuracy, 'log':logs}
@@ -169,4 +175,7 @@ class SegModel(pl.LightningModule):
             self.testset, batch_size=self.batch_size, shuffle=False, pin_memory=True, num_workers=8
         )
 
+    
+    def plot_metrics(type='loss'):
+        pass
    
