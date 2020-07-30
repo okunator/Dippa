@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 
@@ -64,6 +65,27 @@ class SegModel(pl.LightningModule):
         self.train_dir = self.data_dirs[self.dataset]["train_dir"]
         self.test_dir = self.data_dirs[self.dataset]["test_dir"]
 
+    
+    def _compute_metrics(self, yhat, y):
+        pred = yhat.detach().cpu().numpy()
+        predflat = np.argmax(pred, axis=1).flatten()
+        yflat = y.cpu().numpy().flatten()
+        cmatrix = confusion_matrix(yflat, predflat, labels=range(self.n_classes))
+        TN = cmatrix[0, 0]
+        TP = cmatrix[1, 1]
+        FP = cmatrix[0, 1]
+        FN = cmatrix[1, 0]
+        TNR = TN / (TN + FP + 1e-08)
+        TPR = TP / (TP + FN + 1e-08)
+        accuracy = (TP + TN)/(TN + TP + FP + FN+ 1e-08)
+        
+        TNR = torch.from_numpy(np.asarray(TNR))
+        TPR = torch.from_numpy(np.asarray(TPR))
+        accuracy = torch.from_numpy(np.asarray(accuracy))
+        
+        return TNR, TPR, accuracy
+    
+        
     # Lightning framework stuff:
     def forward(self, x):
         return self.model(x)
@@ -81,10 +103,21 @@ class SegModel(pl.LightningModule):
         yhat = self.forward(x)
         loss_matrix = self.criterion(yhat, y)
         loss = (loss_matrix * (self.edge_weight**y_weight)).mean()
-        self.logger.experiment.add_scalars("losses", {"train_loss": loss}, 'progress_bar': {'train_loss': loss})
+        TNR, TPR, accuracy = self._compute_metrics(yhat, y)
 
-        logs = {'train_loss': loss}
-        return {'loss':loss, 'log': logs}
+        logs = {
+            'train_loss': loss,
+            'train_accuracy':accuracy
+        }
+        
+        return {
+            'loss':loss,
+            'train_accuracy':accuracy, 
+            'TNR':TNR, 
+            'TPR':TPR, 
+            'log':logs, 
+            'progress_bar': {'train_loss': loss}
+        }
     
     
     def validation_step(self, val_batch, batch_idx):
@@ -102,47 +135,58 @@ class SegModel(pl.LightningModule):
         loss = (loss_matrix * (self.edge_weight**y_weight)).mean()
         
         # Compute confusion matrix for accuracy
-        pred = yhat.detach().cpu().numpy()
-        predflat = np.argmax(pred, axis=1).flatten()
-        yflat = y.cpu().numpy().flatten()
-        cmatrix = confusion_matrix(yflat, predflat, labels=range(self.n_classes))
-        TN = cmatrix[0, 0]
-        TP = cmatrix[1, 1]
-        FP = cmatrix[0, 1]
-        FN = cmatrix[1, 0]
-        TNR = TN / (TN + FP + 1e-08)
-        TPR = TP / (TP + FN + 1e-08)
-        accuracy = (TP + TN)/(TN + TP + FP + FN+ 1e-08)
+        TNR, TPR, accuracy = self._compute_metrics(yhat, y)
         
-        TNR = torch.from_numpy(np.asarray(TNR))
-        TPR = torch.from_numpy(np.asarray(TPR))
-        accuracy = torch.from_numpy(np.asarray(accuracy))
+        logs = {
+            'val_loss': loss, 
+            'val_accuracy':accuracy
+        }
         
-        # plot to the same plot as train loss
-        self.logger.experiment.add_scalars("losses", {"val_loss": loss})
-        
-        logs = {'val_loss': loss, 'TN': TN, 'TP':TP, 'FP':FP, 'FN':FN, 'TNR':TNR, 'TPR':TPR, 'acc':accuracy}
-        return {'val_loss': loss, 'accuracy':accuracy, 'log':logs, 'progress_bar': {'val_loss': loss}}
+        return {
+            'val_loss': loss, 
+            'val_accuracy':accuracy, 
+            'TNR':TNR, 
+            'TPR':TPR, 
+            'log':logs, 
+            'progress_bar': {'val_loss': loss}
+        }
     
     
     def validation_epoch_end(self, outputs):
-        accuracy = torch.stack([x['accuracy'] for x in outputs]).mean()
+        accuracy = torch.stack([x['val_accuracy'] for x in outputs]).mean()
         TNR = torch.stack([x['TNR'] for x in outputs]).mean()
         TPR = torch.stack([x['TPR'] for x in outputs]).mean()
         avg_val_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
-        tensorboard_logs = {'avg_val_loss': avg_val_loss, 'accuracy':accuracy, 'TNR':TNR, 'TPR':TPR}
-        return {'accuracy':accuracy, 'val_loss': avg_loss, 'log': tensorboard_logs}
+        
+        tensorboard_logs = {
+            'avg_val_loss': avg_val_loss, 
+            'avg_val_accuracy':accuracy, 
+            'avg_val_TNR':TNR, 
+            'avg_val_TPR':TPR
+        }
+        
+        return {'avg_val_accuracy':accuracy, 'val_loss': avg_val_loss, 'log': tensorboard_logs}
     
     
     def training_epoch_end(self, outputs):
-        avg_loss = torch.stack([x['train_loss'] for x in outputs]).mean()
-        tensorboard_logs = {'avg_train_loss': avg_loss}
-        return {'avg_train_loss': avg_loss, 'log': tensorboard_logs}
+        accuracy = torch.stack([x['train_accuracy'] for x in outputs]).mean()
+        TNR = torch.stack([x['TNR'] for x in outputs]).mean()
+        TPR = torch.stack([x['TPR'] for x in outputs]).mean()
+        avg_train_loss = torch.stack([x['loss'] for x in outputs]).mean()
+        
+        tensorboard_logs = {
+            'avg_train_loss': avg_train_loss, 
+            'avg_train_accuracy':accuracy, 
+            'avg_train_TNR':TNR,
+            'avg_train_TPR':TPR
+        }
+        
+        return {'avg_train_accuracy':accuracy, 'avg_train_loss': avg_train_loss, 'log': tensorboard_logs}
 
     
     def configure_optimizers(self):
         layerwise_params = {"encoder*": dict(lr=self.encoder_lr, weight_decay=self.encoder_weight_decay)}
-        
+
         # Remove weight_decay for biases and apply layerwise_params for encoder
         model_params = utils.process_model_params(self.model, layerwise_params=layerwise_params)
         
@@ -185,61 +229,114 @@ class SegModel(pl.LightningModule):
             self.testset, batch_size=self.batch_size, shuffle=False, pin_memory=True, num_workers=8
         )
 
+
+
+def plot_metrics(conf, scale='log', metric='loss'):
+    """
+    Plot the training and validation loss to same graph
+    Args:
+        scale (str) : y-axis scale. One of ('log', 'normal').
+        metrics (str) : One of the averaged metrics ('loss', 'accuracy', 'TNR', 'TPR').
+    """
     
-    # NOT WORKING YET
-    #def plot_loss(self, scale='log'):
-    #    """
-    #    Plot the training and validation loss to same graph
-    #    Args:
-    #        scale (str) : y-axis scale. One of ('log', 'normal').  
-    #    """
-    #    
-    #    assert scale in ('log', 'normal')
-    #    ldir = Path(logdir)
-    #    logdirs = {str(x).split('/')[-1]:x 
-    #               for x in ldir.glob("**/*") 
-    #               if x.is_dir() and str(x).split('/')[-1].startswith("version")}
-    #    
-    #    train_losses_all = {}
-    #    avg_valid_losses_all = {}
-    #    avg_valid_accuracies_all = {}
-    #    processed_batches_all = {}
-    #    epochs_all = {}
-    #
-    #    for key in logdirs.keys():
-    #        try:
-    #            train_losses_all[key] = []
-    #            avg_valid_losses_all[key] = []
-    #            avg_valid_accuracies_all[key] = []
-    #            processed_batches_all[key] = []
-    #            epochs_all[key] = []
-    #            summary_reader = SummaryReader(logdirs[key], types=['scalar'])
-    #            
-    #            for item in summary_reader:
-    #                processed_batches_all[key].append(item.step)
-    #                if item.tag == 'train_loss':
-    #                    train_losses_all[key].append(item.value)
-    #                elif item.tag == 'epoch':
-    #                    epochs_all[key].append(item.value)
-    #                elif item.tag == 'accuracy':
-    #                    avg_valid_accuracies_all[key].append(item.value)
-    #                elif item.tag == 'avg_val_loss':
-    #                    avg_valid_losses_all[key].append(item.value)
-    #
-    #        except:
-    #            pass
-    #        
-    #    np_train_losses = np.array(train_losses)
-    #    np_valid_losses = np.array(valid_losses)
-    #    np_epochs = np.array(epochs)
-    #
-    #    plt.rcParams["figure.figsize"] = (20,10)
-    #
-    #    df = pd.DataFrame({'training loss': train_losses, 'validation loss': valid_losses, 'epoch': epochs})
-    #    ax = plt.gca()
-    #    df.plot(kind='line',x='epoch',y='training loss',ax=ax)
-    #    df.plot(kind='line',x='epoch',y='validation loss', color='red', ax=ax)
-    #    plt.yscale(scale)
-    #    plt.show()
-        
+    assert scale in ('log', 'normal'), "y-scale not in ('log', 'normal')"
+    assert metric in ('loss', 'accuracy', 'TNR', 'TPR'), "metric not in ('loss', 'accuracy', 'TNR', 'TPR')"
+    ldir = Path(conf['logdir'])
+    logdirs = {str(x).split('/')[-1]:x 
+               for x in ldir.glob("**/*") 
+               if x.is_dir() and str(x).split('/')[-1].startswith(conf['experiment_version'])}
+
+    train_losses_all = {}
+    avg_train_losses_all = {}
+    avg_valid_losses_all = {}
+    avg_valid_accuracies_all = {}
+    avg_train_accuracies_all = {}
+    avg_valid_TNR_all = {}
+    avg_train_TNR_all = {}
+    avg_valid_TPR_all = {}
+    avg_train_TPR_all = {}
+    epochs_all = {}
+
+    for key in logdirs.keys():
+        try:
+            train_losses_all[key] = []
+            avg_train_losses_all[key] = []
+            avg_valid_losses_all[key] = []
+            avg_valid_accuracies_all[key] = []
+            avg_train_accuracies_all[key] = []
+            avg_valid_TNR_all[key] = []
+            avg_train_TNR_all[key] = []
+            avg_valid_TPR_all[key] = []
+            avg_train_TPR_all[key] = []
+            epochs_all[key] = []
+            summary_reader = SummaryReader(logdirs[key], types=['scalar'])
+
+            for item in summary_reader:
+                #print(item.tag)
+                if item.tag == 'train_loss':
+                    train_losses_all[key].append(item.value)
+                elif item.tag == 'epoch':
+                    epochs_all[key].append(item.value)
+                elif item.tag == 'avg_val_accuracy':
+                    avg_valid_accuracies_all[key].append(item.value)
+                elif item.tag == 'avg_train_accuracy':
+                    avg_train_accuracies_all[key].append(item.value)
+                elif item.tag == 'avg_val_loss':
+                    avg_valid_losses_all[key].append(item.value)
+                elif item.tag == 'avg_train_loss':
+                    avg_train_losses_all[key].append(item.value)
+                elif item.tag == 'avg_val_TNR':
+                    avg_valid_TNR_all[key].append(item.value)
+                elif item.tag == 'avg_train_TNR':
+                    avg_train_TNR_all[key].append(item.value)
+                elif item.tag == 'avg_val_TPR':
+                    avg_valid_TPR_all[key].append(item.value)
+                elif item.tag == 'avg_train_TPR':
+                    avg_train_TPR_all[key].append(item.value)
+        except:
+            pass
+
+    np_train_losses = np.array(avg_train_losses_all[conf['experiment_version']])
+    np_valid_losses = np.array(avg_valid_losses_all[conf['experiment_version']])
+    np_valid_accuracy = np.array(avg_valid_accuracies_all[conf['experiment_version']])
+    np_train_accuracy = np.array(avg_train_accuracies_all[conf['experiment_version']])
+    np_valid_TNR = np.array(avg_valid_TNR_all[conf['experiment_version']])
+    np_train_TNR = np.array(avg_train_TNR_all[conf['experiment_version']])
+    np_valid_TPR = np.array(avg_valid_TPR_all[conf['experiment_version']])
+    np_train_TPR = np.array(avg_train_TPR_all[conf['experiment_version']])
+    np_epochs = np.unique(np.array(epochs_all[conf['experiment_version']]))
+    
+    df = pd.DataFrame(
+       {
+            'training loss': np_train_losses, 
+            'validation loss': np_valid_losses,
+            'training acc':np_train_accuracy,
+            'validation acc':np_valid_accuracy,
+            'training TNR':np_train_TNR,
+            'validation TNR':np_valid_TNR,
+            'training TPR':np_train_TPR,
+            'validation TPR':np_valid_TPR,
+            'epoch': np_epochs
+       }
+    )
+
+    if metric == 'accuracy':
+        y1 = 'training acc'
+        y2 = 'validation acc'
+    elif metric == 'loss':
+        y1 = 'training loss'
+        y2 = 'validation loss'
+    elif metric == 'TPR':
+        y1 = 'training TPR'
+        y2 = 'validation TPR'
+    elif metric == 'TNR':
+        y1 = 'training TNR'
+        y2 = 'validation TNR'
+
+    plt.rcParams["figure.figsize"] = (20,10)
+    ax = plt.gca()
+    df.plot(kind='line',x='epoch', y=y1, ax=ax)
+    df.plot(kind='line',x='epoch', y=y2, color='red', ax=ax)
+    plt.yscale(scale)
+    plt.show()
    

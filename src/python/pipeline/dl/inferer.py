@@ -14,7 +14,6 @@ from skimage.filters import difference_of_gaussians
 from skimage.exposure import histogram
 from collections import OrderedDict
 from multiprocessing import Pool
-from joblib import Parallel, delayed
 
 from .post_processing import *
 from .metrics import *
