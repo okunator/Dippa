@@ -8,6 +8,7 @@ from pathlib import Path
 from sklearn.metrics import confusion_matrix
 from catalyst.contrib.nn import DiceLoss, IoULoss
 from catalyst.contrib.nn import Ralamb, RAdam, Lookahead
+from torch import nn
 from torch import optim
 from torch.utils.data import DataLoader
 from catalyst.dl import utils
@@ -18,7 +19,7 @@ from .datasets import *
 
 
 class SegModel(pl.LightningModule):
-    def __init__(self, model, criterion, conf):
+    def __init__(self, model, conf):
         """
         Pytorch Lightning abstraction for any pytorch segmentation model architecture used in this project.
         
@@ -33,7 +34,6 @@ class SegModel(pl.LightningModule):
         assert conf['dataset'] in ('kumar', 'consep', 'pannuke'), "dataset param not in ('kumar', 'consep', 'pannuke')"
         
         self.model = model
-        self.criterion = criterion
         self.dataset = conf['dataset']
         self.n_classes = conf['n_classes']
         self.batch_size = conf['batch_size']
@@ -64,7 +64,11 @@ class SegModel(pl.LightningModule):
         
         self.train_dir = self.data_dirs[self.dataset]["train_dir"]
         self.test_dir = self.data_dirs[self.dataset]["test_dir"]
-
+        
+        self.CE = nn.CrossEntropyLoss(
+            ignore_index = -100,
+            reduction = 'none'
+        )
     
     def _compute_metrics(self, yhat, y):
         pred = yhat.detach().cpu().numpy()
@@ -101,7 +105,7 @@ class SegModel(pl.LightningModule):
         y = y.long()
         
         yhat = self.forward(x)
-        loss_matrix = self.criterion(yhat, y)
+        loss_matrix = self.CE(yhat, y)
         loss = (loss_matrix * (self.edge_weight**y_weight)).mean()
         TNR, TPR, accuracy = self._compute_metrics(yhat, y)
 
@@ -131,7 +135,7 @@ class SegModel(pl.LightningModule):
         
         # Compute loss
         yhat = self.forward(x)
-        loss_matrix = self.criterion(yhat, y)        
+        loss_matrix = self.CE(yhat, y)        
         loss = (loss_matrix * (self.edge_weight**y_weight)).mean()
         
         # Compute confusion matrix for accuracy

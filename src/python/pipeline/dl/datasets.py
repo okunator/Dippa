@@ -76,33 +76,33 @@ class BinarySegmentationDataset(Dataset):
     def __len__(self): return self.nitems
     
     
-def visualize_batch(loader):
-    """
-    Visualize a batch of a datloader
-    Args:
-        loader (DataLoader) : torch DataLoader obj that contains custom DataSet object defined above
-    """
-    assert isinstance(loader, DataLoader)
-    
-    batch = next(iter(loader))
-
-    # [6 x 3 x patch_size x patch_size]
-    image_b = batch['image']
-    # [batch_size x patch_size x patch_size]
-    mask_b = batch['mask']
-    # [batch_size x patch_size x patch_size]
-    contour_b = batch['contour']
-    # [batch_size x patch_sizex patch_size]
-    wmap_b = batch['mask_weight']
-
-    fig, axes = plt.subplots(2, 3, figsize=(30, 20))
-    for i, ax in enumerate(axes.flat):
-        plt.subplot(2, 3, i+1)
-        plt.imshow(image_b[i, ...].permute(1, 2, 0), interpolation='none')
-        plt.imshow(mask_b[i, ...], interpolation='none', alpha=0.3)
-        plt.imshow(contour_b[i, ...], interpolation='none', alpha=0.3, cmap="jet")
-        plt.imshow(wmap_b[i, ...], interpolation='none', alpha=0.3, cmap="magma")
-        plt.tight_layout(w_pad=4, h_pad=4)
+# def visualize_batch(loader):
+#     """
+#     Visualize a batch of a datloader
+#     Args:
+#         loader (DataLoader) : torch DataLoader obj that contains custom DataSet object defined above
+#     """
+#     assert isinstance(loader, DataLoader)
+#     
+#     batch = next(iter(loader))
+# 
+#     # [6 x 3 x patch_size x patch_size]
+#     image_b = batch['image']
+#     # [batch_size x patch_size x patch_size]
+#     mask_b = batch['mask']
+#     # [batch_size x patch_size x patch_size]
+#     contour_b = batch['contour']
+#     # [batch_size x patch_sizex patch_size]
+#     wmap_b = batch['mask_weight']
+# 
+#     fig, axes = plt.subplots(2, 3, figsize=(30, 20))
+#     for i, ax in enumerate(axes.flat):
+#         plt.subplot(2, 3, i+1)
+#         plt.imshow(image_b[i, ...].permute(1, 2, 0), interpolation='none')
+#         plt.imshow(mask_b[i, ...], interpolation='none', alpha=0.3)
+#         plt.imshow(contour_b[i, ...], interpolation='none', alpha=0.3, cmap="jet")
+#         plt.imshow(wmap_b[i, ...], interpolation='none', alpha=0.3, cmap="magma")
+#         plt.tight_layout(w_pad=4, h_pad=4)
     
 
     
