@@ -20,32 +20,26 @@ from .metrics import *
 
 
 class Inferer(object):
-    def __init__(self, batch_size, patch_size, model, n_classes, 
-                 smoothen=True, dataset='kumar', verbose=True):
+    def __init__(self, model, conf, verbose=True):
         """
         Inferer for any of the models that are trained with lightning framework defined in lightning_model.py
         inference can be done for these datasets: Kumar, CoNSep and PanNuke dataset. Datasets need dto be in right format.
         Documentation in progress...
         
         Args: 
-            batch_size (int) : batch_size used in the DataLoader when training
-            patch_size (int) : The size (width x height) of an image patch that goes through the network. Usually for U-net family 
-                               models this is a multiple of 32. For now we have used 224x224 for smp models.
             model (SegModel) : SegModel that has been used in training. See: Train_lightning.ipynb for example how to define it
-            n_classes (int)  : number of classes the model outputs. For binary segmentation n_classes = 2 (background vs. nuclei)
-            smoothen (bool)  : wether to use gaussian differences to smooth out the tiles of predictions. (Helpful in downstream)
-            dataset (str)    : one of ('kumar', 'consep', 'pannuke'). These are 3 benchmarking datasets for this project
+            conf (OmegaConf) : the same config that wasused for training a network
             verbose (bool)   : wether or not to print the progress of running inference
         """
         
-        assert dataset in ('kumar', 'consep', 'pannuke'), "dataset param not in ('kumar', 'consep', 'pannuke')"
+        assert conf['dataset'] in ('kumar', 'consep', 'pannuke'), "dataset param not in ('kumar', 'consep', 'pannuke')"
         
-        self.patch_size = patch_size
-        self.batch_size = batch_size
         self.model = model
-        self.n_classes = n_classes
-        self.dataset = dataset
-        self.smoothen = smoothen
+        self.dataset = conf['dataset']
+        self.patch_size = conf['patch_size']
+        self.batch_size = conf['batch_size']
+        self.n_classes = conf['n_classes']
+        self.smoothen = conf['inference_args']['smoothen']
         self.verbose = verbose
         self.stride_size = self.patch_size//2
         

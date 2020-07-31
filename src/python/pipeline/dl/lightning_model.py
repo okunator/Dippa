@@ -18,7 +18,7 @@ from .datasets import *
 
 
 class SegModel(pl.LightningModule):
-    def __init__(self, model, criterion, hparams, dataset='kumar'):
+    def __init__(self, model, criterion, conf):
         """
         Pytorch Lightning abstraction for any pytorch segmentation model architecture used in this project.
         
@@ -26,25 +26,25 @@ class SegModel(pl.LightningModule):
             model (nn.Module) : Pytorch model specification. Can be from smp, toolbelt, or a custom model. 
                                 ttatch wrappers work also. Basically any model that inherits nn.Module shld work
             criterion (nn.Module) : Pytorch loss function. 
-            haparams (dict) : hyperparameters for every component of the training process.
+            conf (OmegaConf) : Config data for training/inference.
         """
         super(SegModel, self).__init__()
         
-        assert dataset in ('kumar', 'consep', 'pannuke'), "dataset param not in ('kumar', 'consep', 'pannuke')"
+        assert conf['dataset'] in ('kumar', 'consep', 'pannuke'), "dataset param not in ('kumar', 'consep', 'pannuke')"
         
-        self.dataset = dataset
         self.model = model
         self.criterion = criterion
-        self.edge_weight = hparams['loss_args']['edge_weight']
-        self.batch_size = hparams['dataloader_args']['batch_size']
-        self.n_classes = hparams['dataloader_args']['n_classes']
-        self.lr = hparams['optimizer_args']['lr']
-        self.encoder_lr = hparams['optimizer_args']['encoder_lr']
-        self.weight_decay = hparams['optimizer_args']['weight_decay']
-        self.encoder_weight_decay = hparams['optimizer_args']['encoder_weight_decay']
-        self.factor = hparams['scheduler_args']['factor']
-        self.patience = hparams['scheduler_args']['patience']
-        self.save_hyperparameters(hparams)
+        self.dataset = conf['dataset']
+        self.n_classes = conf['n_classes']
+        self.batch_size = conf['batch_size']
+        self.edge_weight = conf['loss_args']['edge_weight']   
+        self.lr = conf['optimizer_args']['lr']
+        self.encoder_lr = conf['optimizer_args']['encoder_lr']
+        self.weight_decay = conf['optimizer_args']['weight_decay']
+        self.encoder_weight_decay = conf['optimizer_args']['encoder_weight_decay']
+        self.factor = conf['scheduler_args']['factor']
+        self.patience = conf['scheduler_args']['patience']
+        self.save_hyperparameters(conf)
         
         # HDF5 database directories
         self.data_dirs = {
@@ -239,12 +239,14 @@ def plot_metrics(conf, scale='log', metric='loss'):
         metrics (str) : One of the averaged metrics ('loss', 'accuracy', 'TNR', 'TPR').
     """
     
-    assert scale in ('log', 'normal'), "y-scale not in ('log', 'normal')"
+    assert scale in ('log', 'linear'), "y-scale not in ('log', 'linear')"
     assert metric in ('loss', 'accuracy', 'TNR', 'TPR'), "metric not in ('loss', 'accuracy', 'TNR', 'TPR')"
-    ldir = Path(conf['logdir'])
-    logdirs = {str(x).split('/')[-1]:x 
+    ldir = Path(conf['experiment_root_dir'])
+    
+    folder = 'version_' + conf['experiment_version']
+    logdirs = {folder:x 
                for x in ldir.glob("**/*") 
-               if x.is_dir() and str(x).split('/')[-1].startswith(conf['experiment_version'])}
+               if x.is_dir() and str(x).split('/')[-1].startswith('tf')}
 
     train_losses_all = {}
     avg_train_losses_all = {}
@@ -296,15 +298,15 @@ def plot_metrics(conf, scale='log', metric='loss'):
         except:
             pass
 
-    np_train_losses = np.array(avg_train_losses_all[conf['experiment_version']])
-    np_valid_losses = np.array(avg_valid_losses_all[conf['experiment_version']])
-    np_valid_accuracy = np.array(avg_valid_accuracies_all[conf['experiment_version']])
-    np_train_accuracy = np.array(avg_train_accuracies_all[conf['experiment_version']])
-    np_valid_TNR = np.array(avg_valid_TNR_all[conf['experiment_version']])
-    np_train_TNR = np.array(avg_train_TNR_all[conf['experiment_version']])
-    np_valid_TPR = np.array(avg_valid_TPR_all[conf['experiment_version']])
-    np_train_TPR = np.array(avg_train_TPR_all[conf['experiment_version']])
-    np_epochs = np.unique(np.array(epochs_all[conf['experiment_version']]))
+    np_train_losses = np.array(avg_train_losses_all[folder])
+    np_valid_losses = np.array(avg_valid_losses_all[folder])
+    np_valid_accuracy = np.array(avg_valid_accuracies_all[folder])
+    np_train_accuracy = np.array(avg_train_accuracies_all[folder])
+    np_valid_TNR = np.array(avg_valid_TNR_all[folder])
+    np_train_TNR = np.array(avg_train_TNR_all[folder])
+    np_valid_TPR = np.array(avg_valid_TPR_all[folder])
+    np_train_TPR = np.array(avg_train_TPR_all[folder])
+    np_epochs = np.unique(np.array(epochs_all[folder]))
     
     df = pd.DataFrame(
        {
@@ -339,4 +341,5 @@ def plot_metrics(conf, scale='log', metric='loss'):
     df.plot(kind='line',x='epoch', y=y2, color='red', ax=ax)
     plt.yscale(scale)
     plt.show()
-   
+
+

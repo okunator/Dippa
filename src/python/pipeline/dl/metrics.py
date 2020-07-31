@@ -10,8 +10,7 @@ from scipy import ndimage as ndi
 from scipy.optimize import linear_sum_assignment
 from skimage.metrics import variation_of_information
 
-# AJI This scores each predicted nuclei separately with IoU on the corresponding ground truth nuclei
-# This is copied from here: https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
+# Ported from here: https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
 def AJI(true, pred):
     """
     AJI version distributed by MoNuSeg, has no permutation problem but suffered from 
@@ -40,7 +39,6 @@ def AJI(true, pred):
                                len(pred_id_list) -1], dtype=np.float64)
 
 
-    # single nuclei instance mask from the ground truth 
     for true_id in true_id_list[1:]: # 0-th is background
         t_mask = true_masks[true_id]
 
@@ -62,11 +60,8 @@ def AJI(true, pred):
             FN = len(subtraction[subtraction == 1])
             total = FP + TP + FN # everything except background
 
-            # Set the intersects and unions in the pairwise matrices
-            # to the right place
             pairwise_inter[true_id-1, pred_id-1] = TP
             pairwise_union[true_id-1, pred_id-1] = total
-            # pairwise_union[true_id-1, pred_id-1] = add.sum()-TP # same way as in the link
 
     # Calculate the pairwise (matching nuclei pair) IoU    
     pairwise_iou = pairwise_inter / (pairwise_union + 1.0e-6)
@@ -89,11 +84,9 @@ def AJI(true, pred):
 
     # Calculate the overall intersection and union on these matching nucleis
     # NOTE: We have excluded the predictions of nuclei instances that are FALSE POSITIVES
-    # This is because the ones without intersection were excluded 
     overall_inter = (pairwise_inter[paired_true, paired_pred]).sum()
     overall_union = (pairwise_union[paired_true, paired_pred]).sum()
 
-    # index to instance ID that start from 1
     paired_true = (list(paired_true + 1))
     paired_pred = (list(paired_pred + 1))
 
@@ -102,7 +95,6 @@ def AJI(true, pred):
     unpaired_true = np.array([idx for idx in true_id_list[1:] if idx not in paired_true])
     unpaired_pred = np.array([idx for idx in pred_id_list[1:] if idx not in paired_pred])
 
-    # Loop and add the pixels corresponding to each index to the union 
     for true_id in unpaired_true:
         overall_union += true_masks[true_id].sum()
     for pred_id in unpaired_pred:
@@ -114,7 +106,7 @@ def AJI(true, pred):
     return aji_score
 
 
-# copied from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
+# ported from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
 def AJI_plus(true, pred):
     """
     AJI+, an AJI version with maximal unique pairing to obtain overall intersecion.
@@ -174,11 +166,6 @@ def AJI_plus(true, pred):
     paired_iou = pairwise_iou[paired_true, paired_pred]
     # now select all those paired with iou != 0.0 i.e have intersection
     
-    #####################################################################
-    #####################################################################
-    #####################################################################
-    # continue
-    
     paired_true = paired_true[paired_iou > 0.0]
     paired_pred = paired_pred[paired_iou > 0.0]
     paired_inter = pairwise_inter[paired_true, paired_pred]
@@ -200,8 +187,7 @@ def AJI_plus(true, pred):
     return aji_score
 
 
-# copied from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
-# This uses pretty much the same procedure as above ones but here we just calculate the DICE for each nuclei instance
+# ported from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
 def DICE2(true, pred):
     """
     Ensemble dice.
@@ -240,7 +226,7 @@ def DICE2(true, pred):
 
     return 2 * overall_inter / overall_total
 
-# copied from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
+# ported from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
 def PQ(true, pred, match_iou=0.5):
     """
     `match_iou` is the IoU threshold level to determine the pairing between
@@ -262,9 +248,6 @@ def PQ(true, pred, match_iou=0.5):
                     
     """
     assert match_iou >= 0.0, "Cant' be negative"
-    
-    # true = np.copy(true)
-    # pred = np.copy(pred)
     
     true_id_list = list(np.unique(true))
     pred_id_list = list(np.unique(pred))
