@@ -31,7 +31,7 @@ class SegModel(pl.LightningModule):
         """
         super(SegModel, self).__init__()
         
-        assert conf['dataset'] in ('kumar', 'consep', 'pannuke'), "dataset param not in ('kumar', 'consep', 'pannuke')"
+        assert conf['dataset'] in ('kumar', 'consep', 'pannuke')
         
         self.model = model
         self.dataset = conf['dataset']
@@ -49,16 +49,16 @@ class SegModel(pl.LightningModule):
         # HDF5 database directories
         self.data_dirs = {
             'kumar':{
-                'test_dir': "../../../../databases/Kumar/patch_224/test_Kumar.pytable",
-                'train_dir': "../../../../databases//Kumar/patch_224/train_Kumar.pytable"
+                'test_dir': "../../../../databases/Kumar/patch_256/test_Kumar.pytable",
+                'train_dir': "../../../../databases/Kumar/patch_256/train_Kumar.pytable"
             },
             'consep':{
-                'test_dir': "../../../../databases/ConSeP/patch_224/test_Kumar.pytable",
-                'train_dir': "../../../../databases/ConSeP/patch_224/train_Kumar.pytable"
+                'test_dir': "../../../../databases/ConSeP/patch_256/test_Kumar.pytable",
+                'train_dir': "../../../../databases/ConSeP/patch_256/train_Kumar.pytable"
             },
             'pannuke': {
-                'test_dir': "../../../../databases/PanNuke/patch_224/test_Kumar.pytable",
-                'train_dir': "../../../../databases/PanNuke/patch_224/train_Kumar.pytable"
+                'test_dir': "../../../../databases/PanNuke/patch_256/test_Kumar.pytable",
+                'train_dir': "../../../../databases/PanNuke/patch_256/train_Kumar.pytable"
             }
         }
         

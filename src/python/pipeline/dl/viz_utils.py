@@ -17,7 +17,8 @@ def random_colors(N, bright=True):
 
     return colors
 
-
+# ported from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
+# minor mods
 def draw_contours(mask, image, fill_contours=False, thickness=2):
     # Find contours for rgb mask to superimpose it the original image
     # mask needs to be instance labelled
@@ -40,7 +41,9 @@ def draw_contours(mask, image, fill_contours=False, thickness=2):
         
         inst_map_crop = inst_map[y1:y2, x1:x2]
         inst_bg_crop = bg[y1:y2, x1:x2]
-        contours, hierarchy = cv2.findContours(inst_map_crop, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(
+            inst_map_crop, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+        )
         
         if fill_contours:
             contoured_rgb = cv2.drawContours(

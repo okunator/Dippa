@@ -22,17 +22,20 @@ from .metrics import *
 class Inferer(object):
     def __init__(self, model, conf, verbose=True):
         """
-        Inferer for any of the models that are trained with lightning framework defined in lightning_model.py
-        inference can be done for these datasets: Kumar, CoNSep and PanNuke dataset. Datasets need dto be in right format.
+        Inferer for any of the models that are trained with lightning framework 
+        defined in lightning_model.py
+        
         Documentation in progress...
         
         Args: 
-            model (SegModel) : SegModel that has been used in training. See: Train_lightning.ipynb for example how to define it
+            model (SegModel) : SegModel that has been used in training.
+                               See: Train_lightning.ipynb for example how to define it
+                               
             conf (OmegaConf) : the same config that wasused for training a network
             verbose (bool)   : wether or not to print the progress of running inference
         """
         
-        assert conf['dataset'] in ('kumar', 'consep', 'pannuke'), "dataset param not in ('kumar', 'consep', 'pannuke')"
+        assert conf['dataset'] in ('kumar', 'consep', 'pannuke')
         
         self.model = model
         self.dataset = conf['dataset']
@@ -90,8 +93,8 @@ class Inferer(object):
     def _smoothen_batches(self, output_batch):
         """
         Use differences of gaussians from skimage to smoothen out prediction batches.
-        Effectively removes checkerboard effect after the tiles are merged and eases thresholding
-        from the prediction histogram.
+        Effectively removes checkerboard effect after the tiles are merged and eases
+        thresholding from the prediction histogram.
         """
         for i in range(output_batch.shape[0]):
             for c in range(self.n_classes):
@@ -188,8 +191,8 @@ class Inferer(object):
     
     def run(self):
         """
-        Do inference on the given dataset, with the pytorch lightining model that has been used for training.
-        See lightning_model.py and Train_lightning.ipynb.
+        Do inference on the given dataset, with the pytorch lightining model that 
+        has been used for training. See lightning_model.py and Train_lightning.ipynb.
         """
         
         # Put SegModel to gpu
@@ -262,8 +265,8 @@ class Inferer(object):
             
     def save_outputs(self, output_dir):
         """
-        Save predictions to .mat files (python dictionary). Key for accessing after reading one file
-        is 'pred_map'
+        Save predictions to .mat files (python dictionary). Key for accessing after
+        reading one file is 'pred_map':
         
         f = scipy.io.loadmat(file)
         f = f['pred_map']
@@ -308,7 +311,8 @@ class Inferer(object):
             axes[i][2].axis('off')
             
     
-    def _post_process_pipeline(self, prob_map, thresh=2, postproc_func=inv_dist_watershed):
+    def _post_process_pipeline(self, prob_map, thresh=2, 
+                               postproc_func=inv_dist_watershed):
         
         if self.smoothen:
             # Find the steepest drop in the histogram
@@ -344,8 +348,8 @@ class Inferer(object):
             "PQ": pq['pq'], # panoptic quality
             "SQ": pq['sq'], # segmentation quality
             "DQ": pq['dq'], # Detection quality i.e. F1-score
-            "inst Sensitivity": pq['sensitivity'], # Sensitivity in detecting matching nucleis
-            "inst Precision": pq['precision'],  # Specificity in detecting matching nucleis
+            "inst Sensitivity": pq['sensitivity'],
+            "inst Precision": pq['precision'],
             "splits":splits,
             "merges":merges
         }
@@ -359,7 +363,8 @@ class Inferer(object):
         assert len(self.outputs) != 0, "No predictions found"
         self.model.cpu()
         
-        preds = [self.outputs[key] for key in self.outputs.keys() if key.endswith("nuc_map")]
+        preds = [self.outputs[key] for key in self.outputs.keys() 
+                 if key.endswith("nuc_map")]
         
         segs = None
         with Pool() as pool:
@@ -378,7 +383,7 @@ class Inferer(object):
         assert any([key for key in self.outputs.keys() if key.endswith("inst_map")]), "Run post_processing first!"
         
         inst_maps = [self.outputs[key] for key in self.outputs.keys() if key.endswith("inst_map")]
-        gts = [scipy.io.loadmat(f)['inst_map'].astype("uint32") for f in self.gt_masks]
+        gts = [scipy.io.loadmat(f)['inst_map'].astype("uint16") for f in self.gt_masks]
         params_list = list(zip(gts, inst_maps))
         
         metrics = None
