@@ -19,7 +19,7 @@ from .post_processing import *
 from .metrics import *
 
 
-class Inferer(object):
+class Inferer:
     def __init__(self, model, conf, verbose=True):
         """
         Inferer for any of the models that are trained with lightning framework 
@@ -35,36 +35,35 @@ class Inferer(object):
             verbose (bool)   : wether or not to print the progress of running inference
         """
         
-        assert conf['dataset'] in ('kumar', 'consep', 'pannuke')
+        assert conf["dataset"] in ("kumar", "consep", "pannuke")
         
         self.model = model
-        self.dataset = conf['dataset']
-        self.patch_size = conf['patch_size']
-        self.batch_size = conf['batch_size']
-        self.n_classes = conf['n_classes']
-        self.smoothen = conf['inference_args']['smoothen']
+        self.dataset = conf["dataset"]
+        self.patch_size = conf["patch_size"]
+        self.batch_size = conf["batch_size"]
+        self.smoothen = conf["inference_args"]["smoothen"]
         self.verbose = verbose
         self.stride_size = self.patch_size//2
         
         # Dataset directories
         self.data_dirs = {
-            'kumar':{
-                'kumar_im':"../../../../datasets/Nucleisegmentation-Kumar/test/Images",
-                'kumar_gt':"../../../../datasets/Nucleisegmentation-Kumar/test/Labels",
-                'gt_sfx':'/*.mat',
-                'im_sfx':'/*.tif'
+            "kumar":{
+                "kumar_im":"../../../../datasets/Nucleisegmentation-Kumar/test/Images",
+                "kumar_gt":"../../../../datasets/Nucleisegmentation-Kumar/test/Labels",
+                "gt_sfx":"/*.mat",
+                "im_sfx":"/*.tif"
             },
-            'consep':{
-                'consep_im':"../../../../datasets/Nucleisegmentation-CoNSeP/test/Images",
-                'consep_gt':"../../../../datasets/Nucleisegmentation-CoNSeP/test/Labels",
-                'gt_sfx':'/*.mat',
-                'im_sfx':'/*.png'
+            "consep":{
+                "consep_im":"../../../../datasets/Nucleisegmentation-CoNSeP/test/Images",
+                "consep_gt":"../../../../datasets/Nucleisegmentation-CoNSeP/test/Labels",
+                "gt_sfx":"/*.mat",
+                "im_sfx":"/*.png"
             },
-            'pannuke': {
-                'pannuke_im':"../../../../datasets/Nucleisegmentation-PanNuke/test/Images",
-                'pannuke_gt':"../../../../datasets/Nucleisegmentation-PanNuke/test/Labels",
-                'gt_sfx':'/*.mat',
-                'im_sfx':'/*.png'
+            "pannuke": {
+                "pannuke_im":"../../../../datasets/Nucleisegmentation-PanNuke/test/Images",
+                "pannuke_gt":"../../../../datasets/Nucleisegmentation-PanNuke/test/Labels",
+                "gt_sfx":"/*.mat",
+                "im_sfx":"/*.png"
             }
         }
         
@@ -76,6 +75,7 @@ class Inferer(object):
         self.files = sorted(glob.glob(self.dir_im + im_sfx))
         self.gt_masks = sorted(glob.glob(self.dir_gt + gt_sfx))
         self.n_files = len(self.files)
+        self.n_classes = len(self.classes)
 
         self.outputs = OrderedDict()
         self.metrics = OrderedDict()
@@ -139,9 +139,9 @@ class Inferer(object):
             # shape for pytorch and predict
             batch_d = torch.from_numpy(batch.transpose(0, 3, 1, 2))
             if torch.cuda.is_available():
-                batch_d = batch_d.type('torch.cuda.FloatTensor')
+                batch_d = batch_d.type("torch.cuda.FloatTensor")
             else:
-                batch_d = batch_d.type('torch.FloatTensor')
+                batch_d = batch_d.type("torch.FloatTensor")
             
             pred_batch = self.model(batch_d) 
             pred_batch = pred_batch.detach().cpu().numpy()
@@ -186,7 +186,7 @@ class Inferer(object):
     
     
     def _get_fn(self, path):
-        return path.split('/')[-1][:-4]
+        return path.split("/")[-1][:-4]
     
     
     def run(self):
@@ -200,7 +200,7 @@ class Inferer(object):
         self.model.model.eval()
         
         if len(self.outputs) > 0:
-            print('Clearing previous predictions')
+            print("Clearing previous predictions")
             clear_predictions()
                     
         for i, path in enumerate(self.files):
@@ -234,17 +234,17 @@ class Inferer(object):
         for i, path in enumerate(self.files):
             fn = self._get_fn(path)
             gt = scipy.io.loadmat(self.gt_masks[i])
-            gt = gt['inst_map']
+            gt = gt["inst_map"]
             nuc_map = self.outputs[f"{fn}_nuc_map"]
             bg_map = self.outputs[f"{fn}_bg_map"]
-            axes[i][0].imshow(nuc_map, interpolation='none')
-            axes[i][0].axis('off')
+            axes[i][0].imshow(nuc_map, interpolation="none")
+            axes[i][0].axis("off")
 
-            axes[i][1].imshow(bg_map, interpolation='none')
-            axes[i][1].axis('off')
+            axes[i][1].imshow(bg_map, interpolation="none")
+            axes[i][1].axis("off")
 
-            axes[i][2].imshow(gt, interpolation='none')
-            axes[i][2].axis('off')
+            axes[i][2].imshow(gt, interpolation="none")
+            axes[i][2].axis("off")
             
             
     def plot_histograms(self):
@@ -266,10 +266,10 @@ class Inferer(object):
     def save_outputs(self, output_dir):
         """
         Save predictions to .mat files (python dictionary). Key for accessing after
-        reading one file is 'pred_map':
+        reading one file is "pred_map":
         
         f = scipy.io.loadmat(file)
-        f = f['pred_map']
+        f = f["pred_map"]
         
         Args:
             output_dir (str) : path to the directory where predictions are saved.
@@ -279,10 +279,10 @@ class Inferer(object):
         
         for i, path in enumerate(self.files):
             fn = self._get_fn(path)
-            new_fn = fn + '_pred_map.mat'
-            print('saving: ', fn)
+            new_fn = fn + "_pred_map.mat"
+            print("saving: ", fn)
             nuc_map = self.outputs[f"{fn}_nuc_map"]
-            # scipy.io.savemat(new_fn, mdict={'pred_map': nuc_map})
+            # scipy.io.savemat(new_fn, mdict={"pred_map": nuc_map})
             
             
     def plot_segmentations(self):
@@ -297,18 +297,18 @@ class Inferer(object):
         for i, path in enumerate(self.files):
             fn = self._get_fn(path)
             gt = scipy.io.loadmat(self.gt_masks[i])
-            gt = gt['inst_map']
+            gt = gt["inst_map"]
             inst_map = self.outputs[f"{fn}_inst_map"]
             nuc_map = self.outputs[f"{fn}_nuc_map"]
             
-            axes[i][0].imshow(nuc_map, interpolation='none')
-            axes[i][0].axis('off')
+            axes[i][0].imshow(nuc_map, interpolation="none")
+            axes[i][0].axis("off")
             
-            axes[i][1].imshow(inst_map, interpolation='none')
-            axes[i][1].axis('off')
+            axes[i][1].imshow(inst_map, interpolation="none")
+            axes[i][1].axis("off")
 
-            axes[i][2].imshow(gt, interpolation='none')
-            axes[i][2].axis('off')
+            axes[i][2].imshow(gt, interpolation="none")
+            axes[i][2].axis("off")
             
     
     def _post_process_pipeline(self, prob_map, thresh=2, 
@@ -342,14 +342,14 @@ class Inferer(object):
         splits, merges = split_and_merge(true, pred)
         
         return {
-            'AJI': aji, 
-            'AJI plus': aji_p, 
+            "AJI": aji, 
+            "AJI plus": aji_p, 
             "DICE2": dice2, 
-            "PQ": pq['pq'], # panoptic quality
-            "SQ": pq['sq'], # segmentation quality
-            "DQ": pq['dq'], # Detection quality i.e. F1-score
-            "inst Sensitivity": pq['sensitivity'],
-            "inst Precision": pq['precision'],
+            "PQ": pq["pq"], # panoptic quality
+            "SQ": pq["sq"], # segmentation quality
+            "DQ": pq["dq"], # Detection quality i.e. F1-score
+            "inst Sensitivity": pq["sensitivity"],
+            "inst Precision": pq["precision"],
             "splits":splits,
             "merges":merges
         }
@@ -383,7 +383,7 @@ class Inferer(object):
         assert any([key for key in self.outputs.keys() if key.endswith("inst_map")]), "Run post_processing first!"
         
         inst_maps = [self.outputs[key] for key in self.outputs.keys() if key.endswith("inst_map")]
-        gts = [scipy.io.loadmat(f)['inst_map'].astype("uint16") for f in self.gt_masks]
+        gts = [scipy.io.loadmat(f)["inst_map"].astype("uint16") for f in self.gt_masks]
         params_list = list(zip(gts, inst_maps))
         
         metrics = None
@@ -396,7 +396,7 @@ class Inferer(object):
             
         # Create pandas df of the result metrics
         score_df = pd.DataFrame(self.metrics).transpose()
-        score_df.loc['averages for the test set'] = score_df.mean(axis=0)
+        score_df.loc["averages for the test set"] = score_df.mean(axis=0)
         return score_df
         
     
