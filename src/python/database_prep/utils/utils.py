@@ -1,3 +1,4 @@
+import math
 import tables
 import cv2
 import numpy as np
@@ -7,6 +8,135 @@ import matplotlib.pyplot as plt
 import sklearn.feature_extraction.image
 from pathlib import Path
 from sklearn.model_selection import train_test_split
+
+# Patch Extractor from hover-net repo
+# https://github.com/vqdang/hover_net/blob/master/src/misc/patch_extractor.py
+#####
+class PatchExtractor(object):
+    """
+    Extractor to generate patches with or without padding.
+    Turn on debug mode to see how it is done.
+    Args:
+        x         : input image, should be of shape HWC
+        win_size  : a tuple of (h, w)
+        step_size : a tuple of (h, w)
+        debug     : flag to see how it is done
+    Return:
+        a list of sub patches, each patch has dtype same as x
+    Examples:
+        >>> xtractor = PatchExtractor((450, 450), (120, 120))
+        >>> img = np.full([1200, 1200, 3], 255, np.uint8)
+        >>> patches = xtractor.extract(img, 'mirror')
+    """
+    def __init__(self, win_size, step_size, debug=False):
+
+        self.patch_type = 'mirror'
+        self.win_size  = win_size
+        self.step_size = step_size
+        self.debug   = debug
+        self.counter = 0
+
+    def __get_patch(self, x, ptx):
+        pty = (ptx[0]+self.win_size[0],
+               ptx[1]+self.win_size[1])
+        win = x[ptx[0]:pty[0], 
+                ptx[1]:pty[1]]
+        
+        assert win.shape[0] == self.win_size[0] and \
+               win.shape[1] == self.win_size[1],    \
+               '[BUG] Incorrect Patch Size {0}'.format(win.shape)
+        
+        return win
+    
+    def __extract_valid(self, x):
+        """
+        Extracted patches without padding, only work in case win_size > step_size
+        
+        Note: to deal with the remaining portions which are at the boundary a.k.a
+        those which do not fit when slide left->right, top->bottom), we flip 
+        the sliding direction then extract 1 patch starting from right / bottom edge. 
+        There will be 1 additional patch extracted at the bottom-right corner
+        Args:
+            x         : input image, should be of shape HWC
+            win_size  : a tuple of (h, w)
+            step_size : a tuple of (h, w)
+        Return:
+            a list of sub patches, each patch is same dtype as x
+        """
+
+        im_h = x.shape[0] 
+        im_w = x.shape[1]
+
+        def extract_infos(length, win_size, step_size):
+            flag = (length - win_size) % step_size != 0
+            last_step = math.floor((length - win_size) / step_size)
+            last_step = (last_step + 1) * step_size
+            return flag, last_step
+
+        h_flag, h_last = extract_infos(im_h, self.win_size[0], self.step_size[0])
+        w_flag, w_last = extract_infos(im_w, self.win_size[1], self.step_size[1])    
+
+        sub_patches = []
+        #### Deal with valid block
+        for row in range(0, h_last, self.step_size[0]):
+            for col in range(0, w_last, self.step_size[1]):
+                win = self.__get_patch(x, (row, col))
+                sub_patches.append(win)  
+        #### Deal with edge case
+        if h_flag:
+            row = im_h - self.win_size[0]
+            for col in range(0, w_last, self.step_size[1]):
+                win = self.__get_patch(x, (row, col))
+                sub_patches.append(win)  
+        if w_flag:
+            col = im_w - self.win_size[1]
+            for row in range(0, h_last, self.step_size[0]):
+                win = self.__get_patch(x, (row, col))
+                sub_patches.append(win)  
+        if h_flag and w_flag:
+            ptx = (im_h - self.win_size[0], im_w - self.win_size[1])
+            win = self.__get_patch(x, ptx)
+            sub_patches.append(win)  
+        return np.asarray(sub_patches)
+    
+    def __extract_mirror(self, x):
+        """
+        Extracted patches with mirror padding the boundary such that the 
+        central region of each patch is always within the orginal (non-padded)
+        image while all patches' central region cover the whole orginal image
+        Args:
+            x         : input image, should be of shape HWC
+            win_size  : a tuple of (h, w)
+            step_size : a tuple of (h, w)
+        Return:
+            a list of sub patches, each patch is same dtype as x
+        """
+
+        diff_h = self.win_size[0] - self.step_size[0]
+        padt = diff_h // 2
+        padb = diff_h - padt
+
+        diff_w = self.win_size[1] - self.step_size[1]
+        padl = diff_w // 2
+        padr = diff_w - padl
+
+        pad_type = 'constant' if self.debug else 'reflect'
+        x = np.lib.pad(x, ((padt, padb), (padl, padr), (0, 0)), pad_type)
+        sub_patches = self.__extract_valid(x)
+        return sub_patches
+
+    def extract(self, x, patch_type):
+        patch_type = patch_type.lower()
+        self.patch_type = patch_type
+        if patch_type == 'valid':
+            return self.__extract_valid(x)
+        elif patch_type == 'mirror':
+            return self.__extract_mirror(x)
+        else:
+            assert False, 'Unknown Patch Type [%s]' % patch_type
+        return
+#####
+
 
 class DB_writer:
     """
@@ -19,6 +149,7 @@ class DB_writer:
         self.verbose = verbose
         self.dataset = conf["dataset"]
         self.patch_size = conf["patch_size"]
+        self.stride_size = conf['stride_size']
         self.classes = conf["binary_classes"]
         self.phases = conf["phases"]
         self.data_dirs = conf['data_dirs']
@@ -47,10 +178,12 @@ class DB_writer:
             "test":{"img":test_imgs, "mask":test_masks},
         }
         
-        self.stride_size = self.patch_size//2
-        self.mirror_pad_size = self.patch_size//2
+        # self.mirror_pad_size = self.patch_size//2
         self.n_classes = len(self.classes)
-    
+        self.xtractor = PatchExtractor(
+            (self.patch_size, self.patch_size),
+            (self.stride_size,self.stride_size)
+        )
         
     def _get_suffix(self, directory):
         assert all([file.suffix for file in directory.iterdir()]), "All files should be in same format"
@@ -81,7 +214,16 @@ class DB_writer:
     
     def _split_training_set(self, train_imgs, train_masks, seed=42, size=0.2):
         """
-        Split training set into training and validation set (correct way to train).
+        Split training set into trainingagen(self, batch_size, mode='train', view=False):
+        if mode == 'train':
+            augmentors = self.get_train_augmentors(
+                                            self.train_input_shape,
+                                            self.train_mask_shape,
+                                            view)
+            data_files = get_files(self.train_dir, self.data_ext)
+            data_generator = loader.train_generator
+            nr_procs = self.nr_procs_train
+        else: and validation set (correct way to train).
         Not needed for pan-Nuke (has 3 folds). This might affect training accuracy
         if training set is small. 
         """
@@ -100,6 +242,7 @@ class DB_writer:
         
     
     def _extract_patches(self, io):
+        # OLD, USE HOVERNET PATCH EXTRACTOR INSTEAD
         # add reflect padding 
         pad = (self.mirror_pad_size, self.mirror_pad_size)
         io = np.pad(io, [pad, pad, (0, 0)], mode="reflect")
@@ -166,7 +309,8 @@ class DB_writer:
             if self.dataset == "pannuke":
                 patches = io[None, ...]
             else:
-                patches = self._extract_patches(io)
+                # patches = self._extract_patches(io)
+                patches = self.xtractor.extract(io, 'mirror')
         
             storage["img"].append(patches)
         
@@ -184,7 +328,8 @@ class DB_writer:
             if self.dataset == "pannuke":
                 patches = io[None, :, :, 0]
             else:
-                patches = self._extract_patches(io)
+                # patches = self._extract_patches(io)
+                patches = self.xtractor.extract(io, 'mirror')
                 patches = patches[..., 0].squeeze()
             
             storage["mask"].append(patches)
@@ -214,7 +359,8 @@ class DB_writer:
             io = self._read_mask(img_path)
             io = io[..., None].repeat(3, axis=2)
             
-        patches = self._extract_patches(io)
+        #patches = self._extract_patches(io)
+        patches = self.xtractor.extract(io, 'mirror')
         fignum=200
         low=0
         high=len(patches)
@@ -226,7 +372,7 @@ class DB_writer:
         for idx in range(high - low):
             spl = plt.subplot(dims, dims, idx + 1)
             ax = plt.axis('off')
-            imm = plt.imshow(patches[idx], cmap=matplotlib.cm.gray)
+            imm = plt.imshow(patches[idx].astype('uint8'))
             cl = plt.clim(pmin, pmax)
         plt.show()
 
@@ -255,7 +401,7 @@ def visualize_db_patches(path, index):
     ax[0].title.set_text("ORIGINAL")
     ax[1].title.set_text("MASK")
     ax[2].title.set_text("SUPERIMPOSED")
-    fig.show()
+    plt.show()
     return np.unique(mask)
 
             

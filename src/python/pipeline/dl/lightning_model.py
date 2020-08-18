@@ -245,8 +245,8 @@ def plot_metrics(conf, scale="log", metric="loss"):
         metrics (str) : One of the averaged metrics ("loss", "accuracy", "TNR", "TPR").
     """
     
-    assert scale in ("log", "linear"), "y-scale not in ("log", "linear")"
-    assert metric in ("loss", "accuracy", "TNR", "TPR"), "metric not in ("loss", "accuracy", "TNR", "TPR")"
+    assert scale in ("log", "linear"), "y-scale not in ('log', 'linear')"
+    assert metric in ("loss", "accuracy", "TNR", "TPR"), "metric not in ('loss', 'accuracy', 'TNR', 'TPR')"
     ldir = Path(conf["experiment_root_dir"])
     
     folder = "version_" + conf["experiment_version"]
