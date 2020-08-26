@@ -1,6 +1,11 @@
 *.pyc
-databases/
-datasets/
-results/
+__pycache__
+patches/*
+databases/*
+datasets/nucleisegmentation_kumar/*
+datasets/nucleisegmentation_consep/*
+datasets/nucleisegmentation_pannuke/*
+results/*
 src/python/tests_and_tutorials/
+src/python/old/
 .ipynb_checkpoints
