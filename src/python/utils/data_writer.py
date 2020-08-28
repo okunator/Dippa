@@ -60,8 +60,6 @@ class PatchWriter(ProjectFileManager):
         self.verbose = verbose
         self.crop_to_input = crop_to_input        
         self.classes = class_dict
-        self.mirror_pad_size = self.patch_size//2
-        self.n_classes = len(self.classes)
         self.xtractor = PatchExtractor((patch_size, patch_size), (stride_size, stride_size))
 
         
@@ -101,6 +99,16 @@ class PatchWriter(ProjectFileManager):
         assert stride_size <= patch_size, "stride_size must be <= patch_size"
         assert input_size <= patch_size, "input_size must be <= patch_size"
         
+        
+    @property
+    def mirror_pad_size(self):
+        return self.patch_size // 2
+    
+    
+    @property
+    def n_classes(self):
+        return len(self.classes)
+    
     
     def __read_img(self, path):
         return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)

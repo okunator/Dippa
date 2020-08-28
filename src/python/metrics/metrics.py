@@ -11,9 +11,6 @@ from scipy.optimize import linear_sum_assignment
 from skimage.metrics import variation_of_information
 
 # Ported from here: https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
-
-# Due to list index out of range errors every now & then a small change 
-# applied here to avoid them. Same results are obtained with the old code (if it works).
 def AJI(true, pred):
     """
     AJI version distributed by MoNuSeg, has no permutation problem but suffered from 
@@ -24,22 +21,6 @@ def AJI(true, pred):
     """
     true_id_list = list(np.unique(true))
     pred_id_list = list(np.unique(pred))
-
-    # true_masks = [None,]
-    # for t in true_id_list[1:]:
-    #     t_mask = np.array(true == t, np.int8)
-    #     true_masks.append(t_mask)
-
-    # pred_masks = [None,]
-    # for p in pred_id_list[1:]:
-    #     p_mask = np.array(pred == p, np.int8)
-    #     pred_masks.append(p_mask)
-
-    #     
-    # pairwise_inter = np.zeros([len(true_id_list)-1, 
-    #                            len(pred_id_list)-1], dtype=np.float64)
-    # pairwise_union = np.zeros([len(true_id_list)-1, 
-    #                           len(pred_id_list)]-1, dtype=np.float64)
     
     true_masks = {}
     for t in true_id_list[1:]:
@@ -154,21 +135,6 @@ def AJI_plus(true, pred):
     pairwise_union = np.zeros([len(true_id_list)-1, 
                                len(pred_id_list)-1], dtype=np.float64)
 
-    #true_masks = {}
-    #for t in true_id_list[1:]:
-    #    t_mask = np.array(true == t, np.uint8)
-    #    true_masks[t] = t_mask
-    #
-    #pred_masks = {}
-    #for p in pred_id_list[1:]:
-    #    p_mask = np.array(pred == p, np.uint8)
-    #    pred_masks[p] = p_mask
-    #
-    #pairwise_inter = np.zeros([len(true_masks.keys())+1, 
-    #                           len(pred_masks.keys())+1], dtype=np.float64)
-    #pairwise_union = np.zeros([len(true_masks.keys())+1, 
-    #                           len(pred_masks.keys())+1], dtype=np.float64)
-
     # caching pairwise
     for true_id in true_id_list[1:]: # 0-th is background
     #for true_id in true_masks.keys():
@@ -237,16 +203,6 @@ def DICE2(true, pred):
     for p in pred_id_list[1:]:
         p_mask = np.array(pred == p, np.uint8)
         pred_masks.append(p_mask)
-    
-    # true_masks = {}
-    # for t in true_id_list[1:]:
-    #     t_mask = np.array(true == t, np.uint8)
-    #     true_masks[t] = t_mask
-    # 
-    # pred_masks = {}
-    # for p in pred_id_list[1:]:
-    #     p_mask = np.array(pred == p, np.uint8)
-    #     pred_masks[p] = p_mask
         
     overall_total = 0
     overall_inter = 0
@@ -308,20 +264,6 @@ def PQ(true, pred, match_iou=0.5):
         
     pairwise_iou = np.zeros([len(true_id_list) -1, 
                              len(pred_id_list) -1], dtype=np.float64)
-    
-    #true_masks = {}
-    #for t in true_id_list[1:]:
-    #    t_mask = np.array(true == t, np.uint8)
-    #    true_masks[t] = t_mask
-    #
-    #pred_masks = {}
-    #for p in pred_id_list[1:]:
-    #    p_mask = np.array(pred == p, np.uint8)
-    #    pred_masks[p] = p_mask
-    #
-    #
-    #pairwise_iou = np.zeros([len(true_masks.keys())+1, 
-    #                         len(pred_masks.keys())+1], dtype=np.float64)
 
     # caching pairwise iou
     for true_id in true_id_list[1:]: # 0-th is background

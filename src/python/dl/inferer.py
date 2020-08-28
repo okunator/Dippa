@@ -53,7 +53,8 @@ class Inferer(ProjectFileManager):
             fold (str) : One of ("train", "valid", "test"). Do predictions on one of these data folds.
                          Naturally "test" is the one to use for results
             test_time_augs (bool) : apply test time augmentations with ttatch library. TTA takes so
-                                    much memory that the inference is automatically done on CPU
+                                    much memory that the inference is automatically done on CPU.
+                                    Note that TTA increases inferece time significantly.
             class_dict (Dict) : the dict specifying pixel classes. e.g. {"background":0,"nuclei":1}
             verbose (bool) : wether or not to print the progress of running inference
         """
@@ -68,11 +69,8 @@ class Inferer(ProjectFileManager):
         self.fold = fold
         self.test_time_augs = test_time_augs
         self.classes = class_dict
-
-        self.n_files = len(self.images)
-        self.n_classes = len(self.classes)
-        self.stride_size = self.input_size//2
-
+        
+        # init containers for resluts
         self.soft_maps = OrderedDict()
         self.metrics = OrderedDict()
         self.inst_maps = OrderedDict()
@@ -108,6 +106,21 @@ class Inferer(ProjectFileManager):
     
     
     @property
+    def n_files(self):
+        return len(self.images)
+    
+    
+    @property
+    def n_classes(self):
+        return len(self.classes)
+    
+    
+    @property
+    def stride_size(self):
+        return self.input_size//2
+    
+    
+    @property
     def tta_model(self):
         """
         test time augmentations defined in augmentations.py
@@ -128,6 +141,14 @@ class Inferer(ProjectFileManager):
     
     def __read_img(self, path):
         return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
+    
+    
+    def __read_mask(self, path):
+        return scipy.io.loadmat(path)["inst_map"].astype("uint16")
+    
+    
+    def __get_fn(self, path):
+        return path.split("/")[-1][:-4]
     
     
     def __divide_batch(self, arr, batch_size):
@@ -207,7 +228,6 @@ class Inferer(ProjectFileManager):
         #return torch.mean(torch.cat(masks, dim=0))
 
     
-    
     def __predictions(self, im_patches):
         # Use model to predict batches
         pred_patches = np.zeros((0, self.n_classes, self.input_size, self.input_size))
@@ -236,7 +256,10 @@ class Inferer(ProjectFileManager):
         return pred_patches
         
     
-    def __create_prediction(self, pred_patches, im_shape, patches_shape):
+    def __stitch_patches(self, pred_patches, im_shape, patches_shape):
+        """
+        Back stitch all the soft map patches to full size img
+        """
         #turn from a single list into a matrix of tiles
         pred_patches = pred_patches.reshape(
             patches_shape[0], 
@@ -258,18 +281,7 @@ class Inferer(ProjectFileManager):
         pred = pred[0:im_shape[0], 0:im_shape[1], :]
         return pred
 
-    
-    def clear_predictions(self):
-        """
-        Clear predictions OrderedDict
-        """
-        self.soft_maps.clear()
-    
-    
-    def __get_fn(self, path):
-        return path.split("/")[-1][:-4]
-    
-    
+            
     def run(self):
         """
         Do inference on the given dataset, with the pytorch lightining model that 
@@ -293,16 +305,12 @@ class Inferer(ProjectFileManager):
             im = self.__read_img(path)
             im_patches, patches_shape = self.__extract_patches(im)
             pred_patches = self.__predictions(im_patches)
-            result_pred = self.__create_prediction(pred_patches, im.shape, patches_shape)
+            result_pred = self.__stitch_patches(pred_patches, im.shape, patches_shape)
             nuc_map = result_pred[..., 1]
             bg_map = result_pred[..., 0]
             self.soft_maps[f"{fn}_nuc_map"] = nuc_map
             self.soft_maps[f"{fn}_bg_map"] = bg_map
             
-    
-    def __rm_model(self):
-        pass
-        
                 
     def plot_predictions(self):
         """
@@ -378,8 +386,7 @@ class Inferer(ProjectFileManager):
         fig.tight_layout(w_pad=4, h_pad=4)
         for i, path in enumerate(self.images):
             fn = self.__get_fn(path)
-            gt = scipy.io.loadmat(self.gt_masks[i])
-            gt = gt["inst_map"]
+            gt = self.__read_mask(self.gt_masks[i])
             inst_map = self.inst_maps[f"{fn}_inst_map"]
             nuc_map = self.soft_maps[f"{fn}_nuc_map"]
             
@@ -465,7 +472,7 @@ class Inferer(ProjectFileManager):
         assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
         
         inst_maps = [self.inst_maps[key].astype("uint16") for key in self.inst_maps.keys()]
-        gts = [scipy.io.loadmat(f)["inst_map"].astype("uint16") for f in self.gt_masks]
+        gts = [self.__read_mask(f) for f in self.gt_masks]
         params_list = list(zip(gts, inst_maps))
         
         metrics = None
@@ -482,12 +489,19 @@ class Inferer(ProjectFileManager):
         return score_df
     
     
+    def clear_predictions(self):
+        """
+        Clear predictions OrderedDict
+        """
+        self.soft_maps.clear()
+    
+    
     def __plot_pannuke(self):
         # TODO
         pass
     
     
-    def __infer_pannukse(self):
+    def __infer_pannuke(self):
         # TODO
         pass
     
