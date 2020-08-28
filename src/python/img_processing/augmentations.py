@@ -1,5 +1,6 @@
 import cv2
 import albumentations as A
+import ttach as tta
 from albumentations.pytorch import ToTensorV2
 
 
@@ -111,3 +112,13 @@ def post_transforms():
 def no_transforms():
     # convert to torch.Tensor only
     return [ToTensorV2()]
+
+
+def tta_transforms():
+    return tta.Compose(
+        [
+            tta.HorizontalFlip(),
+            tta.Rotate90(angles=[0, 180]),
+            tta.Multiply(factors=[0.9, 1, 1.1]),        
+        ]
+    )

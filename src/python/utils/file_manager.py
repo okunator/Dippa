@@ -12,10 +12,7 @@ class ProjectFileManager:
                  phases : List,
                  **kwargs : Dict) -> None:
         """
-        This class is used only for managing the files and folder needed
-        in this project. For example when the datasets are downloaded from
-        the internet this class can be used to write them in to the right
-        format and to right folders.
+        This class is used for managing the files and folders needed in this project. 
         
             Args:
                 dataset (str) : one of ('kumar', 'consep', 'pannuke', 'other')

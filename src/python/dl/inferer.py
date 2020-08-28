@@ -14,6 +14,8 @@ from multiprocessing import Pool
 
 from utils.file_manager import ProjectFileManager
 from img_processing.post_processing import *
+from img_processing.augmentations import *
+from img_processing.process_utils import *
 from metrics.metrics import *
 
 
@@ -28,6 +30,7 @@ class Inferer(ProjectFileManager):
                  input_size,
                  smoothen,
                  fold,
+                 test_time_augs,
                  class_dict,
                  verbose=True):
         """
@@ -49,6 +52,8 @@ class Inferer(ProjectFileManager):
                               full size images and makes the thresholding of the soft masks trivial.
             fold (str) : One of ("train", "valid", "test"). Do predictions on one of these data folds.
                          Naturally "test" is the one to use for results
+            test_time_augs (bool) : apply test time augmentations with ttatch library. TTA takes so
+                                    much memory that the inference is automatically done on CPU
             class_dict (Dict) : the dict specifying pixel classes. e.g. {"background":0,"nuclei":1}
             verbose (bool) : wether or not to print the progress of running inference
         """
@@ -61,6 +66,7 @@ class Inferer(ProjectFileManager):
         self.smoothen = smoothen
         self.verbose = verbose
         self.fold = fold
+        self.test_time_augs = test_time_augs
         self.classes = class_dict
 
         self.n_files = len(self.images)
@@ -70,7 +76,6 @@ class Inferer(ProjectFileManager):
         self.soft_maps = OrderedDict()
         self.metrics = OrderedDict()
         self.inst_maps = OrderedDict()
-        
     
     @classmethod
     def from_conf(cls, model, conf):
@@ -83,6 +88,7 @@ class Inferer(ProjectFileManager):
         input_size = conf["patching_args"]["input_size"]
         smoothen = conf["inference_args"]["smoothen"]
         fold = conf["inference_args"]["data_fold"]
+        test_time_augs = conf["inference_args"]["test_time_augmentation"]
         class_type = conf["dataset"]["args"]["class_types"]
         class_dict = conf["dataset"]["class_dicts"][class_type] # clumsy
         
@@ -96,8 +102,17 @@ class Inferer(ProjectFileManager):
             input_size,
             smoothen,
             fold,
+            test_time_augs,
             class_dict
         )
+    
+    
+    @property
+    def tta_model(self):
+        """
+        test time augmentations defined in augmentations.py
+        """
+        return tta.SegmentationTTAWrapper(self.model, tta_transforms())
     
     
     @property
@@ -111,6 +126,10 @@ class Inferer(ProjectFileManager):
         return self.data_folds[self.fold]["mask"]
     
     
+    def __read_img(self, path):
+        return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
+    
+    
     def __divide_batch(self, arr, batch_size):
         """
         Divide image array into batches similarly to DataLoader in pytorch
@@ -121,7 +140,7 @@ class Inferer(ProjectFileManager):
     
     def __smoothen_batches(self, output_batch):
         """
-        Use differences of gaussians from skimage to smoothen out prediction batches.
+        Use gaussian differences from skimage to smoothen out prediction batches.
         Effectively removes checkerboard effect after the tiles are merged and eases
         thresholding from the prediction histogram.
         """
@@ -135,11 +154,7 @@ class Inferer(ProjectFileManager):
             
         return output_batch
     
-    
-    def __read_img(self, path):
-        return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
-        
-        
+            
     def __extract_patches(self, im):
         # add reflection padding
         pad = self.stride_size//2
@@ -161,18 +176,55 @@ class Inferer(ProjectFileManager):
         return arr_out, arr_out_shape
     
     
+    def __ensemble_predictions(self, batch):
+        """
+        ttatch test time augmentation
+        """
+        # TODO
+        pass
+        #masks = []
+        #for transformer in self.transforms:
+        #    # augment image
+        #    print(output_batch.shape)
+        #    augmented_image = transformer.augment_image(output_batch)
+        #    # pass to model
+        #    model_output = self.model(augmented_image)
+        #    print(model_output.shape)
+        #    # reverse augmentation for mask and label
+        #    deaug_mask = transformer.deaugment_mask(model_output)
+        #    print(deaug_mask.shape)
+        #    # save results
+        #    masks.append(deaug_mask)
+        
+        #    del augmented_image
+        #    del deaug_mask
+        #    del model_output
+        #    torch.cuda.empty_cache()
+
+        #del output_batch
+        #torch.cuda.empty_cache()
+        #print(torch.mean(masks).shape)
+        #return torch.mean(torch.cat(masks, dim=0))
+
+    
+    
     def __predictions(self, im_patches):
         # Use model to predict batches
         pred_patches = np.zeros((0, self.n_classes, self.input_size, self.input_size))
         for batch in self.__divide_batch(im_patches, self.batch_size):
             # shape for pytorch and predict
             batch_d = torch.from_numpy(batch.transpose(0, 3, 1, 2))
-            if torch.cuda.is_available():
+            if torch.cuda.is_available() and not self.test_time_augs:
                 batch_d = batch_d.type("torch.cuda.FloatTensor")
             else:
                 batch_d = batch_d.type("torch.FloatTensor")
             
-            pred_batch = self.model(batch_d) 
+            if self.test_time_augs:
+                pred_batch = self.tta_model(batch_d)
+            else:
+                pred_batch = self.model(batch_d)
+                
+            # back to cpu
             pred_batch = pred_batch.detach().cpu().numpy()
             
             if self.smoothen:
@@ -225,8 +277,9 @@ class Inferer(ProjectFileManager):
         """
         
         # Put SegModel to gpu
-        self.model.cuda() if torch.cuda.is_available() else self.model.cpu()    
+        self.model.cuda() if torch.cuda.is_available() and not self.test_time_augs else self.model.cpu()    
         self.model.model.eval()
+        torch.no_grad()
         
         if len(self.soft_maps) > 0:
             print("Clearing previous predictions")
@@ -364,11 +417,11 @@ class Inferer(ProjectFileManager):
     
     def _compute_metrics(self, true, pred):
         # Count scores for each file
-        pq = PQ(true, pred)
-        aji = AJI(true, pred)
-        aji_p = AJI_plus(true, pred)
-        dice2 = DICE2(true, pred)
-        splits, merges = split_and_merge(true, pred)
+        pq = PQ(remap_label(true), remap_label(pred))
+        aji = AJI(remap_label(true), remap_label(pred))
+        aji_p = AJI_plus(remap_label(true), remap_label(pred))
+        dice2 = DICE2(remap_label(true), remap_label(pred))
+        splits, merges = split_and_merge(remap_label(true), remap_label(pred))
         
         return {
             "AJI": aji, 

@@ -139,40 +139,39 @@ def AJI_plus(true, pred):
     true_id_list = list(np.unique(true))
     pred_id_list = list(np.unique(pred))
 
-    # true_masks = [None,]
-    # for t in true_id_list[1:]:
-    #     t_mask = np.array(true == t, np.uint8)
-    #     true_masks.append(t_mask)
-    # 
-    # pred_masks = [None,]
-    # for p in pred_id_list[1:]:
-    #     p_mask = np.array(pred == p, np.uint8)
-    #     pred_masks.append(p_mask)
-    
-    # prefill with value
-    # pairwise_inter = np.zeros([len(true_id_list)-1, 
-    #                            len(pred_id_list)-1], dtype=np.float64)
-    # pairwise_union = np.zeros([len(true_id_list)-1, 
-    #                            len(pred_id_list)-1], dtype=np.float64)
-
-    true_masks = {}
+    true_masks = [None,]
     for t in true_id_list[1:]:
         t_mask = np.array(true == t, np.uint8)
-        true_masks[t] = t_mask
+        true_masks.append(t_mask)
     
-    pred_masks = {}
+    pred_masks = [None,]
     for p in pred_id_list[1:]:
         p_mask = np.array(pred == p, np.uint8)
-        pred_masks[p] = p_mask
-    
-    pairwise_inter = np.zeros([len(true_masks.keys())+1, 
-                               len(pred_masks.keys())+1], dtype=np.float64)
-    pairwise_union = np.zeros([len(true_masks.keys())+1, 
-                               len(pred_masks.keys())+1], dtype=np.float64)
+        pred_masks.append(p_mask)
+
+    pairwise_inter = np.zeros([len(true_id_list)-1, 
+                               len(pred_id_list)-1], dtype=np.float64)
+    pairwise_union = np.zeros([len(true_id_list)-1, 
+                               len(pred_id_list)-1], dtype=np.float64)
+
+    #true_masks = {}
+    #for t in true_id_list[1:]:
+    #    t_mask = np.array(true == t, np.uint8)
+    #    true_masks[t] = t_mask
+    #
+    #pred_masks = {}
+    #for p in pred_id_list[1:]:
+    #    p_mask = np.array(pred == p, np.uint8)
+    #    pred_masks[p] = p_mask
+    #
+    #pairwise_inter = np.zeros([len(true_masks.keys())+1, 
+    #                           len(pred_masks.keys())+1], dtype=np.float64)
+    #pairwise_union = np.zeros([len(true_masks.keys())+1, 
+    #                           len(pred_masks.keys())+1], dtype=np.float64)
 
     # caching pairwise
-    # for true_id in true_id_list[1:]: # 0-th is background
-    for true_id in true_masks.keys():
+    for true_id in true_id_list[1:]: # 0-th is background
+    #for true_id in true_masks.keys():
         t_mask = true_masks[true_id]
         pred_true_overlap = pred[t_mask > 0]
         pred_true_overlap_id = np.unique(pred_true_overlap)
@@ -229,31 +228,31 @@ def DICE2(true, pred):
     true_id_list = list(np.unique(true))
     pred_id_list = list(np.unique(pred))
 
-    # true_masks = [None,]
-    # for t in true_id_list[1:]:
-    #     t_mask = np.array(true == t, np.uint8)
-    #     true_masks.append(t_mask)
-    # 
-    # pred_masks = [None,]
-    # for p in pred_id_list[1:]:
-    #     p_mask = np.array(pred == p, np.uint8)
-    #     pred_masks.append(p_mask)
-    
-    true_masks = {}
+    true_masks = [None,]
     for t in true_id_list[1:]:
         t_mask = np.array(true == t, np.uint8)
-        true_masks[t] = t_mask
+        true_masks.append(t_mask)
     
-    pred_masks = {}
+    pred_masks = [None,]
     for p in pred_id_list[1:]:
         p_mask = np.array(pred == p, np.uint8)
-        pred_masks[p] = p_mask
+        pred_masks.append(p_mask)
+    
+    # true_masks = {}
+    # for t in true_id_list[1:]:
+    #     t_mask = np.array(true == t, np.uint8)
+    #     true_masks[t] = t_mask
+    # 
+    # pred_masks = {}
+    # for p in pred_id_list[1:]:
+    #     p_mask = np.array(pred == p, np.uint8)
+    #     pred_masks[p] = p_mask
         
     overall_total = 0
     overall_inter = 0
 
-    # for true_id in true_id_list[1:]:
-    for true_id in true_masks.keys():
+    for true_id in true_id_list[1:]:
+    # for true_id in true_masks.keys():
         t_mask = true_masks[true_id]
         pred_true_overlap = pred[t_mask > 0]
         pred_true_overlap_id = np.unique(pred_true_overlap)
@@ -297,36 +296,36 @@ def PQ(true, pred, match_iou=0.5):
     true_id_list = list(np.unique(true))
     pred_id_list = list(np.unique(pred))
 
-    #true_masks = [None,]
-    #for t in true_id_list[1:]:
-    #    t_mask = np.array(true == t, np.int16)
-    #    true_masks.append(t_mask)
-    #
-    #pred_masks = [None,]
-    #for p in pred_id_list[1:]:
-    #    p_mask = np.array(pred == p, np.int16)
-    #    pred_masks.append(p_mask)
-    # prefill with value
-    #pairwise_iou = np.zeros([len(true_id_list) -1, 
-    #                         len(pred_id_list) -1], dtype=np.float64)
-    
-    true_masks = {}
+    true_masks = [None,]
     for t in true_id_list[1:]:
         t_mask = np.array(true == t, np.uint8)
-        true_masks[t] = t_mask
+        true_masks.append(t_mask)
     
-    pred_masks = {}
+    pred_masks = [None,]
     for p in pred_id_list[1:]:
         p_mask = np.array(pred == p, np.uint8)
-        pred_masks[p] = p_mask
+        pred_masks.append(p_mask)
+        
+    pairwise_iou = np.zeros([len(true_id_list) -1, 
+                             len(pred_id_list) -1], dtype=np.float64)
     
-    
-    pairwise_iou = np.zeros([len(true_masks.keys())+1, 
-                             len(pred_masks.keys())+1], dtype=np.float64)
+    #true_masks = {}
+    #for t in true_id_list[1:]:
+    #    t_mask = np.array(true == t, np.uint8)
+    #    true_masks[t] = t_mask
+    #
+    #pred_masks = {}
+    #for p in pred_id_list[1:]:
+    #    p_mask = np.array(pred == p, np.uint8)
+    #    pred_masks[p] = p_mask
+    #
+    #
+    #pairwise_iou = np.zeros([len(true_masks.keys())+1, 
+    #                         len(pred_masks.keys())+1], dtype=np.float64)
 
     # caching pairwise iou
-    #for true_id in true_id_list[1:]: # 0-th is background
-    for true_id in true_masks.keys():
+    for true_id in true_id_list[1:]: # 0-th is background
+    #for true_id in true_masks.keys():
         t_mask = true_masks[true_id]
         pred_true_overlap = pred[t_mask > 0]
         pred_true_overlap_id = np.unique(pred_true_overlap)

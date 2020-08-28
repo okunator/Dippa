@@ -15,7 +15,8 @@ class BinarySegmentationDataset(Dataset):
 
         Args:
             fname (str) : path to the pytables database
-            transforms (albu.Compose) : albumentations.Compose object of augmentations from albumentations pkg
+            transforms (albu.Compose) : albumentations.Compose object of 
+                                        augmentations from albumentations pkg
         """
         self.fname = fname
         self.transforms = transforms

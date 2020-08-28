@@ -6,7 +6,7 @@ conf = OmegaConf.create(
         "dataset": {
             "args": {
                 # What dataset you want to use? Has to be one of ("kumar", "consep", "pannuke")
-                "dataset":"consep", 
+                "dataset":"kumar", 
                 
                 # This depends on the dataset. Binary segmentation can be done to all datasets
                 # change this according to your needs. has to be one of ("binary", "consep", "pannuke")
@@ -143,7 +143,8 @@ conf = OmegaConf.create(
         # Inference args
         "inference_args" : {
             "smoothen":True,
-            "data_fold":"test" # what data fold (phase) to use in inference
+            "data_fold":"test", # what data fold (phase) to use in inference
+            "test_time_augmentation":True
         }
     }
 )

@@ -7,12 +7,10 @@ import numpy as np
 class PatchExtractor:
     """
     Extractor to generate patches with or without padding.
-    Turn on debug mode to see how it is done.
     Args:
         x         : input image, should be of shape HWC
         patch_size  : a tuple of (h, w)
         stride_size : a tuple of (h, w)
-        debug     : flag to see how it is done
     Return:
         a list of sub patches, each patch has dtype same as x
     Examples:

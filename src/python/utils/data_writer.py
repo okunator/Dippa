@@ -28,9 +28,10 @@ class PatchWriter(ProjectFileManager):
                  verbose : bool = False,
                  **kwargs : Dict) -> None:
         """
-        This class can be used to create the hdf5 database from the images
-        or it can be used to write patches to .npy files. These data are used
-        in the pytorch Dataset and DataLoader.
+        This class is used to patch input images and to write them to either hdf5 tables
+        or .npy files that are are used in the training of the networks used in this project. 
+        The torch dataset class is written to read from the files created by this class.
+        
             Args:
                 dataset (str) : one of ('kumar', 'consep', 'pannuke', 'other')
                 data_dirs (dict) : dictionary of directories containing masks and images. Keys of this
@@ -58,7 +59,7 @@ class PatchWriter(ProjectFileManager):
         self.input_size = input_size
         self.verbose = verbose
         self.crop_to_input = crop_to_input        
-        self.classes = self.class_dict
+        self.classes = class_dict
         self.mirror_pad_size = self.patch_size//2
         self.n_classes = len(self.classes)
         self.xtractor = PatchExtractor((patch_size, patch_size), (stride_size, stride_size))
