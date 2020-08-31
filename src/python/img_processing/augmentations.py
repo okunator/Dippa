@@ -114,6 +114,7 @@ def no_transforms():
     return [ToTensorV2()]
 
 
+# ttach transformations (turns out these conserve too much memory)
 def tta_transforms():
     return tta.Compose(
         [
@@ -122,3 +123,26 @@ def tta_transforms():
             tta.Multiply(factors=[0.9, 1, 1.1]),        
         ]
     )
+
+
+def tta_augs():
+    return [
+        A.VerticalFlip(p=1),
+        A.HorizontalFlip(p=1),
+        A.Transpose(p=1),
+        A.Rotate((45, 45), p=1),
+        A.Rotate((95, 95), p=1),
+        A.Rotate((125, 125), p=1),
+        A.Rotate((145, 145), p=1),
+    ]
+
+def tta_deaugs():
+    return [
+        A.VerticalFlip(p=1),
+        A.HorizontalFlip(p=1),
+        A.Transpose(p=1),
+        A.Rotate((-45, -45), p=1),
+        A.Rotate((-95, -95), p=1),
+        A.Rotate((-125, -125), p=1),
+        A.Rotate((-145, -145), p=1),
+    ]

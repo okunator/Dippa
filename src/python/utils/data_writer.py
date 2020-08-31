@@ -104,12 +104,7 @@ class PatchWriter(ProjectFileManager):
     def mirror_pad_size(self):
         return self.patch_size // 2
     
-    
-    @property
-    def n_classes(self):
-        return len(self.classes)
-    
-    
+        
     def __read_img(self, path):
         return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
     
@@ -187,7 +182,7 @@ class PatchWriter(ProjectFileManager):
             "mask": np.array((size, size))
         }
         
-        totals = np.zeros((2, self.n_classes))
+        totals = np.zeros((2, len(self.classes)))
         totals[0, :] = list(self.classes.values())
         fn = f"patch{size}_{phase}_{self.dataset}.pytable"
         hdf5 = tables.open_file(self.database_dir.joinpath(fn).as_posix(), mode="w")

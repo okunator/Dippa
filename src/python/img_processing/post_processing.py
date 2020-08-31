@@ -165,7 +165,7 @@ def sobel_watershed(prob_map, inst_map, win_size=13):
     
     # remove small objs. Will enhance PQ a lot '(HACKish)'
     mask[mask > 0] = 1
-    mask = morph.remove_small_objects(mask.astype(bool), min_size=154)
+    mask = morph.remove_small_objects(mask.astype(bool), min_size=100)
     inst_map = ndi.label(mask)[0]
     
     return inst_map

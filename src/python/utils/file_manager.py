@@ -77,7 +77,7 @@ class ProjectFileManager:
     def create_dir(path):
         Path(path).mkdir(parents=True, exist_ok=True)
         
-        
+                
     def __get_suffix(self, directory):
         # Find out the suffix of the image and mask files
         d = Path(directory)
@@ -88,7 +88,7 @@ class ProjectFileManager:
     def __get_files(self, directory):
         # Get the image and mask files from the directory that was provided 
         d = Path(directory)
-        assert d.is_dir(), f"Provided directory: {d.as_posix} for image files is not a directory."
+        assert d.is_dir(), f"Provided directory: {d.as_posix()} for image files is not a directory."
         file_suffix = self.__get_suffix(d)
         return sorted([x.as_posix() for x in d.glob(f"*{file_suffix}")])
     

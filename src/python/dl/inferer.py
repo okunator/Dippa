@@ -104,20 +104,20 @@ class Inferer(ProjectFileManager):
             class_dict
         )
     
-    
-    @property
-    def n_files(self):
-        return len(self.images)
-    
-    
-    @property
-    def n_classes(self):
-        return len(self.classes)
-    
-    
+            
     @property
     def stride_size(self):
         return self.input_size//2
+    
+    
+    @property
+    def tta_augs(self):
+        return tta_augs()
+    
+    
+    @property
+    def tta_deaugs(self):
+        return tta_deaugs()
     
     
     @property
@@ -151,29 +151,20 @@ class Inferer(ProjectFileManager):
         return path.split("/")[-1][:-4]
     
     
+    def __to_device(self, tensor):
+        if torch.cuda.is_available(): # and not self.test_time_augs:
+            tensor = tensor.type("torch.cuda.FloatTensor")
+        else:
+            tensor = tensor.type("torch.FloatTensor")
+        return tensor
+    
+    
     def __divide_batch(self, arr, batch_size):
         """
         Divide image array into batches similarly to DataLoader in pytorch
         """
         for i in range(0, arr.shape[0], batch_size):  
             yield arr[i:i + batch_size, ::] 
-    
-    
-    def __smoothen_batches(self, output_batch):
-        """
-        Use gaussian differences from skimage to smoothen out prediction batches.
-        Effectively removes checkerboard effect after the tiles are merged and eases
-        thresholding from the prediction histogram.
-        """
-        for i in range(output_batch.shape[0]):
-            for c in range(self.n_classes):
-                # class 0 = background
-                output_batch[i, c, ...] = difference_of_gaussians(output_batch[i, c, ...], 1, 50)
-                output_batch[i, c, ...] = torch.from_numpy(output_batch[i, c, ...]).relu().cpu().numpy()
-                output_batch[i, c, ...] = difference_of_gaussians(output_batch[i, c, ...], 1, 10)
-                output_batch[i, c, ...] = torch.from_numpy(output_batch[i, c, ...]).sigmoid().cpu().numpy()
-            
-        return output_batch
     
             
     def __extract_patches(self, im):
@@ -196,60 +187,67 @@ class Inferer(ProjectFileManager):
         arr_out = arr_out.reshape(-1, self.input_size, self.input_size, 3)
         return arr_out, arr_out_shape
     
-    
-    def __ensemble_predictions(self, batch):
+
+    def __ensemble_predict(self, patch):
         """
-        ttatch test time augmentation
+        Self implemented tta ensemble prediction pipeline (memory issues with ttach)
         """
-        # TODO
-        pass
-        #masks = []
-        #for transformer in self.transforms:
-        #    # augment image
-        #    print(output_batch.shape)
-        #    augmented_image = transformer.augment_image(output_batch)
-        #    # pass to model
-        #    model_output = self.model(augmented_image)
-        #    print(model_output.shape)
-        #    # reverse augmentation for mask and label
-        #    deaug_mask = transformer.deaugment_mask(model_output)
-        #    print(deaug_mask.shape)
-        #    # save results
-        #    masks.append(deaug_mask)
         
-        #    del augmented_image
-        #    del deaug_mask
-        #    del model_output
-        #    torch.cuda.empty_cache()
-
-        #del output_batch
-        #torch.cuda.empty_cache()
-        #print(torch.mean(masks).shape)
-        #return torch.mean(torch.cat(masks, dim=0))
+        soft_masks = []
+        for aug, deaug in zip(self.tta_augs, self.tta_deaugs):
+            aug_input = aug(image = patch)
+            tensor = self.__to_device(torch.from_numpy(aug_input["image"].transpose(2, 0, 1))[None, ...])
+            aug_output = self.model(tensor).detach().cpu().numpy().squeeze().transpose(1, 2, 0)
+            deaug_output = deaug(image = aug_output)
+            soft_masks.append(deaug_output["image"])
+            
+        # take the mean of all the predictions
+        return np.asarray(soft_masks).mean(axis=0).transpose(2, 0, 1)
+    
+    
+    def __smoothen(self, prob_map):
+        """
+        Use gaussian differences from skimage to smoothen out prediction.
+        Effectively removes checkerboard effect after the tiles are merged and eases
+        thresholding from the prediction histogram.
+        
+        prob_map.shape = (class, width, height) (torch tensor shape)
+        """
+        for c in range(len(self.classes)):
+            prob_map[c, ...] = difference_of_gaussians(prob_map[c, ...], 1, 50)
+            prob_map[c, ...] = torch.from_numpy(prob_map[c, ...]).relu().cpu().numpy()
+            prob_map[c, ...] = difference_of_gaussians(prob_map[c, ...], 1, 10)
+            prob_map[c, ...] = torch.from_numpy(prob_map[c, ...]).sigmoid().cpu().numpy()
+        return prob_map
 
     
-    def __predictions(self, im_patches):
-        # Use model to predict batches
-        pred_patches = np.zeros((0, self.n_classes, self.input_size, self.input_size))
-        for batch in self.__divide_batch(im_patches, self.batch_size):
-            # shape for pytorch and predict
-            batch_d = torch.from_numpy(batch.transpose(0, 3, 1, 2))
-            if torch.cuda.is_available() and not self.test_time_augs:
-                batch_d = batch_d.type("torch.cuda.FloatTensor")
-            else:
-                batch_d = batch_d.type("torch.FloatTensor")
+    def __process_batch(self, batch):
+        """
+        Do inference to one batch based on the user options (tta, smoothen etc)
+        """
+        # shape for pytorch and predict
+        out_batch = np.zeros((batch.shape[0], len(self.classes), self.input_size, self.input_size))
+        if not self.test_time_augs:
+            out_batch = self.__to_device(torch.from_numpy(batch.transpose(0, 3, 1, 2)))
+            #batch = self.tta_model(batch) # ttach tta prediction
+            out_batch = self.model(out_batch)
+            out_batch = out_batch.detach().cpu().numpy()
             
+        for i in range(batch.shape[0]):
             if self.test_time_augs:
-                pred_batch = self.tta_model(batch_d)
-            else:
-                pred_batch = self.model(batch_d)
-                
-            # back to cpu
-            pred_batch = pred_batch.detach().cpu().numpy()
+                out_batch[i, ...] = self.__ensemble_predict(batch[i, ...])
             
             if self.smoothen:
-                pred_batch = self.__smoothen_batches(pred_batch)
-
+                out_batch[i, ...] = self.__smoothen(out_batch[i, ...])
+                    
+        return out_batch
+    
+    
+    def __predict_patches(self, im_patches):
+        # Use model to predict batches
+        pred_patches = np.zeros((0, len(self.classes), self.input_size, self.input_size))
+        for batch in self.__divide_batch(im_patches, self.batch_size):            
+            pred_batch = self.__process_batch(batch)
             pred_patches = np.append(pred_patches, pred_batch, axis=0)
 
         pred_patches = pred_patches.transpose((0, 2, 3, 1))
@@ -289,7 +287,7 @@ class Inferer(ProjectFileManager):
         """
         
         # Put SegModel to gpu
-        self.model.cuda() if torch.cuda.is_available() and not self.test_time_augs else self.model.cpu()    
+        self.model.cuda() if torch.cuda.is_available() else self.model.cpu()    
         self.model.model.eval()
         torch.no_grad()
         
@@ -304,7 +302,7 @@ class Inferer(ProjectFileManager):
                 
             im = self.__read_img(path)
             im_patches, patches_shape = self.__extract_patches(im)
-            pred_patches = self.__predictions(im_patches)
+            pred_patches = self.__predict_patches(im_patches)
             result_pred = self.__stitch_patches(pred_patches, im.shape, patches_shape)
             nuc_map = result_pred[..., 1]
             bg_map = result_pred[..., 0]
@@ -319,7 +317,7 @@ class Inferer(ProjectFileManager):
         
         assert len(self.soft_maps) != 0, "No predictions found"
     
-        fig, axes = plt.subplots(self.n_files, 3, figsize=(65, self.n_files*12))
+        fig, axes = plt.subplots(len(self.images), 3, figsize=(65, len(self.images)*12))
         fig.tight_layout(w_pad=4, h_pad=4)
         for i, path in enumerate(self.images):
             fn = self.__get_fn(path)
@@ -344,7 +342,7 @@ class Inferer(ProjectFileManager):
         
         assert len(self.soft_maps) != 0, "No predictions found"
         
-        figg, axes = plt.subplots(self.n_files//3, 4, figsize=(30,15))
+        figg, axes = plt.subplots(len(self.images)//3, 4, figsize=(30,15))
         axes = axes.flatten()
         for i, path in enumerate(self.images):
             fn = self.__get_fn(path)
@@ -382,7 +380,7 @@ class Inferer(ProjectFileManager):
         
         assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
     
-        fig, axes = plt.subplots(self.n_files, 3, figsize=(65, self.n_files*12))
+        fig, axes = plt.subplots(len(self.images), 3, figsize=(65, len(self.images)*12))
         fig.tight_layout(w_pad=4, h_pad=4)
         for i, path in enumerate(self.images):
             fn = self.__get_fn(path)
@@ -398,7 +396,7 @@ class Inferer(ProjectFileManager):
 
             axes[i][2].imshow(gt, interpolation="none")
             axes[i][2].axis("off")
-            
+    
     
     def _post_process_pipeline(self, prob_map, thresh=2, 
                                postproc_func=inv_dist_watershed):
