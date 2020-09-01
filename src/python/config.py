@@ -144,7 +144,7 @@ conf = OmegaConf.create(
         "inference_args" : {
             "smoothen":True, # Inference time slightly slower. Recommended
             "data_fold":"test", # what data fold (phase) to use in inference
-            "test_time_augmentation":True, # Inference time slow if True. Minor improvement to results.
+            "test_time_augmentation":True, # Inference time slightly slower. Recommended
         }
     }
 )

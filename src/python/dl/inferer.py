@@ -8,14 +8,15 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 from skimage.filters import difference_of_gaussians
+from skimage.exposure import histogram
 from collections import OrderedDict
 from multiprocessing import Pool
 
 from utils.file_manager import ProjectFileManager
-from img_processing.post_processing import *
-from img_processing.augmentations import *
-from img_processing.process_utils import *
-from metrics.metrics import *
+from img_processing.post_processing import activation, naive_thresh, smoothed_thresh, inv_dist_watershed
+from img_processing.augmentations import tta_augs, tta_deaugs, tta_five_crops, resize
+from img_processing.process_utils import remap_label
+from metrics.metrics import PQ, AJI, AJI_plus, DICE2, split_and_merge
 
 
 class Inferer(ProjectFileManager):
@@ -108,17 +109,7 @@ class Inferer(ProjectFileManager):
     def stride_size(self):
         return self.input_size//2
     
-    
-    @property
-    def tta_augs(self):
-        return tta_augs()
-    
-    
-    @property
-    def tta_deaugs(self):
-        return tta_deaugs()
-    
-    
+        
     @property
     def tta_model(self):
         """
@@ -194,16 +185,52 @@ class Inferer(ProjectFileManager):
 
     def __ensemble_predict(self, patch):
         """
-        Self implemented tta ensemble prediction pipeline (memory issues with ttach)
+        Own implementation of tta ensemble prediction pipeline (memory issues with ttach).
+        Following instructions of 'beneficial augmentations' from:
+        
+        "Towards Principled Test-Time Augmentation"
+        D. Shanmugam, D. Blalock, R. Sahoo, J. Guttag 
+        link : https://dmshanmugam.github.io/pdfs/icml_2020_testaug.pdf
+        
+        1. vflip, hflip and transpose and rotations
+        2. custom fivecrops aug
+        
+        Idea for flips and rotations:
+            1. flip or rotate, 
+            2. predict, 
+            3. deaugment prediction,
+            4. save to augmented results
+        Idea for five_crops:
+            1. crop to one fourth of network input size (corner crop or center crop)
+            2. scale to network input size
+            3. predict
+            4. downscale to crop size
+            5. Save result to result matrix
+            6. Save result matrix to augmented results
         """
         
         soft_masks = []
-        for aug, deaug in zip(self.tta_augs, self.tta_deaugs):
+        
+        # flip ttas
+        for aug, deaug in zip(tta_augs(), tta_deaugs()):
             aug_input = aug(image = patch)
             tensor = self.__to_device(torch.from_numpy(aug_input["image"].transpose(2, 0, 1))[None, ...])
             aug_output = self.model(tensor).detach().cpu().numpy().squeeze().transpose(1, 2, 0)
             deaug_output = deaug(image = aug_output)
             soft_masks.append(deaug_output["image"])
+            
+        # five crops tta
+        scale_up = resize(patch.shape[0], patch.shape[1])
+        scale_down = resize(patch.shape[0]//2, patch.shape[1]//2)
+        out = np.zeros((patch.shape[0], patch.shape[1], len(self.classes)))
+        for crop in tta_five_crops(patch):
+            cropped_im = crop(image = patch)
+            scaled_im = scale_up(image = cropped_im["image"])
+            tensor = self.__to_device(torch.from_numpy(scaled_im["image"].transpose(2, 0, 1))[None, ...])
+            output = self.model(tensor).detach().cpu().numpy().squeeze().transpose(1, 2, 0)
+            downscaled_out = scale_down(image = output)
+            out[crop.y_min:crop.y_max, crop.x_min:crop.x_max] = downscaled_out["image"]
+            soft_masks.append(out)
             
         # take the mean of all the predictions
         return np.asarray(soft_masks).mean(axis=0).transpose(2, 0, 1)

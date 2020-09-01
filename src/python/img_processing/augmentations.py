@@ -132,9 +132,10 @@ def tta_augs():
         A.Transpose(p=1),
         A.Rotate((45, 45), p=1),
         A.Rotate((95, 95), p=1),
-        A.Rotate((125, 125), p=1),
-        A.Rotate((145, 145), p=1),
+        A.Rotate((155, 155), p=1),
+        A.Rotate((245, 245), p=1),
     ]
+
 
 def tta_deaugs():
     return [
@@ -143,6 +144,30 @@ def tta_deaugs():
         A.Transpose(p=1),
         A.Rotate((-45, -45), p=1),
         A.Rotate((-95, -95), p=1),
-        A.Rotate((-125, -125), p=1),
-        A.Rotate((-145, -145), p=1),
+        A.Rotate((-155, -155), p=1),
+        A.Rotate((-245, -245), p=1),
     ]
+
+
+def tta_five_crops(io):
+    return [
+        # left upper crop
+        A.Crop(0, 0, io.shape[0]//2, io.shape[1]//2),
+        #right upper crop
+        A.Crop(io.shape[0]//2, io.shape[1]//2, io.shape[0], io.shape[1]),
+        # left lower crop
+        A.Crop(0, io.shape[0]//2, io.shape[1]//2, io.shape[1]),
+        # right lower crop
+        A.Crop(io.shape[0]//2, 0, io.shape[1], io.shape[0]//2),
+        # Center crop
+        A.Crop(
+            io.shape[0]//2//2, 
+            io.shape[0]//2//2, 
+            io.shape[0]//2+io.shape[0]//2//2,
+            io.shape[1]//2+io.shape[1]//2//2
+        )
+    ]
+
+
+def resize(height, width):
+    return A.Resize(height, width)
