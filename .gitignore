@@ -1,7 +1,7 @@
 *.pyc
 __pycache__
-patches/*
-databases/*
+patches/hdf5/*
+patches/npy//*
 datasets/nucleisegmentation_kumar/*
 datasets/nucleisegmentation_consep/*
 datasets/nucleisegmentation_pannuke/*

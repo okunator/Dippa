@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import skimage.morphology as morph
 import skimage.segmentation as segm
+from skimage.exposure import histogram
 from skimage import filters
 from torch import nn
 from scipy import ndimage as ndi
@@ -29,9 +30,12 @@ def medfilter_instances(seg):
 
 def activation(prob_map, method='sigmoid'):
     # Activation
-    assert method in ('relu', 'sigmoid', 'relu-sigmoid', 'celu-sigmoid', 'None')
+    assert method in ('relu', 'celu', 'sigmoid', 'relu-sigmoid', 'celu-sigmoid', 'None')
     if method == 'relu':
         act = torch.from_numpy(prob_map).relu().numpy()
+    elif method == 'celu':
+        celu = nn.CELU()
+        act = celu(torch.from_numpy(prob_map)).numpy()
     elif method == 'sigmoid':
         act = torch.from_numpy(prob_map).sigmoid().numpy()
     elif method == 'relu-sigmoid':
@@ -45,16 +49,18 @@ def activation(prob_map, method='sigmoid'):
     return act
 
 
+def to_inst_map(seg):
+    mask = ndi.binary_fill_holes(seg)
+    mask = morph.remove_small_objects(seg.astype(bool), min_size=64)
+    inst_map = ndi.label(mask)[0]
+    return inst_map
+
+
 def naive_thresh_logits(prob_map, threshold=0.5):
     # Threshold naively when values b/w [0,1]
     seg = prob_map.copy()
     seg = seg > threshold
-    
-    # Final smoothening of the jagged edges
-    mask = scipy.signal.medfilt(seg, 3)
-    mask = ndi.binary_fill_holes(mask)
-    mask = morph.remove_small_objects(seg.astype(bool), min_size=64)
-    inst_map = ndi.label(mask)[0]
+    inst_map = to_inst_map(seg)
     return inst_map
 
 
@@ -63,12 +69,7 @@ def naive_thresh(prob_map, threshold=2):
     seg = prob_map.copy()
     seg[seg < np.amax(prob_map)/threshold] = 0
     seg[seg > np.amax(prob_map)/threshold] = 1
-    
-    # Final smoothening of the jagged edges
-    mask = scipy.signal.medfilt(seg, 3)
-    mask = ndi.binary_fill_holes(mask)
-    mask = morph.remove_small_objects(seg.astype(bool), min_size=64)
-    inst_map = ndi.label(mask)[0]
+    inst_map = to_inst_map(seg)
     return inst_map
 
 
@@ -76,9 +77,7 @@ def niblack_thresh(prob_map, win_size=13):
     thresh = filters.threshold_niblack(prob_map, window_size=win_size)
     mask = prob_map > thresh
     mask = cv2_opening(mask)
-    mask = ndi.binary_fill_holes(mask)
-    mask = morph.remove_small_objects(mask, min_size=64)
-    inst_map = ndi.label(mask)[0]
+    inst_map = to_inst_map(mask)
     return inst_map
     
 
@@ -86,25 +85,35 @@ def sauvola_thresh(prob_map, win_size=33):
     thresh = filters.threshold_sauvola(prob_map, window_size=win_size)
     mask = prob_map > thresh
     mask = cv2_opening(mask)
-    mask = ndi.binary_fill_holes(mask)
-    mask = morph.remove_small_objects(mask, min_size=64)
-    inst_map = ndi.label(mask)[0]
+    inst_map = to_inst_map(mask)
     return inst_map
 
 
 def morph_chan_vese_thresh(prob_map):
     init_ls = segm.checkerboard_level_set(prob_map.shape, 2)
-    ls = segm.morphological_chan_vese(prob_map, 35, smoothing=1, init_level_set=init_ls, lambda1=1, lambda2=1)
+    ls = segm.morphological_chan_vese(prob_map, 35, smoothing=1, init_level_set=init_ls)
     hist = np.histogram(ls)[0]
     
     if hist[-1] > hist[0]:
         ls = 1 - ls
         
-    ls = morph.remove_small_objects(ls.astype(bool), min_size=64)
-    ls = ndi.binary_fill_holes(ls)
-    inst_map =  ndi.label(ls)[0]
+    inst_map = to_inst_map(ls)
     return inst_map
-  
+
+
+def smoothed_thresh(prob_map):
+    """
+    Thresholding probability map after it has been smoothed with gaussian differences
+    """
+    # Find the steepest drop in the histogram
+    hist, hist_centers = histogram(prob_map)
+    d = np.diff(hist)
+    b = d == np.min(d)
+    b = np.append(b, False) # append one ince np.diff loses one element in arr
+    thresh = hist_centers[b] + 0.07
+    mask = naive_thresh_logits(prob_map, thresh)
+    return mask
+
 
 def cv2_opening(mask):
     mask[mask > 0] = 1
@@ -210,7 +219,7 @@ def inv_dist_watershed(inst_map, win_size=13):
     # watershed
     mask = segm.watershed(-distmap, markers, mask=ann, watershed_line=True)
     
-    # remove small cells. Will enhance PQ a lot '(HACKish)'
+    # remove small cells. Will enhance PQ a lot (HACKish)
     mask[mask > 0] = 1
     mask = morph.remove_small_objects(mask.astype(bool), min_size=100)
     inst_map = ndi.label(mask)[0]

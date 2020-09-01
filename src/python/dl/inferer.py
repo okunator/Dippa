@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 from skimage.filters import difference_of_gaussians
-from skimage.exposure import histogram
 from collections import OrderedDict
 from multiprocessing import Pool
 
@@ -104,7 +103,7 @@ class Inferer(ProjectFileManager):
             class_dict
         )
     
-            
+    
     @property
     def stride_size(self):
         return self.input_size//2
@@ -139,6 +138,11 @@ class Inferer(ProjectFileManager):
         return self.data_folds[self.fold]["mask"]
     
     
+    @property
+    def get_model(self, model="best"):
+        assert model in ("best", "last"), "model param needs to be one of ('best', 'last')"
+    
+    
     def __read_img(self, path):
         return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
     
@@ -152,7 +156,7 @@ class Inferer(ProjectFileManager):
     
     
     def __to_device(self, tensor):
-        if torch.cuda.is_available(): # and not self.test_time_augs:
+        if torch.cuda.is_available():
             tensor = tensor.type("torch.cuda.FloatTensor")
         else:
             tensor = tensor.type("torch.FloatTensor")
@@ -215,9 +219,9 @@ class Inferer(ProjectFileManager):
         """
         for c in range(len(self.classes)):
             prob_map[c, ...] = difference_of_gaussians(prob_map[c, ...], 1, 50)
-            prob_map[c, ...] = torch.from_numpy(prob_map[c, ...]).relu().cpu().numpy()
+            prob_map[c, ...] = activation(prob_map[c, ...], 'relu')
             prob_map[c, ...] = difference_of_gaussians(prob_map[c, ...], 1, 10)
-            prob_map[c, ...] = torch.from_numpy(prob_map[c, ...]).sigmoid().cpu().numpy()
+            prob_map[c, ...] = activation(prob_map[c, ...], 'sigmoid')
         return prob_map
 
     
@@ -377,7 +381,7 @@ class Inferer(ProjectFileManager):
         """
         Plot the binary segmentations after running post_processing.
         """
-        
+        #TODO: Fix take of gt masks here
         assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
     
         fig, axes = plt.subplots(len(self.images), 3, figsize=(65, len(self.images)*12))
@@ -402,22 +406,12 @@ class Inferer(ProjectFileManager):
                                postproc_func=inv_dist_watershed):
         # threshold first
         if self.smoothen:
-            # Find the steepest drop in the histogram
-            hist, hist_centers = histogram(prob_map)
-            d = np.diff(hist)
-            b = d == np.min(d)
-            b = np.append(b, False) # append one ince np.diff loses one element in arr
-            thresh = hist_centers[b] + 0.05
-            mask = naive_thresh_logits(prob_map, thresh)
+            mask = smoothed_thresh(prob_map)
         else:
             mask = naive_thresh(prob_map, thresh)
                 
         # post-processing after thresholding
-        mask = postproc_func(mask, 15)
-        mask[mask > 0] = 1
-        mask = ndi.binary_fill_holes(mask)
-        mask = ndi.label(mask)[0]        
-        return mask
+        return postproc_func(mask)        
     
     
     def _compute_metrics(self, true, pred):
@@ -483,7 +477,7 @@ class Inferer(ProjectFileManager):
             
         # Create pandas df of the result metrics
         score_df = pd.DataFrame(self.metrics).transpose()
-        score_df.loc["averages for the test set"] = score_df.mean(axis=0)
+        score_df.loc["averages for the set"] = score_df.mean(axis=0)
         return score_df
     
     
