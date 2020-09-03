@@ -255,56 +255,73 @@ class PatchWriter(ProjectFileManager):
         hdf5.close()
         
     
-    def viz_pannuke_patches(self):
-        # TODO
-        pass
+    def __viz_pannuke_patches(self, phase, img_type):
+        img_paths = self.data_folds[phase]["img"]
+        mask_paths = self.data_folds[phase]["mask"]
+        idxs = np.random.randint(low = 0, high=len(img_paths), size=25)
+        
+        fig, ax = plt.subplots(5 , 5, figsize=(50,50))
+        ax = ax.flatten()
+        for i, idx in enumerate(idxs):
+            if img_type == "img":
+                io = self.__read_img(img_paths[idx])
+            elif img_type == "mask":
+                io = self.__read_mask(mask_paths[idx])
+            else:
+                im = self.__read_img(img_paths[idx])
+                mask = self.__read_mask(mask_paths[idx])
+                io = np.where(mask[..., None], im, 0)
+            ax[i].imshow(io)
+        
     
     
-    def viz_patches_example(self, index, img_type="img", phase="train"):
+    def viz_patches_example(self, index=1, img_type="img", phase="train"):
         # This is fugly as heck... 
-        assert self.dataset != "pannuke", "pannuke is patched. Patch extractor is not used for it"
         assert img_type in ("img", "mask", "overlay") 
         assert phase in ("train", "test", "valid")            
-            
-        img_path = self.data_folds[phase]["img"][index]
-        mask_path = self.data_folds[phase]["mask"][index]
-        im = self.__read_img(img_path)
-        mask = self.__read_mask(mask_path)
-        overlay = np.where(mask[..., None], im, 0)
-        mask = mask[..., None].repeat(3, axis=2)
-        patches_im = self.xtractor.extract(im, 'mirror')
-        patches_mask = self.xtractor.extract(mask, 'mirror')
-        patches_mask = patches_mask[..., 0].squeeze()
         
-        if self.crop_to_input:
-            patches_im, patches_mask, patches_overlay = self.__augment_patches(
-                patches_im, patches_mask, do_overlay=True
-            )
+        if self.dataset == "pannuke":
+            self.__viz_pannuke_patches(phase, img_type)
         else:
-            patches_overlay = self.xtractor.extract(overlay, 'mirror')
-            
-        if img_type == "img":
-            patches = patches_im
-        elif img_type == "mask":
-            patches = patches_mask
-        else:
-            patches = patches_overlay
-        
-        fignum=200
-        low=0
-        high=len(patches)
+            img_path = self.data_folds[phase]["img"][index]
+            mask_path = self.data_folds[phase]["mask"][index]
+            im = self.__read_img(img_path)
+            mask = self.__read_mask(mask_path)
+            overlay = np.where(mask[..., None], im, 0)
+            mask = mask[..., None].repeat(3, axis=2)
+            patches_im = self.xtractor.extract(im, 'mirror')
+            patches_mask = self.xtractor.extract(mask, 'mirror')
+            patches_mask = patches_mask[..., 0].squeeze()
 
-        # Visualize
-        fig_patches = plt.figure(fignum, figsize=(35,35))
-        pmin, pmax = patches.min(), patches.max()
-        dims = np.ceil(np.sqrt(high - low))
-        for idx in range(high - low):
-            spl = plt.subplot(dims, dims, idx + 1)
-            ax = plt.axis('off')
-            imm = plt.imshow(patches[idx].astype('uint8'))
-            cl = plt.clim(pmin, pmax)
-        plt.show()
-        return patches.shape
+            if self.crop_to_input:
+                patches_im, patches_mask, patches_overlay = self.__augment_patches(
+                    patches_im, patches_mask, do_overlay=True
+                )
+            else:
+                patches_overlay = self.xtractor.extract(overlay, 'mirror')
+
+            if img_type == "img":
+                patches = patches_im
+            elif img_type == "mask":
+                patches = patches_mask
+            else:
+                patches = patches_overlay
+
+            fignum=200
+            low=0
+            high=len(patches)
+
+            # Visualize
+            fig_patches = plt.figure(fignum, figsize=(35,35))
+            pmin, pmax = patches.min(), patches.max()
+            dims = np.ceil(np.sqrt(high - low))
+            for idx in range(high - low):
+                spl = plt.subplot(dims, dims, idx + 1)
+                ax = plt.axis('off')
+                imm = plt.imshow(patches[idx].astype('uint8'))
+                cl = plt.clim(pmin, pmax)
+            plt.show()
+            return patches.shape
 
 
     def write_dbs(self):

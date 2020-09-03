@@ -32,7 +32,7 @@ class Inferer(ProjectFileManager):
                  fold,
                  test_time_augs,
                  class_dict,
-                 verbose=True):
+                 verbose):
         """
         Inferer for any of the models that are trained with lightning framework 
         in this project (defined in lightning_model.py)
@@ -69,6 +69,7 @@ class Inferer(ProjectFileManager):
         self.fold = fold
         self.test_time_augs = test_time_augs
         self.classes = class_dict
+        self.verbose = verbose
         
         # init containers for resluts
         self.soft_maps = OrderedDict()
@@ -87,6 +88,7 @@ class Inferer(ProjectFileManager):
         smoothen = conf["inference_args"]["smoothen"]
         fold = conf["inference_args"]["data_fold"]
         test_time_augs = conf["inference_args"]["test_time_augmentation"]
+        verbose = conf["inference_args"]["verbose"]
         class_type = conf["dataset"]["args"]["class_types"]
         class_dict = conf["dataset"]["class_dicts"][class_type] # clumsy
         
@@ -101,7 +103,8 @@ class Inferer(ProjectFileManager):
             smoothen,
             fold,
             test_time_augs,
-            class_dict
+            class_dict,
+            verbose
         )
     
     
@@ -131,6 +134,7 @@ class Inferer(ProjectFileManager):
     
     @property
     def get_model(self, model="best"):
+        #TODO: get the best or the last model based on config
         assert model in ("best", "last"), "model param needs to be one of ('best', 'last')"
     
     
@@ -154,38 +158,28 @@ class Inferer(ProjectFileManager):
         return tensor
     
     
-    def __divide_batch(self, arr, batch_size):
+    def __predict_batch(self, batch, batch_size):
         """
-        Divide image array into batches similarly to DataLoader in pytorch
+        Do a prediction for a batch of size self.batch_size, or for a single patch i.e 
+        batch_size = 1. If tta is used or dataset is pannuke then batch_size = 1. Otherwise
+        batch size will be self.batch_size
         """
-        for i in range(0, arr.shape[0], batch_size):  
-            yield arr[i:i + batch_size, ::] 
-    
-            
-    def __extract_patches(self, im):
-        # add reflection padding
-        pad = self.stride_size//2
-        io = np.pad(im, [(pad, pad), (pad, pad), (0, 0)], mode="reflect")
-
-        # add extra padding to match an exact multiple of 32 (unet) patch size, 
-        extra_pad_row = int(np.ceil(io.shape[0] / self.input_size)*self.input_size - io.shape[0])
-        extra_pad_col = int(np.ceil(io.shape[1] / self.input_size)*self.input_size - io.shape[1])
-        io = np.pad(io, [(0, extra_pad_row), (0, extra_pad_col), (0, 0)], mode="constant")
-        
-        # extract the patches from input images
-        arr_out = sklearn.feature_extraction.image.extract_patches(
-            io, (self.input_size, self.input_size, 3), self.stride_size
-        )
-        
-        # shape the dimensions to correct sizes for pytorch model
-        arr_out_shape = arr_out.shape
-        arr_out = arr_out.reshape(-1, self.input_size, self.input_size, 3)
-        return arr_out, arr_out_shape
+        if batch_size == 1:
+            tensor = self.__to_device(torch.from_numpy(batch.transpose(2, 0, 1))[None, ...])
+            out_batch = self.model(tensor).detach().cpu().numpy().squeeze().transpose(1, 2, 0)
+        else:
+            tensor = self.__to_device(torch.from_numpy(batch.transpose(0, 3, 1, 2)))
+            # out_batch = self.tta_model(batch) # ttach tta prediction
+            out_batch = self.model(tensor).detach().cpu().numpy()
+        return out_batch
     
 
     def __ensemble_predict(self, patch):
         """
         Own implementation of tta ensemble prediction pipeline (memory issues with ttach).
+        This will loop every patch in a batch and do an ensemble prediction for every 
+        single patch.
+        
         Following instructions of 'beneficial augmentations' from:
         
         "Towards Principled Test-Time Augmentation"
@@ -214,8 +208,7 @@ class Inferer(ProjectFileManager):
         # flip ttas
         for aug, deaug in zip(tta_augs(), tta_deaugs()):
             aug_input = aug(image = patch)
-            tensor = self.__to_device(torch.from_numpy(aug_input["image"].transpose(2, 0, 1))[None, ...])
-            aug_output = self.model(tensor).detach().cpu().numpy().squeeze().transpose(1, 2, 0)
+            aug_output = self.__predict_batch(aug_input["image"], 1)
             deaug_output = deaug(image = aug_output)
             soft_masks.append(deaug_output["image"])
             
@@ -226,8 +219,7 @@ class Inferer(ProjectFileManager):
         for crop in tta_five_crops(patch):
             cropped_im = crop(image = patch)
             scaled_im = scale_up(image = cropped_im["image"])
-            tensor = self.__to_device(torch.from_numpy(scaled_im["image"].transpose(2, 0, 1))[None, ...])
-            output = self.model(tensor).detach().cpu().numpy().squeeze().transpose(1, 2, 0)
+            output = self.__predict_batch(scaled_im["image"], 1)
             downscaled_out = scale_down(image = output)
             out[crop.y_min:crop.y_max, crop.x_min:crop.x_max] = downscaled_out["image"]
             soft_masks.append(out)
@@ -250,7 +242,15 @@ class Inferer(ProjectFileManager):
             prob_map[c, ...] = difference_of_gaussians(prob_map[c, ...], 1, 10)
             prob_map[c, ...] = activation(prob_map[c, ...], 'sigmoid')
         return prob_map
-
+    
+    
+    def __divide_batch(self, arr, batch_size):
+        """
+        Divide patched image array into batches similarly to DataLoader in pytorch
+        """
+        for i in range(0, arr.shape[0], batch_size):  
+            yield arr[i:i + batch_size, ::] 
+    
     
     def __process_batch(self, batch):
         """
@@ -259,10 +259,7 @@ class Inferer(ProjectFileManager):
         # shape for pytorch and predict
         out_batch = np.zeros((batch.shape[0], len(self.classes), self.input_size, self.input_size))
         if not self.test_time_augs:
-            out_batch = self.__to_device(torch.from_numpy(batch.transpose(0, 3, 1, 2)))
-            #batch = self.tta_model(batch) # ttach tta prediction
-            out_batch = self.model(out_batch)
-            out_batch = out_batch.detach().cpu().numpy()
+            out_batch = self.__predict_batch(batch, self.batch_size)
             
         for i in range(batch.shape[0]):
             if self.test_time_augs:
@@ -270,12 +267,16 @@ class Inferer(ProjectFileManager):
             
             if self.smoothen:
                 out_batch[i, ...] = self.__smoothen(out_batch[i, ...])
+            else:
+                out_batch[i, ...] = activation(out_batch[i, ...], "sigmoid")
                     
         return out_batch
     
     
     def __predict_patches(self, im_patches):
-        # Use model to predict batches
+        """
+        Divide patched image to batches and process and run predictions for batches.
+        """
         pred_patches = np.zeros((0, len(self.classes), self.input_size, self.input_size))
         for batch in self.__divide_batch(im_patches, self.batch_size):            
             pred_batch = self.__process_batch(batch)
@@ -283,6 +284,30 @@ class Inferer(ProjectFileManager):
 
         pred_patches = pred_patches.transpose((0, 2, 3, 1))
         return pred_patches
+    
+    
+    def __extract_patches(self, im):
+        """
+        Extract network input sized patches from images bigger than the network input size
+        """
+        # add reflection padding
+        pad = self.stride_size//2
+        io = np.pad(im, [(pad, pad), (pad, pad), (0, 0)], mode="reflect")
+
+        # add extra padding to match an exact multiple of 32 (unet) patch size, 
+        extra_pad_row = int(np.ceil(io.shape[0] / self.input_size)*self.input_size - io.shape[0])
+        extra_pad_col = int(np.ceil(io.shape[1] / self.input_size)*self.input_size - io.shape[1])
+        io = np.pad(io, [(0, extra_pad_row), (0, extra_pad_col), (0, 0)], mode="constant")
+        
+        # extract the patches from input images
+        arr_out = sklearn.feature_extraction.image.extract_patches(
+            io, (self.input_size, self.input_size, 3), self.stride_size
+        )
+        
+        # shape the dimensions to correct sizes for pytorch model
+        arr_out_shape = arr_out.shape
+        arr_out = arr_out.reshape(-1, self.input_size, self.input_size, 3)
+        return arr_out, arr_out_shape
         
     
     def __stitch_patches(self, pred_patches, im_shape, patches_shape):
@@ -310,7 +335,7 @@ class Inferer(ProjectFileManager):
         pred = pred[0:im_shape[0], 0:im_shape[1], :]
         return pred
 
-            
+    
     def run(self):
         """
         Do inference on the given dataset, with the pytorch lightining model that 
@@ -324,7 +349,7 @@ class Inferer(ProjectFileManager):
         
         if len(self.soft_maps) > 0:
             print("Clearing previous predictions")
-            clear_predictions()
+            self.clear_predictions()
                     
         for i, path in enumerate(self.images):
             fn = self.__get_fn(path)
@@ -332,9 +357,21 @@ class Inferer(ProjectFileManager):
                 print(f"Prediction for: {fn}")
                 
             im = self.__read_img(path)
-            im_patches, patches_shape = self.__extract_patches(im)
-            pred_patches = self.__predict_patches(im_patches)
-            result_pred = self.__stitch_patches(pred_patches, im.shape, patches_shape)
+            if self.dataset == "pannuke":
+                # Pannuke deviates from othe datasets so it needs to be processed differently.
+                if self.test_time_augs:
+                    result_pred = self.__ensemble_predict(im)
+                else:
+                    result_pred = self.__predict_batch(im, 1)
+                if self.smoothen:
+                    result_pred = self.__smoothen(result_pred)
+                else:
+                    result_pred = activation(result_pred, "sigmoid")
+            else:
+                im_patches, patches_shape = self.__extract_patches(im)
+                pred_patches = self.__predict_patches(im_patches)
+                result_pred = self.__stitch_patches(pred_patches, im.shape, patches_shape)
+                
             nuc_map = result_pred[..., 1]
             bg_map = result_pred[..., 0]
             self.soft_maps[f"{fn}_nuc_map"] = nuc_map

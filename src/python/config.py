@@ -6,7 +6,7 @@ conf = OmegaConf.create(
         "dataset": {
             "args": {
                 # What dataset you want to use? Has to be one of ("kumar", "consep", "pannuke")
-                "dataset":"kumar", 
+                "dataset":"pannuke", 
                 
                 # This depends on the dataset. Binary segmentation can be done to all datasets
                 # change this according to your needs. has to be one of ("binary", "consep", "pannuke")
@@ -110,7 +110,7 @@ conf = OmegaConf.create(
         "patching_args":{
             "patch_size":512, # Size of an image patch that gets written to hdf5 db
             "stride_size":96, # Size of window stride
-            "input_size":256, # network input size
+            "input_size":256, # network input size (multiple of 32)
             "crop_to_input":True,
             "verbose":False
         },
@@ -142,9 +142,10 @@ conf = OmegaConf.create(
         
         # Inference args
         "inference_args" : {
-            "smoothen":True, # Inference time slightly slower. Recommended
+            "smoothen":False, # Inference time slightly slower. Recommended
             "data_fold":"test", # what data fold (phase) to use in inference
-            "test_time_augmentation":True, # Inference time slightly slower. Recommended
+            "test_time_augmentation":False, # Inference time slightly slower. Recommended
+            "verbose":True,
         }
     }
 )
