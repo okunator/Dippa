@@ -6,7 +6,7 @@ conf = OmegaConf.create(
         "dataset": {
             "args": {
                 # What dataset you want to use? Has to be one of ("kumar", "consep", "pannuke")
-                "dataset":"pannuke", 
+                "dataset":"consep", 
                 
                 # This depends on the dataset. Binary segmentation can be done to all datasets
                 # change this according to your needs. has to be one of ("binary", "consep", "pannuke")
@@ -114,14 +114,19 @@ conf = OmegaConf.create(
             "crop_to_input":True,
             "verbose":False
         },
+        
+        # Define the model name and the experiment
+        # These will be used to write the result files to the right folders
+        "experiment_args":{
+            "model_name":"FPN",
+            "experiment_version":"test_consep",
+        },
 
         # Model training args
         "training_args": {
-            "model_name":"FPN",
-            "experiment_version":"test99",
             "batch_size":6,
-            "resume_training":True, # continue training where you left off?
-            "num_epochs":50,
+            "resume_training":False, # continue training where you left off?
+            "num_epochs":30,
             "num_gpus":1,
             "optimizer_args":{
                 "lr":0.001,
@@ -142,9 +147,13 @@ conf = OmegaConf.create(
         
         # Inference args
         "inference_args" : {
-            "smoothen":False, # Inference time slightly slower. Recommended
+            "smoothen":False, # Inference time slightly slower. Gets rid of checkerboard. May lower PQ.
             "data_fold":"test", # what data fold (phase) to use in inference
-            "test_time_augmentation":False, # Inference time slightly slower. Recommended
+            "test_time_augmentation":True, # Inference time slightly slower
+            "threshold":0.5, # if smoothen is not used, then this is used for threshing soft masks
+            # For each experiment the model weights at the final epoch and best model against validation 
+            # data will be saved. Choose one of ('best', 'last')
+            "model_weights":"best",
             "verbose":True,
         }
     }

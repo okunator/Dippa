@@ -13,10 +13,21 @@ from collections import OrderedDict
 from multiprocessing import Pool
 
 from utils.file_manager import ProjectFileManager
-from img_processing.post_processing import activation, naive_thresh, smoothed_thresh, inv_dist_watershed
-from img_processing.augmentations import tta_augs, tta_deaugs, tta_five_crops, resize
 from img_processing.process_utils import remap_label
-from metrics.metrics import PQ, AJI, AJI_plus, DICE2, split_and_merge
+from img_processing.post_processing import (activation, 
+                                            naive_thresh_logits, 
+                                            smoothed_thresh, 
+                                            inv_dist_watershed)
+
+from img_processing.augmentations import (tta_augs,
+                                          tta_deaugs,
+                                          tta_five_crops,
+                                          resize)
+from metrics.metrics import (PQ,
+                             AJI,
+                             AJI_plus,
+                             DICE2,
+                             split_and_merge)
 
 
 class Inferer(ProjectFileManager):
@@ -31,6 +42,7 @@ class Inferer(ProjectFileManager):
                  smoothen,
                  fold,
                  test_time_augs,
+                 threshold,
                  class_dict,
                  verbose):
         """
@@ -55,6 +67,7 @@ class Inferer(ProjectFileManager):
             test_time_augs (bool) : apply test time augmentations with ttatch library. TTA takes so
                                     much memory that the inference is automatically done on CPU.
                                     Note that TTA increases inferece time significantly.
+            threshold (float) : threshold for the softmasks that have values b/w [0, 1]
             class_dict (Dict) : the dict specifying pixel classes. e.g. {"background":0,"nuclei":1}
             verbose (bool) : wether or not to print the progress of running inference
         """
@@ -68,6 +81,7 @@ class Inferer(ProjectFileManager):
         self.verbose = verbose
         self.fold = fold
         self.test_time_augs = test_time_augs
+        self.thresh = threshold
         self.classes = class_dict
         self.verbose = verbose
         
@@ -88,6 +102,7 @@ class Inferer(ProjectFileManager):
         smoothen = conf["inference_args"]["smoothen"]
         fold = conf["inference_args"]["data_fold"]
         test_time_augs = conf["inference_args"]["test_time_augmentation"]
+        thresh = conf["inference_args"]["threshold"]
         verbose = conf["inference_args"]["verbose"]
         class_type = conf["dataset"]["args"]["class_types"]
         class_dict = conf["dataset"]["class_dicts"][class_type] # clumsy
@@ -103,6 +118,7 @@ class Inferer(ProjectFileManager):
             smoothen,
             fold,
             test_time_augs,
+            thresh,
             class_dict,
             verbose
         )
@@ -252,34 +268,30 @@ class Inferer(ProjectFileManager):
             yield arr[i:i + batch_size, ::] 
     
     
-    def __process_batch(self, batch):
-        """
-        Do inference to one batch based on the user options (tta, smoothen etc)
-        """
-        # shape for pytorch and predict
-        out_batch = np.zeros((batch.shape[0], len(self.classes), self.input_size, self.input_size))
-        if not self.test_time_augs:
-            out_batch = self.__predict_batch(batch, self.batch_size)
-            
-        for i in range(batch.shape[0]):
-            if self.test_time_augs:
-                out_batch[i, ...] = self.__ensemble_predict(batch[i, ...])
-            
-            if self.smoothen:
-                out_batch[i, ...] = self.__smoothen(out_batch[i, ...])
-            else:
-                out_batch[i, ...] = activation(out_batch[i, ...], "sigmoid")
-                    
-        return out_batch
-    
-    
     def __predict_patches(self, im_patches):
         """
         Divide patched image to batches and process and run predictions for batches.
+        Pannuke imgs are not divided to patches and are utilized as is.
         """
         pred_patches = np.zeros((0, len(self.classes), self.input_size, self.input_size))
-        for batch in self.__divide_batch(im_patches, self.batch_size):            
-            pred_batch = self.__process_batch(batch)
+        for batch in self.__divide_batch(im_patches, self.batch_size):
+            
+            pred_batch = np.zeros(
+                (batch.shape[0], len(self.classes), self.input_size, self.input_size)
+            )
+            
+            if not self.test_time_augs:
+                pred_batch = self.__predict_batch(batch, self.batch_size)
+
+            for i in range(batch.shape[0]):
+                if self.test_time_augs:
+                    pred_batch[i, ...] = self.__ensemble_predict(batch[i, ...])
+
+                if self.smoothen:
+                    pred_batch[i, ...] = self.__smoothen(pred_batch[i, ...])
+                else:
+                    pred_batch[i, ...] = activation(pred_batch[i, ...], "sigmoid")
+                    
             pred_patches = np.append(pred_patches, pred_batch, axis=0)
 
         pred_patches = pred_patches.transpose((0, 2, 3, 1))
@@ -358,146 +370,52 @@ class Inferer(ProjectFileManager):
                 
             im = self.__read_img(path)
             if self.dataset == "pannuke":
-                # Pannuke deviates from othe datasets so it needs to be processed differently.
-                if self.test_time_augs:
-                    result_pred = self.__ensemble_predict(im)
-                else:
-                    result_pred = self.__predict_batch(im, 1)
-                if self.smoothen:
-                    result_pred = self.__smoothen(result_pred)
-                else:
-                    result_pred = activation(result_pred, "sigmoid")
+                result_pred = self.__predict_patches(im[None, ...])
+                result_pred = result_pred.squeeze()
             else:
                 im_patches, patches_shape = self.__extract_patches(im)
                 pred_patches = self.__predict_patches(im_patches)
                 result_pred = self.__stitch_patches(pred_patches, im.shape, patches_shape)
-                
+            
             nuc_map = result_pred[..., 1]
             bg_map = result_pred[..., 0]
             self.soft_maps[f"{fn}_nuc_map"] = nuc_map
             self.soft_maps[f"{fn}_bg_map"] = bg_map
             
-                
-    def plot_predictions(self):
-        """
-        Plot the probability maps after running inference.
-        """
-        
-        assert len(self.soft_maps) != 0, "No predictions found"
     
-        fig, axes = plt.subplots(len(self.images), 3, figsize=(65, len(self.images)*12))
-        fig.tight_layout(w_pad=4, h_pad=4)
-        for i, path in enumerate(self.images):
-            fn = self.__get_fn(path)
-            gt = scipy.io.loadmat(self.gt_masks[i])
-            gt = gt["inst_map"]
-            nuc_map = self.soft_maps[f"{fn}_nuc_map"]
-            bg_map = self.soft_maps[f"{fn}_bg_map"]
-            axes[i][0].imshow(nuc_map, interpolation="none")
-            axes[i][0].axis("off")
-
-            axes[i][1].imshow(bg_map, interpolation="none")
-            axes[i][1].axis("off")
-
-            axes[i][2].imshow(gt, interpolation="none")
-            axes[i][2].axis("off")
-            
-            
-    def plot_histograms(self):
-        """
-        Plot the histograms of the probability maps after running inference.
-        """
-        
-        assert len(self.soft_maps) != 0, "No predictions found"
-        
-        figg, axes = plt.subplots(len(self.images)//3, 4, figsize=(30,15))
-        axes = axes.flatten()
-        for i, path in enumerate(self.images):
-            fn = self.__get_fn(path)
-            nuc_map = self.soft_maps[f"{fn}_nuc_map"]
-            hist, hist_centers = histogram(nuc_map)
-            axes[i].plot(hist_centers, hist, lw=2)
-            
-            
-    def save_outputs(self, output_dir):
-        """
-        Save predictions to .mat files (python dictionary). Key for accessing after
-        reading one file is "pred_map":
-        
-        f = scipy.io.loadmat(file)
-        f = f["pred_map"]
-        
-        Args:
-            output_dir (str) : path to the directory where predictions are saved.
-        """
-        
-        assert len(self.soft_maps) != 0, "No predictions found"
-        
-        for i, path in enumerate(self.images):
-            fn = self.__get_fn(path)
-            new_fn = fn + "_pred_map.mat"
-            print("saving: ", fn)
-            nuc_map = self.soft_maps[f"{fn}_nuc_map"]
-            # scipy.io.savemat(new_fn, mdict={"pred_map": nuc_map})
-            
-            
-    def plot_segmentations(self):
-        """
-        Plot the binary segmentations after running post_processing.
-        """
-        #TODO: Fix take of gt masks here
-        assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
-    
-        fig, axes = plt.subplots(len(self.images), 3, figsize=(65, len(self.images)*12))
-        fig.tight_layout(w_pad=4, h_pad=4)
-        for i, path in enumerate(self.images):
-            fn = self.__get_fn(path)
-            gt = self.__read_mask(self.gt_masks[i])
-            inst_map = self.inst_maps[f"{fn}_inst_map"]
-            nuc_map = self.soft_maps[f"{fn}_nuc_map"]
-            
-            axes[i][0].imshow(nuc_map, interpolation="none")
-            axes[i][0].axis("off")
-            
-            axes[i][1].imshow(inst_map, interpolation="none")
-            axes[i][1].axis("off")
-
-            axes[i][2].imshow(gt, interpolation="none")
-            axes[i][2].axis("off")
-    
-    
-    def _post_process_pipeline(self, prob_map, thresh=2, 
+    def _post_process_pipeline(self, prob_map, thresh, 
                                postproc_func=inv_dist_watershed):
         # threshold first
         if self.smoothen:
             mask = smoothed_thresh(prob_map)
         else:
-            mask = naive_thresh(prob_map, thresh)
+            mask = naive_thresh_logits(prob_map, thresh)
                 
         # post-processing after thresholding
         return postproc_func(mask)        
     
     
     def _compute_metrics(self, true, pred):
-        # Count scores for each file
-        pq = PQ(remap_label(true), remap_label(pred))
-        aji = AJI(remap_label(true), remap_label(pred))
-        aji_p = AJI_plus(remap_label(true), remap_label(pred))
-        dice2 = DICE2(remap_label(true), remap_label(pred))
-        splits, merges = split_and_merge(remap_label(true), remap_label(pred))
-        
-        return {
-            "AJI": aji, 
-            "AJI plus": aji_p, 
-            "DICE2": dice2, 
-            "PQ": pq["pq"], # panoptic quality
-            "SQ": pq["sq"], # segmentation quality
-            "DQ": pq["dq"], # Detection quality i.e. F1-score
-            "inst Sensitivity": pq["sensitivity"],
-            "inst Precision": pq["precision"],
-            "splits":splits,
-            "merges":merges
-        }
+        # Count scores for each file if gt has annotations
+        if len(np.unique(true)) > 1: 
+            pq = PQ(remap_label(true), remap_label(pred))
+            aji = AJI(remap_label(true), remap_label(pred))
+            aji_p = AJI_plus(remap_label(true), remap_label(pred))
+            dice2 = DICE2(remap_label(true), remap_label(pred))
+            splits, merges = split_and_merge(remap_label(true), remap_label(pred))
+
+            return {
+                "AJI": aji, 
+                "AJI plus": aji_p, 
+                "DICE2": dice2, 
+                "PQ": pq["pq"], # panoptic quality
+                "SQ": pq["sq"], # segmentation quality
+                "DQ": pq["dq"], # Detection quality i.e. F1-score
+                "inst Sensitivity": pq["sensitivity"],
+                "inst Precision": pq["precision"],
+                "splits":splits,
+                "merges":merges
+            }
 
             
     def post_process(self):
@@ -508,11 +426,18 @@ class Inferer(ProjectFileManager):
         assert self.soft_maps, f"{self.soft_maps}, No predictions found. Run predictions first"
         self.model.cpu() # put model to cpu (avoid pool errors)
         
-        preds = [self.soft_maps[key] for key in self.soft_maps.keys() if key.endswith("nuc_map")]
+        preds = [(self.soft_maps[key], self.thresh) 
+                 for key in self.soft_maps.keys() 
+                 if key.endswith("nuc_map")]
         
-        segs = None
-        with Pool() as pool:
-            segs = pool.map(self._post_process_pipeline, preds)
+        segs = []
+        if self.dataset == "pannuke":
+            # Pool fails when using pannuke for some reason 
+            for pred in preds:
+                segs.append(self._post_process_pipeline(pred, self.thresh))
+        else:     
+            with Pool() as pool:
+                segs = pool.starmap(self._post_process_pipeline, preds)
         
         for i, path in enumerate(self.images):
             fn = self.__get_fn(path)
@@ -531,9 +456,14 @@ class Inferer(ProjectFileManager):
         gts = [self.__read_mask(f) for f in self.gt_masks]
         params_list = list(zip(gts, inst_maps))
         
-        metrics = None
-        with Pool() as pool:
-            metrics = pool.starmap(self._compute_metrics, params_list)
+        metrics = []
+        if self.dataset == "pannuke":
+            # Pool fails when using pannuke for some reason
+            for true, pred in params_list:
+                metrics.append(self._compute_metrics(true, pred))
+        else:
+            with Pool() as pool:
+                metrics = pool.starmap(self._compute_metrics, params_list)
         
         for i, path in enumerate(self.images):
             fn = self.__get_fn(path)
@@ -557,9 +487,108 @@ class Inferer(ProjectFileManager):
         pass
     
     
-    def __infer_pannuke(self):
-        # TODO
-        pass
+    def plot_predictions(self):
+        """
+        Plot the probability maps after running inference.
+        """
+        
+        assert len(self.soft_maps) != 0, "No predictions found"
+    
+        fig, axes = plt.subplots(len(self.images), 3, figsize=(65, len(self.images)*12))
+        fig.tight_layout(w_pad=4, h_pad=4)
+        for i, path in enumerate(self.images):
+            fn = self.__get_fn(path)
+            gt = scipy.io.loadmat(self.gt_masks[i])
+            gt = gt["inst_map"]
+            nuc_map = self.soft_maps[f"{fn}_nuc_map"]
+            bg_map = self.soft_maps[f"{fn}_bg_map"]
+            axes[i][0].imshow(nuc_map, interpolation="none")
+            axes[i][0].axis("off")
+
+            axes[i][1].imshow(bg_map, interpolation="none")
+            axes[i][1].axis("off")
+
+            axes[i][2].imshow(gt, interpolation="none")
+            axes[i][2].axis("off")
+
+
+    def __sample_idxs(self):
+        """
+        Sample paths of images given a list of image paths
+        """
+        return np.random.randint(low = 0, high=len(self.images), size=25)
+    
+    
+    def plot_histograms(self):
+        """
+        Plot the histograms of the probability maps after running inference.
+        """
+        
+        assert self.soft_maps, "No predictions found"
+        idxs = self.__sample_idxs()
+        images = np.asarray(self.images)[idxs] if self.dataset == "pannuke" else self.images 
+        
+        figg, axes = plt.subplots(len(images)//3, 4, figsize=(30,15))
+        axes = axes.flatten()
+        for i, path in enumerate(images):
+            fn = self.__get_fn(path)
+            nuc_map = self.soft_maps[f"{fn}_nuc_map"]
+            hist, hist_centers = histogram(nuc_map)
+            axes[i].plot(hist_centers, hist, lw=2)
+            
+            
+    def save_outputs(self, output_dir):
+        """
+        Save predictions to .mat files (python dictionary). Key for accessing after
+        reading one file is "pred_map":
+        
+        f = scipy.io.loadmat(file)
+        f = f["pred_map"]
+        
+        Args:
+            output_dir (str) : path to the directory where predictions are saved.
+        """
+        
+        assert self.soft_maps, "No predictions found"
+        
+        for i, path in enumerate(self.images):
+            fn = self.__get_fn(path)
+            new_fn = fn + "_pred_map.mat"
+            print("saving: ", fn)
+            nuc_map = self.soft_maps[f"{fn}_nuc_map"]
+            # scipy.io.savemat(new_fn, mdict={"pred_map": nuc_map})
+            
+            
+    def plot_segmentations(self):
+        """
+        Plot the binary segmentations after running post_processing.
+        """
+        #TODO: Fix take of gt masks here
+        assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
+        idxs = self.__sample_idxs()
+        images = np.asarray(self.images)[idxs] if self.dataset == "pannuke" else self.images
+        gt_masks = np.asarray(self.gt_masks)[idxs] if self.dataset == "pannuke" else self.gt_masks
+    
+        fig, axes = plt.subplots(len(images), 4, figsize=(65, len(images)*12))
+        fig.tight_layout(w_pad=4, h_pad=4)
+        for i, path in enumerate(images):
+            fn = self.__get_fn(path)
+            im = self.__read_img(images[i])
+            gt = self.__read_mask(gt_masks[i])
+            inst_map = self.inst_maps[f"{fn}_inst_map"]
+            nuc_map = self.soft_maps[f"{fn}_nuc_map"]
+            
+            axes[i][0].imshow(im, interpolation="none")
+            axes[i][0].axis("off")
+            
+            axes[i][1].imshow(nuc_map, interpolation="none")
+            axes[i][1].axis("off")
+            
+            axes[i][2].imshow(inst_map, interpolation="none")
+            axes[i][2].axis("off")
+
+            axes[i][3].imshow(gt, interpolation="none")
+            axes[i][3].axis("off")
     
 
             

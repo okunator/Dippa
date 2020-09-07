@@ -11,23 +11,6 @@ from scipy import ndimage as ndi
 from .process_utils import *
 
 
-def medfilter_instances(seg):
-    # Median filter each unique instance to smoothen the borders of nucleis
-    shape = seg.shape[:2]
-    ann = ndi.label(seg)[0]
-    nuc_list = list(np.unique(ann))
-    nuc_list.remove(0) # 0 is background
-
-    filtmap = np.zeros(shape, dtype=np.uint32)    
-    for nuc_id in nuc_list:
-        nuc_map = np.copy(ann == nuc_id)
-        filt = filters.median(nuc_map, disk(2))
-        filt[filt > 0] = 1
-        filtmap += filt
-    
-    return filtmap
-
-
 def activation(prob_map, method='sigmoid'):
     # Activation
     assert method in ('relu', 'celu', 'sigmoid', 'relu-sigmoid', 'celu-sigmoid', 'None')
@@ -58,6 +41,7 @@ def to_inst_map(seg):
 
 def naive_thresh_logits(prob_map, threshold=0.5):
     # Threshold naively when values b/w [0,1]
+    assert 0 <= threshold <= 1, f"thresh = {threshold}. given threshold not between [0,1]"
     seg = prob_map.copy()
     seg = seg > threshold
     inst_map = to_inst_map(seg)
@@ -109,8 +93,8 @@ def smoothed_thresh(prob_map):
     hist, hist_centers = histogram(prob_map)
     d = np.diff(hist)
     b = d == np.min(d)
-    b = np.append(b, False) # append one ince np.diff loses one element in arr
-    thresh = hist_centers[b] + 0.07
+    b = np.append(b, False) # append one since np.diff loses one element in arr
+    thresh = hist_centers[b][0] + 0.07
     mask = naive_thresh_logits(prob_map, thresh)
     return mask
 
@@ -263,3 +247,20 @@ def random_walk(inst_map, contour):
 
     inst_map = ndi.label(labels)[0]
     return inst_map
+
+
+def medfilter_instances(seg):
+    # Median filter each unique instance to smoothen the borders of nucleis
+    shape = seg.shape[:2]
+    ann = ndi.label(seg)[0]
+    nuc_list = list(np.unique(ann))
+    nuc_list.remove(0) # 0 is background
+
+    filtmap = np.zeros(shape, dtype=np.uint32)    
+    for nuc_id in nuc_list:
+        nuc_map = np.copy(ann == nuc_id)
+        filt = filters.median(nuc_map, disk(2))
+        filt[filt > 0] = 1
+        filtmap += filt
+    
+    return filtmap

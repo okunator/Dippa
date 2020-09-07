@@ -224,7 +224,8 @@ def DICE2(true, pred):
             overall_total += total
             overall_inter += inter
 
-    return 2 * overall_inter / overall_total
+    return 2 * overall_inter / (overall_total + 1.0e-6)
+
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
 def PQ(true, pred, match_iou=0.5):

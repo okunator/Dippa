@@ -329,7 +329,7 @@ def plot_metrics(conf, scale="log", metric="loss"):
     assert metric in ("loss", "accuracy", "TNR", "TPR"), "metric not in ('loss', 'accuracy', 'TNR', 'TPR')"
     ldir = Path(conf["paths"]["experiment_root_dir"])
     
-    folder = "version_" + conf["training_args"]["experiment_version"]
+    folder = "version_" + conf["experiment_args"]["experiment_version"]
     logdirs = {folder:x 
                for x in ldir.glob("**/*") 
                if x.is_dir() and str(x).split("/")[-1].startswith("tf")}

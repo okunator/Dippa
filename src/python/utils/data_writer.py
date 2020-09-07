@@ -33,11 +33,11 @@ class PatchWriter(ProjectFileManager):
         The torch dataset class is written to read from the files created by this class.
         
             Args:
-                dataset (str) : one of ('kumar', 'consep', 'pannuke', 'other')
+                dataset (str) : one of ("kumar", "consep", "pannuke", "other")
                 data_dirs (dict) : dictionary of directories containing masks and images. Keys of this
-                                   dict must be the same as ('kumar', 'consep', 'pannuke', 'other')
+                                   dict must be the same as ("kumar", "consep", "pannuke", "other")
                 database_root_dir (str) : directory where the databases are written
-                phases (list) : list of the phases (['train', 'valid', 'test'] or ['train', 'test'])     
+                phases (list) : list of the phases (["train", "valid", "test"] or ["train", "test"])     
                 patch_size (int) : size of a single image patch saved to an HDF5 db
                 stride_size (int) : size of the stride when patching
                 input_size (int) : size of the network input patch
@@ -65,17 +65,17 @@ class PatchWriter(ProjectFileManager):
         
     @classmethod
     def from_conf(cls, conf):
-        dataset = conf['dataset']['args']['dataset']
-        data_dirs = conf['paths']['data_dirs']
-        database_root = conf['paths']['database_root_dir']
-        phases = conf['dataset']['args']['phases']
-        patch_size = conf['patching_args']['patch_size']
-        stride_size = conf['patching_args']['stride_size']
-        input_size = conf['patching_args']['input_size']
+        dataset = conf["dataset"]["args"]["dataset"]
+        data_dirs = conf["paths"]["data_dirs"]
+        database_root = conf["paths"]["database_root_dir"]
+        phases = conf["dataset"]["args"]["phases"]
+        patch_size = conf["patching_args"]["patch_size"]
+        stride_size = conf["patching_args"]["stride_size"]
+        input_size = conf["patching_args"]["input_size"]
         class_type = conf["dataset"]["args"]["class_types"]
         class_dict = conf["dataset"]["class_dicts"][class_type] # clumsy
-        crop_to_input = conf['patching_args']['crop_to_input'],
-        verbose = conf['patching_args']['verbose']
+        crop_to_input = conf["patching_args"]["crop_to_input"],
+        verbose = conf["patching_args"]["verbose"]
         cls.validate_patch_args(patch_size, stride_size, input_size)
         
         return cls(
@@ -215,8 +215,8 @@ class PatchWriter(ProjectFileManager):
         # Do the patching for the files
         for img_path, mask_path in zip(imgs, masks):
             if self.verbose:
-                print(f"patching {img_path.split('/')[-1]} and writing to db")
-                print(f"patching {mask_path.split('/')[-1]} and writing patches to db")
+                print(f"patching {img_path.split("/")[-1]} and writing to db")
+                print(f"patching {mask_path.split("/")[-1]} and writing patches to db")
                 
             im = self.__read_img(img_path)
             mask = self.__read_mask(mask_path)
@@ -231,8 +231,8 @@ class PatchWriter(ProjectFileManager):
                 patches_mask = mask[None, :, :, 0]
             else:
                 # patches = self.__extract_patches(io)
-                patches_im = self.xtractor.extract(im, 'mirror')
-                patches_mask = self.xtractor.extract(mask, 'mirror')
+                patches_im = self.xtractor.extract(im, "mirror")
+                patches_mask = self.xtractor.extract(mask, "mirror")
                 patches_mask = patches_mask[..., 0].squeeze()
                 
                 if self.crop_to_input:
@@ -289,8 +289,8 @@ class PatchWriter(ProjectFileManager):
             mask = self.__read_mask(mask_path)
             overlay = np.where(mask[..., None], im, 0)
             mask = mask[..., None].repeat(3, axis=2)
-            patches_im = self.xtractor.extract(im, 'mirror')
-            patches_mask = self.xtractor.extract(mask, 'mirror')
+            patches_im = self.xtractor.extract(im, "mirror")
+            patches_mask = self.xtractor.extract(mask, "mirror")
             patches_mask = patches_mask[..., 0].squeeze()
 
             if self.crop_to_input:
@@ -298,7 +298,7 @@ class PatchWriter(ProjectFileManager):
                     patches_im, patches_mask, do_overlay=True
                 )
             else:
-                patches_overlay = self.xtractor.extract(overlay, 'mirror')
+                patches_overlay = self.xtractor.extract(overlay, "mirror")
 
             if img_type == "img":
                 patches = patches_im
@@ -317,8 +317,8 @@ class PatchWriter(ProjectFileManager):
             dims = np.ceil(np.sqrt(high - low))
             for idx in range(high - low):
                 spl = plt.subplot(dims, dims, idx + 1)
-                ax = plt.axis('off')
-                imm = plt.imshow(patches[idx].astype('uint8'))
+                ax = plt.axis("off")
+                imm = plt.imshow(patches[idx].astype("uint8"))
                 cl = plt.clim(pmin, pmax)
             plt.show()
             return patches.shape
@@ -340,8 +340,8 @@ class PatchWriter(ProjectFileManager):
             
 
 def visualize_db_patches(path, index):
-    matplotlib.rcParams.update({'font.size': 22})
-    with tables.open_file(path,'r') as db:
+    matplotlib.rcParams.update({"font.size": 22})
+    with tables.open_file(path,"r") as db:
         img = db.root.img
         maskd = db.root.mask
         im = img[index, ...]
