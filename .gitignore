@@ -5,7 +5,7 @@ patches/npy/*
 datasets/nucleisegmentation_kumar/*
 datasets/nucleisegmentation_consep/*
 datasets/nucleisegmentation_pannuke/*
-results/*
+results/tests/*
 src/tests/
 src/old/
 .ipynb_checkpoints
