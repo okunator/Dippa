@@ -1,11 +1,11 @@
 *.pyc
 __pycache__
 patches/hdf5/*
-patches/npy//*
+patches/npy/*
 datasets/nucleisegmentation_kumar/*
 datasets/nucleisegmentation_consep/*
 datasets/nucleisegmentation_pannuke/*
 results/*
-src/python/tests_and_tutorials/
-src/python/old/
+src/tests/
+src/old/
 .ipynb_checkpoints
