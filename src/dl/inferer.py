@@ -6,6 +6,7 @@ import sklearn.feature_extraction.image
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from torch import nn
 from pathlib import Path
 from skimage.filters import difference_of_gaussians
 from skimage.exposure import histogram
@@ -131,11 +132,7 @@ class Inferer(ProjectFileManager):
             class_dict,
             verbose
         )
-    
-    
-    @static_method
-    def validate_
-    
+        
     
     @property
     def stride_size(self):
@@ -152,12 +149,13 @@ class Inferer(ProjectFileManager):
     
     @property
     def images(self):
-        # TODO: check the phases. if there is no valid phase, then notify
+        assert self.fold in self.phases, f"fold param given: {self.fold} was not in given phases: {self.phases}" 
         return self.data_folds[self.fold]["img"]
     
     
     @property
     def gt_masks(self):
+        assert self.fold in self.phases, f"fold param given: {self.fold} was not in given phases: {self.phases}"
         return self.data_folds[self.fold]["mask"]
     
     
@@ -173,11 +171,17 @@ class Inferer(ProjectFileManager):
         return path.split("/")[-1][:-4]
     
     
-    def __sample_idxs(self):
+    def __sample_idxs(self, n=25):
         """
         Sample paths of images given a list of image paths
+        Args:
+            n (int) : how many integers are sampled 
         """
-        return np.random.randint(low = 0, high=len(self.images), size=25)
+        assert n <= len(self.images), "Cannot sample more integers than there are images in dataset"
+        # Dont plot more than 50 pannuke images
+        if self.dataset == "pannuke" and n > 50:
+            n = 50
+        return np.random.randint(low = 0, high=len(self.images), size=n)
     
     
     def __to_device(self, tensor):
@@ -527,16 +531,16 @@ class Inferer(ProjectFileManager):
         """
         
         assert self.soft_maps, "No predictions found"
-        idxs = self.__sample_idxs()
+        idxs = self.__sample_idxs(25)
         images = np.asarray(self.images)[idxs] if self.dataset == "pannuke" else self.images 
         
         figg, axes = plt.subplots(len(images)//3, 4, figsize=(30,15))
         axes = axes.flatten()
-        for i, path in enumerate(images):
+        for j, path in enumerate(images):
             fn = self.__get_fn(path)
             nuc_map = self.soft_maps[f"{fn}_nuc_map"]
             hist, hist_centers = histogram(nuc_map)
-            axes[i].plot(hist_centers, hist, lw=2)
+            axes[j].plot(hist_centers, hist, lw=2)
             
             
     def save_outputs(self, output_dir):
@@ -553,7 +557,7 @@ class Inferer(ProjectFileManager):
         
         assert self.soft_maps, "No predictions found"
         
-        for i, path in enumerate(self.images):
+        for j, path in enumerate(self.images):
             fn = self.__get_fn(path)
             new_fn = fn + "_pred_map.mat"
             print("saving: ", fn)
@@ -563,59 +567,76 @@ class Inferer(ProjectFileManager):
             
     def plot_segmentations(self):
         """
-        Plot the binary segmentations after running post_processing.
+        Plot all the binary segmentations after running post_processing.
         """
         assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
-        idxs = self.__sample_idxs()
+        idxs = self.__sample_idxs(15)
         images = np.asarray(self.images)[idxs] if self.dataset == "pannuke" else self.images
         gt_masks = np.asarray(self.gt_masks)[idxs] if self.dataset == "pannuke" else self.gt_masks
     
         fig, axes = plt.subplots(len(images), 4, figsize=(65, len(images)*12))
         fig.tight_layout(w_pad=4, h_pad=4)
-        for i, path in enumerate(images):
+        for j, path in enumerate(images):
             fn = self.__get_fn(path)
-            im = self.__read_img(images[i])
-            gt = self.__read_mask(gt_masks[i])
+            im = self.__read_img(images[j])
+            gt = self.__read_mask(gt_masks[j])
             inst_map = self.inst_maps[f"{fn}_inst_map"]
             nuc_map = self.soft_maps[f"{fn}_nuc_map"]
-            
-            axes[i][0].imshow(im, interpolation="none")
-            axes[i][0].axis("off")
-            
-            axes[i][1].imshow(nuc_map, interpolation="none")
-            axes[i][1].axis("off")
-            
-            axes[i][2].imshow(inst_map, interpolation="none")
-            axes[i][2].axis("off")
-
-            axes[i][3].imshow(gt, interpolation="none")
-            axes[i][3].axis("off")
+            axes[j][0].imshow(im, interpolation="none")
+            axes[j][0].axis("off")
+            axes[j][1].imshow(nuc_map, interpolation="none")
+            axes[j][1].axis("off")
+            axes[j][2].imshow(inst_map, interpolation="none")
+            axes[j][2].axis("off")
+            axes[j][3].imshow(gt, interpolation="none")
+            axes[j][3].axis("off")
             
             
-    def plot_overlays(self):
-        
+    def plot_overlays(self, ixs=-1):
+        """
+        Plot segmentation result and ground truth overlaid on the original image side by side
+        Args:
+            ixs (List or int): list of the indexes of the image file in obj.images in the data set. 
+                               default = -1 means all images in the data fold are plotted. If 
+                               dataset = "pannuke" and ixs = -1, then 25 random images are sampled for vis.
+        """
         assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
-        idxs = self.__sample_idxs()
-        images = np.asarray(self.images)[idxs] if self.dataset == "pannuke" else self.images
-        gt_masks = np.asarray(self.gt_masks)[idxs] if self.dataset == "pannuke" else self.gt_masks
         
-        fig, axes = plt.subplots(len(images), 2, figsize=(40, len(images)*20))
-        for j, path in enumerate(images):
+        message = (f"param ixs: ({ixs}) needs to be a list of ints in"
+                   " the range of number of images in total or -1."
+                   f" number of images = {len(self.images)}")
+        
+        if isinstance(ixs, List):
+            assert all(i <= len(self.images) for i in ixs), message
+        elif isinstance(ixs, int):
+            assert ixs == -1, message
+        
+            
+        if ixs == -1:
+            idxs = np.array(range(len(self.images)))
+        elif ixs == -1 and self.dataset == "pannuke":
+            idxs = self.__sample_idxs(25)
+        else:
+            idxs = np.array(ixs)
+            
+        images = np.asarray(self.images)[idxs]
+        gt_masks = np.asarray(self.gt_masks)[idxs]
+        
+        fig, axes = plt.subplots(len(images), 2, figsize=(40, len(images)*20), squeeze=False)
+        for j, path in enumerate(images): 
             fn = self.__get_fn(path)
             im = self.__read_img(path)
             gt = self.__read_mask(gt_masks[j])
             inst_map = self.inst_maps[f"{fn}_inst_map"]
-
             _, im_gt = draw_contours(gt, im)
             _, im_res = draw_contours(inst_map, im)
-
-            axes[j][0].set_title(f"Ground truth: {fn}", fontsize=30)
-            axes[j][0].imshow(im_gt, interpolation='none')
-            axes[j][0].axis('off')
-
-            axes[j][1].set_title(f"Segmentation result: {fn}", fontsize=30)
-            axes[j][1].imshow(im_res, cmap='gray', interpolation='none')
-            axes[j][1].axis('off')
+            
+            axes[j, 0].set_title(f"Ground truth: {fn}", fontsize=30)
+            axes[j, 0].imshow(im_gt, interpolation='none')
+            axes[j, 0].axis('off')
+            axes[j, 1].set_title(f"Segmentation result: {fn}", fontsize=30)
+            axes[j, 1].imshow(im_res, cmap='gray', interpolation='none')
+            axes[j, 1].axis('off')
 
         fig.tight_layout(w_pad=4, h_pad=4)
     
