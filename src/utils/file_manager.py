@@ -57,8 +57,6 @@ class ProjectFileManager:
         model_name = conf["experiment_args"]["model_name"]
         phases = conf["dataset"]["args"]["phases"]
         
-        cls.validate_data_args(dataset, data_dirs, phases, database_root, experiment_version)
-        
         return cls(
             dataset,
             data_dirs,
@@ -75,8 +73,8 @@ class ProjectFileManager:
         assert dataset in ("kumar", "consep", "pannuke", "other"), f"input dataset: {dataset}"
         assert list(data_dirs.keys()) == ["kumar", "consep", "pannuke", "other"], f"{data_dirs.keys()}"
         assert phases in (["train", "valid", "test"], ["train", "test"]), f"{phases}"
-        assert Path(database_root).exists(), f"{database_root} 'database_root_dir' defined in config not found."
-        assert Path(experiment_root).exists(), f"experiment_root: {experiment_root} not found."
+        assert Path(database_root).exists(), f"database_root: {database_root} not found. Check config.py"
+        assert Path(experiment_root).exists(), f"experiment_root: {experiment_root} not found. Check config.py"
         
         data_paths_bool = [Path(p).exists() for d in data_dirs.values() for p in d.values()]
         assert any(data_paths_bool), ("None of the config file 'data_dirs' paths exist. "

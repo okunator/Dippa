@@ -28,7 +28,7 @@ class PatchWriter(ProjectFileManager):
                  input_size: int,
                  class_dict: Dict,
                  crop_to_input: bool,
-                 verbose: bool = False,
+                 verbose: bool,
                  **kwargs: Dict) -> None:
         """
         This class is used to patch input images and to write them to either hdf5 tables
@@ -64,7 +64,7 @@ class PatchWriter(ProjectFileManager):
         """
         super(PatchWriter, self).__init__(dataset, data_dirs, database_root, experiment_root,
                                           experiment_version, model_name, phases)
-        self.validate_patch_args(patch_size, stride_size, input_size)
+        self.__validate_patch_args(patch_size, stride_size, input_size)
         self.patch_size = patch_size
         self.stride_size = stride_size
         self.input_size = input_size
@@ -90,7 +90,6 @@ class PatchWriter(ProjectFileManager):
         class_dict = conf["dataset"]["class_dicts"][class_type] # clumsy
         crop_to_input = conf["patching_args"]["crop_to_input"],
         verbose = conf["patching_args"]["verbose"]
-        cls.validate_patch_args(patch_size, stride_size, input_size)
         
         return cls(
             dataset,
@@ -109,26 +108,19 @@ class PatchWriter(ProjectFileManager):
         )
     
     
-    @staticmethod
-    def validate_patch_args(patch_size, stride_size, input_size):
+    def __validate_patch_args(self, patch_size, stride_size, input_size):
         shapes = [self.__read_img(f).shape
                   for phase in self.phases 
                   for key, val in self.data_folds[phase].items()
                   for f in val if key =='img']
         
-        assert all(s[0] >= patch_size and s[1] >= patch_size for s in shapes), ("height or width of some "
+        assert stride_size <= patch_size, "stride_size must be <= patch_size"
+        assert input_size <= patch_size, "input_size must be <= patch_size"
+        assert all(s[0] >= patch_size and s[1] >= patch_size for s in shapes), ("height or width of s given "
                                                                                 "img is < patch_size "
                                                                                 f"({patch_size})."
                                                                                 " Check your image shapes.")
-        assert stride_size <= patch_size, "stride_size must be <= patch_size"
-        assert input_size <= patch_size, "input_size must be <= patch_size"
-        
-        
-    @property
-    def mirror_pad_size(self):
-        return self.patch_size // 2
-    
-        
+            
     def __read_img(self, path):
         return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
     
@@ -141,7 +133,8 @@ class PatchWriter(ProjectFileManager):
     def __extract_patches(self, io):
         # OLD, USE HOVERNET PATCH EXTRACTOR INSTEAD
         # add reflect padding 
-        pad = (self.mirror_pad_size, self.mirror_pad_size)
+        mirror_pad = self.patch_size // 2
+        pad = (mirror_pad, mirror_pad)
         io = np.pad(io, [pad, pad, (0, 0)], mode="reflect")
         
         # convert input image into overlapping tiles
@@ -235,12 +228,12 @@ class PatchWriter(ProjectFileManager):
                 chunkshape=np.append([1], block_shape[img_type]),
                 filters=tables.Filters(complevel=6, complib="zlib")
             )
-        
+
         # Do the patching for the files
         for img_path, mask_path in zip(imgs, masks):
             if self.verbose:
-                print(f"patching {img_path.split("/")[-1]} and writing to db")
-                print(f"patching {mask_path.split("/")[-1]} and writing patches to db")
+                print(f"patching {img_path.split('/')[-1]} and writing to db")
+                print(f"patching {mask_path.split('/')[-1]} and writing patches to db")
                 
             im = self.__read_img(img_path)
             mask = self.__read_mask(mask_path)
