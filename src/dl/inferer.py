@@ -15,6 +15,7 @@ from typing import List, Dict
 
 from utils.file_manager import ProjectFileManager
 from img_processing.process_utils import remap_label
+from img_processing.viz_utils import draw_contours
 from img_processing.post_processing import (activation, naive_thresh_logits, 
                                             smoothed_thresh, inv_dist_watershed)
 
@@ -158,12 +159,6 @@ class Inferer(ProjectFileManager):
         return self.data_folds[self.fold]["mask"]
     
     
-    @property
-    def get_model(self, model="best"):
-        #TODO: get the best or the last model based on config
-        assert model in ("best", "last"), "model param needs to be one of ('best', 'last')"
-    
-    
     def __read_img(self, path):
         return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
     
@@ -174,6 +169,13 @@ class Inferer(ProjectFileManager):
     
     def __get_fn(self, path):
         return path.split("/")[-1][:-4]
+    
+    
+    def __sample_idxs(self):
+        """
+        Sample paths of images given a list of image paths
+        """
+        return np.random.randint(low = 0, high=len(self.images), size=25)
     
     
     def __to_device(self, tensor):
@@ -504,12 +506,10 @@ class Inferer(ProjectFileManager):
         
         assert len(self.soft_maps) != 0, "No predictions found"
     
-        fig, axes = plt.subplots(len(self.images), 3, figsize=(65, len(self.images)*12))
+        fig, axes = plt.subplots(len(self.images), 2, figsize=(65, len(self.images)*12))
         fig.tight_layout(w_pad=4, h_pad=4)
         for i, path in enumerate(self.images):
             fn = self.__get_fn(path)
-            gt = scipy.io.loadmat(self.gt_masks[i])
-            gt = gt["inst_map"]
             nuc_map = self.soft_maps[f"{fn}_nuc_map"]
             bg_map = self.soft_maps[f"{fn}_bg_map"]
             axes[i][0].imshow(nuc_map, interpolation="none")
@@ -517,16 +517,6 @@ class Inferer(ProjectFileManager):
 
             axes[i][1].imshow(bg_map, interpolation="none")
             axes[i][1].axis("off")
-
-            axes[i][2].imshow(gt, interpolation="none")
-            axes[i][2].axis("off")
-
-
-    def __sample_idxs(self):
-        """
-        Sample paths of images given a list of image paths
-        """
-        return np.random.randint(low = 0, high=len(self.images), size=25)
     
     
     def plot_histograms(self):
@@ -573,7 +563,6 @@ class Inferer(ProjectFileManager):
         """
         Plot the binary segmentations after running post_processing.
         """
-        #TODO: Fix take of gt masks here
         assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
         idxs = self.__sample_idxs()
         images = np.asarray(self.images)[idxs] if self.dataset == "pannuke" else self.images
@@ -599,6 +588,34 @@ class Inferer(ProjectFileManager):
 
             axes[i][3].imshow(gt, interpolation="none")
             axes[i][3].axis("off")
+            
+            
+    def plot_overlays(self):
+        
+        assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
+        idxs = self.__sample_idxs()
+        images = np.asarray(self.images)[idxs] if self.dataset == "pannuke" else self.images
+        gt_masks = np.asarray(self.gt_masks)[idxs] if self.dataset == "pannuke" else self.gt_masks
+        
+        fig, axes = plt.subplots(len(images), 2, figsize=(40, len(images)*20))
+        for j, path in enumerate(images):
+            fn = self.__get_fn(path)
+            im = self.__read_img(path)
+            gt = self.__read_mask(gt_masks[j])
+            inst_map = self.inst_maps[f"{fn}_inst_map"]
+
+            _, im_gt = draw_contours(gt, im)
+            _, im_res = draw_contours(inst_map, im)
+
+            axes[j][0].set_title(f"Ground truth: {fn}", fontsize=30)
+            axes[j][0].imshow(im_gt, interpolation='none')
+            axes[j][0].axis('off')
+
+            axes[j][1].set_title(f"Segmentation result: {fn}", fontsize=30)
+            axes[j][1].imshow(im_res, cmap='gray', interpolation='none')
+            axes[j][1].axis('off')
+
+        fig.tight_layout(w_pad=4, h_pad=4)
     
 
             
