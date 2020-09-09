@@ -16,20 +16,20 @@ from img_processing.augmentations import *
 
 class PatchWriter(ProjectFileManager):
     def __init__(self, 
-                 dataset : str,
-                 data_dirs : Dict,
-                 database_root : str,
-                 experiment_root : str,
-                 experiment_version : str,
-                 model_name : str,
-                 phases : List,
-                 patch_size : int,
-                 stride_size : int,
-                 input_size : int,
-                 class_dict : Dict,
-                 crop_to_input : bool,
-                 verbose : bool = False,
-                 **kwargs : Dict) -> None:
+                 dataset: str,
+                 data_dirs: Dict,
+                 database_root: str,
+                 experiment_root: str,
+                 experiment_version: str,
+                 model_name: str,
+                 phases: List,
+                 patch_size: int,
+                 stride_size: int,
+                 input_size: int,
+                 class_dict: Dict,
+                 crop_to_input: bool,
+                 verbose: bool = False,
+                 **kwargs: Dict) -> None:
         """
         This class is used to patch input images and to write them to either hdf5 tables
         or .npy files that are are used in the training of the networks used in this project. 
@@ -111,8 +111,15 @@ class PatchWriter(ProjectFileManager):
     
     @staticmethod
     def validate_patch_args(patch_size, stride_size, input_size):
-        # TODO validate the other args aswell
-        # TODO: Validate that the image files are larger than the patch_size
+        shapes = [self.__read_img(f).shape
+                  for phase in self.phases 
+                  for key, val in self.data_folds[phase].items()
+                  for f in val if key =='img']
+        
+        assert all(s[0] >= patch_size and s[1] >= patch_size for s in shapes), ("height or width of some "
+                                                                                "img is < patch_size "
+                                                                                f"({patch_size})."
+                                                                                " Check your image shapes.")
         assert stride_size <= patch_size, "stride_size must be <= patch_size"
         assert input_size <= patch_size, "input_size must be <= patch_size"
         

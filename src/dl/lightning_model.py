@@ -22,24 +22,24 @@ from datasets import *
 
 class SegModel(pl.LightningModule):
     def __init__(self,
-                 model : nn.Module,
-                 dataset : str,
-                 data_dirs : Dict,
-                 database_root : str,
-                 experiment_root : str,
-                 experiment_version : str,
-                 model_name : str,
-                 phases : List,
-                 input_size : int,
-                 batch_size : int,
-                 edge_weight : float,
-                 lr : float,
-                 encoder_lr : float,
-                 weight_decay : float,
-                 encoder_weight_decay : float,
-                 scheduler_factor : float,
-                 scheduler_patience : float,
-                 class_dict : Dict) -> None:
+                 model: nn.Module,
+                 dataset: str,
+                 data_dirs: Dict,
+                 database_root: str,
+                 experiment_root: str,
+                 experiment_version: str,
+                 model_name: str,
+                 phases: List,
+                 input_size: int,
+                 batch_size: int,
+                 edge_weight: float,
+                 lr: float,
+                 encoder_lr: float,
+                 weight_decay: float,
+                 encoder_weight_decay: float,
+                 scheduler_factor: float,
+                 scheduler_patience: float,
+                 class_dict: Dict) -> None:
         """
         Pytorch Lightning abstraction for any pytorch segmentation model architecture used
         in this project.

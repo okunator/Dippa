@@ -25,22 +25,22 @@ from metrics.metrics import PQ, AJI, AJI_plus, DICE2, split_and_merge
 
 class Inferer(ProjectFileManager):
     def __init__(self, 
-                 model,
-                 dataset,
-                 data_dirs,
-                 database_root,
-                 experiment_root,
-                 experiment_version,
-                 model_name,
-                 phases,
-                 batch_size,
-                 input_size,
-                 smoothen,
-                 fold,
-                 test_time_augs,
-                 threshold,
-                 class_dict,
-                 verbose):
+                 model: nn.Module,
+                 dataset: str,
+                 data_dirs: Dict,
+                 database_root: str,
+                 experiment_root: str,
+                 experiment_version: str,
+                 model_name: str,
+                 phases: List,
+                 batch_size: int,
+                 input_size: int,
+                 smoothen: bool,
+                 fold: str,
+                 test_time_augs: bool,
+                 threshold: float,
+                 class_dict: Dict,
+                 verbose: bool) -> None:
         """
         Inferer for any of the models that are trained with lightning framework 
         in this project (defined in lightning_model.py)
@@ -67,9 +67,7 @@ class Inferer(ProjectFileManager):
                               full size images and makes the thresholding of the soft masks trivial.
             fold (str) : One of ("train", "valid", "test"). Do predictions on one of these data folds.
                          Naturally "test" is the one to use for results
-            test_time_augs (bool) : apply test time augmentations with ttatch library. TTA takes so
-                                    much memory that the inference is automatically done on CPU.
-                                    Note that TTA increases inferece time significantly.
+            test_time_augs (bool) : apply test time augmentations (TTA).
             threshold (float) : threshold for the softmasks that have values b/w [0, 1]
             class_dict (Dict) : the dict specifying pixel classes. e.g. {"background":0,"nuclei":1}
             verbose (bool) : wether or not to print the progress of running inference
@@ -133,6 +131,10 @@ class Inferer(ProjectFileManager):
             class_dict,
             verbose
         )
+    
+    
+    @static_method
+    def validate_
     
     
     @property

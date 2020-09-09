@@ -25,8 +25,8 @@ conf = OmegaConf.create(
                 # If dataset = 'pannuke' and phases = ["train", "valid", "test"] the fold1
                 # is used as training set, fold2 is used as validation set and fold3 is used
                 # as test set. If dataset = 'pannuke' and phases = ["train", "test"] then
-                # fold 1 and fold2 are combined to training set and fold3 remains as test set
-                "phases":["train", "valid", "test"], # or ["train", "test"]
+                # fold1 and fold2 are combined to training set and fold3 remains as test set
+                "phases":["train", "test"], # ["train", "valid", "test"] or ["train", "test"]
             },
             "class_dicts": {
                 "binary":{
