@@ -1,3 +1,5 @@
+import zipfile
+import shutil
 import numpy as np
 from pathlib import Path
 from typing import List, Dict
@@ -169,25 +171,60 @@ class ProjectFileManager:
     @staticmethod      
     def create_dir(path):
         Path(path).mkdir(parents=True, exist_ok=True)
-        
-    
-    def model_checkpoint(self, which='last'):
-        assert self.experiment_dir.exists(), "Experiment dir does not exist. Train the model first."
-        assert which in ("best", "last"), f"param which: {which} not one of ('best', 'last')"
-        
-        ckpt = None
-        for item in self.experiment_dir.iterdir():
-            if item.is_file() and item.suffix == ".ckpt":
-                if which == "last" and "last" in str(item) and ckpt is None:
-                    ckpt = item
-                elif which == "best" and "last" not in str(item) and ckpt is None:
-                    ckpt = item
-        
-        assert ckpt is not None, f"{ckpt} checkpoint is None."
-        return ckpt
-        
+                    
+            
+    @staticmethod
+    def extract_zips(folder, rm=False):
+        for f in Path(folder).iterdir():
+            if f.is_file() and f.suffix == ".zip":
+                with zipfile.ZipFile(f, 'r') as z:
+                    z.extractall(folder)
+                if rm:
+                    f.unlink()
                 
-    def __get_suffix(self, directory):
+                
+    def __mv_to_orig(self, folder):
+        """
+        Move contents of a folder to a folder named "orig" in the current folder
+        """
+        p = folder.joinpath("orig")
+        self.create_dir(p)
+        for f in folder.iterdir():
+            orig = f if f.is_dir() and f.name == "orig" else None
+            if orig is None:
+                f.rename(folder/"orig"/f.name)
+        return p
+    
+    
+    def handle_kumar(self, kumar_raw_root, rm_zips=False):
+        """
+        This expects that the kumar .zip files are downloaded from google drive and are in the right 
+        folders. All .zip files inside the directory will be unzipped w/o any further checks so do not put
+        any extra .zip files in the dir that you do not want to get extracted. If the .zip files were
+        extracted beforehand then the extraction will be skipped.
+        Args:
+            kumar_raw_root (str): the folder where the kumar data .zip files are located
+            rm_zips (bool): Delete the .zip files after the contents are extracetd. If the .zip file 
+                            contents where extracted before running this method and the folder does 
+                            not contain any .zip files, this param will be ignored.
+        """
+        root = Path(kumar_raw_root)
+        p = self.__mv_to_orig(root)
+        self.extract_zips(p, rm_zips)
+        
+        for f in p.iterdir():
+            if f.is_dir() and "training" in f.name.lower():
+                for item in Path(f).iterdir():
+                    if item.name == "Tissue Images":
+                        # item.rename(item.parents[2]/"train") #cut/paste
+                        shutil.copytree(str(item), str(Path(item.parents[2]/"train"/Images))) #copy/paste
+                    elif item.name == "Annotations":
+                        pass
+            elif f.is_dir() and "test" in f.name.lower():
+                pass
+        
+        
+    def __get_img_suffix(self, directory):
         # Find out the suffix of the image and mask files
         d = Path(directory)
         assert all([file.suffix for file in d.iterdir()]), "All image files should be in same format"
@@ -198,7 +235,7 @@ class ProjectFileManager:
         # Get the image and mask files from the directory that was provided 
         d = Path(directory)
         assert d.is_dir(), f"Provided directory: {d.as_posix()} for image files is not a directory."
-        file_suffix = self.__get_suffix(d)
+        file_suffix = self.__get_img_suffix(d)
         return sorted([x.as_posix() for x in d.glob(f"*{file_suffix}")])
     
             
@@ -306,5 +343,24 @@ class ProjectFileManager:
     def convert_masks(self, format=".mat"):
         # assert format in (".mat", ".npy")
         pass
+    
+    
+    def model_checkpoint(self, which='last'):
+        """
+        Get the best or last checkpoint of a trained network.
+        """
+        assert self.experiment_dir.exists(), "Experiment dir does not exist. Train the model first."
+        assert which in ("best", "last"), f"param which: {which} not one of ('best', 'last')"
+        
+        ckpt = None
+        for item in self.experiment_dir.iterdir():
+            if item.is_file() and item.suffix == ".ckpt":
+                if which == "last" and "last" in str(item) and ckpt is None:
+                    ckpt = item
+                elif which == "best" and "last" not in str(item) and ckpt is None:
+                    ckpt = item
+        
+        assert ckpt is not None, f"{ckpt} checkpoint is None."
+        return ckpt
 
     
