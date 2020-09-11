@@ -5,8 +5,8 @@ Borrowing a lot of methods from HoVer-Net [repo](https://github.com/vqdang/hover
 
 ## Instructions for downloading the datasets
 1. Download the datsets from the links below
-2. Move the downloaded zip files to the corresponding folders in `datasets/` folder
-3. Run these scripts...
+2. Move the downloaded zip files or extract the contents of the zip files to the corresponding folders in `datasets/` folder
+3. Run this script or notebook to convert the data to right format for training and benchmarking.
 
 #### Data download links:
 1. **kumar**  
