@@ -6,12 +6,13 @@ Borrowing a lot of from HoVer-Net [repo]https://github.com/vqdang/hover_net: and
 1. Download the datsets:
 
 Data download links:
-1. kumar: - Train: https://drive.google.com/file/d/1JZN9Jq9km0rZNiYNEukE_8f0CsSK3Pe4/view . 
+1. kumar: 
+          - Train: https://drive.google.com/file/d/1JZN9Jq9km0rZNiYNEukE_8f0CsSK3Pe4/view . 
           - Test: https://drive.google.com/file/d/1NKkSQ5T0ZNQ8aUhh0a8Dt2YKYCQXIViw/view
-2. consep: - []https://warwick.ac.uk/fac/sci/dcs/research/tia/data/hovernet/
+2. consep: - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/hovernet/
 3. cpm: - ...
-4. pannuke: - []https://warwick.ac.uk/fac/sci/dcs/research/tia/data/pannuke
-5. dsb 2018: []https://bbbc.broadinstitute.org/BBBC038
+4. pannuke: - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/pannuke
+5. dsb 2018: https://bbbc.broadinstitute.org/BBBC038
 
 References:
 
