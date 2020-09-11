@@ -42,7 +42,11 @@ conf = OmegaConf.create(
                 },
                 "pannuke":{
                     "background":0,
-                    # TODO: rest off the classeshan one
+                    "neoplastic":1,
+                    "non-neoplastic-epithelial":2,
+                    "inflammatory":3,
+                    "connective":4,
+                    "dead":5
                 }
             }
         },
@@ -72,24 +76,24 @@ conf = OmegaConf.create(
             
             "data_dirs": {
                 "kumar": {
-                    "train_im":"../../datasets/nucleisegmentation_kumar/train/Images",
-                    "train_gt":"../../datasets/nucleisegmentation_kumar/train/Labels",
-                    "test_im":"../../datasets/nucleisegmentation_kumar/test/Images",
-                    "test_gt":"../../datasets/nucleisegmentation_kumar/test/Labels",
+                    "train_im":"../../datasets/kumar/train/Images",
+                    "train_gt":"../../datasets/kumar/train/Labels",
+                    "test_im":"../../datasets/kumar/test/Images",
+                    "test_gt":"../../datasets/kumar/test/Labels",
                 },
                 "consep":{
-                    "train_im":"../../datasets/nucleisegmentation_consep/train/Images",
-                    "train_gt":"../../datasets/nucleisegmentation_consep/train/Labels",
-                    "test_im":"../../datasets/nucleisegmentation_consep/test/Images",
-                    "test_gt":"../../datasets/nucleisegmentation_consep/test/Labels",
+                    "train_im":"../../datasets/consep/train/Images",
+                    "train_gt":"../../datasets/consep/train/Labels",
+                    "test_im":"../../datasets/consep/test/Images",
+                    "test_gt":"../../datasets/consep/test/Labels",
                 },
                 "pannuke": {
-                    "train_im":"../../datasets/nucleisegmentation_pannuke/train/Images",
-                    "train_gt":"../../datasets/nucleisegmentation_pannuke/train/Labels",
-                    "valid_im":"../../datasets/nucleisegmentation_pannuke/valid/Images",
-                    "valid_gt":"../../datasets/nucleisegmentation_pannuke/valid/Labels",
-                    "test_im":"../../datasets/nucleisegmentation_pannuke/test/Images",
-                    "test_gt":"../../datasets/nucleisegmentation_pannuke/test/Labels",
+                    "train_im":"../../datasets/pannuke/train/Images",
+                    "train_gt":"../../datasets/pannuke/train/Labels",
+                    "valid_im":"../../datasets/pannuke/valid/Images",
+                    "valid_gt":"../../datasets/pannuke/valid/Labels",
+                    "test_im":"../../datasets/pannuke/test/Images",
+                    "test_gt":"../../datasets/pannuke/test/Labels",
                 },
                 "other": {
                     # TODO:
