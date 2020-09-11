@@ -1,7 +1,11 @@
 *.pyc
 __pycache__
-patches/hdf5/*
-patches/npy/*
+patches/hdf5/kumar/*
+patches/hdf5/consep/*
+patches/hdf5/pannuke/*
+patches/npy/kumar/*
+patches/npy/consep/*
+patches/npy/pannuke/*
 datasets/nucleisegmentation_kumar/test/*
 datasets/nucleisegmentation_kumar/train/*
 datasets/nucleisegmentation_consep/test/*
