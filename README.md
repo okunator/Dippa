@@ -7,17 +7,17 @@ Borrowing a lot of methods from HoVer-Net [repo](https://github.com/vqdang/hover
 2. Move the downloaded zip files to the corresponding folders in `datasets/` folder
 3. Run these scripts...
 
-Data download links:
-1. kumar:  
-          Train: https://drive.google.com/file/d/1JZN9Jq9km0rZNiYNEukE_8f0CsSK3Pe4/view .   
-          Test: https://drive.google.com/file/d/1NKkSQ5T0ZNQ8aUhh0a8Dt2YKYCQXIViw/view  
+#### Data download links:
+1. **kumar**  
+          - Train: https://drive.google.com/file/d/1JZN9Jq9km0rZNiYNEukE_8f0CsSK3Pe4/view .   
+          - Test: https://drive.google.com/file/d/1NKkSQ5T0ZNQ8aUhh0a8Dt2YKYCQXIViw/view  
           
-2. consep: - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/hovernet/
-3. cpm: - ...
-4. pannuke: - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/pannuke
-5. dsb 2018: https://bbbc.broadinstitute.org/BBBC038
+2. **consep** - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/hovernet/
+3. **cpm** - TODO
+4. **pannuke** - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/pannuke
+5. **kaggle dsb 2018**: https://bbbc.broadinstitute.org/BBBC038
 
-References:
+## References
 
 - [1] N. Kumar, R. Verma, S. Sharma, S. Bhargava, A. Vahadane and A. Sethi, "A Dataset and a Technique for Generalized Nuclear Segmentation for Computational Pathology," in IEEE Transactions on Medical Imaging, vol. 36, no. 7, pp. 1550-1560, July 2017 
 - [2] S. Graham, Q. D. Vu, S. E. A. Raza, A. Azam, Y-W. Tsang, J. T. Kwak and N. Rajpoot. "HoVer-Net: Simultaneous Segmentation and Classification of Nuclei in Multi-Tissue Histology Images." Medical Image Analysis, Sept. 2019. [doi]
