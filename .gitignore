@@ -18,8 +18,12 @@ datasets/pannuke/test/*
 datasets/pannuke/train/*
 datasets/pannuke/valid/*
 datasets/pannuke/orig/*
-datasets/dsb2018/*
-datasets/cpm/*
+datasets/dsb2018/train/*
+datasets/dsb2018/test/*
+datasets/dsb2018/orig/*
+datasets/cpm/train/*
+datasets/cpm/test/*
+datasets/cpm/orig/*
 results/tests/*
 src/tests/
 src/old/
