@@ -13,7 +13,7 @@ Data download links:
 4. pannuke: - []https://warwick.ac.uk/fac/sci/dcs/research/tia/data/pannuke
 5. dsb 2018: []https://bbbc.broadinstitute.org/BBBC038
 
-References
+References:
 
 - [1] N. Kumar, R. Verma, S. Sharma, S. Bhargava, A. Vahadane and A. Sethi, "A Dataset and a Technique for Generalized Nuclear Segmentation for Computational Pathology," in IEEE Transactions on Medical Imaging, vol. 36, no. 7, pp. 1550-1560, July 2017 
 - [2] S. Graham, Q. D. Vu, S. E. A. Raza, A. Azam, Y-W. Tsang, J. T. Kwak and N. Rajpoot. "HoVer-Net: Simultaneous Segmentation and Classification of Nuclei in Multi-Tissue Histology Images." Medical Image Analysis, Sept. 2019. [doi]
