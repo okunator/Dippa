@@ -2,9 +2,14 @@
 __pycache__
 patches/hdf5/*
 patches/npy/*
-datasets/nucleisegmentation_kumar/*
-datasets/nucleisegmentation_consep/*
-datasets/nucleisegmentation_pannuke/*
+datasets/nucleisegmentation_kumar/test/*
+datasets/nucleisegmentation_kumar/train/*
+datasets/nucleisegmentation_consep/test/*
+datasets/nucleisegmentation_consep/train/*
+datasets/nucleisegmentation_pannuke/test/*
+datasets/nucleisegmentation_pannuke/train/*
+datasets/nucleisegmentation_pannuke/valid/*
+datasets/nucleisegmentation_pannuke/orig/*
 results/tests/*
 src/tests/
 src/old/

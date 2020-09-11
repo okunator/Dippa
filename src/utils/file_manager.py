@@ -73,8 +73,8 @@ class ProjectFileManager:
         assert dataset in ("kumar", "consep", "pannuke", "other"), f"input dataset: {dataset}"
         assert list(data_dirs.keys()) == ["kumar", "consep", "pannuke", "other"], f"{data_dirs.keys()}"
         assert phases in (["train", "valid", "test"], ["train", "test"]), f"{phases}"
-        assert Path(database_root).exists(), f"database_root: {database_root} not found. Check config.py"
-        assert Path(experiment_root).exists(), f"experiment_root: {experiment_root} not found. Check config.py"
+        assert Path(database_root).exists(), f"database_root: {database_root} not found. Check config"
+        assert Path(experiment_root).exists(), f"experiment_root: {experiment_root} not found. Check config"
         
         data_paths_bool = [Path(p).exists() for d in data_dirs.values() for p in d.values()]
         assert any(data_paths_bool), ("None of the config file 'data_dirs' paths exist. "
@@ -141,7 +141,8 @@ class ProjectFileManager:
             test_dbs = list(self.database_dir.glob("*_test_*"))
         else:
             train_dbs = list(self.database_dir.glob("*_train_*"))
-            valid_dbs = list(self.database_dir.glob("*_test_*"))
+            valid_dbs = list(self.database_dir.glob("*_test_*")) # test set used for both valid and test
+            test_dbs = list(self.database_dir.glob("*_test_*")) # remember to not use the best model w this
             
         assert train_dbs, (f"{train_dbs} HDF5 training db not found. Create the dbs first. " 
                             "Check instructions.")

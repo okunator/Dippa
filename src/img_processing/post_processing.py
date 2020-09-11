@@ -203,7 +203,7 @@ def inv_dist_watershed(inst_map, win_size=13):
     # watershed
     mask = segm.watershed(-distmap, markers, mask=ann, watershed_line=True)
     
-    # remove small cells. Will enhance PQ a lot (HACKish)
+    # remove small cells. Will enhance PQ in kumar a lot (HACKish)
     mask[mask > 0] = 1
     mask = morph.remove_small_objects(mask.astype(bool), min_size=100)
     inst_map = ndi.label(mask)[0]

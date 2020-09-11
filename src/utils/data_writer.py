@@ -116,8 +116,8 @@ class PatchWriter(ProjectFileManager):
         
         assert stride_size <= patch_size, "stride_size must be <= patch_size"
         assert input_size <= patch_size, "input_size must be <= patch_size"
-        assert all(s[0] >= patch_size and s[1] >= patch_size for s in shapes), ("height or width of s given "
-                                                                                "img is < patch_size "
+        assert all(s[0] >= patch_size and s[1] >= patch_size for s in shapes), ("height or width of given "
+                                                                                "imgs is < patch_size "
                                                                                 f"({patch_size})."
                                                                                 " Check your image shapes.")
             

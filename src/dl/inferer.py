@@ -149,13 +149,13 @@ class Inferer(ProjectFileManager):
     
     @property
     def images(self):
-        assert self.fold in self.phases, f"fold param given: {self.fold} was not in given phases: {self.phases}" 
+        assert self.fold in self.phases, f"fold param: {self.fold} was not in given phases: {self.phases}" 
         return self.data_folds[self.fold]["img"]
     
     
     @property
     def gt_masks(self):
-        assert self.fold in self.phases, f"fold param given: {self.fold} was not in given phases: {self.phases}"
+        assert self.fold in self.phases, f"fold param: {self.fold} was not in given phases: {self.phases}"
         return self.data_folds[self.fold]["mask"]
     
     
@@ -268,7 +268,7 @@ class Inferer(ProjectFileManager):
         Effectively removes checkerboard effect after the tiles are merged and eases
         thresholding from the prediction histogram.
         
-        prob_map.shape = (class, width, height) (torch tensor shape)
+        prob_map.shape = (class, width, height)
         """
         for c in range(len(self.classes)):
             prob_map[c, ...] = difference_of_gaussians(prob_map[c, ...], 1, 50)
@@ -288,7 +288,7 @@ class Inferer(ProjectFileManager):
     
     def __predict_patches(self, im_patches):
         """
-        Divide patched image to batches and process and run predictions for batches.
+        Divide patched image array to batches and process and run predictions for batches.
         Pannuke imgs are not divided to patches and are utilized as is.
         """
         pred_patches = np.zeros((0, len(self.classes), self.input_size, self.input_size))
@@ -495,16 +495,11 @@ class Inferer(ProjectFileManager):
     
     def clear_predictions(self):
         """
-        Clear predictions OrderedDict
+        Clear soft_masks if there are any
         """
         self.soft_maps.clear()
     
-    
-    def __plot_pannuke(self):
-        # TODO
-        pass
-    
-    
+        
     def plot_predictions(self):
         """
         Plot the probability maps after running inference.
@@ -596,9 +591,9 @@ class Inferer(ProjectFileManager):
         """
         Plot segmentation result and ground truth overlaid on the original image side by side
         Args:
-            ixs (List or int): list of the indexes of the image file in obj.images in the data set. 
+            ixs (List or int): list of the indexes of the image files in Inferer.images. 
                                default = -1 means all images in the data fold are plotted. If 
-                               dataset = "pannuke" and ixs = -1, then 25 random images are sampled for vis.
+                               dataset = "pannuke" and ixs = -1, then 25 random images are sampled.
         """
         assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
         
