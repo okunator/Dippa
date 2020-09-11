@@ -1,6 +1,6 @@
 # Dippa
 Benchmarking of deep learning and other segmentation methods for H&amp;E images
-Borrowing a lot of from HoVer-Net [repo]https://github.com/vqdang/hover_net: and paper [2]
+Borrowing a lot of from HoVer-Net [repo](https://github.com/vqdang/hover_net): and paper [2]
 
 ## Instructions
 1. Download the datsets:
