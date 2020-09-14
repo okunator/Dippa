@@ -1,9 +1,13 @@
 import zipfile
 import shutil
+import cv2
+import scipy.io
 import numpy as np
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import List, Dict
 from sklearn.model_selection import train_test_split
+from img_processing.viz_utils import draw_contours
 
 
 class ProjectFileManager:
@@ -158,6 +162,16 @@ class ProjectFileManager:
             "test":get_input_sizes(test_dbs)
         }
     
+    
+    @staticmethod
+    def read_img(path):
+        return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
+    
+    
+    @staticmethod
+    def read_mask(path):
+        return scipy.io.loadmat(path)["inst_map"].astype("uint16")
+    
         
     @staticmethod
     def remove_existing_files(directory):
@@ -181,49 +195,52 @@ class ProjectFileManager:
                     z.extractall(folder)
                 if rm:
                     f.unlink()
-                
-                
-    def __mv_to_orig(self, folder):
+
+                    
+    @staticmethod 
+    def kumar_xml2mat(x, to):
         """
-        Move contents of a folder to a folder named "orig" in the current folder
-        """
-        p = folder.joinpath("orig")
-        self.create_dir(p)
-        for f in folder.iterdir():
-            orig = f if f.is_dir() and f.name == "orig" else None
-            if orig is None:
-                f.rename(folder/"orig"/f.name)
-        return p
-    
-    
-    def handle_kumar(self, kumar_raw_root, rm_zips=False):
-        """
-        This expects that the kumar .zip files are downloaded from google drive and are in the right 
-        folders. All .zip files inside the directory will be unzipped w/o any further checks so do not put
-        any extra .zip files in the dir that you do not want to get extracted. If the .zip files were
-        extracted beforehand then the extraction will be skipped.
+        From https://github.com/vqdang/hover_net/blob/master/src/misc/proc_kumar_ann.py
+        Convert the xml annotation files to .mat files with 'inst_map' key.
+        
         Args:
-            kumar_raw_root (str): the folder where the kumar data .zip files are located
-            rm_zips (bool): Delete the .zip files after the contents are extracetd. If the .zip file 
-                            contents where extracted before running this method and the folder does 
-                            not contain any .zip files, this param will be ignored.
+            x (Path): path to the xml file
+            to (Path): directory where the .mat file is written
         """
-        root = Path(kumar_raw_root)
-        p = self.__mv_to_orig(root)
-        self.extract_zips(p, rm_zips)
+        xml = ET.parse(x)
+        contour_dbg = np.zeros((1000, 1000), np.uint8)
+        insts_list = []
+        for idx, region_xml in enumerate(xml.findall('.//Region')):
+            vertices = []
+            for vertex_xml in region_xml.findall('.//Vertex'):
+                attrib = vertex_xml.attrib
+                vertices.append([float(attrib['X']), 
+                                 float(attrib['Y'])])
+            vertices = np.array(vertices) + 0.5
+            vertices = vertices.astype('int32')
+            contour_blb = np.zeros((1000, 1000), np.uint8)
+            
+            # fill both the inner area and contour with idx+1 color
+            cv2.drawContours(contour_blb, [vertices], 0, idx+1, -1)
+            insts_list.append(contour_blb)
+            
+        insts_size_list = np.array(insts_list)
+        insts_size_list = np.sum(insts_size_list, axis=(1 , 2))
+        insts_size_list = list(insts_size_list)
+        pair_insts_list = zip(insts_list, insts_size_list)
         
-        for f in p.iterdir():
-            if f.is_dir() and "training" in f.name.lower():
-                for item in Path(f).iterdir():
-                    if item.name == "Tissue Images":
-                        # item.rename(item.parents[2]/"train") #cut/paste
-                        shutil.copytree(str(item), str(Path(item.parents[2]/"train"/Images))) #copy/paste
-                    elif item.name == "Annotations":
-                        pass
-            elif f.is_dir() and "test" in f.name.lower():
-                pass
+        # sort in z-axis basing on size, larger on top
+        pair_insts_list = sorted(pair_insts_list, key=lambda x: x[1])
+        insts_list, insts_size_list = zip(*pair_insts_list)
+        ann = np.zeros((1000, 1000), np.int32)
         
-        
+        for idx, inst_map in enumerate(insts_list):
+            ann[inst_map > 0] = idx + 1
+            
+        mask_fn = Path(to / x.with_suffix(".mat").name)
+        scipy.io.savemat(mask_fn, mdict={'inst_map': ann})
+                
+
     def __get_img_suffix(self, directory):
         # Find out the suffix of the image and mask files
         d = Path(directory)
@@ -264,87 +281,88 @@ class ProjectFileManager:
             "valid_masks":valid_masks
         }
     
-                
-    # Methods for raw data downloaded from the links provided
-    @staticmethod 
-    def kumar_xml2mat(path):
+    
+    def __mv_to_orig(self, folder):
         """
-        From https://github.com/vqdang/hover_net/blob/master/src/misc/proc_kumar_ann.py
+        Move contents of any folder to a new folder named "orig" created in the current folder
+        """
+        p = folder.joinpath("orig")
+        self.create_dir(p)
+        for f in folder.iterdir():
+            orig = f if f.is_dir() and f.name == "orig" else None
+            if orig is None:
+                f.rename(folder/"orig"/f.name)
+        return p
+    
+    
+    def __save_overlays(self, img_path, ann_path):
+        """
+        Save original images with annotation contours overlayed on top
+        """
+        overlay_dir = Path(img_path.parents[0] / "Overlays")
+        self.create_dir(overlay_dir)
+        for im_path, ann_path in zip(sorted(img_path.glob("*")), sorted(ann_path.glob("*.mat"))):
+            im = self.read_img(str(im_path))
+            mask = self.read_mask(str(ann_path))
+            _, overlay = draw_contours(mask, im)
+            fn = Path(overlay_dir / im_path.with_suffix(".png").name)
+            cv2.imwrite(str(fn), overlay)
+            
+
+    def handle_raw_kumar(self, kumar_raw_root, rm_zips=False, overlays=True):
+        """
+        This converts kumar xml annotations to .mat files and moves the training and testing images to
+        the correct folders that are used later in training and inference.
+        
+        This expects that the kumar .zip files are downloaded from google drive and are in the right 
+        folders. All .zip files inside the directory will be unzipped w/o any further checks so do not put
+        any extra .zip files in the dir that you do not want to get extracted. If the .zip files were
+        extracted beforehand then the extraction will be skipped.
+        Args:
+            kumar_raw_root (str): the folder where the kumar data .zip files are located
+            rm_zips (bool): Delete the .zip files after the contents are extracetd. If the .zip file 
+                            contents where extracted before running this method and the folder does 
+                            not contain any .zip files, this param will be ignored.
+            overlays (bool): save mask contour-image overlays to own folder. 
         """
         
-        imgs_dir = "../../datasets/Nucleisegmentation-Kumar/train/Images/"
-        anns_dir = "../../datasets/Nucleisegmentation-Kumar/train/Annotations_xml/"
-        save_dir = "../../datasets/Nucleisegmentation-Kumar/train/Labels/"
-
-        file_list = glob.glob(imgs_dir + '*.png')
-        file_list.sort() # ensure same order [1]
-
-        for filename in file_list: # png for base
-            filename = os.path.basename(filename)
-            basename = filename.split('.')[0]
-
-            print(basename)
-            img = cv2.imread(imgs_dir + filename)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-            hw = img.shape[:2]
-
-            xml = ET.parse(anns_dir + basename + '.xml')
-
-            contour_dbg = np.zeros(hw, np.uint8)
-
-            insts_list = []
-            for idx, region_xml in enumerate(xml.findall('.//Region')):
-                vertices = []
-                for vertex_xml in region_xml.findall('.//Vertex'):
-                    attrib = vertex_xml.attrib
-                    vertices.append([float(attrib['X']), 
-                                     float(attrib['Y'])])
-                vertices = np.array(vertices) + 0.5
-                vertices = vertices.astype('int32')
-                contour_blb = np.zeros(hw, np.uint8)
-
-                # fill both the inner area and contour with idx+1 color
-                cv2.drawContours(contour_blb, [vertices], 0, idx+1, -1)
-                insts_list.append(contour_blb)
-
-            insts_size_list = np.array(insts_list)
-            insts_size_list = np.sum(insts_size_list, axis=(1 , 2))
-            insts_size_list = list(insts_size_list)
-
-            pair_insts_list = zip(insts_list, insts_size_list)
-
-            # sort in z-axis basing on size, larger on top
-            pair_insts_list = sorted(pair_insts_list, key=lambda x: x[1])
-            insts_list, insts_size_list = zip(*pair_insts_list)
-
-            ann = np.zeros(hw, np.int32)
-            for idx, inst_map in enumerate(insts_list):
-                ann[inst_map > 0] = idx + 1
-
-            mask_fn = save_dir+'/'+basename+'_mask.mat'
-            scipy.io.savemat(mask_fn, mdict={'inst_map': ann})
+        root = Path(kumar_raw_root)
+        assert not (root.joinpath("train").exists() and root.joinpath("test").exists()), (
+                    "test and training directories already exists. To run this again, remove the files and "
+                    f"folders from: {kumar_raw_root} and repeat the steps in the instructions."
+        )
+        
+        orig_dir = self.__mv_to_orig(root)
+        self.extract_zips(orig_dir, rm_zips)
+        imgs_test_dir = Path(root / "test/Images")
+        anns_test_dir = Path(root / "test/Labels")
+        imgs_train_dir = Path(root / "train/Images")
+        anns_train_dir = Path(root / "train/Labels")
     
+        for f in orig_dir.iterdir():
+            if f.is_dir() and "training" in f.name.lower():
+                for item in f.iterdir():
+                    self.create_dir(anns_train_dir)
+                    if item.name == "Tissue Images":
+                        # item.rename(item.parents[2]/"train") #cut/paste
+                        shutil.copytree(str(item), str(imgs_train_dir)) #copy/paste
+                    elif item.name == "Annotations":
+                        for ann in item.iterdir():
+                            self.kumar_xml2mat(ann, anns_train_dir)
+                            
+            elif f.is_dir() and "test" in f.name.lower():
+                self.create_dir(anns_test_dir)
+                self.create_dir(imgs_test_dir)
+                for ann in f.glob("*.xml"):
+                    self.kumar_xml2mat(ann, anns_test_dir)
+                for item in f.glob("*.tif"):
+                    shutil.copy(str(item), str(imgs_test_dir))
+                    
+        if overlays:
+            self.__save_overlays(imgs_test_dir, anns_test_dir)
+            self.__save_overlays(imgs_train_dir, anns_train_dir)
     
-    @staticmethod
-    def to_mat():
-        pass
-    
-    
-    @staticmethod
-    def to_png():
-        pass
-    
-    
-    def convert_imgs(self, format=".png"):
-        #assert format in (".png", ".tif")
-        pass
-    
-    def convert_masks(self, format=".mat"):
-        # assert format in (".mat", ".npy")
-        pass
-    
-    
+
     def model_checkpoint(self, which='last'):
         """
         Get the best or last checkpoint of a trained network.
@@ -362,5 +380,39 @@ class ProjectFileManager:
         
         assert ckpt is not None, f"{ckpt} checkpoint is None."
         return ckpt
+    
+    
+    def download_url(self):
+        pass
+        # import requests
+        # 
+        # def download_file_from_google_drive(id, destination):
+        #     def get_confirm_token(response):
+        #         for key, value in response.cookies.items():
+        #             if key.startswith('download_warning'):
+        #                 return value
+        # 
+        #         return None
+        # 
+        #     def save_response_content(response, destination):
+        #         CHUNK_SIZE = 32768
+        # 
+        #         with open(destination, "wb") as f:
+        #             for chunk in response.iter_content(CHUNK_SIZE):
+        #                 if chunk: # filter out keep-alive new chunks
+        #                     f.write(chunk)
+        # 
+        #     URL = "https://docs.google.com/uc?export=download"
+        # 
+        #     session = requests.Session()
+        # 
+        #     response = session.get(URL, params = { 'id' : id }, stream = True)
+        #     token = get_confirm_token(response)
+        # 
+        #     if token:
+        #         params = { 'id' : id, 'confirm' : token }
+        #         response = session.get(URL, params = params, stream = True)
+        # 
+        #     save_response_content(response, destination)
 
     

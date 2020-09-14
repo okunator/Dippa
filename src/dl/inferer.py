@@ -158,15 +158,7 @@ class Inferer(ProjectFileManager):
         assert self.fold in self.phases, f"fold param: {self.fold} was not in given phases: {self.phases}"
         return self.data_folds[self.fold]["mask"]
     
-    
-    def __read_img(self, path):
-        return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
-    
-    
-    def __read_mask(self, path):
-        return scipy.io.loadmat(path)["inst_map"].astype("uint16")
-    
-    
+        
     def __get_fn(self, path):
         return path.split("/")[-1][:-4]
     
@@ -386,7 +378,7 @@ class Inferer(ProjectFileManager):
             if self.verbose:
                 print(f"Prediction for: {fn}")
                 
-            im = self.__read_img(path)
+            im = self.read_img(path)
             if self.dataset == "pannuke":
                 result_pred = self.__predict_patches(im[None, ...])
                 result_pred = result_pred.squeeze()
@@ -471,7 +463,7 @@ class Inferer(ProjectFileManager):
         assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
         
         inst_maps = [self.inst_maps[key].astype("uint16") for key in self.inst_maps.keys()]
-        gts = [self.__read_mask(f) for f in self.gt_masks]
+        gts = [self.read_mask(f) for f in self.gt_masks]
         params_list = list(zip(gts, inst_maps))
         
         metrics = []
@@ -573,8 +565,8 @@ class Inferer(ProjectFileManager):
         fig.tight_layout(w_pad=4, h_pad=4)
         for j, path in enumerate(images):
             fn = self.__get_fn(path)
-            im = self.__read_img(images[j])
-            gt = self.__read_mask(gt_masks[j])
+            im = self.read_img(images[j])
+            gt = self.read_mask(gt_masks[j])
             inst_map = self.inst_maps[f"{fn}_inst_map"]
             nuc_map = self.soft_maps[f"{fn}_nuc_map"]
             axes[j][0].imshow(im, interpolation="none")
@@ -620,8 +612,8 @@ class Inferer(ProjectFileManager):
         fig, axes = plt.subplots(len(images), 2, figsize=(40, len(images)*20), squeeze=False)
         for j, path in enumerate(images): 
             fn = self.__get_fn(path)
-            im = self.__read_img(path)
-            gt = self.__read_mask(gt_masks[j])
+            im = self.read_img(path)
+            gt = self.read_mask(gt_masks[j])
             inst_map = self.inst_maps[f"{fn}_inst_map"]
             _, im_gt = draw_contours(gt, im)
             _, im_res = draw_contours(inst_map, im)

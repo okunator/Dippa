@@ -109,7 +109,7 @@ class PatchWriter(ProjectFileManager):
     
     
     def __validate_patch_args(self, patch_size, stride_size, input_size):
-        shapes = [self.__read_img(f).shape
+        shapes = [self.read_img(f).shape
                   for phase in self.phases 
                   for key, val in self.data_folds[phase].items()
                   for f in val if key =='img']
@@ -121,15 +121,7 @@ class PatchWriter(ProjectFileManager):
                                                                                 f"({patch_size})."
                                                                                 " Check your image shapes.")
             
-    def __read_img(self, path):
-        return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
-    
-    
-    def __read_mask(self, path):
-        mask = scipy.io.loadmat(path)
-        return mask["inst_map"]
-    
-    
+            
     def __extract_patches(self, io):
         # OLD, USE HOVERNET PATCH EXTRACTOR INSTEAD
         # add reflect padding 
@@ -235,8 +227,8 @@ class PatchWriter(ProjectFileManager):
                 print(f"patching {img_path.split('/')[-1]} and writing to db")
                 print(f"patching {mask_path.split('/')[-1]} and writing patches to db")
                 
-            im = self.__read_img(img_path)
-            mask = self.__read_mask(mask_path)
+            im = self.read_img(img_path)
+            mask = self.read_mask(mask_path)
             mask = mask[..., None].repeat(3, axis=2)
 
             for j, key in enumerate(self.classes.values()): 
@@ -281,12 +273,12 @@ class PatchWriter(ProjectFileManager):
         ax = ax.flatten()
         for i, idx in enumerate(idxs):
             if img_type == "img":
-                io = self.__read_img(img_paths[idx])
+                io = self.read_img(img_paths[idx])
             elif img_type == "mask":
-                io = self.__read_mask(mask_paths[idx])
+                io = self.read_mask(mask_paths[idx])
             else:
-                im = self.__read_img(img_paths[idx])
-                mask = self.__read_mask(mask_paths[idx])
+                im = self.read_img(img_paths[idx])
+                mask = self.read_mask(mask_paths[idx])
                 io = np.where(mask[..., None], im, 0)
             ax[i].imshow(io)
         
@@ -302,8 +294,8 @@ class PatchWriter(ProjectFileManager):
         else:
             img_path = self.data_folds[phase]["img"][index]
             mask_path = self.data_folds[phase]["mask"][index]
-            im = self.__read_img(img_path)
-            mask = self.__read_mask(mask_path)
+            im = self.read_img(img_path)
+            mask = self.read_mask(mask_path)
             overlay = np.where(mask[..., None], im, 0)
             mask = mask[..., None].repeat(3, axis=2)
             patches_im = self.xtractor.extract(im, "mirror")
