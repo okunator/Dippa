@@ -59,33 +59,41 @@ conf = OmegaConf.create(
             # Otherwise a lot of stuff will prbly have to modified and things break..
             # TODO
             "raw_data_dirs":{
-                "kumar":"../../datasets/kumar_test/",
-                "consep":"../../datasets/consep_test/",
-                "pannuke":"../../datasets/pannuke_test/",
-                "dsb2018":"../..",
-                "cpm":"../.."
+                "kumar":{
+                    "train":"../../datasets/kumar_test/",
+                    "test":"../../datasets/kumar_test/",
+                },
+                "consep":{
+                    "train":"../../datasets/consep_test/",
+                    "test":"../../datasets/consep_test/",
+                },
+                "pannuke":{
+                    "train":"../../datasets/pannuke_test/",
+                    "valid":"../../datasets/pannuke_test/",
+                    "test":"../../datasets/pannuke_test/",
+                },
             },
             
             "data_dirs": {
                 "kumar": {
-                    "train_im":"../../datasets/kumar/train/images",
-                    "train_gt":"../../datasets/kumar/train/labels",
-                    "test_im":"../../datasets/kumar/test/images",
-                    "test_gt":"../../datasets/kumar/test/labels",
+                    "train_im":"../../datasets/kumar/train/Images",
+                    "train_gt":"../../datasets/kumar/train/Labels",
+                    "test_im":"../../datasets/kumar/test/Images",
+                    "test_gt":"../../datasets/kumar/test/Labels",
                 },
                 "consep":{
-                    "train_im":"../../datasets/consep/train/images",
-                    "train_gt":"../../datasets/consep/train/labels",
-                    "test_im":"../../datasets/consep/test/images",
-                    "test_gt":"../../datasets/consep/test/labels",
+                    "train_im":"../../datasets/consep/train/Images",
+                    "train_gt":"../../datasets/consep/train/Labels",
+                    "test_im":"../../datasets/consep/test/Images",
+                    "test_gt":"../../datasets/consep/test/Labels",
                 },
                 "pannuke": {
-                    "train_im":"../../datasets/pannuke/train/images",
-                    "train_gt":"../../datasets/pannuke/train/labels",
-                    "valid_im":"../../datasets/pannuke/valid/images",
-                    "valid_gt":"../../datasets/pannuke/valid/labels",
-                    "test_im":"../../datasets/pannuke/test/images",
-                    "test_gt":"../../datasets/pannuke/test/labels",
+                    "train_im":"../../datasets/pannuke/train/Images",
+                    "train_gt":"../../datasets/pannuke/train/Labels",
+                    "valid_im":"../../datasets/pannuke/valid/Images",
+                    "valid_gt":"../../datasets/pannuke/valid/Labels",
+                    "test_im":"../../datasets/pannuke/test/Images",
+                    "test_gt":"../../datasets/pannuke/test/Labels",
                 },
                 "other": {
                     # TODO:
