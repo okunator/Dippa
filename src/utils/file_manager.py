@@ -1,11 +1,11 @@
 import zipfile
-import shutil
 import cv2
 import scipy.io
 import numpy as np
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import List, Dict
+from distutils import dir_util, file_util
 from sklearn.model_selection import train_test_split
 from img_processing.viz_utils import draw_contours
 
@@ -299,7 +299,7 @@ class ProjectFileManager:
         """
         Save original images with annotation contours overlayed on top
         """
-        overlay_dir = Path(img_path.parents[0] / "Overlays")
+        overlay_dir = Path(img_path.parents[0] / "instance_overlays")
         self.create_dir(overlay_dir)
         for im_path, ann_path in zip(sorted(img_path.glob("*")), sorted(ann_path.glob("*.mat"))):
             im = self.read_img(str(im_path))
@@ -309,6 +309,14 @@ class ProjectFileManager:
             cv2.imwrite(str(fn), overlay)
             
 
+    def __check_raw_root(self, raw_root):
+        root = Path(raw_root)
+        assert not (root.joinpath("train").exists() and root.joinpath("test").exists()), (
+                    "test and training directories already exists. To run this again, remove the files and "
+                    f"folders from: {raw_root} and repeat the steps in the instructions."
+        )
+    
+                
     def handle_raw_kumar(self, kumar_raw_root, rm_zips=False, overlays=True):
         """
         This converts kumar xml annotations to .mat files and moves the training and testing images to
@@ -327,17 +335,13 @@ class ProjectFileManager:
         """
         
         root = Path(kumar_raw_root)
-        assert not (root.joinpath("train").exists() and root.joinpath("test").exists()), (
-                    "test and training directories already exists. To run this again, remove the files and "
-                    f"folders from: {kumar_raw_root} and repeat the steps in the instructions."
-        )
-        
+        self.__check_raw_root(root)
         orig_dir = self.__mv_to_orig(root)
         self.extract_zips(orig_dir, rm_zips)
-        imgs_test_dir = Path(root / "test/Images")
-        anns_test_dir = Path(root / "test/Labels")
-        imgs_train_dir = Path(root / "train/Images")
-        anns_train_dir = Path(root / "train/Labels")
+        imgs_test_dir = Path(root / "test/images")
+        anns_test_dir = Path(root / "test/labels")
+        imgs_train_dir = Path(root / "train/images")
+        anns_train_dir = Path(root / "train/labels")
     
         for f in orig_dir.iterdir():
             if f.is_dir() and "training" in f.name.lower():
@@ -345,7 +349,7 @@ class ProjectFileManager:
                     self.create_dir(anns_train_dir)
                     if item.name == "Tissue Images":
                         # item.rename(item.parents[2]/"train") #cut/paste
-                        shutil.copytree(str(item), str(imgs_train_dir)) #copy/paste
+                        dir_util.copy_tree(str(item), str(imgs_train_dir)) #copy/paste
                     elif item.name == "Annotations":
                         for ann in item.iterdir():
                             self.kumar_xml2mat(ann, anns_train_dir)
@@ -356,13 +360,51 @@ class ProjectFileManager:
                 for ann in f.glob("*.xml"):
                     self.kumar_xml2mat(ann, anns_test_dir)
                 for item in f.glob("*.tif"):
-                    shutil.copy(str(item), str(imgs_test_dir))
+                    file_util.copy_file(str(item), str(imgs_test_dir))
                     
         if overlays:
             self.__save_overlays(imgs_test_dir, anns_test_dir)
             self.__save_overlays(imgs_train_dir, anns_train_dir)
     
 
+    def handle_raw_consep(self, consep_raw_root, rm_zips=False, overlays=True):
+        """
+        
+        Args:
+            consep_raw_root (str): the folder where the consep data .zip files are located
+            rm_zips (bool): Delete the .zip files after the contents are extracetd. If the .zip file 
+                            contents where extracted before running this method and the folder does 
+                            not contain any .zip files, this param will be ignored.
+            overlays (bool): save mask contour-image overlays to own folder. 
+        """
+        root = Path(consep_raw_root)
+        self.__check_raw_root(root)
+        orig_dir = self.__mv_to_orig(root)
+        self.extract_zips(orig_dir, rm_zips)
+        
+        for item in orig_dir.iterdir():
+            if item.is_dir() and item.name == "CoNSeP":
+                dir_util.copy_tree(str(item), str(root))
+        
+        for d in root.iterdir():
+            if d.is_dir() and d.name != "orig":
+                for item in d.iterdir():
+                    if item.name == "Overlay":
+                        item.rename(Path(d / "type_overlays"))
+                    else:
+                        item.rename(Path(d / item.name.lower()))
+                d.rename(d.as_posix().lower())
+        
+        if overlays:
+            imgs_test_dir = Path(root / "test/images")
+            anns_test_dir = Path(root / "test/labels")
+            imgs_train_dir = Path(root / "train/images")
+            anns_train_dir = Path(root / "train/labels")
+            self.__save_overlays(imgs_test_dir, anns_test_dir)
+            self.__save_overlays(imgs_train_dir, anns_train_dir)
+        
+    
+    
     def model_checkpoint(self, which='last'):
         """
         Get the best or last checkpoint of a trained network.
