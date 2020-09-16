@@ -367,4 +367,8 @@ def visualize_db_patches(path, index):
     plt.show()
     return np.unique(mask)
 
-            
+
+# How to get correct types of instances example
+#t1 = gt['type_map'] == 4
+#inst_map = np.copy(gt['inst_map'])
+#inst_map[~t1] = 0

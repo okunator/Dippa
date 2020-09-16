@@ -76,8 +76,10 @@ class ProjectFileManager:
     
     @staticmethod
     def validate_data_args(dataset, data_dirs, phases, database_root, experiment_root):        
-        assert dataset in ("kumar", "consep", "pannuke", "other"), f"input dataset: {dataset}"
-        assert list(data_dirs.keys()) == ["kumar", "consep", "pannuke", "other"], f"{data_dirs.keys()}"
+        assert dataset in ("kumar","consep","pannuke","dsb2018","cpm","other"), f"input dataset: {dataset}"
+        assert set(data_dirs.keys()) == {"kumar","consep","dsb2018","cpm","pannuke","other"},(
+                f"{data_dirs.keys()} unknown key added in the data_dirs keys."
+        )
         assert phases in (["train", "valid", "test"], ["train", "test"]), f"{phases}"
         assert Path(database_root).exists(), f"database_root: {database_root} not found. Check config"
         assert Path(experiment_root).exists(), f"experiment_root: {experiment_root} not found. Check config"
@@ -99,6 +101,10 @@ class ProjectFileManager:
         
     @property
     def data_folds(self):
+        """
+        Getter for the 'train', 'valid', 'test' fold paths. Also splits training set to train and valid
+        if 'valid is in phases list'
+        """
         train_imgs = self.__get_files(self.data_dirs[self.dataset]["train_im"])
         train_masks = self.__get_files(self.data_dirs[self.dataset]["train_gt"])
         test_imgs = self.__get_files(self.data_dirs[self.dataset]["test_im"])
@@ -127,7 +133,9 @@ class ProjectFileManager:
     
     @property
     def databases(self):
-        
+        """
+        Getter for the databases that were written by the PatchWriter
+        """
         def get_input_sizes(paths):
             # Paths to dbs are named as 'patchsize_dataset'. e.g. 'patch256_kumar.pytable' 
             # This will parse the name and use patchsize as key for a dict
@@ -169,8 +177,9 @@ class ProjectFileManager:
     
     
     @staticmethod
-    def read_mask(path):
-        return scipy.io.loadmat(path)["inst_map"].astype("uint16")
+    def read_mask(path, type_map=False):
+        key = "type_map" if type_map else "inst_map"
+        return scipy.io.loadmat(path)[key].astype("int32")
     
         
     @staticmethod
@@ -197,8 +206,7 @@ class ProjectFileManager:
                     f.unlink()
 
                     
-    @staticmethod 
-    def kumar_xml2mat(x, to):
+    def __kumar_xml2mat(self, x, to):
         """
         From https://github.com/vqdang/hover_net/blob/master/src/misc/proc_kumar_ann.py
         Convert the xml annotation files to .mat files with 'inst_map' key.
@@ -242,7 +250,7 @@ class ProjectFileManager:
                 
 
     def __get_img_suffix(self, directory):
-        # Find out the suffix of the image and mask files
+        # Find out the suffix of the image and mask files and assert if images have mixed suffices
         d = Path(directory)
         assert all([file.suffix for file in d.iterdir()]), "All image files should be in same format"
         return [file.suffix for file in directory.iterdir()][0]
@@ -295,94 +303,61 @@ class ProjectFileManager:
         return p
     
     
-    def __save_overlays(self, img_path, ann_path):
+    def __save_overlays(self, img_path, ann_path, type_overlays=False):
         """
         Save original images with annotation contours overlayed on top
         """
-        overlay_dir = Path(img_path.parents[0] / "instance_overlays")
-        self.create_dir(overlay_dir)
+        
+        inst_overlay_dir = Path(img_path.parents[0] / "instance_overlays")
+        self.create_dir(inst_overlay_dir)
         for im_path, ann_path in zip(sorted(img_path.glob("*")), sorted(ann_path.glob("*.mat"))):
             im = self.read_img(str(im_path))
             mask = self.read_mask(str(ann_path))
-            _, overlay = draw_contours(mask, im)
-            fn = Path(overlay_dir / im_path.with_suffix(".png").name)
-            cv2.imwrite(str(fn), overlay)
-            
+            if type_overlays:
+                type_overlay_dir = Path(img_path.parents[0] / "type_overlays")
+                self.create_dir(type_overlay_dir)
+                type_map = self.read_mask(str(ann_path), type_map=True)
+                _, type_overlay = draw_contours(mask, im, type_map=type_map)
+                fn = Path(type_overlay_dir / im_path.with_suffix(".png").name)
+                cv2.imwrite(str(fn), cv2.cvtColor(type_overlay, cv2.COLOR_RGB2BGR))
+                
+            _, inst_overlay = draw_contours(mask, im)
+            fn = Path(inst_overlay_dir / im_path.with_suffix(".png").name)
+            cv2.imwrite(str(fn), cv2.cvtColor(inst_overlay, cv2.COLOR_RGB2BGR))
+                  
 
     def __check_raw_root(self, raw_root):
         root = Path(raw_root)
         assert not (root.joinpath("train").exists() and root.joinpath("test").exists()), (
-                    "test and training directories already exists. To run this again, remove the files and "
-                    f"folders from: {raw_root} and repeat the steps in the instructions."
+                    "test and training directories already exists. To run this again, remove the files "
+                    f"and folders from: {raw_root} and repeat the steps in the instructions."
         )
-    
-    
-                
-    def handle_raw_kumar(self, kumar_raw_root, rm_zips=False, overlays=True):
-        """
-        This converts kumar xml annotations to .mat files and moves the training and testing images to
-        the correct folders that are used later in training and inference.
         
-        This expects that the kumar .zip files are downloaded from google drive and are in the right 
-        folders. All .zip files inside the directory will be unzipped w/o any further checks so do not put
-        any extra .zip files in the dir that you do not want to get extracted. If the .zip files were
-        extracted beforehand then the extraction will be skipped.
-        Args:
-            kumar_raw_root (str): the folder where the kumar data .zip files are located
-            rm_zips (bool): Delete the .zip files after the contents are extracetd. If the .zip file 
-                            contents where extracted before running this method and the folder does 
-                            not contain any .zip files, this param will be ignored.
-            overlays (bool): save mask contour-image overlays to own folder. 
-        """
         
-        root = Path(kumar_raw_root)
-        self.__check_raw_root(root)
-        orig_dir = self.__mv_to_orig(root)
-        self.extract_zips(orig_dir, rm_zips)
-        imgs_test_dir = Path(root / "test/images")
-        anns_test_dir = Path(root / "test/labels")
-        imgs_train_dir = Path(root / "train/images")
-        anns_train_dir = Path(root / "train/labels")
-    
+    def __handle_kumar(self, orig_dir, imgs_train_dir, anns_train_dir, imgs_test_dir, anns_test_dir):
+        self.create_dir(anns_train_dir)
+        self.create_dir(imgs_train_dir)
+        self.create_dir(anns_test_dir)
+        self.create_dir(imgs_test_dir)
+        
         for f in orig_dir.iterdir():
             if f.is_dir() and "training" in f.name.lower():
                 for item in f.iterdir():
-                    self.create_dir(anns_train_dir)
                     if item.name == "Tissue Images":
                         # item.rename(item.parents[2]/"train") #cut/paste
                         dir_util.copy_tree(str(item), str(imgs_train_dir)) #copy/paste
                     elif item.name == "Annotations":
                         for ann in item.iterdir():
-                            self.kumar_xml2mat(ann, anns_train_dir)
+                            self.__kumar_xml2mat(ann, anns_train_dir)
                             
             elif f.is_dir() and "test" in f.name.lower():
-                self.create_dir(anns_test_dir)
-                self.create_dir(imgs_test_dir)
                 for ann in f.glob("*.xml"):
-                    self.kumar_xml2mat(ann, anns_test_dir)
+                    self.__kumar_xml2mat(ann, anns_test_dir)
                 for item in f.glob("*.tif"):
                     file_util.copy_file(str(item), str(imgs_test_dir))
                     
-        if overlays:
-            self.__save_overlays(imgs_test_dir, anns_test_dir)
-            self.__save_overlays(imgs_train_dir, anns_train_dir)
     
-
-    def handle_raw_consep(self, consep_raw_root, rm_zips=False, overlays=True):
-        """
-        
-        Args:
-            consep_raw_root (str): the folder where the consep data .zip files are located
-            rm_zips (bool): Delete the .zip files after the contents are extracetd. If the .zip file 
-                            contents where extracted before running this method and the folder does 
-                            not contain any .zip files, this param will be ignored.
-            overlays (bool): save mask contour-image overlays to own folder. 
-        """
-        root = Path(consep_raw_root)
-        self.__check_raw_root(root)
-        orig_dir = self.__mv_to_orig(root)
-        self.extract_zips(orig_dir, rm_zips)
-        
+    def __handle_consep(self, root, orig_dir):
         for item in orig_dir.iterdir():
             if item.is_dir() and item.name == "CoNSeP":
                 dir_util.copy_tree(str(item), str(root))
@@ -395,15 +370,136 @@ class ProjectFileManager:
                     else:
                         item.rename(Path(d / item.name.lower()))
                 d.rename(d.as_posix().lower())
+                
+                
+    def __handle_pannuke(self, pannuke_folds, orig_dir, imgs_train_dir, 
+                         anns_train_dir, imgs_test_dir, anns_test_dir):
         
+        self.create_dir(anns_train_dir)
+        self.create_dir(imgs_train_dir)
+        self.create_dir(anns_test_dir)
+        self.create_dir(imgs_test_dir)
+        
+        fold_files = {
+            f"{file.parts[-2]}_{file.name[:-4]}": file for dir1 in orig_dir.iterdir() if dir1.is_dir()
+            for dir2 in dir1.iterdir() if dir2.is_dir()
+            for dir3 in dir2.iterdir() if dir3.is_dir()
+            for file in dir3.iterdir() if file.is_file() and file.suffix == ".npy"
+        }
+        
+        fold_phases = {
+            "train":{
+                "img":imgs_train_dir,
+                "mask":anns_train_dir
+            },
+            "valid":{
+                "img":imgs_train_dir,
+                "mask":anns_train_dir
+            },
+            "test":{
+                "img":imgs_test_dir,
+                "mask":anns_test_dir
+            }
+        }
+        
+        for i in range(1, 4):
+            masks = np.load(fold_files[f"fold{i}_masks"]).astype("int32")
+            imgs = np.load(fold_files[f"fold{i}_images"]).astype("uint8")
+            types = np.load(fold_files[f"fold{i}_types"])
+            
+            for ty in np.unique(types):
+                imgs_by_type = imgs[types == ty]
+                masks_by_type = masks[types == ty]
+                for j in range(imgs_by_type.shape[0]):
+                    name = f"{ty}_fold{i}_{j}"
+                    dir_key = pannuke_folds[f"fold{i}"]
+                    img_dir = fold_phases[dir_key]["img"]
+                    mask_dir = fold_phases[dir_key]["mask"]
+
+                    fn_im = Path(img_dir / name).with_suffix(".png")
+                    cv2.imwrite(str(fn_im), cv2.cvtColor(imgs_by_type[j, ...], cv2.COLOR_RGB2BGR))
+                    
+                    # Create inst map
+                    temp_mask = masks_by_type[j, ...]
+                    inst_map = np.zeros(temp_mask.shape[:2], dtype=np.int32)
+                    type_map = np.zeros(temp_mask.shape[:2], dtype=np.int32)
+                    for t, l in enumerate(range(temp_mask.shape[-1]-1), 1):
+                        inst_map += temp_mask[..., l]
+                        temp_type = np.copy(temp_mask[..., l])
+                        temp_type[temp_type > 0] = t
+                        type_map += temp_type
+                        
+                    # if two cells overlap, adding both classes to type_map will create
+                    # a sum of those classes for those pixels and things would break so
+                    # we'll just remove the overlaps here.
+                    type_map[type_map > temp_mask.shape[-1]-1] = 0
+                    fn_mask = Path(mask_dir / name).with_suffix(".mat")
+                    scipy.io.savemat(fn_mask, mdict={"inst_map": inst_map, "type_map":type_map})
+                    
+                    
+    def __handle_dsb2018(self):
+        pass
+    
+    
+    def __handle_cpm(self):
+        pass
+    
+        
+    def handle_raw_data(self, dataset, raw_root, rm_zips=False, overlays=True, 
+                        pannuke_folds={"fold1":"train", "fold2":"valid", "fold3":"test"}):
+        """
+        Convert the raw data to the right format and move the files to the right folders for training and
+        inference. Training and inference expects a specific folder and file structure and this automates
+        that stuff.
+        
+        Args:
+            dataset (str): one of ("kumar","consep","pannuke","dsb2018","cpm","other")
+            raw_root (str): path to the raw data .zip files or extracted. See config for where to put the
+                            .zip files after downloading them from the internet.
+            rm_zips (bool): delete the .zp files after they are extracted
+            overlays (bool): plot annotation contours on top of original images.
+            pannuke_folds (Dict): If dataset == "pannuke", this dictionary specifies which pannuke folds
+                                  are used as 'train', 'valid' and 'test' fold. If only 'train' and 'test'
+                                  phases are used then the extra 'valid' fold is added to the 'train' fold.
+                                  If dataset is not "pannuke", this arg is ignored.
+                                  
+        """
+        assert all(key in ("fold1", "fold2", "fold3") for key in pannuke_folds.keys()), (
+            f"keys of the pannuke_folds arg need to be in ('fold1', 'fold2', 'fold3')"
+        )
+        
+        assert all(val in ("train", "valid", "test") for val in pannuke_folds.values()), (
+            f"values of the pannuke_folds arg need to be in ('train', 'valid', 'test')"
+        )
+        
+        # extract .zips and move the files to 'orig' folder
+        root = Path(raw_root)
+        self.__check_raw_root(root)
+        orig_dir = self.__mv_to_orig(root)
+        self.extract_zips(orig_dir, rm_zips)
+        imgs_test_dir = Path(root / "test/images")
+        anns_test_dir = Path(root / "test/labels")
+        imgs_train_dir = Path(root / "train/images")
+        anns_train_dir = Path(root / "train/labels")
+        
+        # ad hoc handling of the different datasets to convert them to same format
+        if dataset == "kumar":
+            self.__handle_kumar(orig_dir, imgs_train_dir, anns_train_dir, imgs_test_dir, anns_test_dir)
+        elif dataset == "consep":
+            self.__handle_consep(root, orig_dir)
+        elif dataset == "pannuke":
+            self.__handle_pannuke(pannuke_folds, orig_dir, imgs_train_dir,
+                                  anns_train_dir, imgs_test_dir, anns_test_dir)
+        elif dataset == "cpm":
+            pass # TODO
+        elif dataset == "dsb2018":
+            pass # TODO
+        
+        # draw overlays
         if overlays:
-            imgs_test_dir = Path(root / "test/images")
-            anns_test_dir = Path(root / "test/labels")
-            imgs_train_dir = Path(root / "train/images")
-            anns_train_dir = Path(root / "train/labels")
-            self.__save_overlays(imgs_test_dir, anns_test_dir)
-            self.__save_overlays(imgs_train_dir, anns_train_dir)
-        
+            type_overlays = True if dataset == "pannuke" else False
+            self.__save_overlays(imgs_test_dir, anns_test_dir, type_overlays=type_overlays)
+            self.__save_overlays(imgs_train_dir, anns_train_dir, type_overlays=type_overlays)
     
     
     def model_checkpoint(self, which='last'):
@@ -425,6 +521,7 @@ class ProjectFileManager:
         return ckpt
     
     
+    # TODO: automatically download the files from the links in github
     def download_url(self):
         pass
         # import requests

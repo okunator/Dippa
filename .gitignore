@@ -10,14 +10,14 @@ patches/npy/consep/*
 patches/npy/pannuke/*
 patches/npy/dsb2018/*
 patches/npy/cpm/*
-datasets/kumar_test/
 datasets/kumar/test/*
 datasets/kumar/train/*
+datasets/kumar/orig/*
 datasets/consep/test/*
 datasets/consep/train/*
+datasets/consep/orig/*
 datasets/pannuke/test/*
 datasets/pannuke/train/*
-datasets/pannuke/valid/*
 datasets/pannuke/orig/*
 datasets/dsb2018/train/*
 datasets/dsb2018/test/*
@@ -29,3 +29,5 @@ results/tests/*
 src/tests/
 src/old/
 .ipynb_checkpoints
+.DS_Store
+README.txt

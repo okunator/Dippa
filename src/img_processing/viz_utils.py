@@ -19,7 +19,7 @@ def random_colors(N, bright=True):
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
 # minor mods
-def draw_contours(mask, image, fill_contours=False, thickness=2):
+def draw_contours(mask, image, type_map=None, fill_contours=False, thickness=2):
     # Find contours for rgb mask to superimpose it the original image
     # mask needs to be instance labelled
     bg = np.full(mask.shape + (3,), 255, dtype=np.uint8)
@@ -27,12 +27,19 @@ def draw_contours(mask, image, fill_contours=False, thickness=2):
     shape = mask.shape[:2]
     nuc_list = list(np.unique(mask))
     nuc_list.remove(0) # 0 is background
-    inst_colors = random_colors(len(nuc_list))
-    inst_colors = np.array(inst_colors)
     
-    for idx, nuc_id in enumerate(nuc_list):
-        inst_color = inst_colors[idx]
+    if type_map is None:
+        inst_colors = random_colors(len(nuc_list))
+        inst_colors = np.array(inst_colors)
+    else:
+        inst_colors = np.array([
+            (255., 0., 0.), (0., 255., 0.), (0., 0., 255.),
+            (255., 255., 0.), (255., 165., 0.), (0., 255., 255.)
+        ])
+    
+    for idx, nuc_id in enumerate(nuc_list): 
         inst_map = np.array(mask == nuc_id, np.uint8)
+        
         y1, y2, x1, x2  = bounding_box(inst_map)
         y1 = y1 - 2 if y1 - 2 >= 0 else y1 
         x1 = x1 - 2 if x1 - 2 >= 0 else x1 
@@ -44,7 +51,9 @@ def draw_contours(mask, image, fill_contours=False, thickness=2):
         contours, hierarchy = cv2.findContours(
             inst_map_crop, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
-        
+
+        k = idx if type_map is None else np.unique(type_map[inst_map > 0])[0]
+        inst_color = inst_colors[k]
         if fill_contours:
             contoured_rgb = cv2.drawContours(
                 inst_bg_crop, [max(contours, key = cv2.contourArea)], 

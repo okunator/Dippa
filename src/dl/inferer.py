@@ -160,7 +160,7 @@ class Inferer(ProjectFileManager):
     
         
     def __get_fn(self, path):
-        return path.split("/")[-1][:-4]
+        return Path(path).name[:-4]
     
     
     def __sample_idxs(self, n=25):

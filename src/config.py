@@ -43,10 +43,10 @@ conf = OmegaConf.create(
                 "pannuke":{
                     "background":0,
                     "neoplastic":1,
-                    "non-neoplastic-epithelial":2,
-                    "inflammatory":3,
-                    "connective":4,
-                    "dead":5
+                    "inflammatory":2,
+                    "connective":3,
+                    "dead":4,
+                    "epithelial":5,
                 }
             }
         },
@@ -59,11 +59,11 @@ conf = OmegaConf.create(
             # Otherwise a lot of stuff will prbly have to modified and things break..
             # TODO
             "raw_data_dirs":{
-                "kumar":"../../datasets/kumar_test/",
-                "consep":"../../datasets/consep_test/",
-                "pannuke":"../../datasets/pannuke_test/",
-                "dsb2018":"../..",
-                "cpm":"../.."
+                "kumar":"../../datasets/kumar/",
+                "consep":"../../datasets/consep/",
+                "pannuke":"../../datasets/pannuke/",
+                "dsb2018":"../../datasets/dsb2018/",
+                "cpm":"../../datasets/cpm/"
             },
             
             "data_dirs": {
@@ -79,11 +79,21 @@ conf = OmegaConf.create(
                     "test_im":"../../datasets/consep/test/images",
                     "test_gt":"../../datasets/consep/test/labels",
                 },
+                "dsb2018":{
+                    "train_im":"../../datasets/dsb2018/train/images",
+                    "train_gt":"../../datasets/dsb2018/train/labels",
+                    "test_im":"../../datasets/dsb2018/test/images",
+                    "test_gt":"../../datasets/dsb2018/test/labels",
+                },
+                "cpm":{
+                    "train_im":"../../datasets/cpm/train/images",
+                    "train_gt":"../../datasets/cpm/train/labels",
+                    "test_im":"../../datasets/cpm/test/images",
+                    "test_gt":"../../datasets/cpm/test/labels",
+                },
                 "pannuke": {
                     "train_im":"../../datasets/pannuke/train/images",
                     "train_gt":"../../datasets/pannuke/train/labels",
-                    "valid_im":"../../datasets/pannuke/valid/images",
-                    "valid_gt":"../../datasets/pannuke/valid/labels",
                     "test_im":"../../datasets/pannuke/test/images",
                     "test_gt":"../../datasets/pannuke/test/labels",
                 },
@@ -113,7 +123,7 @@ conf = OmegaConf.create(
         # small enough stride size. Training will get slower though...
         "patching_args":{
             "patch_size":512, # Size of an image patch that gets written to hdf5 db
-            "stride_size":96, # Size of window stride
+            "stride_size":80, # Size of window stride
             "input_size":256, # network input size (multiple of 32)
             "crop_to_input":True,
             "verbose":False
