@@ -17,19 +17,21 @@ from img_processing.augmentations import *
 class PatchWriter(ProjectFileManager):
     def __init__(self, 
                  dataset: str,
-                 data_dirs: Dict,
+                 data_dirs: Dict[str, str],
                  database_root: str,
                  experiment_root: str,
                  experiment_version: str,
                  model_name: str,
-                 phases: List,
+                 phases: List[str],
                  patch_size: int,
                  stride_size: int,
                  input_size: int,
-                 class_dict: Dict,
+                 class_dict: Dict[str, str],
                  crop_to_input: bool,
                  verbose: bool,
-                 **kwargs: Dict) -> None:
+                 pannuke_folds: Dict[str, str] = {"fold1":"train", "fold2":"valid", "fold3":"test"},
+                 **kwargs: Dict,
+                 ) -> None:
         """
         This class is used to patch input images and to write them to either hdf5 tables
         or .npy files that are are used in the training of the networks used in this project. 
@@ -59,11 +61,13 @@ class PatchWriter(ProjectFileManager):
                                        problems with affine transformations on square matrices.
                                        This might be useful since the acces time will be a lot
                                        faster in the db if the patches are small.
-                                       
                 verbose (bool) : Print files being patched to console
+                pannuke_folds (Dict[str, str]) : if dataset == "pannuke", this dict will define what 
+                                                 fold is used as train, valid and test folds. Otherwise
+                                                 this is ignored.
         """
         super(PatchWriter, self).__init__(dataset, data_dirs, database_root, experiment_root,
-                                          experiment_version, model_name, phases)
+                                          experiment_version, model_name, phases, pannuke_folds)
         self.__validate_patch_args(patch_size, stride_size, input_size)
         self.patch_size = patch_size
         self.stride_size = stride_size
@@ -88,8 +92,9 @@ class PatchWriter(ProjectFileManager):
         input_size = conf["patching_args"]["input_size"]
         class_type = conf["dataset"]["args"]["class_types"]
         class_dict = conf["dataset"]["class_dicts"][class_type] # clumsy
-        crop_to_input = conf["patching_args"]["crop_to_input"],
+        crop_to_input = conf["patching_args"]["crop_to_input"]
         verbose = conf["patching_args"]["verbose"]
+        pannuke_folds = conf["dataset"]["pannuke_folds"]
         
         return cls(
             dataset,
@@ -104,7 +109,8 @@ class PatchWriter(ProjectFileManager):
             input_size,
             class_dict,
             crop_to_input,
-            verbose
+            verbose,
+            pannuke_folds
         )
     
     

@@ -28,7 +28,7 @@ class Inferer(ProjectFileManager):
     def __init__(self, 
                  model: nn.Module,
                  dataset: str,
-                 data_dirs: Dict,
+                 data_dirs: Dict[str, str],
                  database_root: str,
                  experiment_root: str,
                  experiment_version: str,
@@ -40,8 +40,10 @@ class Inferer(ProjectFileManager):
                  fold: str,
                  test_time_augs: bool,
                  threshold: float,
-                 class_dict: Dict,
-                 verbose: bool) -> None:
+                 class_dict: Dict[str, str],
+                 verbose: bool,
+                 pannuke_folds: Dict[str, str] = {"fold1":"train", "fold2":"valid", "fold3":"test"}
+                )-> None:
         """
         Inferer for any of the models that are trained with lightning framework 
         in this project (defined in lightning_model.py)
@@ -72,11 +74,14 @@ class Inferer(ProjectFileManager):
             threshold (float) : threshold for the softmasks that have values b/w [0, 1]
             class_dict (Dict) : the dict specifying pixel classes. e.g. {"background":0,"nuclei":1}
             verbose (bool) : wether or not to print the progress of running inference
+            pannuke_folds (Dict[str, str]) : if dataset == "pannuke", this dict will define what 
+                                             fold is used as train, valid and test folds. Otherwise
+                                             this is ignored.
         """
         
         
         super(Inferer, self).__init__(dataset, data_dirs, database_root, experiment_root,
-                                      experiment_version, model_name, phases)
+                                      experiment_version, model_name, phases, pannuke_folds)
         self.model = model
         self.batch_size = batch_size
         self.input_size = input_size
@@ -113,6 +118,7 @@ class Inferer(ProjectFileManager):
         verbose = conf["inference_args"]["verbose"]
         class_type = conf["dataset"]["args"]["class_types"]
         class_dict = conf["dataset"]["class_dicts"][class_type] # clumsy
+        pannuke_folds = conf["dataset"]["pannuke_folds"]
         
         return cls(
             model,
@@ -130,7 +136,8 @@ class Inferer(ProjectFileManager):
             test_time_augs,
             thresh,
             class_dict,
-            verbose
+            verbose,
+            pannuke_folds
         )
         
     

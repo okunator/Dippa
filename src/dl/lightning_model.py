@@ -24,7 +24,7 @@ class SegModel(pl.LightningModule):
     def __init__(self,
                  model: nn.Module,
                  dataset: str,
-                 data_dirs: Dict,
+                 data_dirs: Dict[str, str],
                  database_root: str,
                  experiment_root: str,
                  experiment_version: str,
@@ -39,7 +39,9 @@ class SegModel(pl.LightningModule):
                  encoder_weight_decay: float,
                  scheduler_factor: float,
                  scheduler_patience: float,
-                 class_dict: Dict) -> None:
+                 class_dict: Dict[str, str],
+                 pannuke_folds: Dict[str, str] = {"fold1":"train", "fold2":"valid", "fold3":"test"}
+                ) -> None:
         """
         Pytorch Lightning abstraction for any pytorch segmentation model architecture used
         in this project.
@@ -70,6 +72,9 @@ class SegModel(pl.LightningModule):
             scheduler_factor (float) : 
             scheduler_patience (int) : ...
             class_dict (Dict) : the dict specifying pixel classes. e.g. {"background":0,"nuclei":1}
+            pannuke_folds (Dict[str, str]) : if dataset == "pannuke", this dict will define what 
+                                             fold is used as train, valid and test folds. Otherwise
+                                             this is ignored.
             
         """
         super(SegModel, self).__init__()
@@ -102,7 +107,8 @@ class SegModel(pl.LightningModule):
             experiment_root,
             experiment_version,
             model_name,
-            phases
+            phases,
+            pannuke_folds
         )
         
         self.n_classes = len(self.classes)
@@ -129,6 +135,7 @@ class SegModel(pl.LightningModule):
         patience = conf["training_args"]["scheduler_args"]["patience"]
         class_type = conf["dataset"]["args"]["class_types"]
         class_dict = conf["dataset"]["class_dicts"][class_type] # clumsy
+        pannuke_folds = conf["dataset"]["pannuke_folds"]
         
         return cls(
             model,
@@ -148,7 +155,8 @@ class SegModel(pl.LightningModule):
             encoder_weight_decay,
             factor,
             patience,
-            class_dict
+            class_dict,
+            pannuke_folds
         )
     
     

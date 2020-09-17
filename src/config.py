@@ -7,14 +7,14 @@ conf = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"FPN",
-            "experiment_version":"test_consep2",
+            "experiment_version":"test_pannuke2",
         },
         
         # General dataset constants and args
         "dataset": {
             "args": {
                 # What dataset you want to use? Has to be one of ("kumar", "consep", "pannuke")
-                "dataset":"consep", 
+                "dataset":"pannuke", 
                 
                 # This depends on the dataset. Binary segmentation can be done to all datasets
                 # change this according to your needs. has to be one of ("binary", "consep", "pannuke")
@@ -26,7 +26,7 @@ conf = OmegaConf.create(
                 # of your choosing are treated as train, valid and test folds. If dataset 
                 # = 'pannuke' and phases = ["train", "test"] then two folds of your choosing
                 # are combined to training set remaining fold is the test set
-                "phases":["train", "test"], # ["train", "valid", "test"] or ["train", "test"]
+                "phases":["train", "valid", "test"], # ["train", "valid", "test"] or ["train", "test"]
             },
             "class_dicts": {
                 "binary":{
@@ -48,6 +48,14 @@ conf = OmegaConf.create(
                     "dead":4,
                     "epithelial":5,
                 }
+            },
+            
+            # If pannuke dataset is used, this dict is used to define what folds are used as 
+            # train, valid and test folds
+            "pannuke_folds": {
+                "fold1":"train", 
+                "fold2":"valid", 
+                "fold3":"test"
             }
         },
         

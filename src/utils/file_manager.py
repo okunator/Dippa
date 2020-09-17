@@ -11,15 +11,17 @@ from img_processing.viz_utils import draw_contours
 
 
 class ProjectFileManager:
-    def __init__(self, 
+    def __init__(self,
                  dataset: str, 
                  data_dirs: Dict, 
                  database_root: str,
                  experiment_root: str,
                  experiment_version: str,
                  model_name: str,
-                 phases: List,
-                 **kwargs: Dict) -> None:
+                 phases: List[str],
+                 pannuke_folds: Dict[str, str] = {"fold1":"train", "fold2":"valid", "fold3":"test"},
+                 **kwargs: Dict,
+                ) -> None:
         """
         This class is used for managing the files and folders needed in this project. 
         
@@ -37,6 +39,9 @@ class ProjectFileManager:
                 model_name (str) : The name of the model used in the experiment. This name will be used
                                    for results folder of training and inference results
                 phases (list) : list of the phases (["train", "valid", "test"] or ["train", "test"])
+                pannuke_folds (Dict[str, str]) : if dataset == "pannuke", this dict will define what 
+                                                 fold is used as train, valid and test folds. Otherwise
+                                                 this is ignored.
         """
         super().__init__(**kwargs)
         self.validate_data_args(dataset, data_dirs, phases, database_root, experiment_root)
@@ -47,6 +52,7 @@ class ProjectFileManager:
         self.experiment_version = experiment_version
         self.model_name = model_name
         self.phases = phases
+        self.pannuke_folds = pannuke_folds
         
         # TODO:
         # self.patches_root = Path(patches_root)
@@ -62,6 +68,7 @@ class ProjectFileManager:
         experiment_version = conf["experiment_args"]["experiment_version"]
         model_name = conf["experiment_args"]["model_name"]
         phases = conf["dataset"]["args"]["phases"]
+        pannuke_folds = conf["dataset"]["pannuke_folds"]
         
         return cls(
             dataset,
@@ -70,7 +77,8 @@ class ProjectFileManager:
             experiment_root,
             experiment_version,
             model_name,
-            phases
+            phases,
+            pannuke_folds
         )
     
     
@@ -147,10 +155,20 @@ class ProjectFileManager:
         test_masks = self.__get_files(self.data_dirs[self.dataset]["test_gt"])
         
         # optionally create validation set from training set if dataset is not pan-Nuke
-        if "valid" in self.phases and self.dataset == "pannuke":
-            valid_imgs = self.__get_files(self.data_dirs[self.dataset]["valid_im"])
-            valid_masks = self.__get_files(self.data_dirs[self.dataset]["valid_gt"])   
-        elif "valid" in self.phases:
+        # if "valid" in self.phases and self.dataset == "pannuke":
+        #     valid_imgs = self.__get_files(self.data_dirs[self.dataset]["valid_im"])
+        #     valid_masks = self.__get_files(self.data_dirs[self.dataset]["valid_gt"])   
+        # elif "valid" in self.phases:
+        #     d = self.__split_training_set(train_imgs, train_masks)
+        #     train_imgs = d["train_imgs"]
+        #     train_masks = d["train_masks"]
+        #     valid_imgs = d["valid_imgs"]
+        #     valid_masks = d["valid_masks"]
+        # else:
+        #     valid_imgs = None
+        #     valid_masks = None
+        
+        if "valid" in self.phases:
             d = self.__split_training_set(train_imgs, train_masks)
             train_imgs = d["train_imgs"]
             train_masks = d["train_masks"]
@@ -227,19 +245,37 @@ class ProjectFileManager:
         Split training set into training and validation set (correct way to train).
         This might affect training accuracy if training set is small.
         
-        For pannuke
+        For pannuke the splits are based on the 
         """
-        indices = np.arange(len(train_imgs))
-        train_indices, valid_indices = train_test_split(
-            indices, test_size=size, random_state=42, shuffle=True
-        )
-                      
-        np_train_imgs = np.array(train_imgs)
-        np_train_masks = np.array(train_masks)
-        train_imgs = sorted(np_train_imgs[train_indices].tolist())
-        train_masks = sorted(np_train_masks[train_indices].tolist())
-        valid_imgs = sorted(np_train_imgs[valid_indices].tolist())
-        valid_masks = sorted(np_train_masks[valid_indices].tolist())
+        def split_pannuke(paths):
+            phases = {}
+            for fold, phase in self.pannuke_folds.items():
+                phases[phase] = []
+                for item in paths:
+                    if fold in Path(item).name:
+                        phases[phase].append(item)
+            return phases
+        
+        
+        if self.dataset == "pannuke":
+            imgs = split_pannuke(train_imgs)
+            masks = split_pannuke(train_masks)
+            train_imgs = sorted(imgs["train"])
+            train_masks = sorted(masks["train"])
+            valid_imgs = sorted(imgs["valid"])
+            valid_masks = sorted(masks["valid"])
+        else:
+            indices = np.arange(len(train_imgs))
+            train_indices, valid_indices = train_test_split(
+                indices, test_size=size, random_state=42, shuffle=True
+            )
+
+            np_train_imgs = np.array(train_imgs)
+            np_train_masks = np.array(train_masks)
+            train_imgs = sorted(np_train_imgs[train_indices].tolist())
+            train_masks = sorted(np_train_masks[train_indices].tolist())
+            valid_imgs = sorted(np_train_imgs[valid_indices].tolist())
+            valid_masks = sorted(np_train_masks[valid_indices].tolist())
         
         return {
             "train_imgs":train_imgs,
@@ -452,7 +488,6 @@ class ProjectFileManager:
                         raw_root: str, 
                         rm_zips: bool = False, 
                         overlays: bool = True, 
-                        pannuke_folds: Dict[str, str] = {"fold1":"train", "fold2":"valid", "fold3":"test"}
                        ) -> None:
         """
         Convert the raw data to the right format and move the files to the right folders for training and
@@ -540,7 +575,7 @@ class ProjectFileManager:
         
         Args:
             folds (List): list of the folds you want to include. e.g. ["fold", "fold3"]
-            types (List): list of the tissue types you want to include e.g. ["Breast", "Colon"]
+            types (List): list of the tissue types you want to include e.g. ["Breast", "Colon"].
             data (str): one of "img", "mask" or "both"
         Returns:
             A Dict of Path objects to the pannuke files specified by the options
