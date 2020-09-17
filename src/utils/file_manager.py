@@ -154,20 +154,6 @@ class ProjectFileManager:
         test_imgs = self.__get_files(self.data_dirs[self.dataset]["test_im"])
         test_masks = self.__get_files(self.data_dirs[self.dataset]["test_gt"])
         
-        # optionally create validation set from training set if dataset is not pan-Nuke
-        # if "valid" in self.phases and self.dataset == "pannuke":
-        #     valid_imgs = self.__get_files(self.data_dirs[self.dataset]["valid_im"])
-        #     valid_masks = self.__get_files(self.data_dirs[self.dataset]["valid_gt"])   
-        # elif "valid" in self.phases:
-        #     d = self.__split_training_set(train_imgs, train_masks)
-        #     train_imgs = d["train_imgs"]
-        #     train_masks = d["train_masks"]
-        #     valid_imgs = d["valid_imgs"]
-        #     valid_masks = d["valid_masks"]
-        # else:
-        #     valid_imgs = None
-        #     valid_masks = None
-        
         if "valid" in self.phases:
             d = self.__split_training_set(train_imgs, train_masks)
             train_imgs = d["train_imgs"]

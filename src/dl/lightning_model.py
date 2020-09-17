@@ -345,23 +345,22 @@ class SegModel(pl.LightningModule):
 
 
 
-def plot_metrics(conf, scale="log", metric="loss"):
+def plot_metrics(conf, scale: str = "log", metric: str = "loss", save:bool = False) -> None:
     """
     Plot the training and validation loss to same graph
     Args:
         scale (str) : y-axis scale. One of ("log", "normal").
         metrics (str) : One of the averaged metrics ("loss", "accuracy", "TNR", "TPR").
+        save (bool): Save result image
     """
     
     assert scale in ("log", "linear"), "y-scale not in ('log', 'linear')"
     assert metric in ("loss", "accuracy", "TNR", "TPR"), "metric not in ('loss', 'accuracy', 'TNR', 'TPR')"
     ldir = Path(conf["paths"]["experiment_root_dir"])
     
-    folder = "version_" + conf["experiment_args"]["experiment_version"]
-    logdirs = {folder:x 
-               for x in ldir.glob("**/*") 
-               if x.is_dir() and str(x).split("/")[-1].startswith("tf")}
-
+    folder = f"{conf['experiment_args']['model_name']}/version_{conf['experiment_args']['experiment_version']}"
+    logdir = Path(ldir / folder / "tf")
+    
     train_losses_all = {}
     avg_train_losses_all = {}
     avg_valid_losses_all = {}
@@ -373,54 +372,54 @@ def plot_metrics(conf, scale="log", metric="loss"):
     avg_train_TPR_all = {}
     epochs_all = {}
 
-    for key in logdirs.keys():
-        try:
-            train_losses_all[key] = []
-            avg_train_losses_all[key] = []
-            avg_valid_losses_all[key] = []
-            avg_valid_accuracies_all[key] = []
-            avg_train_accuracies_all[key] = []
-            avg_valid_TNR_all[key] = []
-            avg_train_TNR_all[key] = []
-            avg_valid_TPR_all[key] = []
-            avg_train_TPR_all[key] = []
-            epochs_all[key] = []
-            summary_reader = SummaryReader(logdirs[key], types=["scalar"])
 
-            for item in summary_reader:
-                #print(item.tag)
-                if item.tag == "train_loss":
-                    train_losses_all[key].append(item.value)
-                elif item.tag == "epoch":
-                    epochs_all[key].append(item.value)
-                elif item.tag == "avg_val_accuracy":
-                    avg_valid_accuracies_all[key].append(item.value)
-                elif item.tag == "avg_train_accuracy":
-                    avg_train_accuracies_all[key].append(item.value)
-                elif item.tag == "avg_val_loss":
-                    avg_valid_losses_all[key].append(item.value)
-                elif item.tag == "avg_train_loss":
-                    avg_train_losses_all[key].append(item.value)
-                elif item.tag == "avg_val_TNR":
-                    avg_valid_TNR_all[key].append(item.value)
-                elif item.tag == "avg_train_TNR":
-                    avg_train_TNR_all[key].append(item.value)
-                elif item.tag == "avg_val_TPR":
-                    avg_valid_TPR_all[key].append(item.value)
-                elif item.tag == "avg_train_TPR":
-                    avg_train_TPR_all[key].append(item.value)
-        except:
-            pass
+    try:
+        train_losses_all = []
+        avg_train_losses_all = []
+        avg_valid_losses_all = []
+        avg_valid_accuracies_all = []
+        avg_train_accuracies_all = []
+        avg_valid_TNR_all = []
+        avg_train_TNR_all = []
+        avg_valid_TPR_all = []
+        avg_train_TPR_all = []
+        epochs_all = []
+        summary_reader = SummaryReader(logdir, types=["scalar"])
 
-    np_train_losses = np.array(avg_train_losses_all[folder])
-    np_valid_losses = np.array(avg_valid_losses_all[folder])
-    np_valid_accuracy = np.array(avg_valid_accuracies_all[folder])
-    np_train_accuracy = np.array(avg_train_accuracies_all[folder])
-    np_valid_TNR = np.array(avg_valid_TNR_all[folder])
-    np_train_TNR = np.array(avg_train_TNR_all[folder])
-    np_valid_TPR = np.array(avg_valid_TPR_all[folder])
-    np_train_TPR = np.array(avg_train_TPR_all[folder])
-    np_epochs = np.unique(np.array(epochs_all[folder]))
+        for item in summary_reader:
+            #print(item.tag)
+            if item.tag == "train_loss":
+                train_losses_all.append(item.value)
+            elif item.tag == "epoch":
+                epochs_all.append(item.value)
+            elif item.tag == "avg_val_accuracy":
+                avg_valid_accuracies_all.append(item.value)
+            elif item.tag == "avg_train_accuracy":
+                avg_train_accuracies_all.append(item.value)
+            elif item.tag == "avg_val_loss":
+                avg_valid_losses_all.append(item.value)
+            elif item.tag == "avg_train_loss":
+                avg_train_losses_all.append(item.value)
+            elif item.tag == "avg_val_TNR":
+                avg_valid_TNR_all.append(item.value)
+            elif item.tag == "avg_train_TNR":
+                avg_train_TNR_all.append(item.value)
+            elif item.tag == "avg_val_TPR":
+                avg_valid_TPR_all.append(item.value)
+            elif item.tag == "avg_train_TPR":
+                avg_train_TPR_all.append(item.value)
+    except:
+        pass
+
+    np_train_losses = np.array(avg_train_losses_all)
+    np_valid_losses = np.array(avg_valid_losses_all)
+    np_valid_accuracy = np.array(avg_valid_accuracies_all)
+    np_train_accuracy = np.array(avg_train_accuracies_all)
+    np_valid_TNR = np.array(avg_valid_TNR_all)
+    np_train_TNR = np.array(avg_train_TNR_all)
+    np_valid_TPR = np.array(avg_valid_TPR_all)
+    np_train_TPR = np.array(avg_train_TPR_all)
+    np_epochs = np.unique(np.array(epochs_all))
     
     df = pd.DataFrame(
        {
@@ -432,7 +431,7 @@ def plot_metrics(conf, scale="log", metric="loss"):
             "validation TNR":np_valid_TNR,
             "training TPR":np_train_TPR,
             "validation TPR":np_valid_TPR,
-            "epoch": np_epochs
+            "epoch": np_epochs[0:len(np_train_losses)]
        }
     )
 
@@ -454,6 +453,12 @@ def plot_metrics(conf, scale="log", metric="loss"):
     df.plot(kind="line",x="epoch", y=y1, ax=ax)
     df.plot(kind="line",x="epoch", y=y2, color="red", ax=ax)
     plt.yscale(scale)
+    
+    if save:
+        plot_dir = logdir.parents[0].joinpath("training_plots")
+        plot_dir.mkdir(parents=True, exist_ok=True)
+        plt.savefig(Path(plot_dir / f"{scale}_{metric}.png"))
+    
     plt.show()
 
 

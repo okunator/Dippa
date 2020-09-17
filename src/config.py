@@ -51,7 +51,8 @@ conf = OmegaConf.create(
             },
             
             # If pannuke dataset is used, this dict is used to define what folds are used as 
-            # train, valid and test folds
+            # train, valid and test folds. If phases == ["train", "test"]. the "train" and "valid"
+            # folds are combined
             "pannuke_folds": {
                 "fold1":"train", 
                 "fold2":"valid", 

@@ -11,7 +11,7 @@ from typing import List, Dict
 from sklearn.model_selection import train_test_split
 from patch_extractor import PatchExtractor
 from file_manager import ProjectFileManager
-from img_processing.augmentations import *
+from img_processing.augmentations import rigid_transforms, random_crop, compose
 
 
 class PatchWriter(ProjectFileManager):
@@ -289,7 +289,14 @@ class PatchWriter(ProjectFileManager):
         
     
     
-    def viz_patches_example(self, index=1, img_type="img", phase="train"):
+    def viz_patches_example(self, index: int = 1, img_type: str ="img", phase: str = "train"):
+        """
+        A visualization of what the patches look like that are written to the hdf5 database.
+        Args:
+            index (int): the index number of the filepath in the list of files belonging to a specific dataset
+            img_type (str): whether to use masks or images or a juxtaposition of both
+            phase (str): One of ('train', 'test', 'valid').
+        """
         # This is fugly as heck... 
         assert img_type in ("img", "mask", "overlay") 
         assert phase in ("train", "test", "valid")            
@@ -339,6 +346,9 @@ class PatchWriter(ProjectFileManager):
 
 
     def write_dbs(self):
+        """
+        Writes the hdf5 databases to correct folders.
+        """
         self.create_dir(self.database_dir)
         self.remove_existing_files(self.database_dir)
         for phase in self.phases:
@@ -353,7 +363,13 @@ class PatchWriter(ProjectFileManager):
             
             
 
-def visualize_db_patches(path, index):
+def visualize_db_patches(path: str, index: int):
+    """
+    This function opens the hdf5 file and queries for an image and a mask with an index and plots these.
+    Args:
+        path (str): path to the hdf5 database
+        index (int): index for the patch array in the hdf5 db
+    """
     matplotlib.rcParams.update({"font.size": 22})
     with tables.open_file(path,"r") as db:
         img = db.root.img
