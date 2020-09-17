@@ -22,10 +22,10 @@ conf = OmegaConf.create(
                 
                 # if phases = ["train", "valid", "test"]. The train set is also split to 
                 # validation set. If phases = ["train", "test"], no splitting is done.
-                # If dataset = 'pannuke' and phases = ["train", "valid", "test"] the fold1
-                # is used as training set, fold2 is used as validation set and fold3 is used
-                # as test set. If dataset = 'pannuke' and phases = ["train", "test"] then
-                # fold1 and fold2 are combined to training set and fold3 remains as test set
+                # If dataset = 'pannuke' and phases = ["train", "valid", "test"] the folds
+                # of your choosing are treated as train, valid and test folds. If dataset 
+                # = 'pannuke' and phases = ["train", "test"] then two folds of your choosing
+                # are combined to training set remaining fold is the test set
                 "phases":["train", "test"], # ["train", "valid", "test"] or ["train", "test"]
             },
             "class_dicts": {

@@ -89,6 +89,42 @@ class ProjectFileManager:
                                       "Make sure they are created, by runnning these... TODO")
         
         
+        
+    @staticmethod
+    def read_img(path: str) -> np.ndarray:
+        return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
+    
+    
+    @staticmethod
+    def read_mask(path: str, type_map: bool = False) -> np.ndarray:
+        key = "type_map" if type_map else "inst_map"
+        return scipy.io.loadmat(path)[key].astype("int32")
+    
+        
+    @staticmethod
+    def remove_existing_files(directory: str) -> None:
+        assert Path(directory).is_dir(), f"{directory} is not a folder that can be iterated"
+        for item in Path(directory).iterdir():
+            # Do not touch the folders inside the directory
+            if item.is_file():
+                item.unlink()
+
+
+    @staticmethod      
+    def create_dir(path: str) -> None:
+        Path(path).mkdir(parents=True, exist_ok=True)
+                    
+            
+    @staticmethod
+    def extract_zips(folder: str, rm: bool = False) -> None:
+        for f in Path(folder).iterdir():
+            if f.is_file() and f.suffix == ".zip":
+                with zipfile.ZipFile(f, 'r') as z:
+                    z.extractall(folder)
+                if rm:
+                    f.unlink()
+        
+        
     @property
     def database_dir(self):
         return Path(self.database_root).joinpath(f"{self.dataset}")
@@ -170,41 +206,48 @@ class ProjectFileManager:
             "test":get_input_sizes(test_dbs)
         }
     
-    
-    @staticmethod
-    def read_img(path):
-        return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
-    
-    
-    @staticmethod
-    def read_mask(path, type_map=False):
-        key = "type_map" if type_map else "inst_map"
-        return scipy.io.loadmat(path)[key].astype("int32")
-    
-        
-    @staticmethod
-    def remove_existing_files(directory):
-        assert Path(directory).is_dir(), f"{directory} is not a folder that can be iterated"
-        for item in Path(directory).iterdir():
-            # Do not touch the folders inside the directory
-            if item.is_file():
-                item.unlink()
-
-
-    @staticmethod      
-    def create_dir(path):
-        Path(path).mkdir(parents=True, exist_ok=True)
                     
+    def __get_img_suffix(self, directory):
+        # Find out the suffix of the image and mask files and assert if images have mixed suffices
+        d = Path(directory)
+        assert all([file.suffix for file in d.iterdir()]), "All image files should be in same format"
+        return [file.suffix for file in directory.iterdir()][0]
+        
+        
+    def __get_files(self, directory):
+        # Get the image and mask files from the directory that was provided 
+        d = Path(directory)
+        assert d.is_dir(), f"Provided directory: {d.as_posix()} for image files is not a directory."
+        file_suffix = self.__get_img_suffix(d)
+        return sorted([x.as_posix() for x in d.glob(f"*{file_suffix}")])
+    
             
-    @staticmethod
-    def extract_zips(folder, rm=False):
-        for f in Path(folder).iterdir():
-            if f.is_file() and f.suffix == ".zip":
-                with zipfile.ZipFile(f, 'r') as z:
-                    z.extractall(folder)
-                if rm:
-                    f.unlink()
-
+    def __split_training_set(self, train_imgs, train_masks, seed=42, size=0.2):
+        """
+        Split training set into training and validation set (correct way to train).
+        This might affect training accuracy if training set is small.
+        
+        For pannuke
+        """
+        indices = np.arange(len(train_imgs))
+        train_indices, valid_indices = train_test_split(
+            indices, test_size=size, random_state=42, shuffle=True
+        )
+                      
+        np_train_imgs = np.array(train_imgs)
+        np_train_masks = np.array(train_masks)
+        train_imgs = sorted(np_train_imgs[train_indices].tolist())
+        train_masks = sorted(np_train_masks[train_indices].tolist())
+        valid_imgs = sorted(np_train_imgs[valid_indices].tolist())
+        valid_masks = sorted(np_train_masks[valid_indices].tolist())
+        
+        return {
+            "train_imgs":train_imgs,
+            "train_masks":train_masks,
+            "valid_imgs":valid_imgs,
+            "valid_masks":valid_masks
+        }
+    
                     
     def __kumar_xml2mat(self, x, to):
         """
@@ -248,47 +291,6 @@ class ProjectFileManager:
         mask_fn = Path(to / x.with_suffix(".mat").name)
         scipy.io.savemat(mask_fn, mdict={'inst_map': ann})
                 
-
-    def __get_img_suffix(self, directory):
-        # Find out the suffix of the image and mask files and assert if images have mixed suffices
-        d = Path(directory)
-        assert all([file.suffix for file in d.iterdir()]), "All image files should be in same format"
-        return [file.suffix for file in directory.iterdir()][0]
-        
-        
-    def __get_files(self, directory):
-        # Get the image and mask files from the directory that was provided 
-        d = Path(directory)
-        assert d.is_dir(), f"Provided directory: {d.as_posix()} for image files is not a directory."
-        file_suffix = self.__get_img_suffix(d)
-        return sorted([x.as_posix() for x in d.glob(f"*{file_suffix}")])
-    
-            
-    def __split_training_set(self, train_imgs, train_masks, seed=42, size=0.2):
-        """
-        Split training set into training and validation set (correct way to train).
-        Not needed for pan-Nuke (has 3 folds). This might affect training accuracy
-        if training set is small. 
-        """
-        indices = np.arange(len(train_imgs))
-        train_indices, valid_indices = train_test_split(
-            indices, test_size=size, random_state=42, shuffle=True
-        )
-                      
-        np_train_imgs = np.array(train_imgs)
-        np_train_masks = np.array(train_masks)
-        train_imgs = sorted(np_train_imgs[train_indices].tolist())
-        train_masks = sorted(np_train_masks[train_indices].tolist())
-        valid_imgs = sorted(np_train_imgs[valid_indices].tolist())
-        valid_masks = sorted(np_train_masks[valid_indices].tolist())
-        
-        return {
-            "train_imgs":train_imgs,
-            "train_masks":train_masks,
-            "valid_imgs":valid_imgs,
-            "valid_masks":valid_masks
-        }
-    
     
     def __mv_to_orig(self, folder):
         """
@@ -445,8 +447,13 @@ class ProjectFileManager:
         pass
     
         
-    def handle_raw_data(self, dataset, raw_root, rm_zips=False, overlays=True, 
-                        pannuke_folds={"fold1":"train", "fold2":"valid", "fold3":"test"}):
+    def handle_raw_data(self, 
+                        dataset: str, 
+                        raw_root: str, 
+                        rm_zips: bool = False, 
+                        overlays: bool = True, 
+                        pannuke_folds: Dict[str, str] = {"fold1":"train", "fold2":"valid", "fold3":"test"}
+                       ) -> None:
         """
         Convert the raw data to the right format and move the files to the right folders for training and
         inference. Training and inference expects a specific folder and file structure and this automates
@@ -502,9 +509,14 @@ class ProjectFileManager:
             self.__save_overlays(imgs_train_dir, anns_train_dir, type_overlays=type_overlays)
     
     
-    def model_checkpoint(self, which='last'):
+    def model_checkpoint(self, which:str = "last") -> Path:
         """
         Get the best or last checkpoint of a trained network.
+        Args:
+            which (str): one of ("best", "last"). Specifies whether to use last epoch model or best model on
+                         validation data.
+        Returns:
+            Path object to the pytorch checkpoint file.
         """
         assert self.experiment_dir.exists(), "Experiment dir does not exist. Train the model first."
         assert which in ("best", "last"), f"param which: {which} not one of ('best', 'last')"
@@ -519,6 +531,58 @@ class ProjectFileManager:
         
         assert ckpt is not None, f"{ckpt} checkpoint is None."
         return ckpt
+    
+    
+    def get_pannuke_fold(self, folds: List[str], types: List[str], data:str = "both") -> Dict[str, List[Path]]:
+        """
+        After converting the data to right format and moving it to right folders this can be used to get
+        the file paths by pannuke fold.
+        
+        Args:
+            folds (List): list of the folds you want to include. e.g. ["fold", "fold3"]
+            types (List): list of the tissue types you want to include e.g. ["Breast", "Colon"]
+            data (str): one of "img", "mask" or "both"
+        Returns:
+            A Dict of Path objects to the pannuke files specified by the options
+            ex. {"img":[Path1, Path2], "mask":[]}
+        """
+        assert data in ("img", "mask", "both"), f"data arg: {data} needs to be one of ('img', 'mask', 'both')"
+        assert all(fold in ("fold1", "fold2", "fold3") for fold in folds), f"incorrect folds: {folds}"
+        assert all(Path(p).exists() for p in self.data_dirs["pannuke"].values()), ("Data folders do not exists"
+                                                                                   "Convert the data first to"
+                                                                                   "right format. See step 1."
+                                                                                   "from the instructions.")
+        
+        # Use only unique values in given lists and sort
+        folds = sorted(list(set(folds)))
+        types = sorted(list(set(types)))
+        
+        # image type wildcard
+        if data == "img":
+            wc2 = ".png"
+        elif data == "mask":
+            wc2 = ".mat"
+        else:
+            wc2 = ""
+        
+        paths = []
+        for d in dict(self.data_dirs["pannuke"]).values():
+            for tissue in types:
+                tf = list(map(lambda fold : f"{tissue}_{fold}", folds))
+                for wc in tf:
+                    for f in sorted(Path(d).glob(f"*{wc}*{wc2}")):
+                        paths.append(f)
+        
+        path_dict = {}
+        if data == "both":
+            imgs = [path for path in sorted(paths) if path.suffix == ".png"]
+            masks = [path for path in sorted(paths) if path.suffix == ".mat"]
+            path_dict["img"] = imgs
+            path_dict["mask"] = masks
+        else:
+            path_dict[data] = paths
+        
+        return path_dict
     
     
     # TODO: automatically download the files from the links in github

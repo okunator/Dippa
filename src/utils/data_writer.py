@@ -239,7 +239,6 @@ class PatchWriter(ProjectFileManager):
                 patches_im = im[None, ...]
                 patches_mask = mask[None, :, :, 0]
             else:
-                # patches = self.__extract_patches(io)
                 patches_im = self.xtractor.extract(im, "mirror")
                 patches_mask = self.xtractor.extract(mask, "mirror")
                 patches_mask = patches_mask[..., 0].squeeze()
