@@ -8,6 +8,7 @@ import numpy as np
 import sklearn.feature_extraction.image
 from pathlib import Path
 from typing import List, Dict
+from omegaconf import DictConfig
 from sklearn.model_selection import train_test_split
 from patch_extractor import PatchExtractor
 from file_manager import ProjectFileManager
@@ -16,20 +17,9 @@ from img_processing.augmentations import rigid_transforms, random_crop, compose
 
 class PatchWriter(ProjectFileManager):
     def __init__(self, 
-                 dataset: str,
-                 data_dirs: Dict[str, str],
-                 database_root: str,
-                 experiment_root: str,
-                 experiment_version: str,
-                 model_name: str,
-                 phases: List[str],
-                 patch_size: int,
-                 stride_size: int,
-                 input_size: int,
-                 class_dict: Dict[str, str],
-                 crop_to_input: bool,
-                 verbose: bool,
-                 pannuke_folds: Dict[str, str] = {"fold1":"train", "fold2":"valid", "fold3":"test"},
+                 dataset_args: DictConfig,
+                 experiment_args: DictConfig,
+                 patching_args: DictConfig,
                  **kwargs: Dict,
                  ) -> None:
         """
@@ -38,79 +28,42 @@ class PatchWriter(ProjectFileManager):
         The torch dataset class is written to read from the files created by this class.
         
             Args:
-                dataset (str) : one of ("kumar", "consep", "pannuke", "other")
-                data_dirs (dict) : dictionary of directories containing masks and images. Keys of this
-                                   dict must be the same as ("kumar", "consep", "pannuke", "other")
-                database_root_dir (str) : directory where the databases are written
-                experiment_root (str) : directory where results from a network training 
-                                        and inference experiment are written
-                experiment_version (str) : a name for the experiment you want to conduct. e.g. 
-                                           'FPN_test_pannuke' or 'Unet_consep' etc. This name will be used
-                                           for results folder of training and inference results
-                model_name (str) : The name of the model used in the experiment. This name will be used
-                                   for results folder of training and inference results
-                phases (list) : list of the phases (["train", "valid", "test"] or ["train", "test"])     
-                patch_size (int) : size of a single image patch saved to an HDF5 db
-                stride_size (int) : size of the stride when patching
-                input_size (int) : size of the network input patch
-                class_dict (Dict) : the dict specifying pixel classes. e.g. {"background":0,"nuclei":1}
-                crop_to_input (bool) : Whether to crop the extracted patch to the network
-                                       input size before writing to database. Also rigid
-                                       augmentations are applied to the patch before cropping
-                                       since it is useful to tranform bigger patches to avoid
-                                       problems with affine transformations on square matrices.
-                                       This might be useful since the acces time will be a lot
-                                       faster in the db if the patches are small.
-                verbose (bool) : Print files being patched to console
-                pannuke_folds (Dict[str, str]) : if dataset == "pannuke", this dict will define what 
-                                                 fold is used as train, valid and test folds. Otherwise
-                                                 this is ignored.
+                dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                           related to the dataset that is being used.
+                                           Check config.py for more info
+                experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                              that are used for creating result folders
+                                              files. Check config.py for more info
+                patching_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                            that are used for patching input images.
+                                            Check config.py for more info
+                
         """
-        super(PatchWriter, self).__init__(dataset, data_dirs, database_root, experiment_root,
-                                          experiment_version, model_name, phases, pannuke_folds)
-        self.__validate_patch_args(patch_size, stride_size, input_size)
-        self.patch_size = patch_size
-        self.stride_size = stride_size
-        self.input_size = input_size
-        self.verbose = verbose
-        self.crop_to_input = crop_to_input        
-        self.classes = class_dict
-        self.xtractor = PatchExtractor((patch_size, patch_size), (stride_size, stride_size))
+        super(PatchWriter, self).__init__(dataset_args, experiment_args)
+        self.patch_size = patching_args.patch_size
+        self.stride_size = patching_args.stride_size
+        self.input_size = experiment_args.model_input_size
+        self.verbose = patching_args.verbose
+        self.crop_to_input = patching_args.crop_to_input       
+        self.classes = dataset_args.classes
+        self.__validate_patch_args(self.patch_size, self.stride_size, self.input_size)
+        self.xtractor = PatchExtractor(
+            (self.patch_size, self.patch_size), 
+            (self.stride_size, self.stride_size)
+        )
+
 
         
     @classmethod
     def from_conf(cls, conf):
-        dataset = conf["dataset"]["args"]["dataset"]
-        data_dirs = conf["paths"]["data_dirs"]
-        database_root = conf["paths"]["database_root_dir"]
-        experiment_root = conf["paths"]["experiment_root_dir"]
-        experiment_version = conf["experiment_args"]["experiment_version"]
-        model_name = conf["experiment_args"]["model_name"]
-        phases = conf["dataset"]["args"]["phases"]
-        patch_size = conf["patching_args"]["patch_size"]
-        stride_size = conf["patching_args"]["stride_size"]
-        input_size = conf["patching_args"]["input_size"]
-        class_type = conf["dataset"]["args"]["class_types"]
-        class_dict = conf["dataset"]["class_dicts"][class_type] # clumsy
-        crop_to_input = conf["patching_args"]["crop_to_input"]
-        verbose = conf["patching_args"]["verbose"]
-        pannuke_folds = conf["dataset"]["pannuke_folds"]
+        dataset_args = conf.dataset_args
+        experiment_args = conf.experiment_args
+        patching_args = conf.patching_args
         
         return cls(
-            dataset,
-            data_dirs,
-            database_root,
-            experiment_root,
-            experiment_version,
-            model_name,
-            phases,
-            patch_size,
-            stride_size,
-            input_size,
-            class_dict,
-            crop_to_input,
-            verbose,
-            pannuke_folds
+            dataset_args,
+            experiment_args,
+            patching_args
         )
     
     
@@ -122,12 +75,11 @@ class PatchWriter(ProjectFileManager):
         
         assert stride_size <= patch_size, "stride_size must be <= patch_size"
         assert input_size <= patch_size, "input_size must be <= patch_size"
-        assert all(s[0] >= patch_size and s[1] >= patch_size for s in shapes), ("height or width of given "
-                                                                                "imgs is < patch_size "
-                                                                                f"({patch_size})."
-                                                                                " Check your image shapes.")
-            
-            
+        assert all(s[0] >= patch_size and s[1] >= patch_size for s in shapes), (
+            f"height or width of given imgs is < patch_size ({patch_size}). Check your image shapes."
+        )
+
+        
     def __extract_patches(self, io):
         # OLD, USE HOVERNET PATCH EXTRACTOR INSTEAD
         # add reflect padding 

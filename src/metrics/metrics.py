@@ -137,7 +137,6 @@ def AJI_plus(true, pred):
 
     # caching pairwise
     for true_id in true_id_list[1:]: # 0-th is background
-    #for true_id in true_masks.keys():
         t_mask = true_masks[true_id]
         pred_true_overlap = pred[t_mask > 0]
         pred_true_overlap_id = np.unique(pred_true_overlap)
@@ -208,7 +207,6 @@ def DICE2(true, pred):
     overall_inter = 0
 
     for true_id in true_id_list[1:]:
-    # for true_id in true_masks.keys():
         t_mask = true_masks[true_id]
         pred_true_overlap = pred[t_mask > 0]
         pred_true_overlap_id = np.unique(pred_true_overlap)
@@ -228,7 +226,7 @@ def DICE2(true, pred):
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
-def PQ(true, pred, match_iou=0.5):
+def PQ(true, pred, match_iou=0.4):
     """
     `match_iou` is the IoU threshold level to determine the pairing between
     GT instances `p` and prediction instances `g`. `p` and `g` is a pair
@@ -268,7 +266,6 @@ def PQ(true, pred, match_iou=0.5):
 
     # caching pairwise iou
     for true_id in true_id_list[1:]: # 0-th is background
-    #for true_id in true_masks.keys():
         t_mask = true_masks[true_id]
         pred_true_overlap = pred[t_mask > 0]
         pred_true_overlap_id = np.unique(pred_true_overlap)

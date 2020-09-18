@@ -1,0 +1,15 @@
+class_types:
+    binary: 
+        background: 0
+        nuclei: 1
+    types:
+        background: 0
+        nuclei: 1
+        
+
+data_dirs:
+    raw_data_dir: ../../datasets/kumar
+    train_im: ../../datasets/kumar/train/images
+    train_gt: ../../datasets/kumar/train/labels
+    test_im: ../../datasets/kumar/test/images
+    test_gt: ../../datasets/kumar/test/labels 

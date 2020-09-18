@@ -5,14 +5,16 @@ import numpy as np
 import sklearn.feature_extraction.image
 import pandas as pd
 import matplotlib.pyplot as plt
+import ttach as tta
 
 from torch import nn
 from pathlib import Path
+from omegaconf import DictConfig
 from skimage.filters import difference_of_gaussians
 from skimage.exposure import histogram
 from collections import OrderedDict
 from multiprocessing import Pool
-from typing import List, Dict
+from typing import List, Dict, Any
 
 from utils.file_manager import ProjectFileManager
 from img_processing.process_utils import remap_label
@@ -20,78 +22,49 @@ from img_processing.viz_utils import draw_contours
 from img_processing.post_processing import (activation, naive_thresh_logits, 
                                             smoothed_thresh, inv_dist_watershed)
 
-from img_processing.augmentations import tta_augs, tta_deaugs, tta_five_crops, resize
+from img_processing.augmentations import tta_augs, tta_deaugs, tta_five_crops, resize, tta_transforms
 from metrics.metrics import PQ, AJI, AJI_plus, DICE2, split_and_merge
 
 
 class Inferer(ProjectFileManager):
     def __init__(self, 
                  model: nn.Module,
-                 dataset: str,
-                 data_dirs: Dict[str, str],
-                 database_root: str,
-                 experiment_root: str,
-                 experiment_version: str,
-                 model_name: str,
-                 phases: List,
-                 batch_size: int,
-                 input_size: int,
-                 smoothen: bool,
-                 fold: str,
-                 test_time_augs: bool,
-                 threshold: float,
-                 class_dict: Dict[str, str],
-                 verbose: bool,
-                 pannuke_folds: Dict[str, str] = {"fold1":"train", "fold2":"valid", "fold3":"test"}
-                )-> None:
+                 dataset_args: DictConfig,
+                 experiment_args: DictConfig,
+                 inference_args: DictConfig,
+                 **kwargs
+                ) -> None:
         """
         Inferer for any of the models that are trained with lightning framework 
         in this project (defined in lightning_model.py)
         
         Args: 
-            model (SegModel) : SegModel that has been used in training.
-                               See: Train_lightning.ipynb for example how to define it
-            dataset (str) : one of ("kumar", "consep", "pannuke", "other")
-            data_dirs (dict) : dictionary of directories containing masks and images. Keys of this
-                               dict must be the same as ("kumar", "consep", "pannuke", "other")
-            database_root_dir (str) : directory where the databases are written
-            experiment_root (str) : directory where results from a network training 
-                                    and inference experiment are written
-            experiment_version (str) : a name for the experiment you want to conduct. e.g. 
-                                       'FPN_test_pannuke' or 'Unet_consep' etc. This name will be used
-                                       for results folder of training and inference results
-            model_name (str) : The name of the model used in the experiment. This name will be used
-                               for results folder of training and inference results
-            phases (list) : list of the phases (["train", "valid", "test"] or ["train", "test"])
-            batch_size (int) : Number of input patches used for every iteration
-            input_size (int) : Size of the input patch that is fed to the network
-            smoothen (bool) : Use Gaussian differences to smoothen every predicted patch. This will
-                              get rid of the checkerboard pattern after the patches are stithced to
-                              full size images and makes the thresholding of the soft masks trivial.
-            fold (str) : One of ("train", "valid", "test"). Do predictions on one of these data folds.
-                         Naturally "test" is the one to use for results
-            test_time_augs (bool) : apply test time augmentations (TTA).
-            threshold (float) : threshold for the softmasks that have values b/w [0, 1]
-            class_dict (Dict) : the dict specifying pixel classes. e.g. {"background":0,"nuclei":1}
-            verbose (bool) : wether or not to print the progress of running inference
-            pannuke_folds (Dict[str, str]) : if dataset == "pannuke", this dict will define what 
-                                             fold is used as train, valid and test folds. Otherwise
-                                             this is ignored.
+            model (nn.Module) : Pytorch model specification. Can be from smp, toolbelt, or a 
+                                custom model. ttatch wrappers work also. Basically any model 
+                                that inherits nn.Module should work
+            dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                       related to the dataset that is being used.
+                                       config.py for more info
+            experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                          that are used for creating result folders and
+                                          files. Check config.py for more info
+            inference_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                         that are used for inference and post processing.
+                                         Check config.py for more info
+
         """
         
         
-        super(Inferer, self).__init__(dataset, data_dirs, database_root, experiment_root,
-                                      experiment_version, model_name, phases, pannuke_folds)
+        super(Inferer, self).__init__(dataset_args, experiment_args)
         self.model = model
-        self.batch_size = batch_size
-        self.input_size = input_size
-        self.smoothen = smoothen
-        self.verbose = verbose
-        self.fold = fold
-        self.test_time_augs = test_time_augs
-        self.thresh = threshold
-        self.classes = class_dict
-        self.verbose = verbose
+        self.batch_size = experiment_args.batch_size
+        self.input_size = experiment_args.model_input_size
+        self.smoothen = inference_args.smoothen
+        self.verbose = inference_args.verbose
+        self.fold = inference_args.data_fold
+        self.test_time_augs = inference_args.test_time_augmentation
+        self.thresh = inference_args.threshold
+        self.classes = dataset_args.classes
         
         # init containers for resluts
         self.soft_maps = OrderedDict()
@@ -100,68 +73,38 @@ class Inferer(ProjectFileManager):
     
     
     @classmethod
-    def from_conf(cls, model, conf):
+    def from_conf(cls, model: nn.Module, conf):
         model = model
-        dataset = conf["dataset"]["args"]["dataset"]
-        data_dirs = conf["paths"]["data_dirs"]
-        database_root = conf["paths"]["database_root_dir"]
-        experiment_root = conf["paths"]["experiment_root_dir"]
-        experiment_version = conf["experiment_args"]["experiment_version"]
-        model_name = conf["experiment_args"]["model_name"]
-        phases = conf["dataset"]["args"]["phases"]
-        batch_size = conf["training_args"]["batch_size"]
-        input_size = conf["patching_args"]["input_size"]
-        smoothen = conf["inference_args"]["smoothen"]
-        fold = conf["inference_args"]["data_fold"]
-        test_time_augs = conf["inference_args"]["test_time_augmentation"]
-        thresh = conf["inference_args"]["threshold"]
-        verbose = conf["inference_args"]["verbose"]
-        class_type = conf["dataset"]["args"]["class_types"]
-        class_dict = conf["dataset"]["class_dicts"][class_type] # clumsy
-        pannuke_folds = conf["dataset"]["pannuke_folds"]
+        dataset_args = conf.dataset_args
+        experiment_args = conf.experiment_args
+        inference_args = conf.inference_args
         
         return cls(
             model,
-            dataset,
-            data_dirs,
-            database_root,
-            experiment_root,
-            experiment_version,
-            model_name,
-            phases,
-            batch_size,
-            input_size,
-            smoothen,
-            fold,
-            test_time_augs,
-            thresh,
-            class_dict,
-            verbose,
-            pannuke_folds
+            dataset_args,
+            experiment_args,
+            inference_args
         )
         
     
     @property
-    def stride_size(self):
+    def stride_size(self) -> int:
         return self.input_size//2
     
         
     @property
-    def tta_model(self):
-        """
-        test time augmentations defined in augmentations.py
-        """
+    def tta_model(self) -> nn.Module:
         return tta.SegmentationTTAWrapper(self.model, tta_transforms())
     
     
     @property
-    def images(self):
+    def images(self) -> List[str]:
         assert self.fold in self.phases, f"fold param: {self.fold} was not in given phases: {self.phases}" 
         return self.data_folds[self.fold]["img"]
     
     
     @property
-    def gt_masks(self):
+    def gt_masks(self) -> List[str]:
         assert self.fold in self.phases, f"fold param: {self.fold} was not in given phases: {self.phases}"
         return self.data_folds[self.fold]["mask"]
     
@@ -171,11 +114,6 @@ class Inferer(ProjectFileManager):
     
     
     def __sample_idxs(self, n=25):
-        """
-        Sample paths of images given a list of image paths
-        Args:
-            n (int) : how many integers are sampled 
-        """
         assert n <= len(self.images), "Cannot sample more integers than there are images in dataset"
         # Dont plot more than 50 pannuke images
         if self.dataset == "pannuke" and n > 50:
@@ -365,10 +303,10 @@ class Inferer(ProjectFileManager):
         return pred
 
     
-    def run(self):
+    def run(self) -> None:
         """
-        Do inference on the given dataset, with the pytorch lightining model that 
-        has been used for training. See lightning_model.py and Train_lightning.ipynb.
+        Do inference on the given dataset, with a pytorch lightning model that 
+        has been trained. See lightning_model.py and Train_lightning.ipynb.
         """
         
         # Put SegModel to gpu
@@ -423,21 +361,21 @@ class Inferer(ProjectFileManager):
 
             return {
                 "AJI": aji, 
-                "AJI plus": aji_p, 
+                "AJI_plus": aji_p, 
                 "DICE2": dice2, 
                 "PQ": pq["pq"], # panoptic quality
                 "SQ": pq["sq"], # segmentation quality
                 "DQ": pq["dq"], # Detection quality i.e. F1-score
-                "inst Sensitivity": pq["sensitivity"],
-                "inst Precision": pq["precision"],
+                "inst_Sensitivity": pq["sensitivity"],
+                "inst_Precision": pq["precision"],
                 "splits":splits,
                 "merges":merges
             }
 
             
-    def post_process(self):
+    def post_process(self) -> None:
         """
-        Run post processing pipeline for all the predictions given by the network
+        Run post processing pipeline for all the predictions from the network
         """
         
         assert self.soft_maps, f"{self.soft_maps}, No predictions found. Run predictions first"
@@ -450,8 +388,8 @@ class Inferer(ProjectFileManager):
         segs = []
         if self.dataset == "pannuke":
             # Pool fails when using pannuke for some reason 
-            for pred in preds:
-                segs.append(self._post_process_pipeline(pred, self.thresh))
+            for pred, thresh in preds:
+                segs.append(self._post_process_pipeline(pred, thresh))
         else:     
             with Pool() as pool:
                 segs = pool.starmap(self._post_process_pipeline, preds)
@@ -461,7 +399,7 @@ class Inferer(ProjectFileManager):
             self.inst_maps[f"{fn}_inst_map"] = segs[i]
             
             
-    def benchmark(self, save=False):
+    def benchmark(self, save: bool = False) -> pd.DataFrame:
         """
         Run benchmarking metrics for all of the files in the dataset
         Masks are converted to uint16 for memory purposes
@@ -488,18 +426,24 @@ class Inferer(ProjectFileManager):
             
         # Create pandas df of the result metrics
         score_df = pd.DataFrame(self.metrics).transpose()
-        score_df.loc["averages for the set"] = score_df.mean(axis=0)
+        score_df.loc["averages_for_the_set"] = score_df.mean(axis=0)
+        
+        if save:
+            result_dir = Path(self.experiment_dir / "benchmark_results")
+            self.create_dir(result_dir)
+            score_df.to_csv(Path(result_dir / f"{self.model_name}_{self.experiment_version}_result.csv"))
+        
         return score_df
     
     
-    def clear_predictions(self):
+    def clear_predictions(self) -> None:
         """
         Clear soft_masks if there are any
         """
         self.soft_maps.clear()
     
         
-    def plot_predictions(self):
+    def plot_predictions(self) -> None:
         """
         Plot the probability maps after running inference.
         """
@@ -519,7 +463,7 @@ class Inferer(ProjectFileManager):
             axes[i][1].axis("off")
     
     
-    def plot_histograms(self):
+    def plot_histograms(self) -> None:
         """
         Plot the histograms of the probability maps after running inference.
         """
@@ -537,29 +481,7 @@ class Inferer(ProjectFileManager):
             axes[j].plot(hist_centers, hist, lw=2)
             
             
-    def save_outputs(self, output_dir):
-        """
-        Save predictions to .mat files (python dictionary). Key for accessing after
-        reading one file is "pred_map":
-        
-        f = scipy.io.loadmat(file)
-        f = f["pred_map"]
-        
-        Args:
-            output_dir (str) : path to the directory where predictions are saved.
-        """
-        
-        assert self.soft_maps, "No predictions found"
-        
-        for j, path in enumerate(self.images):
-            fn = self.__get_fn(path)
-            new_fn = fn + "_pred_map.mat"
-            print("saving: ", fn)
-            nuc_map = self.soft_maps[f"{fn}_nuc_map"]
-            # scipy.io.savemat(new_fn, mdict={"pred_map": nuc_map})
-            
-            
-    def plot_segmentations(self):
+    def plot_segmentations(self) -> None:
         """
         Plot all the binary segmentations after running post_processing.
         """
@@ -586,13 +508,14 @@ class Inferer(ProjectFileManager):
             axes[j][3].axis("off")
             
             
-    def plot_overlays(self, ixs=-1):
+    def plot_overlays(self, ixs: Any =-1, save: bool = False) -> None:
         """
         Plot segmentation result and ground truth overlaid on the original image side by side
         Args:
             ixs (List or int): list of the indexes of the image files in Inferer.images. 
                                default = -1 means all images in the data fold are plotted. If 
                                dataset = "pannuke" and ixs = -1, then 25 random images are sampled.
+            save (bool): Save the plots
         """
         assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
         
@@ -631,13 +554,14 @@ class Inferer(ProjectFileManager):
             axes[j, 1].set_title(f"Segmentation result: {fn}", fontsize=30)
             axes[j, 1].imshow(im_res, cmap='gray', interpolation='none')
             axes[j, 1].axis('off')
-
-        fig.tight_layout(w_pad=4, h_pad=4)
-    
-
             
+        fig.tight_layout(w_pad=4, h_pad=10)
+        
+        if save:
+            plot_dir = Path(self.experiment_dir / "inference_plots")
+            self.create_dir(plot_dir)
+            fig.savefig(Path(plot_dir / f"{fn}_result.png"))
+
             
             
         
-        
-            

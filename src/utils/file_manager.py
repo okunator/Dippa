@@ -5,6 +5,7 @@ import numpy as np
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import List, Dict
+from omegaconf import DictConfig
 from distutils import dir_util, file_util
 from sklearn.model_selection import train_test_split
 from img_processing.viz_utils import draw_contours
@@ -12,92 +13,37 @@ from img_processing.viz_utils import draw_contours
 
 class ProjectFileManager:
     def __init__(self,
-                 dataset: str, 
-                 data_dirs: Dict, 
-                 database_root: str,
-                 experiment_root: str,
-                 experiment_version: str,
-                 model_name: str,
-                 phases: List[str],
-                 pannuke_folds: Dict[str, str] = {"fold1":"train", "fold2":"valid", "fold3":"test"},
-                 **kwargs: Dict,
+                 dataset_args: DictConfig,
+                 experiment_args: DictConfig,
+                 **kwargs
                 ) -> None:
         """
         This class is used for managing the files and folders needed in this project. 
         
             Args:
-                dataset (str) : one of ("kumar", "consep", "pannuke", "other")
-                data_dirs (dict) : dictionary of directories containing masks and images. Keys of this
-                                   dict must be the one of ("kumar", "consep", "pannuke", "other").
-                                   Check config.
-                database_root (str) : directory where the databases are written
-                experiment_root (str) : directory where results from a network training 
-                                        and inference experiment are written
-                experiment_version (str) : a name for the experiment you want to conduct. e.g. 
-                                           'FPN_test_pannuke' or 'Unet_consep' etc. This name will be used
-                                           for results folder of training and inference results
-                model_name (str) : The name of the model used in the experiment. This name will be used
-                                   for results folder of training and inference results
-                phases (list) : list of the phases (["train", "valid", "test"] or ["train", "test"])
-                pannuke_folds (Dict[str, str]) : if dataset == "pannuke", this dict will define what 
-                                                 fold is used as train, valid and test folds. Otherwise
-                                                 this is ignored.
+                dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                           related to the dataset that is being used.
+                                           config.py for more info
+                experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                              that are used for creating result folders and
+                                              files. Check config.py for more info
         """
         super().__init__(**kwargs)
-        self.validate_data_args(dataset, data_dirs, phases, database_root, experiment_root)
-        self.dataset = dataset
-        self.data_dirs = data_dirs
-        self.database_root = database_root
-        self.experiment_root = experiment_root
-        self.experiment_version = experiment_version
-        self.model_name = model_name
-        self.phases = phases
-        self.pannuke_folds = pannuke_folds
-        
-        # TODO:
-        # self.patches_root = Path(patches_root)
-        # self.patches_npy_dir = self.patches_root.joinpath(f"{self.dataset}")
+        self.dsargs = dataset_args
+        self.exargs = experiment_args
         
     
     @classmethod
     def from_conf(cls, conf):
-        dataset = conf["dataset"]["args"]["dataset"]
-        data_dirs = conf["paths"]["data_dirs"]
-        database_root = conf["paths"]["database_root_dir"]
-        experiment_root = conf["paths"]["experiment_root_dir"]
-        experiment_version = conf["experiment_args"]["experiment_version"]
-        model_name = conf["experiment_args"]["model_name"]
-        phases = conf["dataset"]["args"]["phases"]
-        pannuke_folds = conf["dataset"]["pannuke_folds"]
+        dataset_args = conf.dataset_args
+        experiment_args = conf.experiment_args
         
         return cls(
-            dataset,
-            data_dirs,
-            database_root,
-            experiment_root,
-            experiment_version,
-            model_name,
-            phases,
-            pannuke_folds
+            dataset_args,
+            experiment_args
         )
     
     
-    @staticmethod
-    def validate_data_args(dataset, data_dirs, phases, database_root, experiment_root):        
-        assert dataset in ("kumar","consep","pannuke","dsb2018","cpm","other"), f"input dataset: {dataset}"
-        assert set(data_dirs.keys()) == {"kumar","consep","dsb2018","cpm","pannuke","other"},(
-                f"{data_dirs.keys()} unknown key added in the data_dirs keys."
-        )
-        assert phases in (["train", "valid", "test"], ["train", "test"]), f"{phases}"
-        assert Path(database_root).exists(), f"database_root: {database_root} not found. Check config"
-        assert Path(experiment_root).exists(), f"experiment_root: {experiment_root} not found. Check config"
-        
-        data_paths_bool = [Path(p).exists() for d in data_dirs.values() for p in d.values()]
-        assert any(data_paths_bool), ("None of the config file 'data_dirs' paths exist. "
-                                      "Make sure they are created, by runnning these... TODO")
-        
-        
-        
     @staticmethod
     def read_img(path: str) -> np.ndarray:
         return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
@@ -107,22 +53,22 @@ class ProjectFileManager:
     def read_mask(path: str, type_map: bool = False) -> np.ndarray:
         key = "type_map" if type_map else "inst_map"
         return scipy.io.loadmat(path)[key].astype("int32")
-    
+     
         
     @staticmethod
     def remove_existing_files(directory: str) -> None:
-        assert Path(directory).is_dir(), f"{directory} is not a folder that can be iterated"
+        assert Path(directory).exists(), f"{directory} does not exist"
         for item in Path(directory).iterdir():
             # Do not touch the folders inside the directory
             if item.is_file():
                 item.unlink()
-
-
+        
+        
     @staticmethod      
     def create_dir(path: str) -> None:
         Path(path).mkdir(parents=True, exist_ok=True)
-                    
-            
+    
+    
     @staticmethod
     def extract_zips(folder: str, rm: bool = False) -> None:
         for f in Path(folder).iterdir():
@@ -134,14 +80,47 @@ class ProjectFileManager:
         
         
     @property
-    def database_dir(self):
-        return Path(self.database_root).joinpath(f"{self.dataset}")
+    def experiment_dir(self):
+        ex_root = self.exargs.experiment_root_dir
+        ex_version = self.exargs.experiment_version
+        model_name = self.exargs.model_name
+        return Path(ex_root).joinpath(f"{model_name}/version_{ex_version}")
     
     
     @property
-    def experiment_dir(self):
-        return Path(self.experiment_root).joinpath(f"{self.model_name}/version_{self.experiment_version}")
-        
+    def dataset(self):
+        assert self.dsargs.dataset in ("kumar","consep","pannuke","dsb2018","cpm")
+        return self.dsargs.dataset
+    
+    
+    @property
+    def data_dirs(self):
+        return self.dsargs.data_dirs
+    
+    
+    @property
+    def database_dir(self):
+        assert self.dsargs.patches_dtype in ("npy", "hdf5"), f"{self.dsargs.patches_dtype}"
+        return Path(self.dsargs[f"{self.dsargs.patches_dtype}_patches_root_dir"]).joinpath(f"{self.dataset}")
+    
+    
+    @property
+    def phases(self):
+        assert self.dsargs.phases in (["train", "valid", "test"], ["train", "test"]), f"{self.dsargs.phases}"
+        return self.dsargs.phases
+    
+    
+    @property
+    def pannuke_folds(self):
+        assert self.dataset == "pannuke", f"dataset: {self.dataset}. dataset not pannuke"
+        return self.dsargs.folds
+    
+    
+    @property
+    def pannuke_tissues(self):
+        assert self.dataset == "pannuke", f"dataset: {self.dataset}. dataset not pannuke"
+        return self.dsargs.tissues
+       
         
     @property
     def data_folds(self):
@@ -149,10 +128,10 @@ class ProjectFileManager:
         Getter for the 'train', 'valid', 'test' fold paths. Also splits training set to train and valid
         if 'valid is in phases list'
         """
-        train_imgs = self.__get_files(self.data_dirs[self.dataset]["train_im"])
-        train_masks = self.__get_files(self.data_dirs[self.dataset]["train_gt"])
-        test_imgs = self.__get_files(self.data_dirs[self.dataset]["test_im"])
-        test_masks = self.__get_files(self.data_dirs[self.dataset]["test_gt"])
+        train_imgs = self.__get_files(self.data_dirs["train_im"])
+        train_masks = self.__get_files(self.data_dirs["train_gt"])
+        test_imgs = self.__get_files(self.data_dirs["test_im"])
+        test_masks = self.__get_files(self.data_dirs["test_gt"])
         
         if "valid" in self.phases:
             d = self.__split_training_set(train_imgs, train_masks)
@@ -198,11 +177,13 @@ class ProjectFileManager:
             valid_dbs = list(self.database_dir.glob("*_test_*")) # test set used for both valid and test
             test_dbs = list(self.database_dir.glob("*_test_*")) # remember to not use the best model w this
             
-        assert train_dbs, (f"{train_dbs} HDF5 training db not found. Create the dbs first. " 
-                            "Check instructions.")
+        assert train_dbs, (
+            f"{train_dbs} HDF5 training db not found. Create the dbs first. Check instructions."
+        )
         
-        assert valid_dbs, (f"{valid_dbs} HDF5 validation db not found. Create the dbs first. "
-                            "Check instructions")
+        assert valid_dbs, (
+            f"{valid_dbs} HDF5 validation db not found. Create the dbs first. Check instructions."
+        )
         
         return {
             "train":get_input_sizes(train_dbs),
@@ -210,7 +191,7 @@ class ProjectFileManager:
             "test":get_input_sizes(test_dbs)
         }
     
-                    
+    
     def __get_img_suffix(self, directory):
         # Find out the suffix of the image and mask files and assert if images have mixed suffices
         d = Path(directory)
@@ -224,8 +205,8 @@ class ProjectFileManager:
         assert d.is_dir(), f"Provided directory: {d.as_posix()} for image files is not a directory."
         file_suffix = self.__get_img_suffix(d)
         return sorted([x.as_posix() for x in d.glob(f"*{file_suffix}")])
-    
-            
+        
+        
     def __split_training_set(self, train_imgs, train_masks, seed=42, size=0.2):
         """
         Split training set into training and validation set (correct way to train).
@@ -270,7 +251,7 @@ class ProjectFileManager:
             "valid_masks":valid_masks
         }
     
-                    
+    
     def __kumar_xml2mat(self, x, to):
         """
         From https://github.com/vqdang/hover_net/blob/master/src/misc/proc_kumar_ann.py
@@ -296,7 +277,7 @@ class ProjectFileManager:
             # fill both the inner area and contour with idx+1 color
             cv2.drawContours(contour_blb, [vertices], 0, idx+1, -1)
             insts_list.append(contour_blb)
-            
+               
         insts_size_list = np.array(insts_list)
         insts_size_list = np.sum(insts_size_list, axis=(1 , 2))
         insts_size_list = list(insts_size_list)
@@ -311,8 +292,8 @@ class ProjectFileManager:
             ann[inst_map > 0] = idx + 1
             
         mask_fn = Path(to / x.with_suffix(".mat").name)
-        scipy.io.savemat(mask_fn, mdict={'inst_map': ann})
-                
+        scipy.io.savemat(mask_fn, mdict={'inst_map': ann})         
+    
     
     def __mv_to_orig(self, folder):
         """
@@ -348,16 +329,16 @@ class ProjectFileManager:
             _, inst_overlay = draw_contours(mask, im)
             fn = Path(inst_overlay_dir / im_path.with_suffix(".png").name)
             cv2.imwrite(str(fn), cv2.cvtColor(inst_overlay, cv2.COLOR_RGB2BGR))
-                  
-
+    
+    
     def __check_raw_root(self, raw_root):
         root = Path(raw_root)
-        assert not (root.joinpath("train").exists() and root.joinpath("test").exists()), (
+        assert not all((root.joinpath("train").exists(),  root.joinpath("test").exists())), (
                     "test and training directories already exists. To run this again, remove the files "
                     f"and folders from: {raw_root} and repeat the steps in the instructions."
         )
-        
-        
+    
+    
     def __handle_kumar(self, orig_dir, imgs_train_dir, anns_train_dir, imgs_test_dir, anns_test_dir):
         self.create_dir(anns_train_dir)
         self.create_dir(imgs_train_dir)
@@ -379,8 +360,8 @@ class ProjectFileManager:
                     self.__kumar_xml2mat(ann, anns_test_dir)
                 for item in f.glob("*.tif"):
                     file_util.copy_file(str(item), str(imgs_test_dir))
-                    
-    
+        
+        
     def __handle_consep(self, root, orig_dir):
         for item in orig_dir.iterdir():
             if item.is_dir() and item.name == "CoNSeP":
@@ -394,10 +375,15 @@ class ProjectFileManager:
                     else:
                         item.rename(Path(d / item.name.lower()))
                 d.rename(d.as_posix().lower())
-                
-                
-    def __handle_pannuke(self, pannuke_folds, orig_dir, imgs_train_dir, 
-                         anns_train_dir, imgs_test_dir, anns_test_dir):
+        
+        
+    def __handle_pannuke(self, 
+                         orig_dir,
+                         imgs_train_dir, 
+                         anns_train_dir, 
+                         imgs_test_dir, 
+                         anns_test_dir
+                        ) -> None:
         
         self.create_dir(anns_train_dir)
         self.create_dir(imgs_train_dir)
@@ -436,7 +422,7 @@ class ProjectFileManager:
                 masks_by_type = masks[types == ty]
                 for j in range(imgs_by_type.shape[0]):
                     name = f"{ty}_fold{i}_{j}"
-                    dir_key = pannuke_folds[f"fold{i}"]
+                    dir_key = self.pannuke_folds[f"fold{i}"]
                     img_dir = fold_phases[dir_key]["img"]
                     mask_dir = fold_phases[dir_key]["mask"]
 
@@ -459,8 +445,7 @@ class ProjectFileManager:
                     type_map[type_map > temp_mask.shape[-1]-1] = 0
                     fn_mask = Path(mask_dir / name).with_suffix(".mat")
                     scipy.io.savemat(fn_mask, mdict={"inst_map": inst_map, "type_map":type_map})
-                    
-                    
+                             
     def __handle_dsb2018(self):
         pass
     
@@ -468,10 +453,8 @@ class ProjectFileManager:
     def __handle_cpm(self):
         pass
     
-        
+    
     def handle_raw_data(self, 
-                        dataset: str, 
-                        raw_root: str, 
                         rm_zips: bool = False, 
                         overlays: bool = True, 
                        ) -> None:
@@ -481,9 +464,6 @@ class ProjectFileManager:
         that stuff.
         
         Args:
-            dataset (str): one of ("kumar","consep","pannuke","dsb2018","cpm","other")
-            raw_root (str): path to the raw data .zip files or extracted. See config for where to put the
-                            .zip files after downloading them from the internet.
             rm_zips (bool): delete the .zp files after they are extracted
             overlays (bool): plot annotation contours on top of original images.
             pannuke_folds (Dict): If dataset == "pannuke", this dictionary specifies which pannuke folds
@@ -491,17 +471,9 @@ class ProjectFileManager:
                                   phases are used then the extra 'valid' fold is added to the 'train' fold.
                                   If dataset is not "pannuke", this arg is ignored.
                                   
-        """
-        assert all(key in ("fold1", "fold2", "fold3") for key in pannuke_folds.keys()), (
-            f"keys of the pannuke_folds arg need to be in ('fold1', 'fold2', 'fold3')"
-        )
-        
-        assert all(val in ("train", "valid", "test") for val in pannuke_folds.values()), (
-            f"values of the pannuke_folds arg need to be in ('train', 'valid', 'test')"
-        )
-        
+        """        
         # extract .zips and move the files to 'orig' folder
-        root = Path(raw_root)
+        root = Path(self.data_dirs["raw_data_dir"])
         self.__check_raw_root(root)
         orig_dir = self.__mv_to_orig(root)
         self.extract_zips(orig_dir, rm_zips)
@@ -511,12 +483,12 @@ class ProjectFileManager:
         anns_train_dir = Path(root / "train/labels")
         
         # ad hoc handling of the different datasets to convert them to same format
-        if dataset == "kumar":
+        if self.dataset == "kumar":
             self.__handle_kumar(orig_dir, imgs_train_dir, anns_train_dir, imgs_test_dir, anns_test_dir)
-        elif dataset == "consep":
+        elif self.dataset == "consep":
             self.__handle_consep(root, orig_dir)
-        elif dataset == "pannuke":
-            self.__handle_pannuke(pannuke_folds, orig_dir, imgs_train_dir,
+        elif self.dataset == "pannuke":
+            self.__handle_pannuke(orig_dir, imgs_train_dir,
                                   anns_train_dir, imgs_test_dir, anns_test_dir)
         elif dataset == "cpm":
             pass # TODO
@@ -525,12 +497,14 @@ class ProjectFileManager:
         
         # draw overlays
         if overlays:
-            type_overlays = True if dataset == "pannuke" else False
+            type_overlays = True if self.dataset == "pannuke" else False
             self.__save_overlays(imgs_test_dir, anns_test_dir, type_overlays=type_overlays)
             self.__save_overlays(imgs_train_dir, anns_train_dir, type_overlays=type_overlays)
     
     
-    def model_checkpoint(self, which:str = "last") -> Path:
+    def model_checkpoint(self, 
+                         which:str = "last"
+                        ) -> Path:
         """
         Get the best or last checkpoint of a trained network.
         Args:
@@ -550,11 +524,17 @@ class ProjectFileManager:
                 elif which == "best" and "last" not in str(item) and ckpt is None:
                     ckpt = item
         
-        assert ckpt is not None, f"{ckpt} checkpoint is None."
+        assert ckpt is not None, (
+            f"ckpt: {ckpt}. Checkpoint is None. Make sure that a .ckpt file exists in experiment dir"
+        )
         return ckpt
     
     
-    def get_pannuke_fold(self, folds: List[str], types: List[str], data:str = "both") -> Dict[str, List[Path]]:
+    def get_pannuke_fold(self, 
+                         folds: List[str], 
+                         types: List[str], 
+                         data:str = "both"
+                        ) -> Dict[str, List[Path]]:
         """
         After converting the data to right format and moving it to right folders this can be used to get
         the file paths by pannuke fold.
@@ -567,12 +547,16 @@ class ProjectFileManager:
             A Dict of Path objects to the pannuke files specified by the options
             ex. {"img":[Path1, Path2], "mask":[]}
         """
-        assert data in ("img", "mask", "both"), f"data arg: {data} needs to be one of ('img', 'mask', 'both')"
         assert all(fold in ("fold1", "fold2", "fold3") for fold in folds), f"incorrect folds: {folds}"
-        assert all(Path(p).exists() for p in self.data_dirs["pannuke"].values()), ("Data folders do not exists"
-                                                                                   "Convert the data first to"
-                                                                                   "right format. See step 1."
-                                                                                   "from the instructions.")
+        assert all(tissue in self.pannuke_tissues for tissue in types), (
+            f"types need to be in {self.pannuke_tissues}"
+        )
+        assert data in ("img", "mask", "both"), (
+            f"data arg: {data} needs to be one of ('img', 'mask', 'both')"
+        )
+        assert all(Path(p).exists() for p in self.data_dirs["pannuke"].values()), (
+            "Data folders do not exists Convert the data first to right format. See step 1."
+        )
         
         # Use only unique values in given lists and sort
         folds = sorted(list(set(folds)))

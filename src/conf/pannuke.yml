@@ -1,0 +1,45 @@
+class_types:
+    binary:
+        background: 0
+        nuclei: 1
+    types:
+        background: 0
+        neoplastic: 1
+        inflammatory: 2
+        connective: 3
+        dead: 4
+        epithelial: 5
+        
+folds:
+    fold1: train
+    fold2: valid
+    fold3: test
+    
+tissues:
+    - Adrenal_gland
+    - Bile-duct
+    - Bladder
+    - Breast
+    - Cervix
+    - Colon
+    - Esophagus
+    - HeadNeck
+    - Kidney
+    - Liver
+    - Lung
+    - Ovarian
+    - Pancreatic
+    - Prostate
+    - Skin
+    - Stomach
+    - Testis
+    - Thyroid 
+    - Uterus
+        
+
+data_dirs:
+    raw_data_dir: ../../datasets/pannuke
+    train_im: ../../datasets/pannuke/train/images
+    train_gt: ../../datasets/pannuke/train/labels
+    test_im: ../../datasets/pannuke/test/images
+    test_gt: ../../datasets/pannuke/test/labels

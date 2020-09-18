@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 
 from pathlib import Path
+from omegaconf import DictConfig
 from sklearn.metrics import confusion_matrix
 from catalyst.contrib.nn import DiceLoss, IoULoss
 from catalyst.contrib.nn import Ralamb, RAdam, Lookahead
@@ -23,24 +24,10 @@ from datasets import *
 class SegModel(pl.LightningModule):
     def __init__(self,
                  model: nn.Module,
-                 dataset: str,
-                 data_dirs: Dict[str, str],
-                 database_root: str,
-                 experiment_root: str,
-                 experiment_version: str,
-                 model_name: str,
-                 phases: List,
-                 input_size: int,
-                 batch_size: int,
-                 edge_weight: float,
-                 lr: float,
-                 encoder_lr: float,
-                 weight_decay: float,
-                 encoder_weight_decay: float,
-                 scheduler_factor: float,
-                 scheduler_patience: float,
-                 class_dict: Dict[str, str],
-                 pannuke_folds: Dict[str, str] = {"fold1":"train", "fold2":"valid", "fold3":"test"}
+                 dataset_args: DictConfig,
+                 experiment_args: DictConfig,
+                 training_args: DictConfig,
+                 **kwargs
                 ) -> None:
         """
         Pytorch Lightning abstraction for any pytorch segmentation model architecture used
@@ -50,47 +37,32 @@ class SegModel(pl.LightningModule):
             model (nn.Module) : Pytorch model specification. Can be from smp, toolbelt, or a 
                                 custom model. ttatch wrappers work also. Basically any model 
                                 that inherits nn.Module should work
-            dataset (str) : one of ("kumar", "consep", "pannuke", "other")
-            data_dirs (dict) : dictionary of directories containing masks and images. Keys of this
-                               dict must be the same as ("kumar", "consep", "pannuke", "other")
-            database_root_dir (str) : directory where the databases are written
-            experiment_root (str) : directory where results from a network training 
-                                    and inference experiment are written
-            experiment_version (str) : a name for the experiment you want to conduct. e.g. 
-                                       'FPN_test_pannuke' or 'Unet_consep' etc. This name will be used
-                                       for results folder of training and inference results
-            model_name (str) : The name of the model used in the experiment. This name will be used
-                               for results folder of training and inference results
-            phases (list) : list of the phases (["train", "valid", "test"] or ["train", "test"])
-            input_size (int) : Size of the input patch that is fed to the network
-            batch_size (int) : Number of input patches used for every iteration
-            edge_weight (float) : The weight given to the borders in the cross entropy loss
-            lr (float) : learning rate for the optimizer
-            encoder_lr (float) : learning rate for the optimizer in the encoder part
-            weight_decay (float) : weight decay for the optimizer
-            encoder_weight_decay (float) : weight decay for the optimizer in the encoder part
-            scheduler_factor (float) : 
-            scheduler_patience (int) : ...
-            class_dict (Dict) : the dict specifying pixel classes. e.g. {"background":0,"nuclei":1}
-            pannuke_folds (Dict[str, str]) : if dataset == "pannuke", this dict will define what 
-                                             fold is used as train, valid and test folds. Otherwise
-                                             this is ignored.
+            dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                       related to the dataset that is being used.
+                                       config.py for more info
+            experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                          that are used for creating result folders and
+                                          files. Check config.py for more info
+            training_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                        that are used for training a network.
+                                        Check config.py for more info
+            
             
         """
         super(SegModel, self).__init__()
         
         # Hyperparams
         self.model = model
-        self.batch_size = batch_size
-        self.input_size = input_size
-        self.edge_weight = edge_weight  
-        self.lr = lr
-        self.encoder_lr = encoder_lr
-        self.weight_decay = weight_decay
-        self.encoder_weight_decay = encoder_weight_decay
-        self.factor = scheduler_factor
-        self.patience = scheduler_patience
-        self.classes = class_dict
+        self.batch_size = experiment_args.batch_size
+        self.input_size = experiment_args.model_input_size
+        self.edge_weight = training_args.loss_args.edge_weight  
+        self.lr = training_args.optimizer_args.lr
+        self.encoder_lr = training_args.optimizer_args.encoder_lr
+        self.weight_decay = training_args.optimizer_args.weight_decay
+        self.encoder_weight_decay = training_args.optimizer_args.encoder_weight_decay
+        self.factor = training_args.scheduler_args.factor
+        self.patience = training_args.scheduler_args.patience
+        self.classes = dataset_args.classes
         self.save_hyperparameters()
         
         # Loss criterion
@@ -101,14 +73,8 @@ class SegModel(pl.LightningModule):
         
         # Filemanager
         self.fm = ProjectFileManager(
-            dataset,
-            data_dirs,
-            database_root,
-            experiment_root,
-            experiment_version,
-            model_name,
-            phases,
-            pannuke_folds
+            dataset_args,
+            experiment_args
         )
         
         self.n_classes = len(self.classes)
@@ -117,46 +83,15 @@ class SegModel(pl.LightningModule):
     @classmethod
     def from_conf(cls, model, conf):
         model = model
-        dataset = conf["dataset"]["args"]["dataset"]
-        data_dirs = conf["paths"]["data_dirs"]
-        database_root = conf["paths"]["database_root_dir"]
-        experiment_root = conf["paths"]["experiment_root_dir"]
-        experiment_version = conf["experiment_args"]["experiment_version"]
-        model_name = conf["experiment_args"]["model_name"]
-        phases = conf["dataset"]["args"]["phases"]
-        batch_size = conf["training_args"]["batch_size"]
-        input_size = conf["patching_args"]["input_size"]
-        edge_weight = conf["training_args"]["loss_args"]["edge_weight"]
-        lr = conf["training_args"]["optimizer_args"]["lr"]
-        encoder_lr = conf["training_args"]["optimizer_args"]["encoder_lr"]
-        weight_decay = conf["training_args"]["optimizer_args"]["weight_decay"]
-        encoder_weight_decay = conf["training_args"]["optimizer_args"]["encoder_weight_decay"]
-        factor = conf["training_args"]["scheduler_args"]["factor"]
-        patience = conf["training_args"]["scheduler_args"]["patience"]
-        class_type = conf["dataset"]["args"]["class_types"]
-        class_dict = conf["dataset"]["class_dicts"][class_type] # clumsy
-        pannuke_folds = conf["dataset"]["pannuke_folds"]
+        dataset_args = conf.dataset_args
+        experiment_args = conf.experiment_args
+        training_args = conf.training_args
         
         return cls(
             model,
-            dataset,
-            data_dirs,
-            database_root,
-            experiment_root,
-            experiment_version,
-            model_name,
-            phases,
-            input_size,
-            batch_size,
-            edge_weight,
-            lr,
-            encoder_lr,
-            weight_decay,
-            encoder_weight_decay,
-            factor,
-            patience,
-            class_dict,
-            pannuke_folds
+            dataset_args,
+            experiment_args,
+            training_args
         )
     
     
@@ -356,9 +291,9 @@ def plot_metrics(conf, scale: str = "log", metric: str = "loss", save:bool = Fal
     
     assert scale in ("log", "linear"), "y-scale not in ('log', 'linear')"
     assert metric in ("loss", "accuracy", "TNR", "TPR"), "metric not in ('loss', 'accuracy', 'TNR', 'TPR')"
-    ldir = Path(conf["paths"]["experiment_root_dir"])
+    ldir = Path(conf.experiment_args.experiment_root_dir)
     
-    folder = f"{conf['experiment_args']['model_name']}/version_{conf['experiment_args']['experiment_version']}"
+    folder = f"{conf.experiment_args.model_name}/version_{conf.experiment_args.experiment_version}"
     logdir = Path(ldir / folder / "tf")
     
     train_losses_all = {}
@@ -460,5 +395,3 @@ def plot_metrics(conf, scale: str = "log", metric: str = "loss", save:bool = Fal
         plt.savefig(Path(plot_dir / f"{scale}_{metric}.png"))
     
     plt.show()
-
-

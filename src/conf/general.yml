@@ -1,0 +1,6 @@
+hdf5:
+    hdf5_patches_root_dir: ../../patches/hdf5
+npy:
+    npy_patches_root_dir: ../../patches/npy
+experiment:
+    experiment_root_dir: ../../results/tests

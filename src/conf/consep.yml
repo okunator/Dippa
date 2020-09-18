@@ -1,0 +1,26 @@
+class_types:
+    binary:
+        background: 0
+        nuclei: 1
+    types:
+        background: 0
+        miscellanous: 1
+        inflammatory: 2
+        epithelial: 3
+        spindle: 4
+    types_orig:
+        background: 0
+        miscellanous: 1
+        inflammatory: 2
+        healty_epithelial: 3
+        malignant_epithelial: 4
+        fibroblast: 5
+        muscle: 6
+        endothelial: 7
+
+data_dirs:
+    raw_data_dir: ../../datasets/consep
+    train_im: ../../datasets/consep/train/images
+    train_gt: ../../datasets/consep/train/labels
+    test_im: ../../datasets/consep/test/images
+    test_gt: ../../datasets/consep/test/labels
