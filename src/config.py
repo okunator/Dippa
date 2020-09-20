@@ -113,9 +113,9 @@ def get_conf(conf:DictConfig, dataset:str) -> DictConfig:
     config.patching_args = patching_args
     config.inference_args = inference_args
 
-    class_types = data_conf.class_types[conf.dataset_args.class_types]
+    classes = data_conf.class_types[conf.dataset_args.class_types]
     data_args = data_conf
-    data_args.classes = class_types
+    data_args.classes = classes
     data_args.class_types = conf.dataset_args.class_types
 
     patch_dtype = conf.dataset_args.patches_dtype

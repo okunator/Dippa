@@ -314,7 +314,7 @@ class Inferer(ProjectFileManager):
         self.model.model.eval()
         torch.no_grad()
         
-        if len(self.soft_maps) > 0:
+        if self.soft_maps:
             print("Clearing previous predictions")
             self.clear_predictions()
                     
@@ -402,7 +402,6 @@ class Inferer(ProjectFileManager):
     def benchmark(self, save: bool = False) -> pd.DataFrame:
         """
         Run benchmarking metrics for all of the files in the dataset
-        Masks are converted to uint16 for memory purposes
         """
         
         assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
@@ -424,14 +423,19 @@ class Inferer(ProjectFileManager):
             fn = self.__get_fn(path)
             self.metrics[f"{fn}_metrics"] = metrics[i]
             
-        # Create pandas df of the result metrics
+        # Create pandas df of the result metrics        
         score_df = pd.DataFrame(self.metrics).transpose()
         score_df.loc["averages_for_the_set"] = score_df.mean(axis=0)
+        
+        if self.dataset == "pannuke":
+            df = score_df.rename_axis("fn").reset_index()
+            td = {f"{tis}_avg": df[df.fn.str.contains(f"{tis}")].mean(axis=0) for tis in self.pannuke_tissues}
+            score_df = pd.concat([score_df, pd.DataFrame(td).transpose()])
         
         if save:
             result_dir = Path(self.experiment_dir / "benchmark_results")
             self.create_dir(result_dir)
-            score_df.to_csv(Path(result_dir / f"{self.model_name}_{self.experiment_version}_result.csv"))
+            score_df.to_csv(Path(result_dir / "benchmark_result.csv"))
         
         return score_df
     

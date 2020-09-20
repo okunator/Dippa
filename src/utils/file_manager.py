@@ -209,10 +209,8 @@ class ProjectFileManager:
         
     def __split_training_set(self, train_imgs, train_masks, seed=42, size=0.2):
         """
-        Split training set into training and validation set (correct way to train).
-        This might affect training accuracy if training set is small.
-        
-        For pannuke the splits are based on the 
+        Split training set into training and validation set. This might affect training 
+        accuracy if training set is small. Pannuke is split by the folds specified in the pannuke.yml
         """
         def split_pannuke(paths):
             phases = {}
@@ -454,10 +452,7 @@ class ProjectFileManager:
         pass
     
     
-    def handle_raw_data(self, 
-                        rm_zips: bool = False, 
-                        overlays: bool = True, 
-                       ) -> None:
+    def handle_raw_data(self, rm_zips: bool = False, overlays: bool = True) -> None:
         """
         Convert the raw data to the right format and move the files to the right folders for training and
         inference. Training and inference expects a specific folder and file structure and this automates
@@ -502,9 +497,7 @@ class ProjectFileManager:
             self.__save_overlays(imgs_train_dir, anns_train_dir, type_overlays=type_overlays)
     
     
-    def model_checkpoint(self, 
-                         which:str = "last"
-                        ) -> Path:
+    def model_checkpoint(self, which:str = "last") -> Path:
         """
         Get the best or last checkpoint of a trained network.
         Args:
@@ -530,11 +523,7 @@ class ProjectFileManager:
         return ckpt
     
     
-    def get_pannuke_fold(self, 
-                         folds: List[str], 
-                         types: List[str], 
-                         data:str = "both"
-                        ) -> Dict[str, List[Path]]:
+    def get_pannuke_fold(self, folds: List[str], types: List[str], data:str = "both") -> Dict[str, List[Path]]:
         """
         After converting the data to right format and moving it to right folders this can be used to get
         the file paths by pannuke fold.
@@ -547,14 +536,17 @@ class ProjectFileManager:
             A Dict of Path objects to the pannuke files specified by the options
             ex. {"img":[Path1, Path2], "mask":[]}
         """
-        assert all(fold in ("fold1", "fold2", "fold3") for fold in folds), f"incorrect folds: {folds}"
+        assert self.dataset == "pannuke"
+        assert all(fold in list(self.pannuke_folds.keys()) for fold in folds), (
+            f"incorrect folds: {folds}. Folds need to be in {list(self.pannuke_folds.keys())}"
+        )
         assert all(tissue in self.pannuke_tissues for tissue in types), (
             f"types need to be in {self.pannuke_tissues}"
         )
         assert data in ("img", "mask", "both"), (
             f"data arg: {data} needs to be one of ('img', 'mask', 'both')"
         )
-        assert all(Path(p).exists() for p in self.data_dirs["pannuke"].values()), (
+        assert all(Path(p).exists() for p in self.data_dirs.values()), (
             "Data folders do not exists Convert the data first to right format. See step 1."
         )
         
@@ -571,7 +563,7 @@ class ProjectFileManager:
             wc2 = ""
         
         paths = []
-        for d in dict(self.data_dirs["pannuke"]).values():
+        for d in dict(self.data_dirs).values():
             for tissue in types:
                 tf = list(map(lambda fold : f"{tissue}_{fold}", folds))
                 for wc in tf:
