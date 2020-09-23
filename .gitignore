@@ -31,3 +31,4 @@ src/old/
 .ipynb_checkpoints
 .DS_Store
 README.txt
+Dippa.egg-info

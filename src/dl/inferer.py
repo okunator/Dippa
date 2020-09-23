@@ -6,6 +6,8 @@ import sklearn.feature_extraction.image
 import pandas as pd
 import matplotlib.pyplot as plt
 import ttach as tta
+import dill
+import pathos
 
 from torch import nn
 from pathlib import Path
@@ -13,17 +15,24 @@ from omegaconf import DictConfig
 from skimage.filters import difference_of_gaussians
 from skimage.exposure import histogram
 from collections import OrderedDict
-from multiprocessing import Pool
-from typing import List, Dict, Any
+from pathos.multiprocessing import ThreadPool as Pool
+from typing import List, Dict, Tuple, Callable, Any
 
-from utils.file_manager import ProjectFileManager
-from img_processing.process_utils import remap_label
-from img_processing.viz_utils import draw_contours
-from img_processing.post_processing import (activation, naive_thresh_logits, 
-                                            smoothed_thresh, inv_dist_watershed)
+from src.utils.file_manager import ProjectFileManager
+from src.img_processing.process_utils import remap_label
+from src.img_processing.viz_utils import draw_contours
 
-from img_processing.augmentations import tta_augs, tta_deaugs, tta_five_crops, resize, tta_transforms
-from metrics.metrics import PQ, AJI, AJI_plus, DICE2, split_and_merge
+from src.img_processing.post_processing import (
+    activation, naive_thresh_logits, smoothed_thresh, inv_dist_watershed
+)
+
+from src.img_processing.augmentations import (
+    tta_augs, tta_deaugs, resize, tta_transforms, tta_five_crops
+)
+                                              
+from src.metrics.metrics import (
+    PQ, AJI, AJI_plus, DICE2, split_and_merge
+)
 
 
 class Inferer(ProjectFileManager):
@@ -32,8 +41,7 @@ class Inferer(ProjectFileManager):
                  dataset_args: DictConfig,
                  experiment_args: DictConfig,
                  inference_args: DictConfig,
-                 **kwargs
-                ) -> None:
+                 **kwargs) -> None:
         """
         Inferer for any of the models that are trained with lightning framework 
         in this project (defined in lightning_model.py)
@@ -57,14 +65,13 @@ class Inferer(ProjectFileManager):
         
         super(Inferer, self).__init__(dataset_args, experiment_args)
         self.model = model
-        self.batch_size = experiment_args.batch_size
-        self.input_size = experiment_args.model_input_size
+        self.batch_size = inference_args.batch_size
+        self.input_size = inference_args.model_input_size
         self.smoothen = inference_args.smoothen
         self.verbose = inference_args.verbose
         self.fold = inference_args.data_fold
-        self.test_time_augs = inference_args.test_time_augmentation
+        self.test_time_augs = inference_args.tta
         self.thresh = inference_args.threshold
-        self.classes = dataset_args.classes
         
         # init containers for resluts
         self.soft_maps = OrderedDict()
@@ -73,7 +80,7 @@ class Inferer(ProjectFileManager):
     
     
     @classmethod
-    def from_conf(cls, model: nn.Module, conf):
+    def from_conf(cls, model: nn.Module, conf: DictConfig):
         model = model
         dataset_args = conf.dataset_args
         experiment_args = conf.experiment_args
@@ -109,11 +116,11 @@ class Inferer(ProjectFileManager):
         return self.data_folds[self.fold]["mask"]
     
         
-    def __get_fn(self, path):
+    def __get_fn(self, path:str) -> Path:
         return Path(path).name[:-4]
     
     
-    def __sample_idxs(self, n=25):
+    def __sample_idxs(self, n: int = 25) -> np.ndarray:
         assert n <= len(self.images), "Cannot sample more integers than there are images in dataset"
         # Dont plot more than 50 pannuke images
         if self.dataset == "pannuke" and n > 50:
@@ -121,7 +128,7 @@ class Inferer(ProjectFileManager):
         return np.random.randint(low = 0, high=len(self.images), size=n)
     
     
-    def __to_device(self, tensor):
+    def __to_device(self, tensor: torch.Tensor) -> torch.Tensor:
         if torch.cuda.is_available():
             tensor = tensor.type("torch.cuda.FloatTensor")
         else:
@@ -129,7 +136,7 @@ class Inferer(ProjectFileManager):
         return tensor
     
     
-    def __predict_batch(self, batch, batch_size):
+    def __predict_batch(self, batch: np.ndarray, batch_size: int) -> np.ndarray:
         """
         Do a prediction for a batch of size self.batch_size, or for a single patch i.e 
         batch_size = 1. If tta is used or dataset is pannuke then batch_size = 1. Otherwise
@@ -145,7 +152,7 @@ class Inferer(ProjectFileManager):
         return out_batch
     
 
-    def __ensemble_predict(self, patch):
+    def __ensemble_predict(self, patch: np.ndarray) -> np.ndarray:
         """
         Own implementation of tta ensemble prediction pipeline (memory issues with ttach).
         This will loop every patch in a batch and do an ensemble prediction for every 
@@ -199,7 +206,7 @@ class Inferer(ProjectFileManager):
         return np.asarray(soft_masks).mean(axis=0).transpose(2, 0, 1)
     
     
-    def __smoothen(self, prob_map):
+    def __smoothen(self, prob_map: np.ndarray) -> np.ndarray:
         """
         Use gaussian differences from skimage to smoothen out prediction.
         Effectively removes checkerboard effect after the tiles are merged and eases
@@ -215,7 +222,7 @@ class Inferer(ProjectFileManager):
         return prob_map
     
     
-    def __divide_batch(self, arr, batch_size):
+    def __divide_batch(self, arr: np.ndarray, batch_size: int) -> np.ndarray:
         """
         Divide patched image array into batches similarly to DataLoader in pytorch
         """
@@ -223,7 +230,7 @@ class Inferer(ProjectFileManager):
             yield arr[i:i + batch_size, ::] 
     
     
-    def __predict_patches(self, im_patches):
+    def __predict_patches(self, im_patches: np.ndarray) -> np.ndarray:
         """
         Divide patched image array to batches and process and run predictions for batches.
         Pannuke imgs are not divided to patches and are utilized as is.
@@ -253,7 +260,7 @@ class Inferer(ProjectFileManager):
         return pred_patches
     
     
-    def __extract_patches(self, im):
+    def __extract_patches(self, im: np.ndarray) -> np.ndarray:
         """
         Extract network input sized patches from images bigger than the network input size
         """
@@ -277,7 +284,10 @@ class Inferer(ProjectFileManager):
         return arr_out, arr_out_shape
         
     
-    def __stitch_patches(self, pred_patches, im_shape, patches_shape):
+    def __stitch_patches(self, 
+                         pred_patches: np.ndarray, 
+                         im_shape: Tuple, 
+                         patches_shape: Tuple) -> np.ndarray:
         """
         Back stitch all the soft map patches to full size img
         """
@@ -338,8 +348,10 @@ class Inferer(ProjectFileManager):
             self.soft_maps[f"{fn}_bg_map"] = bg_map
             
     
-    def _post_process_pipeline(self, prob_map, thresh, 
-                               postproc_func=inv_dist_watershed):
+    def _post_process_pipeline(self,
+                               prob_map: np.ndarray, 
+                               thresh: float, 
+                               postproc_func: Callable = inv_dist_watershed):
         # threshold first
         if self.smoothen:
             mask = smoothed_thresh(prob_map)
@@ -350,7 +362,7 @@ class Inferer(ProjectFileManager):
         return postproc_func(mask)        
     
     
-    def _compute_metrics(self, true, pred):
+    def _compute_metrics(self, true: np.ndarray, pred: np.ndarray) -> Dict:
         # Count scores for each file if gt has annotations
         if len(np.unique(true)) > 1: 
             pq = PQ(remap_label(true), remap_label(pred))
@@ -385,14 +397,13 @@ class Inferer(ProjectFileManager):
                  for key in self.soft_maps.keys() 
                  if key.endswith("nuc_map")]
         
-        segs = []
-        if self.dataset == "pannuke":
-            # Pool fails when using pannuke for some reason 
-            for pred, thresh in preds:
-                segs.append(self._post_process_pipeline(pred, thresh))
-        else:     
-            with Pool() as pool:
-                segs = pool.starmap(self._post_process_pipeline, preds)
+        #segs = []
+        #for pred, thresh in preds:
+        #    segs.append(self._post_process_pipeline(pred, thresh))
+        
+        # pickling issues in ProcessPool with typing, hard to fix.. Using ThreadPool instead        
+        with Pool() as pool:
+            segs = pool.starmap(self._post_process_pipeline, preds)
         
         for i, path in enumerate(self.images):
             fn = self.__get_fn(path)
@@ -410,14 +421,12 @@ class Inferer(ProjectFileManager):
         gts = [self.read_mask(f) for f in self.gt_masks]
         params_list = list(zip(gts, inst_maps))
         
-        metrics = []
-        if self.dataset == "pannuke":
-            # Pool fails when using pannuke for some reason
-            for true, pred in params_list:
-                metrics.append(self._compute_metrics(true, pred))
-        else:
-            with Pool() as pool:
-                metrics = pool.starmap(self._compute_metrics, params_list)
+        #metrics = []
+        #for true, pred in params_list:
+        #    metrics.append(self._compute_metrics(true, pred))
+
+        with Pool() as pool:
+            metrics = pool.starmap(self._compute_metrics, params_list)
         
         for i, path in enumerate(self.images):
             fn = self.__get_fn(path)
@@ -566,6 +575,3 @@ class Inferer(ProjectFileManager):
             self.create_dir(plot_dir)
             fig.savefig(Path(plot_dir / f"{fn}_result.png"))
 
-            
-            
-        

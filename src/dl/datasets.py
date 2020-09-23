@@ -4,8 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 
-from img_processing.pre_processing import gen_unet_labels
-from img_processing.process_utils import instance_contours
+from src.img_processing.pre_processing import gen_unet_labels
+from src.img_processing.process_utils import instance_contours
 
 
 class BinarySegmentationDataset(Dataset):
@@ -77,72 +77,3 @@ class BinarySegmentationDataset(Dataset):
     
     def __len__(self): return self.n_items
     
-    
-# def visualize_batch(loader):
-#     """
-#     Visualize a batch of a datloader
-#     Args:
-#         loader (DataLoader) : torch DataLoader obj that contains custom DataSet object defined above
-#     """
-#     assert isinstance(loader, DataLoader)
-#     
-#     batch = next(iter(loader))
-# 
-#     # [6 x 3 x patch_size x patch_size]
-#     image_b = batch['image']
-#     # [batch_size x patch_size x patch_size]
-#     mask_b = batch['mask']
-#     # [batch_size x patch_size x patch_size]
-#     contour_b = batch['contour']
-#     # [batch_size x patch_sizex patch_size]
-#     wmap_b = batch['mask_weight']
-# 
-#     fig, axes = plt.subplots(2, 3, figsize=(30, 20))
-#     for i, ax in enumerate(axes.flat):
-#         plt.subplot(2, 3, i+1)
-#         plt.imshow(image_b[i, ...].permute(1, 2, 0), interpolation='none')
-#         plt.imshow(mask_b[i, ...], interpolation='none', alpha=0.3)
-#         plt.imshow(contour_b[i, ...], interpolation='none', alpha=0.3, cmap="jet")
-#         plt.imshow(wmap_b[i, ...], interpolation='none', alpha=0.3, cmap="magma")
-#         plt.tight_layout(w_pad=4, h_pad=4)
-    
-
-    
-# def get_loaders(phases, dbs, transforms, batch_size=6, edge_weight=True):
-#     """
-#     Initialize PyTorch dataloaders and datsets
-#     
-#     Args:
-#         phases (list[str]) : list of the phases used in training e.g. ['train', 'valid']
-#         dbs dict(phase:path) : e.g {'train': "/mypath/train.pytable", 'valid':"/pathto/valid.pytable"}
-#         transforms (dict[phase:list]) : dict of albu.compose objs of augs for each phase of training
-#         batch_size (int) : size of the batch (number of images) per iteration in training
-#         edge_weight (bool) : apply weights on the edges of the nuclei instances in cross-entropy loss
-#     Returns:
-#         loaders (OrderedDict[phase:DataLoader]) : dict of dataloaders for each phase of training
-#         datasets (OrderedDict[phase:DataSet]) : dict of PyTorch Datasets for each phase of training
-#     """
-# 
-#     assert all(phase in ('train', 'valid') for phase in phases)
-#     assert all(phase in ('train', 'valid') for phase in dbs.keys())
-#     assert all(phase in ('train', 'valid') for phase in transforms.keys())
-#         
-#     dataset = collections.OrderedDict()
-#     loaders = collections.OrderedDict()
-#     
-#     for phase in phases:
-#         dataset[phase] = BinarySegmentationDataset(
-#             fname = dbs[phase], 
-#             transforms = transforms[phase],
-#             edge_weight = edge_weight
-#         )
-#         
-#         loaders[phase] = DataLoader(
-#             dataset[phase], 
-#             batch_size = batch_size, 
-#             shuffle = True, 
-#             num_workers = 8, 
-#             pin_memory = True
-#         )
-#         
-#     return loaders, dataset

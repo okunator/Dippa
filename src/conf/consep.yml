@@ -17,10 +17,3 @@ class_types:
         fibroblast: 5
         muscle: 6
         endothelial: 7
-
-data_dirs:
-    raw_data_dir: ../../datasets/consep
-    train_im: ../../datasets/consep/train/images
-    train_gt: ../../datasets/consep/train/labels
-    test_im: ../../datasets/consep/test/images
-    test_gt: ../../datasets/consep/test/labels

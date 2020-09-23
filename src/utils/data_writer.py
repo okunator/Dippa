@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import List, Dict
 from omegaconf import DictConfig
 from sklearn.model_selection import train_test_split
-from patch_extractor import PatchExtractor
-from file_manager import ProjectFileManager
-from img_processing.augmentations import rigid_transforms, random_crop, compose
+from src.utils.patch_extractor import PatchExtractor
+from src.utils.file_manager import ProjectFileManager
+from src.img_processing.augmentations import rigid_transforms, random_crop, compose
 
 
 class PatchWriter(ProjectFileManager):
@@ -20,8 +20,7 @@ class PatchWriter(ProjectFileManager):
                  dataset_args: DictConfig,
                  experiment_args: DictConfig,
                  patching_args: DictConfig,
-                 **kwargs: Dict,
-                 ) -> None:
+                 **kwargs: Dict,) -> None:
         """
         This class is used to patch input images and to write them to either hdf5 tables
         or .npy files that are are used in the training of the networks used in this project. 
@@ -42,10 +41,9 @@ class PatchWriter(ProjectFileManager):
         super(PatchWriter, self).__init__(dataset_args, experiment_args)
         self.patch_size = patching_args.patch_size
         self.stride_size = patching_args.stride_size
-        self.input_size = experiment_args.model_input_size
+        self.input_size = patching_args.model_input_size
         self.verbose = patching_args.verbose
         self.crop_to_input = patching_args.crop_to_input       
-        self.classes = dataset_args.classes
         self.__validate_patch_args(self.patch_size, self.stride_size, self.input_size)
         self.xtractor = PatchExtractor(
             (self.patch_size, self.patch_size), 
@@ -55,7 +53,7 @@ class PatchWriter(ProjectFileManager):
 
         
     @classmethod
-    def from_conf(cls, conf):
+    def from_conf(cls, conf: DictConfig):
         dataset_args = conf.dataset_args
         experiment_args = conf.experiment_args
         patching_args = conf.patching_args
@@ -67,7 +65,7 @@ class PatchWriter(ProjectFileManager):
         )
     
     
-    def __validate_patch_args(self, patch_size, stride_size, input_size):
+    def __validate_patch_args(self, patch_size: int, stride_size: int, input_size: int) -> None:
         shapes = [self.read_img(f).shape
                   for phase in self.phases 
                   for key, val in self.data_folds[phase].items()
@@ -80,7 +78,7 @@ class PatchWriter(ProjectFileManager):
         )
 
         
-    def __extract_patches(self, io):
+    def __extract_patches(self, io: np.ndarray) -> np.ndarray:
         # OLD, USE HOVERNET PATCH EXTRACTOR INSTEAD
         # add reflect padding 
         mirror_pad = self.patch_size // 2
@@ -99,7 +97,7 @@ class PatchWriter(ProjectFileManager):
         return io_arr
     
     
-    def __rigid_augs_and_crop(self, im, mask):
+    def __rigid_augs_and_crop(self, im: np.ndarray, mask: np.ndarray):
         """
         Do rigid augmentations and crop the patch to the size of the input_size.
         The database access is several times faster if the patches are smaller.
@@ -112,10 +110,11 @@ class PatchWriter(ProjectFileManager):
         return transforms(image=im, mask=mask)
 
     
-    def __augment_patches(self, patches_im, patches_mask, do_overlay=False):
-        """
-        Run the rigid augmentations for the patches
-        """
+    def __augment_patches(self, 
+                          patches_im: np.ndarray, 
+                          patches_mask: np.ndarray,
+                          do_overlay: bool = False) -> None:
+        
         imgs = []
         masks = []
         overlays = []
@@ -133,7 +132,7 @@ class PatchWriter(ProjectFileManager):
         return np.array(imgs), np.array(masks), np.array(overlays)
     
             
-    def __create_db(self, phase):
+    def __create_db(self, phase: str) -> None:
         storage = {}
         imgs = self.data_folds[phase]["img"]
         masks = self.data_folds[phase]["mask"]
@@ -221,7 +220,7 @@ class PatchWriter(ProjectFileManager):
         hdf5.close()
         
     
-    def __viz_pannuke_patches(self, phase, img_type):
+    def __viz_pannuke_patches(self, phase: str, img_type: str) -> None:
         img_paths = self.data_folds[phase]["img"]
         mask_paths = self.data_folds[phase]["mask"]
         idxs = np.random.randint(low = 0, high=len(img_paths), size=25)
@@ -238,16 +237,22 @@ class PatchWriter(ProjectFileManager):
                 mask = self.read_mask(mask_paths[idx])
                 io = np.where(mask[..., None], im, 0)
             ax[i].imshow(io)
-        
+
     
     
-    def viz_patches_example(self, index: int = 1, img_type: str ="img", phase: str = "train"):
+    def viz_patches_example(self, 
+                            index: int = 1, 
+                            img_type: str ="img", 
+                            phase: str = "train") -> np.ndarray:
         """
         A visualization of what the patches look like that are written to the hdf5 database.
         Args:
             index (int): the index number of the filepath in the list of files belonging to a specific dataset
             img_type (str): whether to use masks or images or a juxtaposition of both
             phase (str): One of ('train', 'test', 'valid').
+            
+        Returns:
+            the shape of the patched array
         """
         # This is fugly as heck... 
         assert img_type in ("img", "mask", "overlay") 
@@ -297,7 +302,7 @@ class PatchWriter(ProjectFileManager):
             return patches.shape
 
 
-    def write_dbs(self):
+    def write_dbs(self) -> None:
         """
         Writes the hdf5 databases to correct folders.
         """
@@ -309,18 +314,21 @@ class PatchWriter(ProjectFileManager):
             self.__create_db(phase)
             
             
-    def write_npys(self):
+    def write_npys(self) -> None:
         # TODO
         pass
             
             
 
-def visualize_db_patches(path: str, index: int):
+def visualize_db_patches(path: str, index: int) -> np.ndarray:
     """
     This function opens the hdf5 file and queries for an image and a mask with an index and plots these.
     Args:
         path (str): path to the hdf5 database
         index (int): index for the patch array in the hdf5 db
+    
+    Returns:
+        the unique labels of the mask
     """
     matplotlib.rcParams.update({"font.size": 22})
     with tables.open_file(path,"r") as db:

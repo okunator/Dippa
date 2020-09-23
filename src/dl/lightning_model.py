@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
+import ttach as tta
 
 from pathlib import Path
 from omegaconf import DictConfig
@@ -16,9 +17,9 @@ from catalyst.dl import utils
 from catalyst.contrib.tools.tensorboard import SummaryItem, SummaryReader
 from typing import List, Dict
 
-from utils.file_manager import ProjectFileManager
-from img_processing.augmentations import *
-from datasets import *
+from src.utils.file_manager import ProjectFileManager
+from src.dl.datasets import BinarySegmentationDataset
+from src.img_processing.augmentations import *
 
 
 class SegModel(pl.LightningModule):
@@ -52,9 +53,9 @@ class SegModel(pl.LightningModule):
         super(SegModel, self).__init__()
         
         # Hyperparams
-        self.model = model
-        self.batch_size = experiment_args.batch_size
-        self.input_size = experiment_args.model_input_size
+        self.model = tta.SegmentationTTAWrapper(model, tta_transforms()) if training_args.tta else model
+        self.batch_size = training_args.batch_size
+        self.input_size = training_args.model_input_size
         self.edge_weight = training_args.loss_args.edge_weight  
         self.lr = training_args.optimizer_args.lr
         self.encoder_lr = training_args.optimizer_args.encoder_lr
@@ -62,7 +63,6 @@ class SegModel(pl.LightningModule):
         self.encoder_weight_decay = training_args.optimizer_args.encoder_weight_decay
         self.factor = training_args.scheduler_args.factor
         self.patience = training_args.scheduler_args.patience
-        self.classes = dataset_args.classes
         self.save_hyperparameters()
         
         # Loss criterion
@@ -76,8 +76,6 @@ class SegModel(pl.LightningModule):
             dataset_args,
             experiment_args
         )
-        
-        self.n_classes = len(self.classes)
         
     
     @classmethod
@@ -106,12 +104,18 @@ class SegModel(pl.LightningModule):
         # TODO npy files
         return self.fm.databases['valid'][self.input_size]
     
+    
+    @property
+    def test_data(self):
+        # TODO npy files
+        return self.fm.databases['test'][self.input_size]
+    
         
     def __compute_metrics(self, yhat, y):
         pred = yhat.detach().cpu().numpy()
         predflat = np.argmax(pred, axis=1).flatten()
         yflat = y.cpu().numpy().flatten()
-        cmatrix = confusion_matrix(yflat, predflat, labels=range(self.n_classes))
+        cmatrix = confusion_matrix(yflat, predflat, labels=range(len(self.fm.classes)))
         TN = cmatrix[0, 0]
         TP = cmatrix[1, 1]
         FP = cmatrix[0, 1]
@@ -193,6 +197,38 @@ class SegModel(pl.LightningModule):
         }
     
     
+    def test_step(self, test_batch, batch_idx):
+        x = test_batch["image"]
+        y = test_batch["mask"]
+        y_weight = test_batch["mask_weight"]
+
+        x = x.float()
+        y_weight = y_weight.float()
+        y = y.long()
+        
+        # Compute loss
+        yhat = self.forward(x)
+        loss_matrix = self.CE(yhat, y)        
+        loss = (loss_matrix * (self.edge_weight**y_weight)).mean()
+        
+        # Compute confusion matrix for accuracy
+        TNR, TPR, accuracy = self.__compute_metrics(yhat, y)
+        
+        logs = {
+            "test_loss": loss, 
+            "test_accuracy":accuracy
+        }
+        
+        return {
+            "test_loss": loss, 
+            "test_accuracy":accuracy, 
+            "TNR":TNR, 
+            "TPR":TPR, 
+            "log":logs, 
+            "progress_bar": {"test_loss": loss}
+        }
+    
+    
     def validation_epoch_end(self, outputs):
         accuracy = torch.stack([x["val_accuracy"] for x in outputs]).mean()
         TNR = torch.stack([x["TNR"] for x in outputs]).mean()
@@ -223,6 +259,22 @@ class SegModel(pl.LightningModule):
         }
         
         return {"avg_train_accuracy":accuracy, "avg_train_loss": avg_train_loss, "log": tensorboard_logs}
+    
+    
+    def test_epoch_end(self, outputs):
+        accuracy = torch.stack([x["test_accuracy"] for x in outputs]).mean()
+        TNR = torch.stack([x["TNR"] for x in outputs]).mean()
+        TPR = torch.stack([x["TPR"] for x in outputs]).mean()
+        avg_test_loss = torch.stack([x["test_loss"] for x in outputs]).mean()
+        
+        tensorboard_logs = {
+            "avg_test_loss": avg_test_loss, 
+            "avg_test_accuracy":accuracy, 
+            "avg_test_TNR":TNR,
+            "avg_test_TPR":TPR
+        }
+        
+        return {"avg_test_accuracy":accuracy, "avg_test_loss": avg_test_loss, "log": tensorboard_logs}
 
     
     def configure_optimizers(self):
@@ -249,7 +301,7 @@ class SegModel(pl.LightningModule):
     def prepare_data(self):
         # compose transforms
         # transforms = compose([test_transforms()])
-        transforms = compose([
+        train_transforms = compose([
             hue_saturation_transforms(),
             non_rigid_transforms(),
             blur_transforms(),
@@ -258,14 +310,21 @@ class SegModel(pl.LightningModule):
             to_tensor()
         ])
         
+        test_transforms = compose([no_transforms()])
+        
         self.trainset = BinarySegmentationDataset(
             fname = self.train_data.as_posix(), 
-            transforms = transforms,
+            transforms = train_transforms,
+        )
+        
+        self.validset = BinarySegmentationDataset(
+            fname = self.valid_data.as_posix(), 
+            transforms = test_transforms,
         )
         
         self.testset = BinarySegmentationDataset(
-            fname = self.valid_data.as_posix(), 
-            transforms = transforms,
+            fname = self.test_data.as_posix(), 
+            transforms = test_transforms,
         )
     
     def train_dataloader(self):
@@ -275,9 +334,13 @@ class SegModel(pl.LightningModule):
 
     def val_dataloader(self):
         return DataLoader(
+            self.validset, batch_size=self.batch_size, shuffle=False, pin_memory=True, num_workers=8
+        )
+    
+    def test_dataloader(self):
+        return DataLoader(
             self.testset, batch_size=self.batch_size, shuffle=False, pin_memory=True, num_workers=8
         )
-
 
 
 def plot_metrics(conf, scale: str = "log", metric: str = "loss", save:bool = False) -> None:

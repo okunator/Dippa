@@ -5,18 +5,18 @@ import numpy as np
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import List, Dict
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from distutils import dir_util, file_util
 from sklearn.model_selection import train_test_split
-from img_processing.viz_utils import draw_contours
+from src.img_processing.viz_utils import draw_contours
+from src.settings import DATA_DIR, CONF_DIR
 
 
 class ProjectFileManager:
     def __init__(self,
                  dataset_args: DictConfig,
                  experiment_args: DictConfig,
-                 **kwargs
-                ) -> None:
+                 **kwargs) -> None:
         """
         This class is used for managing the files and folders needed in this project. 
         
@@ -34,7 +34,7 @@ class ProjectFileManager:
         
     
     @classmethod
-    def from_conf(cls, conf):
+    def from_conf(cls, conf: DictConfig):
         dataset_args = conf.dataset_args
         experiment_args = conf.experiment_args
         
@@ -80,7 +80,7 @@ class ProjectFileManager:
         
         
     @property
-    def experiment_dir(self):
+    def experiment_dir(self) -> Path:
         ex_root = self.exargs.experiment_root_dir
         ex_version = self.exargs.experiment_version
         model_name = self.exargs.model_name
@@ -88,46 +88,72 @@ class ProjectFileManager:
     
     
     @property
-    def dataset(self):
+    def dataset(self) -> str:
         assert self.dsargs.dataset in ("kumar","consep","pannuke","dsb2018","cpm")
         return self.dsargs.dataset
     
     
     @property
-    def data_dirs(self):
-        return self.dsargs.data_dirs
+    def data_dirs(self) -> Dict:
+        return {
+            "raw_data_dir":Path(DATA_DIR / self.dataset),
+            "train_im":Path(DATA_DIR / self.dataset / "train" / "images"),
+            "train_gt":Path(DATA_DIR / self.dataset / "train" / "labels"),
+            "test_im":Path(DATA_DIR / self.dataset / "test" / "images"),
+            "test_gt":Path(DATA_DIR / self.dataset / "test" / "labels"),
+        }
     
     
     @property
-    def database_dir(self):
+    def database_dir(self) -> Path:
         assert self.dsargs.patches_dtype in ("npy", "hdf5"), f"{self.dsargs.patches_dtype}"
         return Path(self.dsargs[f"{self.dsargs.patches_dtype}_patches_root_dir"]).joinpath(f"{self.dataset}")
     
     
     @property
-    def phases(self):
+    def phases(self) -> List:
         assert self.dsargs.phases in (["train", "valid", "test"], ["train", "test"]), f"{self.dsargs.phases}"
         return self.dsargs.phases
     
     
     @property
-    def pannuke_folds(self):
+    def classes(self) -> Dict:
+        assert self.dsargs.class_types in ("binary", "types")
+        yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
+        data_conf = OmegaConf.load(yml_path)
+        return data_conf.class_types[self.dsargs.class_types]
+        
+    
+    @property
+    def pannuke_folds(self) -> Dict:
         assert self.dataset == "pannuke", f"dataset: {self.dataset}. dataset not pannuke"
-        return self.dsargs.folds
+        yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
+        data_conf = OmegaConf.load(yml_path)
+        return data_conf.folds
     
     
     @property
-    def pannuke_tissues(self):
+    def pannuke_tissues(self) -> List:
         assert self.dataset == "pannuke", f"dataset: {self.dataset}. dataset not pannuke"
         return self.dsargs.tissues
        
         
     @property
-    def data_folds(self):
+    def data_folds(self) -> Dict:
         """
-        Getter for the 'train', 'valid', 'test' fold paths. Also splits training set to train and valid
-        if 'valid is in phases list'
+        Get the 'train', 'valid', 'test' fold paths. This also splits training set to train and valid
+        if 'valid is in self.phases list'
+        
+        Returns:
+            Dict[str, Dict[str, str]]
+            Dictionary where keys (train, test, valid) point to dictionaries with keys img and mask.
+            The innermost dictionary values where the img and mask -keys point to are sorted lists 
+            containing paths to the image and mask files. 
         """
+        assert all(Path(p).exists() for p in self.data_dirs.values()), (
+            "Data folders do not exists Convert the data first to right format. See step 1."
+        )
+        
         train_imgs = self.__get_files(self.data_dirs["train_im"])
         train_masks = self.__get_files(self.data_dirs["train_gt"])
         test_imgs = self.__get_files(self.data_dirs["test_im"])
@@ -151,9 +177,15 @@ class ProjectFileManager:
     
     
     @property
-    def databases(self):
+    def databases(self) -> Dict:
         """
-        Getter for the databases that were written by the PatchWriter
+        Get the the databases that were written by the PatchWriter
+        
+        Returns:
+            Dict[str, Dict[int, str]]
+            A dictionary where the keys (train, test, valid) are pointing to dictionaries with
+            values are the paths to the hdf5 databases and keys are the size of the square 
+            patches saved in the databass
         """
         def get_input_sizes(paths):
             # Paths to dbs are named as 'patchsize_dataset'. e.g. 'patch256_kumar.pytable' 
@@ -192,22 +224,23 @@ class ProjectFileManager:
         }
     
     
-    def __get_img_suffix(self, directory):
-        # Find out the suffix of the image and mask files and assert if images have mixed suffices
-        d = Path(directory)
-        assert all([file.suffix for file in d.iterdir()]), "All image files should be in same format"
-        return [file.suffix for file in directory.iterdir()][0]
+    def __get_img_suffix(self, directory: Path) -> str:
+        assert all([f.suffix for f in directory.iterdir()]), "All image files should be in same format"
+        return [f.suffix for f in directory.iterdir()][0]
         
         
-    def __get_files(self, directory):
-        # Get the image and mask files from the directory that was provided 
+    def __get_files(self, directory: str) -> List[str]:
         d = Path(directory)
-        assert d.is_dir(), f"Provided directory: {d.as_posix()} for image files is not a directory."
+        assert d.exists(), f"Provided directory: {d.as_posix()} does not exist."
         file_suffix = self.__get_img_suffix(d)
         return sorted([x.as_posix() for x in d.glob(f"*{file_suffix}")])
         
         
-    def __split_training_set(self, train_imgs, train_masks, seed=42, size=0.2):
+    def __split_training_set(self, 
+                             train_imgs: List, 
+                             train_masks: List,
+                             seed: int = 42,
+                             size: float = 0.2) -> None:
         """
         Split training set into training and validation set. This might affect training 
         accuracy if training set is small. Pannuke is split by the folds specified in the pannuke.yml
@@ -250,7 +283,7 @@ class ProjectFileManager:
         }
     
     
-    def __kumar_xml2mat(self, x, to):
+    def __kumar_xml2mat(self, x: Path, to: Path) -> None:
         """
         From https://github.com/vqdang/hover_net/blob/master/src/misc/proc_kumar_ann.py
         Convert the xml annotation files to .mat files with 'inst_map' key.
@@ -293,10 +326,7 @@ class ProjectFileManager:
         scipy.io.savemat(mask_fn, mdict={'inst_map': ann})         
     
     
-    def __mv_to_orig(self, folder):
-        """
-        Move contents of any folder to a new folder named "orig" created in the current folder
-        """
+    def __mv_to_orig(self, folder: Path) -> Path:
         p = folder.joinpath("orig")
         self.create_dir(p)
         for f in folder.iterdir():
@@ -306,11 +336,7 @@ class ProjectFileManager:
         return p
     
     
-    def __save_overlays(self, img_path, ann_path, type_overlays=False):
-        """
-        Save original images with annotation contours overlayed on top
-        """
-        
+    def __save_overlays(self, img_path: Path, ann_path: Path, type_overlays: bool = False) -> None:
         inst_overlay_dir = Path(img_path.parents[0] / "instance_overlays")
         self.create_dir(inst_overlay_dir)
         for im_path, ann_path in zip(sorted(img_path.glob("*")), sorted(ann_path.glob("*.mat"))):
@@ -329,15 +355,13 @@ class ProjectFileManager:
             cv2.imwrite(str(fn), cv2.cvtColor(inst_overlay, cv2.COLOR_RGB2BGR))
     
     
-    def __check_raw_root(self, raw_root):
-        root = Path(raw_root)
-        assert not all((root.joinpath("train").exists(),  root.joinpath("test").exists())), (
-                    "test and training directories already exists. To run this again, remove the files "
-                    f"and folders from: {raw_root} and repeat the steps in the instructions."
-        )
-    
-    
-    def __handle_kumar(self, orig_dir, imgs_train_dir, anns_train_dir, imgs_test_dir, anns_test_dir):
+    def __handle_kumar(self,
+                       orig_dir: Path,
+                       imgs_train_dir: Path,
+                       anns_train_dir: Path,
+                       imgs_test_dir: Path,
+                       anns_test_dir: Path) -> None:
+        
         self.create_dir(anns_train_dir)
         self.create_dir(imgs_train_dir)
         self.create_dir(anns_test_dir)
@@ -360,7 +384,7 @@ class ProjectFileManager:
                     file_util.copy_file(str(item), str(imgs_test_dir))
         
         
-    def __handle_consep(self, root, orig_dir):
+    def __handle_consep(self, root: Path, orig_dir: Path) -> None:
         for item in orig_dir.iterdir():
             if item.is_dir() and item.name == "CoNSeP":
                 dir_util.copy_tree(str(item), str(root))
@@ -372,16 +396,17 @@ class ProjectFileManager:
                         item.rename(Path(d / "type_overlays"))
                     else:
                         item.rename(Path(d / item.name.lower()))
-                d.rename(d.as_posix().lower())
+
+                d.rename(Path(d.parents[0] / d.name.lower()))
+
         
         
     def __handle_pannuke(self, 
-                         orig_dir,
-                         imgs_train_dir, 
-                         anns_train_dir, 
-                         imgs_test_dir, 
-                         anns_test_dir
-                        ) -> None:
+                         orig_dir: Path,
+                         imgs_train_dir: Path, 
+                         anns_train_dir: Path, 
+                         imgs_test_dir: Path, 
+                         anns_test_dir: Path) -> None:
         
         self.create_dir(anns_train_dir)
         self.create_dir(imgs_train_dir)
@@ -443,12 +468,13 @@ class ProjectFileManager:
                     type_map[type_map > temp_mask.shape[-1]-1] = 0
                     fn_mask = Path(mask_dir / name).with_suffix(".mat")
                     scipy.io.savemat(fn_mask, mdict={"inst_map": inst_map, "type_map":type_map})
-                             
-    def __handle_dsb2018(self):
+        
+        
+    def __handle_dsb2018(self) -> None:
         pass
     
     
-    def __handle_cpm(self):
+    def __handle_cpm(self) -> None:
         pass
     
     
@@ -467,9 +493,13 @@ class ProjectFileManager:
                                   If dataset is not "pannuke", this arg is ignored.
                                   
         """        
-        # extract .zips and move the files to 'orig' folder
         root = Path(self.data_dirs["raw_data_dir"])
-        self.__check_raw_root(root)
+        assert not all((root.joinpath("train").exists(),  root.joinpath("test").exists())), (
+            "test and training directories already exists. To run this again, remove the files "
+            f"and folders from: {raw_root} and repeat the steps in the instructions."
+        )
+        
+        # extract .zips and move the files to 'orig' folder
         orig_dir = self.__mv_to_orig(root)
         self.extract_zips(orig_dir, rm_zips)
         imgs_test_dir = Path(root / "test/images")
@@ -479,12 +509,23 @@ class ProjectFileManager:
         
         # ad hoc handling of the different datasets to convert them to same format
         if self.dataset == "kumar":
-            self.__handle_kumar(orig_dir, imgs_train_dir, anns_train_dir, imgs_test_dir, anns_test_dir)
+            self.__handle_kumar(
+                orig_dir, 
+                imgs_train_dir, 
+                anns_train_dir, 
+                imgs_test_dir, 
+                anns_test_dir
+            )
+        elif self.dataset == "pannuke":
+            self.__handle_pannuke(
+                orig_dir, 
+                imgs_train_dir,
+                anns_train_dir, 
+                imgs_test_dir, 
+                anns_test_dir
+            )
         elif self.dataset == "consep":
             self.__handle_consep(root, orig_dir)
-        elif self.dataset == "pannuke":
-            self.__handle_pannuke(orig_dir, imgs_train_dir,
-                                  anns_train_dir, imgs_test_dir, anns_test_dir)
         elif dataset == "cpm":
             pass # TODO
         elif dataset == "dsb2018":
@@ -506,8 +547,10 @@ class ProjectFileManager:
         Returns:
             Path object to the pytorch checkpoint file.
         """
-        assert self.experiment_dir.exists(), "Experiment dir does not exist. Train the model first."
         assert which in ("best", "last"), f"param which: {which} not one of ('best', 'last')"
+        assert self.experiment_dir.exists(), (
+            f"Experiment dir: {self.experiment_dir} does not exist. Train the model first."
+        )
         
         ckpt = None
         for item in self.experiment_dir.iterdir():
@@ -523,16 +566,17 @@ class ProjectFileManager:
         return ckpt
     
     
-    def get_pannuke_fold(self, folds: List[str], types: List[str], data:str = "both") -> Dict[str, List[Path]]:
+    def get_pannuke_fold(self, folds: List, types: List, data:str = "both") -> Dict:
         """
         After converting the data to right format and moving it to right folders this can be used to get
         the file paths by pannuke fold.
         
         Args:
-            folds (List): list of the folds you want to include. e.g. ["fold", "fold3"]
-            types (List): list of the tissue types you want to include e.g. ["Breast", "Colon"].
+            folds (List[str]): list of the folds you want to include. e.g. ["fold", "fold3"]
+            types (List[str]): list of the tissue types you want to include e.g. ["Breast", "Colon"].
             data (str): one of "img", "mask" or "both"
         Returns:
+            Dict[str, List[Path]]
             A Dict of Path objects to the pannuke files specified by the options
             ex. {"img":[Path1, Path2], "mask":[]}
         """

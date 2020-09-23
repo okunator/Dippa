@@ -1,23 +1,20 @@
-from omegaconf import OmegaConf, DictConfig
-from pathlib import Path
+from omegaconf import OmegaConf
 
-# modify this
-user_conf = OmegaConf.create(
+# Modify this when you want to run new experiments
+CONFIG = OmegaConf.create(
     {   
         
         # Define the model name and the experiment
         # These will be used to write the result files to the right folders
         "experiment_args":{
-            "model_name":"FPN",
-            "experiment_version":"test_pannuke",
-            "model_input_size":256, # network input size (multiple of 32)
-            "batch_size":6,
+            "model_name":"Unet",
+            "experiment_version":"test_pannuke_unet2",
         },
         
         # General dataset constants and args
         "dataset_args": {
             # What dataset you want to use? Has to be one of ("kumar", "consep", "pannuke")
-            "dataset":"pannuke", 
+            "dataset":"consep", 
             
             # This depends on the dataset. Binary segmentation can be done to all datasets
             # and semantic segmentation can be done to consep and pannuke datasets
@@ -51,8 +48,9 @@ user_conf = OmegaConf.create(
     
         # Model training args
         "training_args": {
+            "tta":False, # use test time augmentation during training. Note: very slow w ttatch
             "resume_training":False, # continue training where you left off?
-            "num_epochs":30,
+            "num_epochs":7,
             "num_gpus":1,
             "optimizer_args":{
                 "lr":0.001,
@@ -75,7 +73,7 @@ user_conf = OmegaConf.create(
         "inference_args" : {
             "smoothen":False, # Inference time slightly slower. Gets rid of checkerboard. May lower PQ.
             "data_fold":"test", # what data fold (phase) to use in inference
-            "test_time_augmentation":True, # Inference time slightly slower
+            "tta":False, # Inference time slightly slower
             "threshold":0.5, # if smoothen is not used, then this is used for threshing soft masks
             # For each experiment the model weights at the final epoch and best model against 
             # validation data will be saved. Choose one of ('best', 'last')
@@ -84,45 +82,3 @@ user_conf = OmegaConf.create(
         },
     }
 )
-
-def get_conf(conf:DictConfig, dataset:str) -> DictConfig:
-    """
-    Generates a config file in the correct format from the user_conf and .yml confs
-    for different datasets.
-    
-    Args: 
-        conf (DictConfig): the above conf variable
-        dataset (str): dataset that is being used. This key specifies what dataset args
-                       the resulting config contains.
-    Return:
-        DictConfig
-    """
-    conf.dataset_args.dataset = dataset
-    yml_path1 = [f for f in Path("../conf").iterdir() if conf.dataset_args.dataset in f.name][0]
-    yml_path2 = [f for f in Path("../conf").iterdir() if f.name == "general.yml"][0]
-    data_conf = OmegaConf.load(yml_path1)
-    general_conf = OmegaConf.load(yml_path2)
-
-    # pick the right args for the final config
-    training_args = conf.training_args
-    patching_args = conf.patching_args
-    inference_args = conf.inference_args
-
-    config = OmegaConf.create()
-    config.training_args = training_args
-    config.patching_args = patching_args
-    config.inference_args = inference_args
-
-    classes = data_conf.class_types[conf.dataset_args.class_types]
-    data_args = data_conf
-    data_args.classes = classes
-    data_args.class_types = conf.dataset_args.class_types
-
-    patch_dtype = conf.dataset_args.patches_dtype
-    dataset_args = OmegaConf.merge(conf.dataset_args, general_conf[patch_dtype], data_args)
-    experiment_args = OmegaConf.merge(conf.experiment_args, general_conf.experiment)
-
-    # save the correct values to the final conf
-    config.dataset_args = dataset_args
-    config.experiment_args = experiment_args
-    return config
