@@ -25,7 +25,7 @@ pip3 -r requirements.txt
 ##  Instructions for running the experiments
 1. Download the data
 2. Run notebooks or the runner scripts
-    1. Convert the data that you downloaded. `src/convert_raw_data.py` script or `1_Convert_downloaded_data.ipynb
+    1. Convert the data that you downloaded. `src/convert_raw_data.py` script or `1_Convert_downloaded_data.ipynb`
     2. Modify the parameters in the config file. `src/conf/config.py`
     3. Extract or just save tiles/patches from the images you just downloaded and save them to hdf5 format or numpy files. `2_Create_databases.ipynb` or `src/write_patches.py`
     4. Train a model. `3_Train_model.ipynb` or `src/train.py`
