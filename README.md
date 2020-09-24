@@ -57,7 +57,7 @@ pip3 -r requirements.txt
     - `src/` 
         - `conf/`
             - `config_schema.py` dataclasses defining the config file schema in this project
-            - 'config.py' THE CONFIG FILE TO MODIFY FOR DIFFERENT EXPERIMENTS
+            - `config.py` THE CONFIG FILE TO MODIFY FOR DIFFERENT EXPERIMENTS
             - `consep.yml` data related to consep dataset
             - `cpm.yml` data related to cpm dataset TODO
             - `dsb2018.yml` data related to dsb2018 dataset TODO
@@ -70,7 +70,7 @@ pip3 -r requirements.txt
         - `img_processing/`
             - `augmentations.py` data augmentations
             - `post_processing.py` functions used in post processing inst maps 
-            - `pre_processing.py` functions used for patches pre processing patches before training
+            - `pre_processing.py` functions used for pre processing patches before training
             - `process_utils.py` utility functions for img and mask processing
             - `viz_utils.py` utility functions for plotting results
         - `metrics/`
