@@ -24,13 +24,14 @@ pip3 -r requirements.txt
 
 ##  Instructions for running the experiments
 1. Download the data.
-2. Run an experiment. **Note:** you don't have to repeat part **i** and **ii** if you've already done them
+2. Run an experiment.
     1. Convert the data that you downloaded. `src/convert_raw_data.py`
     2. Modify the parameters in the config file. `src/conf/config.py`
     3. Extract patches from the downloaded images and save them to hdf5 or numpy files. `src/write_patches.py`
     4. Train a model with the extracted patches.  `src/train.py`
     5. Infer post process and benchmark.  `src/infer.py`
     6. Optionally you can just run the notebooks in `notebooks/` which do the exact same.
+    - **Note:** you don't have to repeat part **i** and **ii** if you've already done them and you want to run new experiments. If you want to patch the images differently (different stride or window size) for your experiments then modify the config and run part **ii** again.
 
 ## Instructions for downloading the datasets
 1. Download the datsets from the links below
