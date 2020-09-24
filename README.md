@@ -4,9 +4,9 @@ Borrowing a lot of methods from HoVer-Net [repo](https://github.com/vqdang/hover
 **Note**: dl framework is PyTorch 
 
 ## Set Up
-1. Clone the repository
-2. cd to the repository `cd <path>/Dippa/`
-3. (Optional) Create environment: 
+**1.** Clone the repository
+**2.** cd to the repository `cd <path>/Dippa/`
+**3.** Create environment (Optional but recommended) 
 ```
 conda create --name Dippa python=3.6
 conda activate Dippa
@@ -17,7 +17,7 @@ Or
 venv stuff
 ```
 
-4. Install dependencies 
+**4.** Install dependencies 
 ```
 pip3 -r requirements.txt
 ```
