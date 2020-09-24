@@ -3,18 +3,20 @@ Benchmarking of deep learning and other segmentation methods for H&amp;E images
 Borrowing a lot of methods from HoVer-Net [repo](https://github.com/vqdang/hover_net): and methodology from HoVer-Net paper [2]  
 **Note**: dl framework is PyTorch 
 
-# Set Up
+## Set Up
 1. Clone the repository
 2. cd to the repository `cd <path>/Dippa/`
 3. (Optional) Create environment: 
 ```
 conda create --name Dippa python=3.6
 conda activate Dippa
-
-Or
-
-venv ...
 ```
+Or 
+
+```
+venv stuff
+```
+
 4. Install dependencies `pip3 -r requirements.txt`
 
 
