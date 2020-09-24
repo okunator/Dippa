@@ -1,9 +1,12 @@
 import cv2
 import numpy as np
 from scipy import ndimage as ndi
-from scipy.ndimage.morphology import (distance_transform_cdt,
-                                      distance_transform_edt,
-                                      binary_dilation)
+
+from scipy.ndimage.morphology import (
+    distance_transform_cdt,
+    distance_transform_edt,
+    binary_dilation
+)
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/loader/augs.py

@@ -1,7 +1,7 @@
 import math
 import random
 import colorsys
-from .process_utils import *
+from src.img_processing.process_utils import *
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
 def random_colors(N, bright=True):

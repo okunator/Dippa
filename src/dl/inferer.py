@@ -6,8 +6,6 @@ import sklearn.feature_extraction.image
 import pandas as pd
 import matplotlib.pyplot as plt
 import ttach as tta
-import dill
-import pathos
 
 from torch import nn
 from pathlib import Path

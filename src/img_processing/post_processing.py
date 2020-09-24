@@ -8,7 +8,7 @@ from skimage.exposure import histogram
 from skimage import filters
 from torch import nn
 from scipy import ndimage as ndi
-from .process_utils import *
+from src.img_processing.process_utils import *
 
 
 def activation(prob_map, method='sigmoid'):
