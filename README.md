@@ -24,7 +24,7 @@ pip3 -r requirements.txt
 
 ##  Instructions for running the experiments
 1. Download the data
-2. Run an experiment **NOTE:** you don't have to repeat part i and ii if you've already done them
+2. Run an experiment **Note:** you don't have to repeat part **i** and **ii** if you've already done them
     1. Convert the data that you downloaded. `src/convert_raw_data.py`
     2. Modify the parameters in the config file. `src/conf/config.py`
     3. Extract patches from the downloaded images and save them to hdf5 or numpy files. `src/write_patches.py`
