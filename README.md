@@ -25,11 +25,11 @@ pip3 -r requirements.txt
 ##  Instructions for running the experiments
 1. Download the data.
 2. Run an experiment.
-    1. Convert the data that you downloaded. `src/convert_raw_data.py`
+    1. Convert the data that you downloaded. `src/convert.py`
     2. Modify the parameters in the config file. `src/conf/config.py`
-    3. Extract patches from the downloaded images and save them to hdf5 or numpy files. `src/write_patches.py`
+    3. Extract patches from the downloaded images and save them to hdf5 or numpy files. `src/patch.py`
     4. Train a model with the extracted patches.  `src/train.py`
-    5. Infer post process and benchmark.  `src/infer.py`
+    5. Infer, post process and benchmark.  `src/infer.py`
     - Optionally you can just run the notebooks in `notebooks/` which do the exact same.
     - **Note:** you don't have to repeat part **i** and **ii** if you've already done them and you want to run new experiments. If you want to patch the images differently (different stride or window size) for your experiments then modify the config and run part **ii** again.
 
@@ -50,7 +50,7 @@ pip3 -r requirements.txt
 
 ## Repository structure
 - `Dippa`/
-    - `datasets/` Location for the raw and processed datasets after downloading and running `src/convert_raw_data.py`
+    - `datasets/` Location for the raw and processed datasets after downloading and running `src/convert.py`
     - `notebooks/` Notebooks for running the codes instead of running the pyton scripts 
     - `patches/` Location for the patched datasets after running `src/write_patches.py`
     - `src/` 
@@ -80,7 +80,11 @@ pip3 -r requirements.txt
             - `data_writer.py` class for writing image and mask patches for training
             - `file_manager.py` class for handling the downloaded data and managing all files and paths
             - `patch_extractor.py` class for extracting patches from images
+        - `convert.py` Convert the downloaded data to right format
+        - `infer.py` Run inference, post processing and benchmarking
+        - `patch.py` Run patching for downloaded images
         - `settings.py` A convention for building paths
+        - `train.py` Run training for pytorch models
 
 ## References
 
