@@ -1,7 +1,7 @@
 tables==3.4.2
 numpy==1.18.4
 pandas==1.1.2
-torch==1.4.0
+torch==1.6.0
 scipy==1.4.1
 opencv-python==4.2.0.32
 matplotlib==3.2.1
@@ -12,8 +12,8 @@ catalyst==20.6
 ttach==0.0.2
 segmentation-models-pytorch==0.1.0
 pytorch-lightning==0.8.5
-pytorch-toolbelt==0.3.2
 albumentations==0.4.3
 pathos==0.2.6
 dataclasses==0.7
+ray==0.8.7
 -e ./

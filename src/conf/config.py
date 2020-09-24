@@ -27,8 +27,9 @@ CONFIG = OmegaConf.create(
             # validation set. If phases = ["train", "test"], no splitting is done.
             # If dataset = 'pannuke' and phases = ["train", "valid", "test"] the folds
             # of your choosing are treated as train, valid and test folds. If dataset 
-            # = 'pannuke' and phases = ["train", "test"] then two folds of your choosing
-            # are combined to training set remaining fold is the test set
+            # = 'pannuke' and phases = ["train", "test"] then two folds that are set for
+            # train and valid are combined to one big training set remaining fold is the 
+            # test set. Folds can be modified in pannyke.yml
             "phases":["train", "valid", "test"], # ["train", "valid", "test"] or ["train", "test"]
             
             # Use either patches written to hdf5 db or .npy files. One of ("npy", "hdf5")
@@ -65,7 +66,7 @@ CONFIG = OmegaConf.create(
             },
 
             "loss_args" : {
-                "edge_weight" : 1.1,
+                "edge_weight" : 1.1, # How much weight is applied to nuclei borders  
             },
         },
         

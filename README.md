@@ -8,18 +8,20 @@ Borrowing a lot of methods from HoVer-Net [repo](https://github.com/vqdang/hover
 2. cd to the repository `cd <path>/Dippa/`
 3. Create environment (optional but recommended) 
 ```
-conda create --name Dippa python=3.6
+conda create --name DippaEnv python=3.6
 conda activate Dippa
 ```
-Or 
+or 
 
 ```
-venv stuff
+python3 -m venv DippaEnv
+source DippaEnv/bin/activate
+pip install -U pip
 ```
 
 4. Install dependencies 
 ```
-pip3 -r requirements.txt
+pip install -r requirements.txt
 ```
 
 ##  Instructions for running the experiments
