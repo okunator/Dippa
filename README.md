@@ -35,7 +35,7 @@ pip3 -r requirements.txt
 ## Instructions for downloading the datasets
 1. Download the datsets from the links below
 2. Move the downloaded zips or extract the zips to the corresponding folders in `datasets/`
-3. Move to `Part 2` in the instructions above
+3. Move to **Part 2** in the instructions above
 
 #### Data download links:
 1. **kumar**  
