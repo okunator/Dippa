@@ -53,6 +53,7 @@ pip3 -r requirements.txt
     - `datasets/` Location for the raw and processed datasets after downloading and running `src/convert.py`
     - `notebooks/` Notebooks for running the codes instead of running the pyton scripts 
     - `patches/` Location for the patched datasets after running `src/write_patches.py`
+    - `results/` Location for the results from training and inference
     - `src/` 
         - `conf/`
             - `config_schema.py` dataclasses defining the config file schema in this project
