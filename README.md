@@ -17,10 +17,11 @@ Or
 venv stuff
 ```
 
-4. Install dependencies `pip3 -r requirements.txt`
+4. Install dependencies 
+```pip3 -r requirements.txt```
 
 
-# Instructions for running the codes
+##  Instructions for running the experiments
 1. Download the data
 2. Run notebooks or the runner scripts
 
