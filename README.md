@@ -18,7 +18,9 @@ venv stuff
 ```
 
 4. Install dependencies 
-```pip3 -r requirements.txt```
+```
+pip3 -r requirements.txt
+```
 
 
 ##  Instructions for running the experiments
