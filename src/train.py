@@ -6,12 +6,11 @@ from tensorboard import program
 from pytorch_lightning import Trainer
 from pytorch_lightning.logging import TestTubeLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-from omegaconf import OmegaConf 
-from src.conf.conf_schema import Schema
-from src.conf.config import CONFIG
 from src.dl.lightning_model import SegModel
+from src.settings import RESULT_DIR
+from src.conf.config import CONFIG
 
-config = OmegaConf.merge(Schema, CONFIG)
+config = CONFIG
 
 
 def main(config, params):
@@ -21,10 +20,11 @@ def main(config, params):
         encoder_name="resnext50_32x4d", 
         classes=2
     )
-    lightning_model = SegModel.from_conf(model, config)
+    lightning_model = SegModel.from_conf(model, config
+                                         
     # Define lightning logger
     tt_logger = TestTubeLogger(
-        save_dir=config.experiment_args.experiment_root_dir,
+        save_dir=RESULT_DIR,
         name=config.experiment_args.model_name,
         version=config.experiment_args.experiment_version
     )

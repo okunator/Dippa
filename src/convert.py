@@ -1,10 +1,7 @@
-from omegaconf import OmegaConf 
-from src.conf.conf_schema import Schema
 from src.conf.config import CONFIG
 from src.utils.file_manager import ProjectFileManager
 
-config = OmegaConf.merge(Schema, CONFIG)
-
+config = CONFIG
 
 def main(config):
     config.dataset_args.dataset = "kumar"

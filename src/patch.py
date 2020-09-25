@@ -1,9 +1,7 @@
-from omegaconf import OmegaConf 
-from src.conf.conf_schema import Schema
 from src.conf.config import CONFIG
 from src.utils.data_writer import PatchWriter, visualize_db_patches
 
-config = OmegaConf.merge(Schema, CONFIG)
+config = CONFIG
 
 
 def main(config):
