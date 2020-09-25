@@ -95,6 +95,9 @@ class ProjectFileManager:
     
     @property
     def data_dirs(self) -> Dict:
+        assert Path(DATA_DIR / self.dataset).exists(), (
+            f"The folder {Path(DATA_DIR / self.dataset)} for the dataset {self.dataset} does not exist"
+        )
         return {
             "raw_data_dir":Path(DATA_DIR / self.dataset),
             "train_im":Path(DATA_DIR / self.dataset / "train" / "images"),
