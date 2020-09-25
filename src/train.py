@@ -6,7 +6,7 @@ from tensorboard import program
 from pytorch_lightning import Trainer
 from pytorch_lightning.logging import TestTubeLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-from src.dl.lightning_model import SegModel
+from src.dl.lightning_model import SegModel, plot_metrics
 from src.settings import RESULT_DIR
 from src.conf.config import CONFIG
 
@@ -20,7 +20,7 @@ def main(config, params):
         encoder_name="resnext50_32x4d", 
         classes=2
     )
-    lightning_model = SegModel.from_conf(model, config
+    lightning_model = SegModel.from_conf(model, config)
                                          
     # Define lightning logger
     tt_logger = TestTubeLogger(
@@ -57,7 +57,7 @@ def main(config, params):
             checkpoint_callback=checkpoint_callback,
             resume_from_checkpoint=str(last_checkpoint_path),
             profiler=True,
-            show_progress_bar=False
+            progress_bar_refresh_rate=0
         )
 
     else:
@@ -68,7 +68,7 @@ def main(config, params):
             logger=tt_logger,
             checkpoint_callback=checkpoint_callback,
             profiler=True,
-            show_progress_bar=False
+            progress_bar_refresh_rate=0
         )
     
     # Launch tensorboard. Dunno if this even works

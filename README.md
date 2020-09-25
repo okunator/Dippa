@@ -23,7 +23,7 @@ pip install -U pip
 pip install -r requirements.txt
 ```
 
-**Note**: dl framework is PyTorch (torch==1.6.0) which expects cuda 10.2. If you want to use the repo with another version of cuda (10.1 or 9.2) install torch with the installation command found here: https://pytorch.org/ 
+**Note**: dl framework is PyTorch (torch==1.4.0) which expects cuda 10.1. If you want to use the repo with other version of torch and cuda, just follow the installation details at https://pytorch.org/. At least 1.6.0 with cuda 10.1 worked ok. 
 
 
 ##  Instructions for running the experiments

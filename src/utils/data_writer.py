@@ -50,7 +50,6 @@ class PatchWriter(ProjectFileManager):
         )
 
 
-        
     @classmethod
     def from_conf(cls, conf: DictConfig):
         dataset_args = conf.dataset_args

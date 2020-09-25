@@ -497,7 +497,9 @@ class ProjectFileManager:
                                   
         """        
         root = Path(self.data_dirs["raw_data_dir"])
-        assert any(p.iterdir()), f"The directory: {root} is empty. Move the raw data there first and repeat."
+        assert any(root.iterdir()), (
+            f"The directory: {root} is empty. Move the raw data there first and repeat."
+        )
         assert not all((root.joinpath("train").exists(),  root.joinpath("test").exists())), (
             "test and training directories already exists. To run this again, remove the files "
             f"and folders from: {raw_root} and repeat the steps in the instructions."

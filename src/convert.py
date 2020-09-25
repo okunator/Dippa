@@ -16,7 +16,7 @@ def main(config):
     
     config.dataset_args.dataset = "pannuke"
     fm_pannuke = ProjectFileManager.from_conf(config)
-    print("Converting kumar dataset")
+    print("Converting pannuke dataset")
     fm_pannuke.handle_raw_data(rm_zips=False, overlays=True)
 
 
