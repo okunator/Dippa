@@ -12,13 +12,14 @@ from src.img_processing.viz_utils import draw_contours
 from src.settings import DATA_DIR, CONF_DIR
 
 
+# This slipped to spaghetti...
 class ProjectFileManager:
     def __init__(self,
                  dataset_args: DictConfig,
                  experiment_args: DictConfig,
                  **kwargs) -> None:
         """
-        This class is used for managing the files and folders needed in this project. 
+        A class for managing the files and folders needed in this project.
         
             Args:
                 dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
@@ -31,7 +32,7 @@ class ProjectFileManager:
         super().__init__(**kwargs)
         self.dsargs = dataset_args
         self.exargs = experiment_args
-        
+    
     
     @classmethod
     def from_conf(cls, conf: DictConfig):
@@ -200,8 +201,9 @@ class ProjectFileManager:
                 path_dict[size] = path
             return path_dict
                     
-        assert self.database_dir.exists(), ("Database directory not found, Create " 
-                                            "the dbs first. Check instructions.")
+        assert self.database_dir.exists(), (
+            f"Database dir: {self.database_dir} not found, Create the dbs first. Check instructions."
+        )
             
         if "valid" in self.phases:
             train_dbs = list(self.database_dir.glob("*_train_*"))
@@ -256,7 +258,6 @@ class ProjectFileManager:
                     if fold in Path(item).name:
                         phases[phase].append(item)
             return phases
-        
         
         if self.dataset == "pannuke":
             imgs = split_pannuke(train_imgs)

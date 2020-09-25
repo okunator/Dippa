@@ -5,7 +5,6 @@ import scipy.io
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import sklearn.feature_extraction.image
 from pathlib import Path
 from typing import List, Dict
 from omegaconf import DictConfig
@@ -22,7 +21,7 @@ class PatchWriter(ProjectFileManager):
                  patching_args: DictConfig,
                  **kwargs: Dict,) -> None:
         """
-        This class is used to patch input images and to write them to either hdf5 tables
+        A class to patch input images and to write them to either hdf5 tables
         or .npy files that are are used in the training of the networks used in this project. 
         The torch dataset class is written to read from the files created by this class.
         
@@ -77,26 +76,7 @@ class PatchWriter(ProjectFileManager):
             f"height or width of given imgs is < patch_size ({patch_size}). Check your image shapes."
         )
 
-        
-    def __extract_patches(self, io: np.ndarray) -> np.ndarray:
-        # OLD, USE HOVERNET PATCH EXTRACTOR INSTEAD
-        # add reflect padding 
-        mirror_pad = self.patch_size // 2
-        pad = (mirror_pad, mirror_pad)
-        io = np.pad(io, [pad, pad, (0, 0)], mode="reflect")
-        
-        # convert input image into overlapping tiles
-        # size is ntile_row x ntile_col x 1 x patch_size x patch_size x 3
-        io_arr = sklearn.feature_extraction.image.extract_patches(
-            io,
-            (self.patch_size, self.patch_size, 3),
-            self.stride_size
-        )
-        # resize it into a ntile_total x patch_size x patch_size x 3
-        io_arr = io_arr.reshape(-1, self.patch_size, self.patch_size, 3)
-        return io_arr
-    
-    
+            
     def __rigid_augs_and_crop(self, im: np.ndarray, mask: np.ndarray):
         """
         Do rigid augmentations and crop the patch to the size of the input_size.

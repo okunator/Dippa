@@ -16,4 +16,5 @@ albumentations==0.4.3
 pathos==0.2.6
 dataclasses==0.7
 ray==0.8.7
+test-tube==0.7.5
 -e ./

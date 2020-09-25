@@ -8,7 +8,7 @@ CONFIG = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"Unet",
-            "experiment_version":"test_pannuke_unet2",
+            "experiment_version":"test_pannuke_unet5",
         },
         
         # General dataset constants and args

@@ -32,7 +32,7 @@ from src.metrics.metrics import (
     PQ, AJI, AJI_plus, DICE2, split_and_merge
 )
 
-
+# Got spaghetti?
 class Inferer(ProjectFileManager):
     def __init__(self, 
                  model: nn.Module,
@@ -394,11 +394,7 @@ class Inferer(ProjectFileManager):
         preds = [(self.soft_maps[key], self.thresh) 
                  for key in self.soft_maps.keys() 
                  if key.endswith("nuc_map")]
-        
-        #segs = []
-        #for pred, thresh in preds:
-        #    segs.append(self._post_process_pipeline(pred, thresh))
-        
+                
         # pickling issues in ProcessPool with typing, hard to fix.. Using ThreadPool instead        
         with Pool() as pool:
             segs = pool.starmap(self._post_process_pipeline, preds)
@@ -419,10 +415,6 @@ class Inferer(ProjectFileManager):
         gts = [self.read_mask(f) for f in self.gt_masks]
         params_list = list(zip(gts, inst_maps))
         
-        #metrics = []
-        #for true, pred in params_list:
-        #    metrics.append(self._compute_metrics(true, pred))
-
         with Pool() as pool:
             metrics = pool.starmap(self._compute_metrics, params_list)
         
