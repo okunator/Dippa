@@ -41,6 +41,8 @@ CONFIG = OmegaConf.create(
         # input size to the network like in hovernet. You'll get more training data by selecting
         # small enough stride size. Training will get slower though...
         "patching_args":{
+            "batch_size":6,
+            "model_input_size":256,
             "patch_size":512, # Size of an image patch that gets written to hdf5 db
             "stride_size":80, # Size of window stride
             "crop_to_input":True,
@@ -49,6 +51,8 @@ CONFIG = OmegaConf.create(
     
         # Model training args
         "training_args": {
+            "batch_size":6,
+            "model_input_size":256,
             "tta":False, # use test time augmentation during training. Note: very slow w ttatch
             "resume_training":False, # continue training where you left off?
             "num_epochs":7,
@@ -72,6 +76,8 @@ CONFIG = OmegaConf.create(
         
         # Inference args
         "inference_args" : {
+            "batch_size":6,
+            "model_input_size":256,
             "smoothen":False, # Inference time slightly slower. Gets rid of checkerboard. May lower PQ.
             "data_fold":"test", # what data fold (phase) to use in inference
             "tta":False, # Inference time slightly slower

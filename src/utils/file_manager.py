@@ -9,7 +9,7 @@ from omegaconf import DictConfig, OmegaConf
 from distutils import dir_util, file_util
 from sklearn.model_selection import train_test_split
 from src.img_processing.viz_utils import draw_contours
-from src.settings import DATA_DIR, CONF_DIR
+from src.settings import DATA_DIR, CONF_DIR, PATCH_DIR, RESULT_DIR
 
 
 # This slipped to spaghetti...
@@ -82,10 +82,9 @@ class ProjectFileManager:
         
     @property
     def experiment_dir(self) -> Path:
-        ex_root = self.exargs.experiment_root_dir
         ex_version = self.exargs.experiment_version
         model_name = self.exargs.model_name
-        return Path(ex_root).joinpath(f"{model_name}/version_{ex_version}")
+        return RESULT_DIR.joinpath(f"{model_name}/version_{ex_version}")
     
     
     @property
@@ -111,7 +110,7 @@ class ProjectFileManager:
     @property
     def database_dir(self) -> Path:
         assert self.dsargs.patches_dtype in ("npy", "hdf5"), f"{self.dsargs.patches_dtype}"
-        return Path(self.dsargs[f"{self.dsargs.patches_dtype}_patches_root_dir"]).joinpath(f"{self.dataset}")
+        return Path(PATCH_DIR / self.dsargs.patches_dtype / self.dataset)
     
     
     @property

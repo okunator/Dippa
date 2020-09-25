@@ -1,7 +1,6 @@
 # Dippa
 Benchmarking of deep learning and other segmentation methods for H&amp;E images  
 Borrowing a lot of methods from HoVer-Net [repo](https://github.com/vqdang/hover_net): and methodology from HoVer-Net paper [2]  
-**Note**: dl framework is PyTorch (torch==1.6.0) which expects cuda 10.2. If you want to use the repo with another version of cuda (10.1 or 9.2) install torch with the installation command found here: https://pytorch.org/ 
 
 ## Set Up
 1. Clone the repository
@@ -23,6 +22,9 @@ pip install -U pip
 ```
 pip install -r requirements.txt
 ```
+
+**Note**: dl framework is PyTorch (torch==1.6.0) which expects cuda 10.2. If you want to use the repo with another version of cuda (10.1 or 9.2) install torch with the installation command found here: https://pytorch.org/ 
+
 
 ##  Instructions for running the experiments
 1. Download the data.
@@ -58,7 +60,6 @@ pip install -r requirements.txt
     - `results/` Location for the results from training and inference
     - `src/` 
         - `conf/`
-            - `config_schema.py` dataclasses defining the config file schema in this project
             - `config.py` THE CONFIG FILE TO MODIFY FOR DIFFERENT EXPERIMENTS
             - `consep.yml` data related to consep dataset
             - `cpm.yml` data related to cpm dataset TODO

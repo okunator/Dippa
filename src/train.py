@@ -21,8 +21,7 @@ def main(config, params):
         encoder_name="resnext50_32x4d", 
         classes=2
     )
-    
-    print(torch.cuda.is_available())
+    lightning_model = SegModel.from_conf(model, config)
     # Define lightning logger
     tt_logger = TestTubeLogger(
         save_dir=config.experiment_args.experiment_root_dir,
@@ -58,6 +57,7 @@ def main(config, params):
             checkpoint_callback=checkpoint_callback,
             resume_from_checkpoint=str(last_checkpoint_path),
             profiler=True,
+            show_progress_bar=False
         )
 
     else:
@@ -68,10 +68,11 @@ def main(config, params):
             logger=tt_logger,
             checkpoint_callback=checkpoint_callback,
             profiler=True,
+            show_progress_bar=False
         )
     
     # Launch tensorboard. Dunno if this even works
-    if parser.tensorboard:
+    if params.tensorboard:
         log_dir = (
             Path(tt_logger.save_dir)
             / tt_logger.experiment.name
@@ -80,13 +81,14 @@ def main(config, params):
         )
 
         tb = program.TensorBoard()
-        tb.configure(argv=[None, '--logdir', log_dir])
+        tb.configure(argv=[None, '--logdir', log_dir.as_posix()])
         url = tb.launch()
     
     # find the batch size automatically
-    if params.auto_batch_size:
-        new_batch_size = trainer.scale_batch_size(lightning_model)
-        lightning_model.batch_size = new_batch_size
+    # skip this for now since a hard-to-get-rid-off pickling error
+    # if params.auto_bs:
+    #     new_batch_size = trainer.scale_batch_size(lightning_model)
+    #     lightning_model.batch_size = new_batch_size
         
     trainer.fit(lightning_model)
 
@@ -108,12 +110,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', help="specify the model you want to use", default=0)
     parser.add_argument('--tensorboard', help="Use tensorboard", default=True)
-    parser.add_argument('--auto_bs', help="Find a batch size that fits to mem automagically", default=True)
+    parser.add_argument('--auto_bs', help="Find a batch size that fits to mem automagically", default=False)
     parser.add_argument('--plots', help="Save the metrics plots from training", default=True)
     parser.add_argument('--test', help="Run model on test set and report training metrics", default=True)
-    
-    params = parser.parse_args()
-    main(config, params)
+    args = parser.parse_args()
+    main(config, args)
     
     
     
