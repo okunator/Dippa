@@ -21,7 +21,11 @@ def main(config, params):
     
     inf = Inferer.from_conf(lightning_model, config)
     infobj = inf.run()
+    
+    print("Running post-processing")
     inf.post_process()
+    
+    print("Running benchmarks")
     score_df = inf.benchmark(save=True)
     inf.plot_overlays(ixs=[12], save=True)
     

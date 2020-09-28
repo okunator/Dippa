@@ -8,7 +8,7 @@ Borrowing a lot of methods from HoVer-Net [repo](https://github.com/vqdang/hover
 3. Create environment (optional but recommended) 
 ```
 conda create --name DippaEnv python=3.6
-conda activate Dippa
+conda activate DippaEnv
 ```
 or 
 
