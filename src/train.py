@@ -13,20 +13,20 @@ from src.conf.config import CONFIG
 config = CONFIG
 
 
-def main(config, params):
+def main(conf, params):
     # TODO: model builder from arg
     # Use this for testing now
     model = smp.Unet(
         encoder_name="resnext50_32x4d", 
         classes=2
     )
-    lightning_model = SegModel.from_conf(model, config)
+    lightning_model = SegModel.from_conf(model, conf)
                                          
     # Define lightning logger
     tt_logger = TestTubeLogger(
         save_dir=RESULT_DIR,
-        name=config.experiment_args.model_name,
-        version=config.experiment_args.experiment_version
+        name=conf.experiment_args.model_name,
+        version=conf.experiment_args.experiment_version
     )
 
     checkpoint_dir = (
@@ -47,12 +47,12 @@ def main(config, params):
     )
 
     # Resume training?
-    if config.training_args.resume_training:   
+    if conf.training_args.resume_training:   
         last_checkpoint_path = lightning_model.fm.model_checkpoint("last")
         trainer = Trainer(
-            default_root_dir=config.experiment_args.experiment_root_dir,
-            max_epochs=config.training_args.num_epochs, 
-            gpus=config.training_args.num_gpus,  
+            default_root_dir=conf.experiment_args.experiment_root_dir,
+            max_epochs=conf.training_args.num_epochs, 
+            gpus=conf.training_args.num_gpus,  
             logger=tt_logger,
             checkpoint_callback=checkpoint_callback,
             resume_from_checkpoint=str(last_checkpoint_path),
@@ -62,9 +62,9 @@ def main(config, params):
 
     else:
         trainer = Trainer(
-            default_root_dir=config.experiment_args.experiment_root_dir,
-            max_epochs=config.training_args.num_epochs, 
-            gpus=config.training_args.num_gpus,  
+            default_root_dir=conf.experiment_args.experiment_root_dir,
+            max_epochs=conf.training_args.num_epochs, 
+            gpus=conf.training_args.num_gpus,  
             logger=tt_logger,
             checkpoint_callback=checkpoint_callback,
             profiler=True,
@@ -93,10 +93,10 @@ def main(config, params):
     trainer.fit(lightning_model)
 
     if params.plots:
-        plot_metrics(conf=config, metric='accuracy', scale='linear', save=True)
-        plot_metrics(conf=config, metric='loss', scale='linear', save=True)
-        plot_metrics(conf=config, metric='TNR', scale='linear', save=True)
-        plot_metrics(conf=config, metric='TPR', scale='linear', save=True)
+        plot_metrics(conf=conf, metric='accuracy', scale='linear', save=True)
+        plot_metrics(conf=conf, metric='loss', scale='linear', save=True)
+        plot_metrics(conf=conf, metric='TNR', scale='linear', save=True)
+        plot_metrics(conf=conf, metric='TPR', scale='linear', save=True)
 
     
     if params.test:

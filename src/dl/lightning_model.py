@@ -53,16 +53,16 @@ class SegModel(pl.LightningModule):
         super(SegModel, self).__init__()
         
         # Hyperparams
-        self.model = tta.SegmentationTTAWrapper(model, tta_transforms()) if training_args.tta else model
-        self.batch_size = training_args.batch_size
-        self.input_size = training_args.model_input_size
-        self.edge_weight = training_args.loss_args.edge_weight  
-        self.lr = training_args.optimizer_args.lr
-        self.encoder_lr = training_args.optimizer_args.encoder_lr
-        self.weight_decay = training_args.optimizer_args.weight_decay
-        self.encoder_weight_decay = training_args.optimizer_args.encoder_weight_decay
-        self.factor = training_args.scheduler_args.factor
-        self.patience = training_args.scheduler_args.patience
+        self.model = tta.SegmentationTTAWrapper(model, tta_transforms()) if training_args["tta"] else model
+        self.batch_size = training_args["batch_size"]
+        self.input_size = training_args["model_input_size"]
+        self.edge_weight = training_args["edge_weight"]  
+        self.lr = training_args["lr"]
+        self.encoder_lr = training_args["encoder_lr"]
+        self.weight_decay = training_args["weight_decay"]
+        self.encoder_weight_decay = training_args["encoder_weight_decay"]
+        self.factor = training_args["factor"]
+        self.patience = training_args["patience"]
         self.save_hyperparameters()
         
         # Loss criterion

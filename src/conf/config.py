@@ -8,7 +8,7 @@ CONFIG = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"Unet",
-            "experiment_version":"test_pannuke_unet5",
+            "experiment_version":"test_pannuke_unet_pbt6",
         },
         
         # General dataset constants and args
@@ -55,23 +55,22 @@ CONFIG = OmegaConf.create(
             "model_input_size":256,
             "tta":False, # use test time augmentation during training. Note: very slow w ttatch
             "resume_training":False, # continue training where you left off?
-            "num_epochs":7,
+            "num_epochs":2,
             "num_gpus":1,
-            "optimizer_args":{
-                "lr":0.001,
-                "encoder_lr":0.0005,
-                "weight_decay":0.0003,
-                "encoder_weight_decay":0.00003,
-            },
-
-            "scheduler_args": {
-                "factor":0.25,
-                "patience":2,
-            },
-
-            "loss_args" : {
-                "edge_weight" : 1.1, # How much weight is applied to nuclei borders  
-            },
+            
+            # optimizer args
+            "lr":0.001,
+            "encoder_lr":0.0005,
+            "weight_decay":0.0003,
+            "encoder_weight_decay":0.00003,
+            
+            #scheduler args
+            "factor":0.25,
+            "patience":2,
+            
+            # loss args
+            "edge_weight" : 1.0, # How much weight is applied to nuclei borders  
+            
         },
         
         # Inference args

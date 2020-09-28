@@ -1,38 +1,57 @@
+import torch
+import segmentation_models_pytorch as smp
+from functools import partial
+from pathlib import Path
+from typing import Dict
+from omegaconf import DictConfig
+from pytorch_lightning import Trainer
+from pytorch_lightning.logging import TestTubeLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import Callback
+from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.utilities.cloud_io import load as pl_load
 from ray import tune
+from ray.tune import CLIReporter, JupyterNotebookReporter, ExperimentAnalysis
+from ray.tune.schedulers import PopulationBasedTraining
+
+from src.dl.lightning_model import SegModel
+from src.settings import RESULT_DIR
 
 
 class TuneReportCallback(Callback):
     def on_validation_end(self, trainer, pl_module):
         tune.report(
-            loss=trainer.callback_metrics["avg_val_loss"].item(),
-            mean_accuracy=trainer.callback_metrics["avg_val_accuracy"].item())
+            avg_val_loss=trainer.callback_metrics["avg_val_loss"].item(),
+            avg_val_accuracy=trainer.callback_metrics["avg_val_accuracy"].item()
+        )
 
 
 class CheckpointCallback(Callback):
     def on_validation_end(self, trainer, pl_module):
         with tune.checkpoint_dir(step=trainer.global_step) as checkpoint_dir:
-            trainer.save_checkpoint(os.path.join(checkpoint_dir, "checkpoint"))            
+            print("brrr: ", Path(checkpoint_dir).joinpath("checkpoint"))
+            trainer.save_checkpoint(Path(checkpoint_dir).joinpath("checkpoint"))            
             
             
-def train_tune_checkpoint(
-    training_args,
-    dataset_args,
-    experiment_args,
-    checkpoint_dir=None,
-    num_epochs=10,
-    num_gpus=0):
+def train_tune_checkpoint(training_args: Dict,
+                          dataset_args: DictConfig,
+                          experiment_args: DictConfig,
+                          checkpoint_dir: str = None,
+                          num_epochs: int = 10,
+                          num_gpus: int = 1) -> None:
     
     tt_logger = TestTubeLogger(
-        save_dir=tune.get_trial_dir(),
-        name=config.experiment_args.model_name,
-        version=config.experiment_args.experiment_version
+        save_dir=RESULT_DIR,
+        name=experiment_args.model_name,
+        version=experiment_args.experiment_version
     )
     
+    print("trial_dir: ", tune.get_trial_dir())
     trainer = Trainer(
-        default_root_dir=config.experiment_args.experiment_root_dir,
-        max_epochs=config.training_args.num_epochs,
-        gpus=config.training_args.num_gpus,  
+        max_epochs=num_epochs,
+        gpus=num_gpus,  
         logger=tt_logger,
+        #logger=TensorBoardLogger(save_dir=tune.get_trial_dir(), name="", version="."),
         progress_bar_refresh_rate=0,
         callbacks=[CheckpointCallback(), TuneReportCallback()],
         profiler=True
@@ -47,14 +66,15 @@ def train_tune_checkpoint(
         
         pl_model = SegModel(
             base_model, 
-            config.dataset_args,
-            config.experiment_args,
-            config.training_args
+            dataset_args,
+            experiment_args,
+            training_args
         )
         
         # get the ckpt
+        print("chekpoint_dir: ", checkpoint_dir)
         checkpoint = pl_load(checkpoint_dir, map_location=lambda storage, loc: storage)
-        #checkpoint = torch.load(checkpoint_dir, map_location = lambda storage, loc : storage)
+        print("checkpoint: ", checkpoint)
         pl_model.load_state_dict(checkpoint['state_dict'])
         trainer.current_epoch = checkpoint["epoch"]
     else:
@@ -65,55 +85,62 @@ def train_tune_checkpoint(
         
         pl_model = SegModel(
             base_model, 
-            config.dataset_args,
-            config.experiment_args,
-            config.training_args
+            dataset_args,
+            experiment_args,
+            training_args
         )
-
-
+    
+    print("global step: ", trainer.global_step)
     trainer.fit(pl_model)
     
     
-def tune_pbt(
-    config, 
-    num_samples=10, 
-    num_epochs=10, 
-    gpus_per_trial=1) -> None:
+def tune_pbt(conf: DictConfig, 
+             num_samples: int = 10, 
+             num_epochs: int = 10, 
+             gpus_per_trial: int = 1,
+             notebook=False) -> ExperimentAnalysis:
     
-    train_config = {
-        "edge_weight":1,
-        "lr": 1e-3,
-        "batch_size": 6,
-    }
-
+    mn = conf.experiment_args.model_name
+    ev = conf.experiment_args.experiment_version
+    
     scheduler = PopulationBasedTraining(
         time_attr="training_iteration",
-        metric="loss",
+        metric="avg_val_loss",
         mode="min",
-        perturbation_interval=4,
+        perturbation_interval=1,
         hyperparam_mutations={
             "lr": lambda: tune.loguniform(1e-4, 1e-1).func(None),
             "batch_size": [4, 8, 16],
             "edge_weight":[1.1, 1.2, 1.5, 2]
         })
 
-    reporter = CLIReporter(
-        parameter_columns=["edge_weight", "lr", "batch_size"],
-        metric_columns=["loss", "mean_accuracy", "training_iteration"]
-    )
+    if notebook:
+        reporter = JupyterNotebookReporter(
+            overwrite=True,
+            parameter_columns=["edge_weight", "lr", "batch_size"],
+            metric_columns=["avg_val_loss", "avg_val_accuracy", "training_iteration"]
+        )
+    else:
+        reporter = CLIReporter(
+            parameter_columns=["edge_weight", "lr", "batch_size"],
+            metric_columns=["avg_val_loss", "avg_val_accuracy", "training_iteration"]
+        )
 
-    tune.run(
+    analysis = tune.run(
         partial(
             train_tune_checkpoint,
-            dataset_args=config.dataset_args,
-            experiment_args=config.experiment_args,
+            dataset_args=conf.dataset_args,
+            experiment_args=conf.experiment_args,
             num_epochs=num_epochs,
             num_gpus=gpus_per_trial
         ),
         resources_per_trial={"cpu": 1, "gpu": gpus_per_trial},
-        config=train_config,
+        config=dict(conf.training_args),
         num_samples=num_samples,
         scheduler=scheduler,
         progress_reporter=reporter,
-        name="tune_pbt"
+        name="tune_pbt",
+        local_dir=str(Path(RESULT_DIR / mn / f"version_{ev}"))
     )
+    
+    return analysis

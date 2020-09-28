@@ -434,7 +434,9 @@ class Inferer(ProjectFileManager):
         if save:
             result_dir = Path(self.experiment_dir / "benchmark_results")
             self.create_dir(result_dir)
-            score_df.to_csv(Path(result_dir / "benchmark_result.csv"))
+            s = "smoothed" if self.smoothed else ""
+            t = "tta" if self.tta else ""
+            score_df.to_csv(Path(result_dir / f"{s}_{t}_benchmark_result.csv"))
         
         return score_df
     
@@ -563,5 +565,8 @@ class Inferer(ProjectFileManager):
         if save:
             plot_dir = Path(self.experiment_dir / "inference_plots")
             self.create_dir(plot_dir)
-            fig.savefig(Path(plot_dir / f"{fn}_result.png"))
+            
+            s = "smoothed" if self.smoothed else ""
+            t = "tta" if self.tta else ""
+            fig.savefig(Path(plot_dir / f"{fn}_{t}_{s}result.png"))
 

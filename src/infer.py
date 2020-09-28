@@ -8,18 +8,18 @@ from src.dl.lightning_model import SegModel
 
 config = CONFIG
 
-def main(config, params):
+def main(conf, params):
     model = smp.Unet(
         encoder_name="resnext50_32x4d", 
         classes=2
     )
 
-    lightning_model = SegModel.from_conf(model, config)
-    ckpt = lightning_model.fm.model_checkpoint(config.inference_args.model_weights)
+    lightning_model = SegModel.from_conf(model, conf)
+    ckpt = lightning_model.fm.model_checkpoint(conf.inference_args.model_weights)
     checkpoint = torch.load(ckpt, map_location = lambda storage, loc : storage)
     lightning_model.load_state_dict(checkpoint['state_dict'], strict=False)
     
-    inf = Inferer.from_conf(lightning_model, config)
+    inf = Inferer.from_conf(lightning_model, conf)
     infobj = inf.run()
     
     print("Running post-processing")
