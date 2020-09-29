@@ -136,10 +136,10 @@ class SegModel(pl.LightningModule):
         return self.model(x)
     
     
-    def training_step(self, train_batch, batch_idx) :
-        x = train_batch["image"]
-        y = train_batch["mask"]
-        y_weight = train_batch["mask_weight"]
+    def step(self, batch, batch_idx):
+        x = batch["image"]
+        y = batch["mask"]
+        y_weight = batch["mask_weight"]
 
         x = x.float()
         y_weight = y_weight.float()
@@ -149,85 +149,68 @@ class SegModel(pl.LightningModule):
         loss_matrix = self.CE(yhat, y)
         loss = (loss_matrix * (self.edge_weight**y_weight)).mean()
         TNR, TPR, accuracy = self.__compute_metrics(yhat, y)
-
-        logs = {
-            "train_loss": loss,
-            "train_accuracy":accuracy
-        }
         
         return {
             "loss":loss,
-            "train_accuracy":accuracy, 
-            "TNR":TNR, 
-            "TPR":TPR, 
+            "accuracy":accuracy,
+            "TNR":TNR,
+            "TPR":TPR
+        }
+    
+    
+    def training_step(self, train_batch, batch_idx) :        
+        z = self.step(train_batch, batch_idx)
+
+        logs = {
+            "train_loss": z["loss"],
+            "train_accuracy":z["accuracy"]
+        }
+        
+        return {
+            "loss": z["loss"],
+            "train_accuracy": z["accuracy"], 
+            "TNR":z["TNR"], 
+            "TPR":z["TPR"], 
             "log":logs, 
-            "progress_bar": {"train_loss": loss}
+            "progress_bar": {"train_loss": z["loss"]}
         }
     
     
     def validation_step(self, val_batch, batch_idx):
-        x = val_batch["image"]
-        y = val_batch["mask"]
-        y_weight = val_batch["mask_weight"]
+        z = self.step(val_batch, batch_idx)
 
-        x = x.float()
-        y_weight = y_weight.float()
-        y = y.long()
-        
-        # Compute loss
-        yhat = self.forward(x)
-        loss_matrix = self.CE(yhat, y)        
-        loss = (loss_matrix * (self.edge_weight**y_weight)).mean()
-        
-        # Compute confusion matrix for accuracy
-        TNR, TPR, accuracy = self.__compute_metrics(yhat, y)
-        
         logs = {
-            "val_loss": loss, 
-            "val_accuracy":accuracy
+            "val_loss": z["loss"],
+            "val_accuracy":z["accuracy"]
         }
         
         return {
-            "val_loss": loss, 
-            "val_accuracy":accuracy, 
-            "TNR":TNR, 
-            "TPR":TPR, 
+            "val_loss": z["loss"],
+            "val_accuracy": z["accuracy"], 
+            "TNR":z["TNR"], 
+            "TPR":z["TPR"], 
             "log":logs, 
-            "progress_bar": {"val_loss": loss}
+            "progress_bar": {"val_loss": z["loss"]}
         }
-    
+        
     
     def test_step(self, test_batch, batch_idx):
-        x = test_batch["image"]
-        y = test_batch["mask"]
-        y_weight = test_batch["mask_weight"]
+        z = self.step(test_batch, batch_idx)
 
-        x = x.float()
-        y_weight = y_weight.float()
-        y = y.long()
-        
-        # Compute loss
-        yhat = self.forward(x)
-        loss_matrix = self.CE(yhat, y)        
-        loss = (loss_matrix * (self.edge_weight**y_weight)).mean()
-        
-        # Compute confusion matrix for accuracy
-        TNR, TPR, accuracy = self.__compute_metrics(yhat, y)
-        
         logs = {
-            "test_loss": loss, 
-            "test_accuracy":accuracy
+            "test_loss": z["loss"],
+            "test_accuracy":z["accuracy"]
         }
         
         return {
-            "test_loss": loss, 
-            "test_accuracy":accuracy, 
-            "TNR":TNR, 
-            "TPR":TPR, 
+            "test_loss": z["loss"],
+            "test_accuracy": z["accuracy"], 
+            "TNR":z["TNR"], 
+            "TPR":z["TPR"], 
             "log":logs, 
-            "progress_bar": {"test_loss": loss}
+            "progress_bar": {"test_loss": z["loss"]}
         }
-    
+        
     
     def validation_epoch_end(self, outputs):
         accuracy = torch.stack([x["val_accuracy"] for x in outputs]).mean()
