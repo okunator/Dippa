@@ -524,9 +524,11 @@ class Inferer(ProjectFileManager):
         """
         assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
         
-        message = (f"param ixs: ({ixs}) needs to be a list of ints in"
-                   " the range of number of images in total or -1."
-                   f" number of images = {len(self.images)}")
+        message = (
+            f"param ixs: ({ixs}) needs to be a list of ints in"
+            " the range of number of images in total or -1."
+            f" number of images = {len(self.images)}"
+        )
         
         if isinstance(ixs, List):
             assert all(i <= len(self.images) for i in ixs), message

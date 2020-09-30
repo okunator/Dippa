@@ -36,10 +36,11 @@ def train_tune_checkpoint(training_args: Dict,
                           experiment_args: DictConfig,
                           checkpoint_dir: Any = None,
                           num_epochs: int = 10,
-                          num_gpus: int = 1) -> None:
+                          num_gpus: int = 1,
+                          notebook: bool = False) -> None:
     
    #tt_logger = pl_loggers.TestTubeLogger(
-   #    save_dir=RESULT_DIR,
+   #    save_dir=tune.get_trial_dir(),
    #    name=experiment_args.model_name,
    #    version=experiment_args.experiment_version
    #)
@@ -49,12 +50,13 @@ def train_tune_checkpoint(training_args: Dict,
         name="", version="."
     )
     
+    pbrr = 1 if notebook else 0
     trainer = Trainer(
         max_epochs=num_epochs,
         gpus=num_gpus,  
         # logger=tt_logger,
         logger=tb_logger,
-        progress_bar_refresh_rate=0,
+        progress_bar_refresh_rate=pbrr,
         callbacks=[CheckpointCallback(), TuneReportCallback()],
         profiler=True
     )
@@ -74,16 +76,20 @@ def train_tune_checkpoint(training_args: Dict,
         )
         
         # workaround to get the ckpt file since tune fails this 
-        #trial_dir = Path(checkpoint_dir).parents[0]
-        #ckpt_dir = [d for d in trial_dir.iterdir() if d.is_dir() and "checkpoint_" in d.name][0]
-        #ckpt = list(ckpt_dir.glob("*.ckpt"))[0]
+        # The first checkpoints do not get _tmp... suffix in the folder
+        # where they are saved.
+
+        trial_dir = Path(checkpoint_dir).parents[0]
+        ckpt_dir = [d for d in trial_dir.iterdir() if d.is_dir() and "checkpoint_tmp" in d.name][0]
+        ckpt = list(ckpt_dir.glob("*.ckpt"))[0]
         
-        checkpoint = pl_load(, map_location=lambda storage, loc: storage)
-        #checkpoint = pl_load(ckpt.as_posix(), map_location=lambda storage, loc: storage)
+        # checkpoint = pl_load(checkpoint_dir, map_location=lambda storage, loc: storage)
+        checkpoint = pl_load(ckpt.as_posix(), map_location=lambda storage, loc: storage)
         
         # Load the model
         pl_model.load_state_dict(checkpoint['state_dict'])
         trainer.current_epoch = checkpoint["epoch"]
+        print(trainer.current_epoch)
     else:
         base_model = smp.Unet(
             encoder_name="resnext50_32x4d", 
@@ -138,7 +144,8 @@ def tune_pbt(conf: DictConfig,
             dataset_args=conf.dataset_args,
             experiment_args=conf.experiment_args,
             num_epochs=num_epochs,
-            num_gpus=gpus_per_trial
+            num_gpus=gpus_per_trial,
+            notebook=notebook
         ),
         resources_per_trial={"cpu": 1, "gpu": gpus_per_trial},
         config=dict(conf.training_args),
