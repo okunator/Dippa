@@ -14,7 +14,6 @@ from src.img_processing.process_utils import overlays
 from src.settings import DATA_DIR, CONF_DIR, PATCH_DIR, RESULT_DIR
 
 
-
 class FileHandler:
     """
     Class for handling different file formats that are needed in the project.
