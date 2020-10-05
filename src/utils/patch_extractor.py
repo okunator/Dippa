@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import sklearn.feature_extraction.image
 
 # Patch Extractor from hover-net repo
 # https://github.com/vqdang/hover_net/blob/master/src/misc/patch_extractor.py
@@ -113,6 +114,25 @@ class PatchExtractor:
         x = np.lib.pad(x, ((padt, padb), (padl, padr), (0, 0)), pad_type)
         sub_patches = self.__extract_valid(x)
         return sub_patches
+
+
+    def extract_test_patches(self, io, input_size):
+        # add extra padding to match an exact multiple of 32 patch size,
+        extra_pad_row = int(np.ceil(io.shape[0] / input_size)*input_size - io.shape[0])
+        extra_pad_col = int(np.ceil(io.shape[1] / input_size)*input_size - io.shape[1])
+        io = np.pad(io, [(0, extra_pad_row), (0, extra_pad_col),
+                        (0, 0)], mode="constant")
+
+        # extract the patches from input images
+        arr_out = sklearn.feature_extraction.image.extract_patches(
+            io, (input_size, input_size, io.shape[-1]), input_size
+        )
+
+        # shape the dimensions to correct sizes for pytorch model
+        patches_shape = arr_out.shape
+        test_patches = arr_out.reshape(-1, input_size, input_size, io.shape[-1])
+        return test_patches 
+
 
     def extract(self, x, patch_type):
         patch_type = patch_type.lower()

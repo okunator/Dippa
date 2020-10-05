@@ -1,14 +1,22 @@
+import numpy as np
 import math
 import random
 import colorsys
+from typing import List, Dict, Tuple
+from matplotlib import pyplot as plt
 from src.img_processing.process_utils import *
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
-def random_colors(N, bright=True):
+def random_colors(N: int, bright: bool = True) -> List[Tuple[float]]:
     """
     Generate random colors.
     To get visually distinct colors, generate them in HSV space then
     convert to RGB.
+    Args:
+        N (int): number of unique instances in the inst map
+        bright (bool): If True brightness is higher
+    Returns:
+        List of rgb color tuples
     """
     brightness = 1.0 if bright else 0.7
     hsv = [(i / N, 1, brightness) for i in range(N)]
@@ -19,9 +27,23 @@ def random_colors(N, bright=True):
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
 # minor mods
-def draw_contours(mask, image, type_map=None, fill_contours=False, thickness=2):
-    # Find contours for rgb mask to superimpose it the original image
-    # mask needs to be instance labelled
+def draw_contours(mask: np.ndarray, 
+                  image: np.ndarray,
+                  type_map: np.ndarray = None,
+                  fill_contours: bool = False,
+                  thickness: int = 2) -> Tuple[np.ndarray]:
+    """
+    Find contours for rgb mask to superimpose it the original image
+    mask needs to be instance labelled.
+    Args: 
+        mask (np.ndarray): inst_map
+        image (np.ndarray): image
+        type_map (np.ndarray): type_map
+        fill_contours (bool): If True, contours are filled
+        thickness (int): thickness ofthe contour line
+    Returns:
+        The background? and contours overlaid on top of original image.
+    """
     bg = np.full(mask.shape + (3,), 255, dtype=np.uint8)
     
     shape = mask.shape[:2]
@@ -70,3 +92,24 @@ def draw_contours(mask, image, type_map=None, fill_contours=False, thickness=2):
     image_overlayed = np.where(bg, image, 255)
 
     return bg, image_overlayed
+
+
+def viz_patches(patches: np.ndarray) -> Tuple[int]:
+    """
+    patches is assumed to be of shape (n_patches, H, W, n_channels)
+    """
+    fignum = 200
+    low=0
+    high=len(patches)
+
+    # Visualize
+    fig_patches = plt.figure(fignum, figsize=(35,35))
+    pmin, pmax = patches.min(), patches.max()
+    dims = np.ceil(np.sqrt(high - low))
+    for idx in range(high - low):
+        spl = plt.subplot(dims, dims, idx + 1)
+        ax = plt.axis("off")
+        imm = plt.imshow(patches[idx].astype("uint8"))
+        cl = plt.clim(pmin, pmax)
+    plt.show()
+    return patches.shape

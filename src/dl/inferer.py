@@ -326,7 +326,7 @@ class Inferer(ProjectFileManager):
             print("Clearing previous predictions")
             self.clear_predictions()
                     
-        for i, path in enumerate(self.images):
+        for path in self.images:
             fn = self.__get_fn(path)
             if self.verbose:
                 print(f"Prediction for: {fn}")

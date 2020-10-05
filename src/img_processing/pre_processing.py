@@ -107,19 +107,3 @@ def gen_unet_labels(img, wc=None):
     return img, wmap
 
 
-# ported from https://www.kaggle.com/kmader/normalizing-brightfield-stained-and-fluorescence
-def rgb_clahe(in_rgb_img, grid_size = 8): 
-    bgr = in_rgb_img[:,:,[2,1,0]] # flip r and b
-    lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(grid_size,grid_size))
-    lab[:,:,0] = clahe.apply(lab[:,:,0])
-    bgr = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
-    return bgr[:,:,[2,1,0]]
-
-
-# ported from https://www.kaggle.com/kmader/normalizing-brightfield-stained-and-fluorescence
-def rgb_clahe_justl(in_rgb_img, grid_size = 8): 
-    bgr = in_rgb_img[:,:,[2,1,0]] # flip r and b
-    lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(grid_size,grid_size))
-    return clahe.apply(lab[:,:,0])

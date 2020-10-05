@@ -18,8 +18,14 @@ from catalyst.contrib.tools.tensorboard import SummaryItem, SummaryReader
 from typing import List, Dict
 
 from src.utils.file_manager import ProjectFileManager
-from src.dl.datasets import BinarySegmentationDataset
-from src.img_processing.augmentations import *
+from src.dl.datasets import SegmentationDataset
+from src.dl.losses import JointCELoss
+
+from src.img_processing.augmentations import (
+    hue_saturation_transforms, non_rigid_transforms,
+    blur_transforms, random_crop, to_tensor, tta_transforms,
+    non_spatial_transforms, compose, no_transforms
+)
 
 
 class SegModel(pl.LightningModule):
@@ -65,10 +71,18 @@ class SegModel(pl.LightningModule):
         self.patience = training_args["patience"]
         self.save_hyperparameters()
         
-        # Loss criterion
-        self.CE = nn.CrossEntropyLoss(
-            ignore_index = -100,
-            reduction = "none"
+        # Loss criterion for nuclei pixels
+        self.inst_CE = nn.CrossEntropyLoss(reduction = "none")
+        
+        # Loss criterion for type pixels
+        self.type_CE = nn.CrossEntropyLoss(reduction="none",)
+
+        # Joint loss as criterion
+        self.criterion = JointCELoss(
+            first=self.inst_CE,
+            second=self.type_CE,
+            first_weight=1.0, 
+            second_weight=1.0
         )
         
         # Filemanager
@@ -77,7 +91,6 @@ class SegModel(pl.LightningModule):
             experiment_args
         )
         
-    
     @classmethod
     def from_conf(cls, model, conf):
         model = model
@@ -92,25 +105,32 @@ class SegModel(pl.LightningModule):
             training_args
         )
     
-    
     @property
     def train_data(self):
         #TODO npy files
         return self.fm.databases['train'][self.input_size]
-    
     
     @property
     def valid_data(self):
         # TODO npy files
         return self.fm.databases['valid'][self.input_size]
     
-    
     @property
     def test_data(self):
         # TODO npy files
         return self.fm.databases['test'][self.input_size]
-    
-        
+
+    @property
+    def step(self):
+        return self.step_binary if self.fm.class_types == "binary" else self.step_semantic
+
+    def __get_loss_key(self, phase):
+        if phase == "train":
+            loss_key = "loss"
+        else:
+            loss_key = f"{phase}_loss"
+        return loss_key
+       
     def __compute_metrics(self, yhat, y):
         pred = yhat.detach().cpu().numpy()
         predflat = np.argmax(pred, axis=1).flatten()
@@ -129,24 +149,57 @@ class SegModel(pl.LightningModule):
         accuracy = torch.from_numpy(np.asarray(accuracy))
         
         return TNR, TPR, accuracy
-    
-        
+       
     # Lightning framework stuff:
     def forward(self, x):
         return self.model(x)
+
+    def step_return_dict(self, z, phase):
+        loss_key = self.__get_loss_key(phase)
+        logs = {
+            f"{phase}_loss": z["loss"],
+            f"{phase}_accuracy": z["accuracy"]
+        }
+        
+        return {
+            loss_key: z["loss"],
+            f"{phase}_accuracy": z["accuracy"],
+            f"{phase}_TNR": z["TNR"],
+            f"{phase}_TPR": z["TPR"],
+            "log":logs
+        }
+
+    def epoch_end(self, outputs, phase):
+        loss_key = self.__get_loss_key(phase)
+        accuracy = torch.stack([x[f"{phase}_accuracy"] for x in outputs]).mean()
+        TNR = torch.stack([x[f"{phase}_TNR"] for x in outputs]).mean()
+        TPR = torch.stack([x[f"{phase}_TPR"] for x in outputs]).mean()
+        loss = torch.stack([x[loss_key] for x in outputs]).mean()
+        
+        tensorboard_logs = {
+            f"avg_{phase}_loss": loss, 
+            f"avg_{phase}_accuracy":accuracy, 
+            f"avg_{phase}_TNR":TNR, 
+            f"avg_{phase}_TPR":TPR
+        }
+        
+        return {
+            f"{phase}_accuracy": accuracy,
+            loss_key: loss,
+            "log": tensorboard_logs,
+        }
     
-    
-    def step(self, batch, batch_idx):
+    def step_binary(self, batch, batch_idx):
         x = batch["image"]
-        y = batch["mask"]
-        y_weight = batch["mask_weight"]
+        y = batch["binary_map"]
+        y_weight = batch["weight_map"]
 
         x = x.float()
         y_weight = y_weight.float()
         y = y.long()
         
-        yhat = self.forward(x)
-        loss_matrix = self.CE(yhat, y)
+        yhat = self.forward(x)# [0]
+        loss_matrix = self.inst_CE(yhat, y)
         loss = (loss_matrix * (self.edge_weight**y_weight)).mean()
         TNR, TPR, accuracy = self.__compute_metrics(yhat, y)
         
@@ -156,112 +209,66 @@ class SegModel(pl.LightningModule):
             "TNR":TNR,
             "TPR":TPR
         }
-    
-    
-    def training_step(self, train_batch, batch_idx) :        
-        z = self.step(train_batch, batch_idx)
 
-        logs = {
-            "train_loss": z["loss"],
-            "train_accuracy":z["accuracy"]
-        }
+    def step_semantic(self, batch, batch_idx):
+        """
+        For models with two decoder branches, one for inst segmentation, one for semantic. 
+        """
+        x = batch["image"]
+        y_inst = batch["binary_map"]
+        y_type = batch["type_map"]
+        y_weight = batch["weight_map"]
+
+        x = x.float()
+        y_weight = y_weight.float()
+        y_inst = y_inst.long()
+        y_type = y_type.long()
+        
+        yhat_inst, yhat_type  = self.forward(x)
+        loss = self.criterion(
+            yhat_inst, yhat_type, y_inst, y_type, self.edge_weight, y_weight
+        )
+
+        TNR, TPR, accuracy = self.__compute_metrics(yhat_inst, y_inst)
         
         return {
-            "loss": z["loss"],
-            "train_accuracy": z["accuracy"], 
-            "TNR":z["TNR"], 
-            "TPR":z["TPR"], 
-            "log":logs, 
-            "progress_bar": {"train_loss": z["loss"]}
+            "loss":loss,
+            "accuracy":accuracy,
+            "TNR":TNR,
+            "TPR":TPR,
         }
     
-    
+    def training_step(self, train_batch, batch_idx): 
+        z = self.step(train_batch, batch_idx)
+        return_dict = self.step_return_dict(z, "train")
+        return return_dict
+
     def validation_step(self, val_batch, batch_idx):
         z = self.step(val_batch, batch_idx)
+        return_dict = self.step_return_dict(z, "val")
+        return return_dict
 
-        logs = {
-            "val_loss": z["loss"],
-            "val_accuracy":z["accuracy"]
-        }
-        
-        return {
-            "val_loss": z["loss"],
-            "val_accuracy": z["accuracy"], 
-            "TNR":z["TNR"], 
-            "TPR":z["TPR"], 
-            "log":logs, 
-            "progress_bar": {"val_loss": z["loss"]}
-        }
-        
-    
     def test_step(self, test_batch, batch_idx):
         z = self.step(test_batch, batch_idx)
-
-        logs = {
-            "test_loss": z["loss"],
-            "test_accuracy":z["accuracy"]
-        }
-        
-        return {
-            "test_loss": z["loss"],
-            "test_accuracy": z["accuracy"], 
-            "TNR":z["TNR"], 
-            "TPR":z["TPR"], 
-            "log":logs, 
-            "progress_bar": {"test_loss": z["loss"]}
-        }
-        
-    
-    def validation_epoch_end(self, outputs):
-        accuracy = torch.stack([x["val_accuracy"] for x in outputs]).mean()
-        TNR = torch.stack([x["TNR"] for x in outputs]).mean()
-        TPR = torch.stack([x["TPR"] for x in outputs]).mean()
-        avg_val_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
-        
-        tensorboard_logs = {
-            "avg_val_loss": avg_val_loss, 
-            "avg_val_accuracy":accuracy, 
-            "avg_val_TNR":TNR, 
-            "avg_val_TPR":TPR
-        }
-        
-        return {"avg_val_accuracy":accuracy, "val_loss": avg_val_loss, "log": tensorboard_logs}
-    
+        return_dict = self.step_return_dict(z, "test")
+        return return_dict
     
     def training_epoch_end(self, outputs):
-        accuracy = torch.stack([x["train_accuracy"] for x in outputs]).mean()
-        TNR = torch.stack([x["TNR"] for x in outputs]).mean()
-        TPR = torch.stack([x["TPR"] for x in outputs]).mean()
-        avg_train_loss = torch.stack([x["loss"] for x in outputs]).mean()
-        
-        tensorboard_logs = {
-            "avg_train_loss": avg_train_loss, 
-            "avg_train_accuracy":accuracy, 
-            "avg_train_TNR":TNR,
-            "avg_train_TPR":TPR
-        }
-        
-        return {"avg_train_accuracy":accuracy, "avg_train_loss": avg_train_loss, "log": tensorboard_logs}
-    
-    
-    def test_epoch_end(self, outputs):
-        accuracy = torch.stack([x["test_accuracy"] for x in outputs]).mean()
-        TNR = torch.stack([x["TNR"] for x in outputs]).mean()
-        TPR = torch.stack([x["TPR"] for x in outputs]).mean()
-        avg_test_loss = torch.stack([x["test_loss"] for x in outputs]).mean()
-        
-        tensorboard_logs = {
-            "avg_test_loss": avg_test_loss, 
-            "avg_test_accuracy":accuracy, 
-            "avg_test_TNR":TNR,
-            "avg_test_TPR":TPR
-        }
-        
-        return {"avg_test_accuracy":accuracy, "avg_test_loss": avg_test_loss, "log": tensorboard_logs}
+        return_dict = self.epoch_end(outputs, "train")
+        return return_dict
 
-    
+    def validation_epoch_end(self, outputs):
+        return_dict = self.epoch_end(outputs, "val")
+        return return_dict
+
+    def test_epoch_end(self, outputs):
+        return_dict = self.epoch_end(outputs, "test")
+        return return_dict
+
     def configure_optimizers(self):
-        layerwise_params = {"encoder*": dict(lr=self.encoder_lr, weight_decay=self.encoder_weight_decay)}
+        layerwise_params = {
+            "encoder*": dict(lr=self.encoder_lr, weight_decay=self.encoder_weight_decay)
+        }
 
         # Remove weight_decay for biases and apply layerwise_params for encoder
         model_params = utils.process_model_params(self.model, layerwise_params=layerwise_params)
@@ -280,7 +287,6 @@ class SegModel(pl.LightningModule):
         )
         return [optimizer], [scheduler]
     
-    
     def prepare_data(self):
         # compose transforms
         # transforms = compose([test_transforms()])
@@ -295,19 +301,19 @@ class SegModel(pl.LightningModule):
         
         test_transforms = compose([no_transforms()])
         
-        self.trainset = BinarySegmentationDataset(
-            fname = self.train_data.as_posix(), 
-            transforms = train_transforms,
+        self.trainset = SegmentationDataset(
+            fname=self.train_data.as_posix(), 
+            transforms=train_transforms
         )
         
-        self.validset = BinarySegmentationDataset(
-            fname = self.valid_data.as_posix(), 
-            transforms = test_transforms,
+        self.validset = SegmentationDataset(
+            fname=self.valid_data.as_posix(), 
+            transforms=test_transforms
         )
         
-        self.testset = BinarySegmentationDataset(
-            fname = self.test_data.as_posix(), 
-            transforms = test_transforms,
+        self.testset = SegmentationDataset(
+            fname=self.test_data.as_posix(), 
+            transforms=test_transforms
         )
     
     def train_dataloader(self):

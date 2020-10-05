@@ -124,3 +124,22 @@ def remap_label(pred, by_size=False):
     for idx, inst_id in enumerate(pred_id):
         new_pred[pred == inst_id] = idx + 1    
     return new_pred
+
+
+def get_type_instances(inst_map, type_map, class_num):
+    t = type_map == class_num
+    imap = np.copy(inst_map)
+    imap[~t] = 0
+    return imap
+
+
+def overlays(im, mask):
+    """
+    mask is assumed to have shape (HxW)
+    """
+    return np.where(mask[..., None], im, 0)
+
+
+def binarize(inst_map):
+    inst_map[inst_map > 0] = 1
+    return inst_map

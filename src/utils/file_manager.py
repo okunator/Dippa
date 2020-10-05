@@ -1,25 +1,74 @@
+import tables
 import zipfile
 import cv2
 import scipy.io
 import numpy as np
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from omegaconf import DictConfig, OmegaConf
 from distutils import dir_util, file_util
 from sklearn.model_selection import train_test_split
 from src.img_processing.viz_utils import draw_contours
+from src.img_processing.process_utils import overlays
 from src.settings import DATA_DIR, CONF_DIR, PATCH_DIR, RESULT_DIR
 
 
-# This slipped to spaghetti...
-class ProjectFileManager:
+
+class FileHandler:
+    """
+    Class for handling different file formats that are needed in the project.
+    """
+    @staticmethod
+    def read_img(path: str) -> np.ndarray:
+        return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
+
+    @staticmethod
+    def read_mask(path: str, key: str = "inst_map") -> np.ndarray:
+        assert key in ("inst_map", "type_map")
+        return scipy.io.loadmat(path)[key].astype("int32")
+    
+    @staticmethod
+    def remove_existing_files(directory: str) -> None:
+        assert Path(directory).exists(), f"{directory} does not exist"
+        for item in Path(directory).iterdir():
+            # Do not touch the folders inside the directory
+            if item.is_file():
+                item.unlink()
+
+    @staticmethod
+    def read_hdf5_patch(path: str, index: int) -> Tuple[np.ndarray]:
+        with tables.open_file(path, "r") as db:
+            img = db.root.img
+            inst_map = db.root.inst_map
+            type_map = db.root.type_map
+            im_patch = img[index, ...]
+            inst_patch = inst_map[index, ...]
+            type_patch = type_map[index, ...]
+        return im_patch, inst_patch, type_patch
+
+    @staticmethod
+    def create_dir(path: str) -> None:
+        Path(path).mkdir(parents=True, exist_ok=True)
+
+    @staticmethod
+    def extract_zips(folder: str, rm: bool = False) -> None:
+        for f in Path(folder).iterdir():
+            if f.is_file() and f.suffix == ".zip":
+                with zipfile.ZipFile(f, 'r') as z:
+                    z.extractall(folder)
+                if rm:
+                    f.unlink()
+
+
+# Lots of spadghetti b/c different datasets need different ad hoc processing to get stuff aligned
+class ProjectFileManager(FileHandler):
     def __init__(self,
                  dataset_args: DictConfig,
                  experiment_args: DictConfig,
                  **kwargs) -> None:
         """
-        A class for managing the files and folders needed in this project.
+        A class for managing the file and folder paths needed in this project.
         
             Args:
                 dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
@@ -33,7 +82,6 @@ class ProjectFileManager:
         self.dsargs = dataset_args
         self.exargs = experiment_args
     
-    
     @classmethod
     def from_conf(cls, conf: DictConfig):
         dataset_args = conf.dataset_args
@@ -43,55 +91,17 @@ class ProjectFileManager:
             dataset_args,
             experiment_args
         )
-    
-    
-    @staticmethod
-    def read_img(path: str) -> np.ndarray:
-        return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
-    
-    
-    @staticmethod
-    def read_mask(path: str, type_map: bool = False) -> np.ndarray:
-        key = "type_map" if type_map else "inst_map"
-        return scipy.io.loadmat(path)[key].astype("int32")
-     
-        
-    @staticmethod
-    def remove_existing_files(directory: str) -> None:
-        assert Path(directory).exists(), f"{directory} does not exist"
-        for item in Path(directory).iterdir():
-            # Do not touch the folders inside the directory
-            if item.is_file():
-                item.unlink()
-        
-        
-    @staticmethod      
-    def create_dir(path: str) -> None:
-        Path(path).mkdir(parents=True, exist_ok=True)
-    
-    
-    @staticmethod
-    def extract_zips(folder: str, rm: bool = False) -> None:
-        for f in Path(folder).iterdir():
-            if f.is_file() and f.suffix == ".zip":
-                with zipfile.ZipFile(f, 'r') as z:
-                    z.extractall(folder)
-                if rm:
-                    f.unlink()
-        
-        
+
     @property
     def experiment_dir(self) -> Path:
         ex_version = self.exargs.experiment_version
         model_name = self.exargs.model_name
         return RESULT_DIR.joinpath(f"{model_name}/version_{ex_version}")
     
-    
     @property
     def dataset(self) -> str:
         assert self.dsargs.dataset in ("kumar","consep","pannuke","dsb2018","cpm")
         return self.dsargs.dataset
-    
     
     @property
     def data_dirs(self) -> Dict:
@@ -106,18 +116,15 @@ class ProjectFileManager:
             "test_gt":Path(DATA_DIR / self.dataset / "test" / "labels"),
         }
     
-    
     @property
     def database_dir(self) -> Path:
         assert self.dsargs.patches_dtype in ("npy", "hdf5"), f"{self.dsargs.patches_dtype}"
         return Path(PATCH_DIR / self.dsargs.patches_dtype / self.dataset)
     
-    
     @property
     def phases(self) -> List:
         assert self.dsargs.phases in (["train", "valid", "test"], ["train", "test"]), f"{self.dsargs.phases}"
         return self.dsargs.phases
-    
     
     @property
     def classes(self) -> Dict:
@@ -125,7 +132,21 @@ class ProjectFileManager:
         yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
         data_conf = OmegaConf.load(yml_path)
         return data_conf.class_types[self.dsargs.class_types]
-        
+
+    @property
+    def img_types(self) -> Dict:
+        assert self.dsargs.class_types in ("binary", "types")
+        yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
+        data_conf = OmegaConf.load(yml_path)
+        return data_conf.img_types
+
+    @property
+    def class_types(self):
+        return self.dsargs.class_types
+
+    @property
+    def class_weights(self):
+        pass
     
     @property
     def pannuke_folds(self) -> Dict:
@@ -133,14 +154,12 @@ class ProjectFileManager:
         yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
         data_conf = OmegaConf.load(yml_path)
         return data_conf.folds
-    
-    
+        
     @property
     def pannuke_tissues(self) -> List:
         assert self.dataset == "pannuke", f"dataset: {self.dataset}. dataset not pannuke"
         return self.dsargs.tissues
-       
-        
+              
     @property
     def data_folds(self) -> Dict:
         """
@@ -177,7 +196,6 @@ class ProjectFileManager:
             "valid":{"img":valid_imgs, "mask":valid_masks},
             "test":{"img":test_imgs, "mask":test_masks},
         }
-    
     
     @property
     def databases(self) -> Dict:
@@ -227,19 +245,16 @@ class ProjectFileManager:
             "test":get_input_sizes(test_dbs)
         }
     
-    
     def __get_img_suffix(self, directory: Path) -> str:
         assert all([f.suffix for f in directory.iterdir()]), "All image files should be in same format"
         return [f.suffix for f in directory.iterdir()][0]
-        
-        
+           
     def __get_files(self, directory: str) -> List[str]:
         d = Path(directory)
         assert d.exists(), f"Provided directory: {d.as_posix()} does not exist."
         file_suffix = self.__get_img_suffix(d)
         return sorted([x.as_posix() for x in d.glob(f"*{file_suffix}")])
-        
-        
+           
     def __split_training_set(self, 
                              train_imgs: List, 
                              train_masks: List,
@@ -285,7 +300,6 @@ class ProjectFileManager:
             "valid_masks":valid_masks
         }
     
-    
     def __kumar_xml2mat(self, x: Path, to: Path) -> None:
         """
         From https://github.com/vqdang/hover_net/blob/master/src/misc/proc_kumar_ann.py
@@ -324,10 +338,13 @@ class ProjectFileManager:
         
         for idx, inst_map in enumerate(insts_list):
             ann[inst_map > 0] = idx + 1
-            
+        
+        # binary mask as type_map
+        type_map = np.copy(ann)
+        type_map[ann > 0] = 1
+
         mask_fn = Path(to / x.with_suffix(".mat").name)
-        scipy.io.savemat(mask_fn, mdict={'inst_map': ann})         
-    
+        scipy.io.savemat(mask_fn, mdict={"inst_map": ann, "type_map":type_map})         
     
     def __mv_to_orig(self, folder: Path) -> Path:
         p = folder.joinpath("orig")
@@ -338,7 +355,6 @@ class ProjectFileManager:
                 f.rename(folder/"orig"/f.name)
         return p
     
-    
     def __save_overlays(self, img_path: Path, ann_path: Path, type_overlays: bool = False) -> None:
         inst_overlay_dir = Path(img_path.parents[0] / "instance_overlays")
         self.create_dir(inst_overlay_dir)
@@ -348,7 +364,7 @@ class ProjectFileManager:
             if type_overlays:
                 type_overlay_dir = Path(img_path.parents[0] / "type_overlays")
                 self.create_dir(type_overlay_dir)
-                type_map = self.read_mask(str(ann_path), type_map=True)
+                type_map = self.read_mask(str(ann_path), key="type_map")
                 _, type_overlay = draw_contours(mask, im, type_map=type_map)
                 fn = Path(type_overlay_dir / im_path.with_suffix(".png").name)
                 cv2.imwrite(str(fn), cv2.cvtColor(type_overlay, cv2.COLOR_RGB2BGR))
@@ -356,7 +372,6 @@ class ProjectFileManager:
             _, inst_overlay = draw_contours(mask, im)
             fn = Path(inst_overlay_dir / im_path.with_suffix(".png").name)
             cv2.imwrite(str(fn), cv2.cvtColor(inst_overlay, cv2.COLOR_RGB2BGR))
-    
     
     def __handle_kumar(self,
                        orig_dir: Path,
@@ -385,8 +400,7 @@ class ProjectFileManager:
                     self.__kumar_xml2mat(ann, anns_test_dir)
                 for item in f.glob("*.tif"):
                     file_util.copy_file(str(item), str(imgs_test_dir))
-        
-        
+           
     def __handle_consep(self, root: Path, orig_dir: Path) -> None:
         for item in orig_dir.iterdir():
             if item.is_dir() and item.name == "CoNSeP":
@@ -401,9 +415,7 @@ class ProjectFileManager:
                         item.rename(Path(d / item.name.lower()))
 
                 d.rename(Path(d.parents[0] / d.name.lower()))
-
-        
-        
+    
     def __handle_pannuke(self, 
                          orig_dir: Path,
                          imgs_train_dir: Path, 
@@ -471,15 +483,12 @@ class ProjectFileManager:
                     type_map[type_map > temp_mask.shape[-1]-1] = 0
                     fn_mask = Path(mask_dir / name).with_suffix(".mat")
                     scipy.io.savemat(fn_mask, mdict={"inst_map": inst_map, "type_map":type_map})
-        
-        
+            
     def __handle_dsb2018(self) -> None:
         pass
     
-    
     def __handle_cpm(self) -> None:
         pass
-    
     
     def handle_raw_data(self, rm_zips: bool = False, overlays: bool = True) -> None:
         """
@@ -543,7 +552,6 @@ class ProjectFileManager:
             self.__save_overlays(imgs_test_dir, anns_test_dir, type_overlays=type_overlays)
             self.__save_overlays(imgs_train_dir, anns_train_dir, type_overlays=type_overlays)
     
-    
     def model_checkpoint(self, which:str = "last") -> Path:
         """
         Get the best or last checkpoint of a trained network.
@@ -570,7 +578,6 @@ class ProjectFileManager:
             f"ckpt: {ckpt}. Checkpoint is None. Make sure that a .ckpt file exists in experiment dir"
         )
         return ckpt
-    
     
     def get_pannuke_fold(self, folds: List, types: List, data:str = "both") -> Dict:
         """
@@ -630,40 +637,6 @@ class ProjectFileManager:
             path_dict[data] = paths
         
         return path_dict
-    
-    
-    # TODO: automatically download the files from the links in github
-    def download_url(self):
-        pass
-        # import requests
-        # 
-        # def download_file_from_google_drive(id, destination):
-        #     def get_confirm_token(response):
-        #         for key, value in response.cookies.items():
-        #             if key.startswith('download_warning'):
-        #                 return value
-        # 
-        #         return None
-        # 
-        #     def save_response_content(response, destination):
-        #         CHUNK_SIZE = 32768
-        # 
-        #         with open(destination, "wb") as f:
-        #             for chunk in response.iter_content(CHUNK_SIZE):
-        #                 if chunk: # filter out keep-alive new chunks
-        #                     f.write(chunk)
-        # 
-        #     URL = "https://docs.google.com/uc?export=download"
-        # 
-        #     session = requests.Session()
-        # 
-        #     response = session.get(URL, params = { 'id' : id }, stream = True)
-        #     token = get_confirm_token(response)
-        # 
-        #     if token:
-        #         params = { 'id' : id, 'confirm' : token }
-        #         response = session.get(URL, params = params, stream = True)
-        # 
-        #     save_response_content(response, destination)
+
 
     

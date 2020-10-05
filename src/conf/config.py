@@ -8,7 +8,7 @@ CONFIG = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"Unet",
-            "experiment_version":"test_pannuke_unet_pbt5",
+            "experiment_version":"test_pannuke_unet_cls666",
         },
         
         # General dataset constants and args
@@ -21,7 +21,7 @@ CONFIG = OmegaConf.create(
             # change this according to your needs. has to be one of ("binary", "types")
             # Things won't crash even if types is used for a dataset that can be used only for 
             # binary segmentation
-            "class_types":"binary", 
+            "class_types":"types", 
             
             # if phases = ["train", "valid", "test"]. The train set is also split to 
             # validation set. If phases = ["train", "test"], no splitting is done.
@@ -55,7 +55,7 @@ CONFIG = OmegaConf.create(
             "model_input_size":256,
             "tta":False, # use test time augmentation during training. Note: very slow w ttatch
             "resume_training":False, # continue training where you left off?
-            "num_epochs":2,
+            "num_epochs":3,
             "num_gpus":1,
             
             # optimizer args

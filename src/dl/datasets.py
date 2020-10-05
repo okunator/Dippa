@@ -4,19 +4,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 
+from src.utils.file_manager import FileHandler
 from src.img_processing.pre_processing import gen_unet_labels
-from src.img_processing.process_utils import instance_contours
+from src.img_processing.process_utils import instance_contours, binarize
 
 
-class BinarySegmentationDataset(Dataset):
+class SegmentationDataset(Dataset, FileHandler):
     def __init__(self, fname, transforms):
         """
         PyTorch Dataset object that loads items from pytables db
 
         Args:
-            fname (str) : path to the pytables database
-            transforms (albu.Compose) : albumentations.Compose object of 
-                                        augmentations from albumentations pkg
+            fname (str): path to the pytables database
+            transforms (albu.Compose): albumentations.Compose object of 
+                                       augmentations from albumentations pkg
+            class_types (str):  one of ("binary", "types")
         """
         self.fname = fname
         self.transforms = transforms
@@ -31,12 +33,10 @@ class BinarySegmentationDataset(Dataset):
         """
         Patched images and masks are stored in the pytables HDF5 
         database as numpy arrays of shape:
-        img: [npatch x patch_size x patch_size x 3]. 
-        mask: [npatch x patch_size x patch_size x 1] 
-        
+
         See the database_prep_notebooks for more info.
         
-        1. Read a mask and an image from the pytables database corresponding to index
+        1. Read inst_map, type_map and an image from the pytables database corresponding to index
         2. Create instance contours for the instance mask that are used as a weight map for the nuclei edges
         3. Process the mask as described in the Unet paper
         4. Augment the image, mask and mask weight
@@ -48,31 +48,28 @@ class BinarySegmentationDataset(Dataset):
         Returns:
             result (dict) : dictionary containing the augmented image, mask, weight map and filename  
         """
-        with tables.open_file(self.fname,'r') as db:
-            self.img = db.root.img
-            self.mask = db.root.mask
-            img = self.img[index, ...]
-            mask = self.mask[index, ...]
+        im_patch, inst_patch, type_patch = self.read_hdf5_patch(self.fname, index)
         
-        # process the masks as in unet paper
-        contour = instance_contours(mask)
-        mask, weight = gen_unet_labels(mask)
+        # process the inst_maps to find nuclei borders
+        contour = instance_contours(inst_patch)
+        inst_map, weight = gen_unet_labels(inst_patch)
                 
         # Augment
-        augmented = self.transforms(image=img, masks=[mask, weight, contour])
+        augmented = self.transforms(image=im_patch, masks=[inst_map, type_patch, weight, contour])
         img_new = augmented['image']
-        mask_new, weight_new, contour_new = augmented['masks']
+        imap_new, tmap_new, weight_new, contour_new = augmented['masks']
         
         # Binarize mask
-        mask_new[mask_new > 0] = 1
+        binary_map = binarize(imap_new)
         
         result = {}
         result['image'] = img_new
-        result['mask'] = mask_new
-        result['mask_weight'] = weight_new
+        result['inst_map'] = imap_new
+        result['binary_map'] = binary_map
+        result['type_map'] = tmap_new
+        result['weight_map'] = weight_new
         result['contour'] = contour_new
         result['filename'] = self.fname
-        
         return result
     
     def __len__(self): return self.n_items

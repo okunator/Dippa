@@ -35,3 +35,8 @@ tissues:
     - Testis
     - Thyroid 
     - Uterus
+
+img_types:
+    - img
+    - inst_map
+    - type_map

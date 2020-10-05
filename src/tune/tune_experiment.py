@@ -12,7 +12,6 @@ from pytorch_lightning.utilities.cloud_io import load as pl_load
 from ray import tune
 from ray.tune import CLIReporter, JupyterNotebookReporter, ExperimentAnalysis
 from ray.tune.schedulers import PopulationBasedTraining
-
 from src.dl.lightning_model import SegModel
 from src.settings import RESULT_DIR
 
@@ -89,7 +88,6 @@ def train_tune_checkpoint(training_args: Dict,
         # Load the model
         pl_model.load_state_dict(checkpoint['state_dict'])
         trainer.current_epoch = checkpoint["epoch"]
-        print(trainer.current_epoch)
     else:
         base_model = smp.Unet(
             encoder_name="resnext50_32x4d", 
