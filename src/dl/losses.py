@@ -1,39 +1,126 @@
 import torch
-from typing import List
+from typing import List, Optional
 from torch import nn
 from torch.nn.modules.loss import _Loss
+from catalyst.contrib.nn.criterion.ce import SymmetricCrossEntropyLoss
 
-# adapted from: pytorch-toolbelt losses.joint_loss.py
-class WeightedLoss(_Loss):
-    """
-    Wrapper class around CE loss function that applies weights with fixed factor.
-    This class adds nuclei border weights to the final computed loss on a feature map generated
-    from a H&E image.
-    """
-
-    def __init__(self, loss, weight=1.0):
+# adapted these from:
+# https: // github.com/BloodAxe/pytorch-toolbelt/blob/master/pytorch_toolbelt/losses/joint_loss.py
+class WeightedCELoss(_Loss):
+    def __init__(self, weight: float = 1.0, class_weights: Optional[torch.Tensor] = None):
+        """
+        Wrapper class around CE loss function that applies weights with fixed factor.
+        This class adds nuclei border weights to the final computed loss on a feature map generated
+        from a H&E image.
+        Args:
+            weight (float): weight added to the reduced loss
+            class_weights (torch.Tensor): Optional tensor of size n_classes for class weights
+        """
         super().__init__()
-        self.loss = loss
+        self.loss = nn.CrossEntropyLoss(
+            reduction="none",
+            weight=class_weights
+        )
+
         self.weight = weight
 
-    def forward(self, yhat, y, edge_weight, y_weight):
-        loss_matrix = self.loss(yhat, y)
-        loss = (loss_matrix * (edge_weight**y_weight)).mean()
+    def forward(self, 
+                yhat: torch.Tensor,
+                target: torch.Tensor, 
+                target_weight: torch.Tensor,
+                edge_weight: int) -> torch.Tensor:
+        """
+        Args:
+            yhat (torch.Tensor): The feature map generated from the forward() of the model
+            target (torch.Tensor): the ground truth annotations of the input patch
+            target_weight (torch.Tensor): The weight map that points the pixels in clumped nuclei
+                                          that are overlapping.
+            edge_weight (int): weights applied to the nuclei edges: edge_weight^target_weight
+        """
+        loss_matrix = self.loss(yhat, target)
+        loss = (loss_matrix * (edge_weight**target_weight)).mean()
         return loss * self.weight
 
 
 class JointCELoss(_Loss):
-    """
-    Wrap two CE loss functions into one. The first computes CE for binary instance segmentation task
-    from inputs 'yhat_inst' and 'y_inst' and the second computes CE for semantic segmentation task
-    from inputs 'yhat_type' and 'y_type'. Then a weighted sum of two losses is computed.
-    """
-
-    def __init__(self, first: nn.Module, second: nn.Module, first_weight=1.0, second_weight=1.0):
+    def __init__(self,
+                 first_weight: float = 1.0, 
+                 second_weight: float = 1.0,
+                 class_weights_binary: Optional[torch.Tensor] = None,
+                 class_weights_types: Optional[torch.Tensor] = None):
+        """
+        Adds two weighted CE losses to one joint loss. When a classification decoder branch is added
+        to any network, this loss will take in the instance branch and classification branch outputs
+        and computes a weighted joint loss for the whole network to ensure convergence
+        Args:
+            first_weight (float): weight to apply to instance segmentation CE loss
+            second_weight (float): weight to apply to the type segmentation branch
+            class_weights_binary (torch.Tensor): weights applied to binary classes
+            class_weights_types (torch.Tensor): weights applied to cell types
+        """
         super().__init__()
-        self.bCE = WeightedLoss(first, first_weight)
-        self.mCE = WeightedLoss(second, second_weight)
+        self.bCE = WeightedCELoss(first_weight, class_weights_binary)
+        self.mCE = WeightedCELoss(second_weight, class_weights_types)
 
-    def forward(self, yhat_inst, yhat_type, y_inst, y_type, edge_weight, y_weight):
-        return self.bCE(yhat_inst, y_inst, edge_weight, y_weight) + \
-            self.mCE(yhat_type, y_type, edge_weight, y_weight)
+    def forward(self,
+                yhat_inst: torch.Tensor,
+                yhat_type: torch.Tensor,
+                target_inst: torch.Tensor,
+                target_type: torch.Tensor,
+                target_weight: torch.Tensor,
+                edge_weight: float) -> torch.Tensor:
+
+        return self.bCE(yhat_inst, target_inst, edge_weight, target_weight) + \
+            self.mCE(yhat_type, target_type, edge_weight, target_weight)
+
+
+class WeightedSymmetricCELoss(_Loss):
+    def __init__(self, 
+                 alpha: float = 1.0,
+                 beta: float = 1.0, 
+                 weight: float = 1.0):
+        """
+        Weighted Symmetric CE loss. Catalyst implementation
+        Article: https://arxiv.org/abs/1908.06112
+        Source at: https://github.com/catalyst-team/catalyst/blob/master/catalyst/contrib/nn/criterion/ce.py
+        """
+        super().__init__()
+        self.loss = SymmetricCrossEntropyLoss(alpha, beta)
+        self.weight = weight
+    
+    def forward(self, *input) -> torch.Tensor:
+        return self.loss(*input) * self.weight
+
+
+
+class JointSymmetricCELoss(_Loss):
+    def __init__(self,
+                 first_weight: float = 1.0,
+                 second_weight: float = 1.0,
+                 alpha: float = 1.0,
+                 beta: float = 1.0,
+                 class_weights_binary: Optional[torch.Tensor] = None):
+        """
+        Adds one weighted symmetric CE loss and weighted CE loss to one joint loss. 
+        When a classification decoder branch is added to any network, this loss will take
+        in the instance branch and classification branch outputs andd computes a weighted
+        joint loss for the whole network to ensure convergence symmetricCE takes care of the
+        classification branch.
+        """
+        super().__init__()
+        self.bCE = WeightedCELoss(first_weight, class_weights_binary)
+        self.mCE = WeightedSymmetricCELoss(alpha=alpha, beta=beta, weight=second_weight)
+
+    def forward(self,
+                yhat_inst: torch.Tensor,
+                yhat_type: torch.Tensor,
+                target_inst: torch.Tensor,
+                target_type: torch.Tensor,
+                target_weight: torch.Tensor,
+                edge_weight: float) -> torch.Tensor:
+
+        return self.bCE(yhat_inst, target_inst, edge_weight, target_weight) + \
+            self.mCE(yhat_type, target_type)
+
+
+

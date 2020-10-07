@@ -165,7 +165,18 @@ def sobel_watershed(prob_map, inst_map, win_size=13):
 
 
 # adapted from https://github.com/vqdang/hover_net/blob/master/src/postproc/other.py
-def inv_dist_watershed(inst_map, win_size=13):
+def inv_dist_watershed(inst_map: np.ndarray, win_size: int = 13) -> np.ndarray:
+    """
+    After thresholding, this function is used to compute distance maps for each nuclei instance
+    and watershed segment the inverse distmaps. Before computing distance maps a binary opening
+    is performed to the instance map (seems to increase metrics). Markers for the distance maps
+    are computed using niblack thresholding on the distance map.
+
+    Args:
+        inst_map (np.ndarray): The instance map to be segmented
+        win_size (int): window size used in niblack thresholding the distance maps to 
+                        find markers for watershed
+    """
     
     # Morphological opening for smoothing the likely jagged edges
     # This typically improves PQ
@@ -204,8 +215,8 @@ def inv_dist_watershed(inst_map, win_size=13):
     mask = segm.watershed(-distmap, markers, mask=ann, watershed_line=True)
     
     # remove small cells. Will enhance PQ in kumar a lot (HACKish)
-    mask[mask > 0] = 1
-    mask = morph.remove_small_objects(mask.astype(bool), min_size=100)
+    # mask[mask > 0] = 1
+    # mask = morph.remove_small_objects(mask.astype(bool), min_size=100)
     inst_map = ndi.label(mask)[0]
     
     return inst_map

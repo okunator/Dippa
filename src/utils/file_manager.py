@@ -47,6 +47,13 @@ class FileHandler:
         return im_patch, inst_patch, type_patch
 
     @staticmethod
+    def get_class_pixels_num(path: str) -> np.ndarray:
+        with tables.open_file(path, "r") as db:
+            weights = db.root.numpixels[:]
+        class_weight = weights[1, ]
+        return class_weight
+
+    @staticmethod
     def create_dir(path: str) -> None:
         Path(path).mkdir(parents=True, exist_ok=True)
 
@@ -142,10 +149,6 @@ class ProjectFileManager(FileHandler):
     @property
     def class_types(self):
         return self.dsargs.class_types
-
-    @property
-    def class_weights(self):
-        pass
     
     @property
     def pannuke_folds(self) -> Dict:
@@ -243,7 +246,7 @@ class ProjectFileManager(FileHandler):
             "valid":get_input_sizes(valid_dbs),
             "test":get_input_sizes(test_dbs)
         }
-    
+
     def __get_img_suffix(self, directory: Path) -> str:
         assert all([f.suffix for f in directory.iterdir()]), "All image files should be in same format"
         return [f.suffix for f in directory.iterdir()][0]
@@ -577,7 +580,9 @@ class ProjectFileManager(FileHandler):
             f"ckpt: {ckpt}. Checkpoint is None. Make sure that a .ckpt file exists in experiment dir"
         )
         return ckpt
-    
+
+
+
     def get_pannuke_fold(self, folds: List, types: List, data:str = "both") -> Dict:
         """
         After converting the data to right format and moving it to right folders this can be used to get

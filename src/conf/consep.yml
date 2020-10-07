@@ -2,13 +2,13 @@ class_types:
     binary:
         background: 0
         nuclei: 1
-    types:
+    types_new:
         background: 0
         miscellanous: 1
         inflammatory: 2
         epithelial: 3
         spindle: 4
-    types_orig:
+    types:
         background: 0
         miscellanous: 1
         inflammatory: 2

@@ -8,7 +8,7 @@ CONFIG = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"Unet",
-            "experiment_version":"test_pannuke_unet_cls666",
+            "experiment_version":"test_pannuke_unet_cls888",
         },
         
         # General dataset constants and args
@@ -69,7 +69,8 @@ CONFIG = OmegaConf.create(
             "patience":2,
             
             # loss args
-            "edge_weight" : 1.0, # How much weight is applied to nuclei borders  
+            "edge_weight": 1.0, # How much weight is applied to nuclei borders  
+            "class_weights":True
             
         },
         

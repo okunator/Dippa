@@ -19,7 +19,11 @@ from typing import List, Dict
 
 from src.utils.file_manager import ProjectFileManager
 from src.dl.datasets import SegmentationDataset
-from src.dl.losses import JointCELoss
+from src.dl.torch_utils import to_device, argmax_and_flatten
+
+from src.dl.losses import (
+    JointCELoss, WeightedCELoss, JointSymmetricCELoss
+)
 
 from src.img_processing.augmentations import (
     hue_saturation_transforms, non_rigid_transforms,
@@ -62,7 +66,8 @@ class SegModel(pl.LightningModule):
         self.model = tta.SegmentationTTAWrapper(model, tta_transforms()) if training_args["tta"] else model
         self.batch_size = training_args["batch_size"]
         self.input_size = training_args["model_input_size"]
-        self.edge_weight = training_args["edge_weight"]  
+        self.edge_weight = training_args["edge_weight"]
+        self.class_weights = training_args["class_weights"]
         self.lr = training_args["lr"]
         self.encoder_lr = training_args["encoder_lr"]
         self.weight_decay = training_args["weight_decay"]
@@ -70,26 +75,15 @@ class SegModel(pl.LightningModule):
         self.factor = training_args["factor"]
         self.patience = training_args["patience"]
         self.save_hyperparameters()
-        
-        # Loss criterion for nuclei pixels
-        self.inst_CE = nn.CrossEntropyLoss(reduction = "none")
-        
-        # Loss criterion for type pixels
-        self.type_CE = nn.CrossEntropyLoss(reduction="none",)
 
-        # Joint loss as criterion
-        self.criterion = JointCELoss(
-            first=self.inst_CE,
-            second=self.type_CE,
-            first_weight=1.0, 
-            second_weight=1.0
-        )
-        
         # Filemanager
         self.fm = ProjectFileManager(
             dataset_args,
             experiment_args
         )
+        
+        self.criterion = self.CE_loss_func
+
         
     @classmethod
     def from_conf(cls, model, conf):
@@ -122,120 +116,115 @@ class SegModel(pl.LightningModule):
 
     @property
     def step(self):
-        return self.step_binary if self.fm.class_types == "binary" else self.step_semantic
+        return self.step_singlebranch if self.fm.class_types == "binary" else self.step_twobranch
 
-    def __get_loss_key(self, phase):
-        if phase == "train":
-            loss_key = "loss"
+    @property
+    def binary_class_weights(self):
+        num_class_pixels = self.fm.get_class_pixels_num(self.train_data.as_posix())
+        num_binary_pixels = np.sum(num_class_pixels, where=[False] + [True]*(len(num_class_pixels)-1))
+        class_pixels = np.array([num_class_pixels[0], num_binary_pixels])
+        return 1-class_pixels/class_pixels.sum()
+
+    @property
+    def type_class_weights(self):
+        class_pixels = self.fm.get_class_pixels_num(self.train_data.as_posix())
+        return 1-class_pixels/class_pixels.sum()
+
+    @property
+    def CE_loss_func(self):
+        """
+        Choose loss function. Depends on objective (binary, semantic). 
+        """
+        bin_w = to_device(self.binary_class_weights) if self.class_weights else None
+        if self.fm.class_types != "binary":
+            # type_w = to_device(self.type_class_weights) if self.class_weights else None
+            # criterion = JointCELoss(
+            #     class_weights_binary=bin_w,
+            #     class_weights_types=type_w
+            # )
+            criterion = JointSymmetricCELoss(
+                class_weights_binary=bin_w
+            )
         else:
-            loss_key = f"{phase}_loss"
-        return loss_key
-       
-    def __compute_metrics(self, yhat, y):
-        pred = yhat.detach().cpu().numpy()
-        predflat = np.argmax(pred, axis=1).flatten()
-        yflat = y.cpu().numpy().flatten()
-        cmatrix = confusion_matrix(yflat, predflat, labels=range(len(self.fm.classes)))
-        TN = cmatrix[0, 0]
-        TP = cmatrix[1, 1]
-        FP = cmatrix[0, 1]
-        FN = cmatrix[1, 0]
-        TNR = TN / (TN + FP + 1e-08)
-        TPR = TP / (TP + FN + 1e-08)
-        accuracy = (TP + TN)/(TN + TP + FP + FN+ 1e-08)
-        
-        TNR = torch.from_numpy(np.asarray(TNR))
-        TPR = torch.from_numpy(np.asarray(TPR))
-        accuracy = torch.from_numpy(np.asarray(accuracy))
-        
-        return TNR, TPR, accuracy
-       
+            criterion = WeightedCELoss(class_weights=bin_w)
+        return criterion
+
+
     # Lightning framework stuff:
     def forward(self, x):
         return self.model(x)
 
     def step_return_dict(self, z, phase):
-        loss_key = self.__get_loss_key(phase)
         logs = {
             f"{phase}_loss": z["loss"],
             f"{phase}_accuracy": z["accuracy"]
         }
         
         return {
-            loss_key: z["loss"],
+            "loss": z["loss"],
             f"{phase}_accuracy": z["accuracy"],
-            f"{phase}_TNR": z["TNR"],
-            f"{phase}_TPR": z["TPR"],
             "log":logs
         }
-
-    def epoch_end(self, outputs, phase):
-        loss_key = self.__get_loss_key(phase)
-        accuracy = torch.stack([x[f"{phase}_accuracy"] for x in outputs]).mean()
-        TNR = torch.stack([x[f"{phase}_TNR"] for x in outputs]).mean()
-        TPR = torch.stack([x[f"{phase}_TPR"] for x in outputs]).mean()
-        loss = torch.stack([x[loss_key] for x in outputs]).mean()
-        
-        tensorboard_logs = {
-            f"avg_{phase}_loss": loss, 
-            f"avg_{phase}_accuracy":accuracy, 
-            f"avg_{phase}_TNR":TNR, 
-            f"avg_{phase}_TPR":TPR
-        }
-        
-        return {
-            f"{phase}_accuracy": accuracy,
-            loss_key: loss,
-            "log": tensorboard_logs,
-        }
     
-    def step_binary(self, batch, batch_idx):
+    def step_singlebranch(self, batch, batch_idx):
         x = batch["image"]
-        y = batch["binary_map"]
-        y_weight = batch["weight_map"]
+        target = batch["binary_map"]
+        target_weight = batch["weight_map"]
 
         x = x.float()
-        y_weight = y_weight.float()
-        y = y.long()
+        target_weight = target_weight.float()
+        target = target.long()
         
-        yhat = self.forward(x)# [0]
-        loss_matrix = self.inst_CE(yhat, y)
-        loss = (loss_matrix * (self.edge_weight**y_weight)).mean()
-        TNR, TPR, accuracy = self.__compute_metrics(yhat, y)
-        
+        yhat = self.forward(x)
+        loss = self.criterion(yhat, target)
+        accuracy = utils.metrics.accuracy(
+            argmax_and_flatten(yhat), target.view(1, -1)
+        )
         return {
             "loss":loss,
-            "accuracy":accuracy,
-            "TNR":TNR,
-            "TPR":TPR
+            "accuracy":accuracy[0],
         }
 
-    def step_semantic(self, batch, batch_idx):
+    def step_twobranch(self, batch, batch_idx):
         """
         For models with two decoder branches, one for inst segmentation, one for semantic. 
         """
         x = batch["image"]
-        y_inst = batch["binary_map"]
-        y_type = batch["type_map"]
-        y_weight = batch["weight_map"]
+        inst_target = batch["binary_map"]
+        type_target = batch["type_map"]
+        target_weight = batch["weight_map"]
 
         x = x.float()
-        y_weight = y_weight.float()
-        y_inst = y_inst.long()
-        y_type = y_type.long()
+        target_weight = target_weight.float()
+        inst_target = inst_target.long()
+        type_target = type_target.long()
         
         yhat_inst, yhat_type  = self.forward(x)
         loss = self.criterion(
-            yhat_inst, yhat_type, y_inst, y_type, self.edge_weight, y_weight
+            yhat_inst, yhat_type, inst_target, type_target, self.edge_weight, target_weight
         )
 
-        TNR, TPR, accuracy = self.__compute_metrics(yhat_inst, y_inst)
-        
+        type_acc = utils.metrics.accuracy(
+            argmax_and_flatten(yhat_inst), inst_target.view(1, -1)
+        )
+
         return {
             "loss":loss,
-            "accuracy":accuracy,
-            "TNR":TNR,
-            "TPR":TPR,
+            "accuracy":type_acc[0],
+        }
+
+    def epoch_end(self, outputs, phase):
+        accuracy = torch.stack([x[f"{phase}_accuracy"] for x in outputs]).mean()
+        loss = torch.stack([x["loss"] for x in outputs]).mean()
+
+        tensorboard_logs = {
+            f"avg_{phase}_loss": loss,
+            f"avg_{phase}_accuracy": accuracy,
+        }
+
+        return {
+            "loss": loss,
+            "log": tensorboard_logs,
         }
     
     def training_step(self, train_batch, batch_idx): 
@@ -342,7 +331,7 @@ def plot_metrics(conf, scale: str = "log", metric: str = "loss", save:bool = Fal
     """
     
     assert scale in ("log", "linear"), "y-scale not in ('log', 'linear')"
-    assert metric in ("loss", "accuracy", "TNR", "TPR"), "metric not in ('loss', 'accuracy', 'TNR', 'TPR')"
+    assert metric in ("loss", "accuracy"), "metric not in ('loss', 'accuracy')"
     ldir = Path(conf.experiment_args.experiment_root_dir)
     
     folder = f"{conf.experiment_args.model_name}/version_{conf.experiment_args.experiment_version}"
@@ -353,10 +342,6 @@ def plot_metrics(conf, scale: str = "log", metric: str = "loss", save:bool = Fal
     avg_valid_losses_all = {}
     avg_valid_accuracies_all = {}
     avg_train_accuracies_all = {}
-    avg_valid_TNR_all = {}
-    avg_train_TNR_all = {}
-    avg_valid_TPR_all = {}
-    avg_train_TPR_all = {}
     epochs_all = {}
 
 
@@ -366,10 +351,6 @@ def plot_metrics(conf, scale: str = "log", metric: str = "loss", save:bool = Fal
         avg_valid_losses_all = []
         avg_valid_accuracies_all = []
         avg_train_accuracies_all = []
-        avg_valid_TNR_all = []
-        avg_train_TNR_all = []
-        avg_valid_TPR_all = []
-        avg_train_TPR_all = []
         epochs_all = []
         summary_reader = SummaryReader(logdir, types=["scalar"])
 
@@ -387,14 +368,6 @@ def plot_metrics(conf, scale: str = "log", metric: str = "loss", save:bool = Fal
                 avg_valid_losses_all.append(item.value)
             elif item.tag == "avg_train_loss":
                 avg_train_losses_all.append(item.value)
-            elif item.tag == "avg_val_TNR":
-                avg_valid_TNR_all.append(item.value)
-            elif item.tag == "avg_train_TNR":
-                avg_train_TNR_all.append(item.value)
-            elif item.tag == "avg_val_TPR":
-                avg_valid_TPR_all.append(item.value)
-            elif item.tag == "avg_train_TPR":
-                avg_train_TPR_all.append(item.value)
     except:
         pass
 
@@ -402,10 +375,6 @@ def plot_metrics(conf, scale: str = "log", metric: str = "loss", save:bool = Fal
     np_valid_losses = np.array(avg_valid_losses_all)
     np_valid_accuracy = np.array(avg_valid_accuracies_all)
     np_train_accuracy = np.array(avg_train_accuracies_all)
-    np_valid_TNR = np.array(avg_valid_TNR_all)
-    np_train_TNR = np.array(avg_train_TNR_all)
-    np_valid_TPR = np.array(avg_valid_TPR_all)
-    np_train_TPR = np.array(avg_train_TPR_all)
     np_epochs = np.unique(np.array(epochs_all))
     
     df = pd.DataFrame(
@@ -414,10 +383,6 @@ def plot_metrics(conf, scale: str = "log", metric: str = "loss", save:bool = Fal
             "validation loss": np_valid_losses,
             "training acc":np_train_accuracy,
             "validation acc":np_valid_accuracy,
-            "training TNR":np_train_TNR,
-            "validation TNR":np_valid_TNR,
-            "training TPR":np_train_TPR,
-            "validation TPR":np_valid_TPR,
             "epoch": np_epochs[0:len(np_train_losses)]
        }
     )
@@ -428,12 +393,6 @@ def plot_metrics(conf, scale: str = "log", metric: str = "loss", save:bool = Fal
     elif metric == "loss":
         y1 = "training loss"
         y2 = "validation loss"
-    elif metric == "TPR":
-        y1 = "training TPR"
-        y2 = "validation TPR"
-    elif metric == "TNR":
-        y1 = "training TNR"
-        y2 = "validation TNR"
 
     plt.rcParams["figure.figsize"] = (20,10)
     ax = plt.gca()

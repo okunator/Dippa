@@ -2,15 +2,16 @@ import cv2
 import numpy as np
 import albumentations as A
 import ttach as tta
-from typing import List, Any
+from typing import List
 from albumentations.pytorch import ToTensorV2
+from albumentations.core.transforms_interface import BasicTransform
 
 
-def pre_transforms(image_size: int = 256) -> List[Any]:
+def pre_transforms(image_size: int = 256) -> List[BasicTransform]:
     return [A.Resize(image_size, image_size, p=1)]
 
 
-def test_transforms(input_size: int = 256) -> List[Any]:
+def test_transforms(input_size: int = 256) -> List[BasicTransform]:
     result = [
         A.VerticalFlip(p=.5),
         A.HorizontalFlip(p=.5),
@@ -23,7 +24,7 @@ def test_transforms(input_size: int = 256) -> List[Any]:
     return result
 
 
-def rigid_transforms(input_size: int = 256) -> List[Any]:
+def rigid_transforms(input_size: int = 256) -> List[BasicTransform]:
     return [
         A.OneOf([
             A.RandomRotate90(),
@@ -36,7 +37,7 @@ def rigid_transforms(input_size: int = 256) -> List[Any]:
     ]
 
 
-def non_rigid_transforms() -> List[Any]:
+def non_rigid_transforms() -> List[BasicTransform]:
     return [
         A.OneOf([
             A.ElasticTransform(
@@ -50,19 +51,19 @@ def non_rigid_transforms() -> List[Any]:
     ]
 
 
-def affine_transforms() -> List[Any]:
+def affine_transforms() -> List[BasicTransform]:
     return [A.ShiftScaleRotate(
         shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2
     )]
 
 
-def hue_saturation_transforms() -> List[Any]:
+def hue_saturation_transforms() -> List[BasicTransform]:
     return [A.HueSaturationValue(
         hue_shift_limit=(0,15), sat_shift_limit=0, val_shift_limit=0, p=.5
     )]
 
 
-def blur_transforms() -> List[Any]:
+def blur_transforms() -> List[BasicTransform]:
     return [
         A.OneOf([
             A.MotionBlur(p=0.5),
@@ -72,19 +73,19 @@ def blur_transforms() -> List[Any]:
     ]
 
 
-def center_crop(input_size: int) -> List[Any]:
+def center_crop(input_size: int) -> List[BasicTransform]:
     return [
         A.CenterCrop(input_size, input_size, always_apply=True, p=1)
     ]
 
 
-def random_crop(input_size: int) -> List[Any]:
+def random_crop(input_size: int) -> List[BasicTransform]:
     return [
         A.RandomCrop(input_size, input_size, always_apply=True, p=1)
     ]
 
 
-def non_spatial_transforms() -> List[Any]:
+def non_spatial_transforms() -> List[BasicTransform]:
     return [
         A.OneOf([
             A.CLAHE(p=0.8),
@@ -94,17 +95,17 @@ def non_spatial_transforms() -> List[Any]:
     ]
 
 
-def to_tensor() -> List[Any]:
+def to_tensor() -> List[BasicTransform]:
     return [ToTensorV2()]
 
 
-def compose(transforms_to_compose: List[Any]) -> A.Compose:
+def compose(transforms_to_compose: List[BasicTransform]) -> A.Compose:
     # combine all augmentations into one single pipeline
     result = A.Compose([item for sublist in transforms_to_compose for item in sublist])
     return result
 
 
-def no_transforms() -> List[Any]:
+def no_transforms() -> List[BasicTransform]:
     # convert to torch.Tensor only
     return [ToTensorV2()]
 
@@ -120,7 +121,7 @@ def tta_transforms() -> tta.Compose:
     )
 
 
-def tta_augs() -> List[Any]:
+def tta_augs() -> List[BasicTransform]:
     return [
         A.VerticalFlip(p=1),
         A.HorizontalFlip(p=1),
@@ -132,7 +133,7 @@ def tta_augs() -> List[Any]:
     ]
 
 
-def tta_deaugs() -> List[Any]:
+def tta_deaugs() -> List[BasicTransform]:
     return [
         A.VerticalFlip(p=1),
         A.HorizontalFlip(p=1),
@@ -144,7 +145,7 @@ def tta_deaugs() -> List[Any]:
     ]
 
 
-def tta_five_crops(io: np.ndarray) -> List[Any]:
+def tta_five_crops(io: np.ndarray) -> List[BasicTransform]:
     return [
         # left upper crop
         A.Crop(0, 0, io.shape[0]//2, io.shape[1]//2),
