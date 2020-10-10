@@ -128,20 +128,23 @@ class ProjectFileManager(FileHandler):
         return Path(PATCH_DIR / self.dsargs.patches_dtype / self.dataset)
     
     @property
-    def phases(self) -> List:
+    def phases(self) -> List[str]:
         assert self.dsargs.phases in (["train", "valid", "test"], ["train", "test"]), f"{self.dsargs.phases}"
         return self.dsargs.phases
     
     @property
-    def classes(self) -> Dict:
-        assert self.dsargs.class_types in ("binary", "types")
+    def classes(self) -> Dict[int, str]:
+        assert self.dsargs.class_types in ("binary", "semantic")
         yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
         data_conf = OmegaConf.load(yml_path)
-        return data_conf.class_types[self.dsargs.class_types]
+        if self.dataset == "consep":
+            key = data_conf.types_to_use
+        else:
+            key = self.dsargs.class_types
+        return data_conf.class_types[key]
 
     @property
     def img_types(self) -> Dict:
-        assert self.dsargs.class_types in ("binary", "types")
         yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
         data_conf = OmegaConf.load(yml_path)
         return data_conf.img_types

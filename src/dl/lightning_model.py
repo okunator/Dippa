@@ -22,7 +22,8 @@ from src.dl.datasets import SegmentationDataset
 from src.dl.torch_utils import to_device, argmax_and_flatten
 
 from src.dl.losses import (
-    JointCELoss, WeightedCELoss, JointSymmetricCELoss
+    JointCELoss, WeightedCELoss, JointSymmetricCELoss,
+    WeightedSymmetricCELoss
 )
 
 from src.img_processing.augmentations import (
@@ -137,12 +138,15 @@ class SegModel(pl.LightningModule):
         """
         bin_w = to_device(self.binary_class_weights) if self.class_weights else None
         if self.fm.class_types != "binary":
-            # type_w = to_device(self.type_class_weights) if self.class_weights else None
+            type_w = to_device(self.type_class_weights) if self.class_weights else None
             # criterion = JointCELoss(
             #     class_weights_binary=bin_w,
             #     class_weights_types=type_w
             # )
             criterion = JointSymmetricCELoss(
+                alpha=1.0,
+                beta=1.0,
+                reduction=False,
                 class_weights_binary=bin_w
             )
         else:
@@ -153,20 +157,11 @@ class SegModel(pl.LightningModule):
     # Lightning framework stuff:
     def forward(self, x):
         return self.model(x)
-
-    def step_return_dict(self, z, phase):
-        logs = {
-            f"{phase}_loss": z["loss"],
-            f"{phase}_accuracy": z["accuracy"]
-        }
-        
-        return {
-            "loss": z["loss"],
-            f"{phase}_accuracy": z["accuracy"],
-            "log":logs
-        }
     
     def step_singlebranch(self, batch, batch_idx):
+        """
+        For models with only one segmentation branch for instance segmentation.
+        """
         x = batch["image"]
         target = batch["binary_map"]
         target_weight = batch["weight_map"]
@@ -175,10 +170,10 @@ class SegModel(pl.LightningModule):
         target_weight = target_weight.float()
         target = target.long()
         
-        yhat = self.forward(x)
-        loss = self.criterion(yhat, target)
+        soft_mask = self.forward(x)
+        loss = self.criterion(soft_mask["instances"], target)
         accuracy = utils.metrics.accuracy(
-            argmax_and_flatten(yhat), target.view(1, -1)
+            argmax_and_flatten(soft_mask["instances"]), target.view(1, -1)
         )
         return {
             "loss":loss,
@@ -199,13 +194,20 @@ class SegModel(pl.LightningModule):
         inst_target = inst_target.long()
         type_target = type_target.long()
         
-        yhat_inst, yhat_type  = self.forward(x)
+        soft_mask = self.forward(x)
+
         loss = self.criterion(
-            yhat_inst, yhat_type, inst_target, type_target, self.edge_weight, target_weight
+            yhat_inst=soft_mask["instances"], 
+            yhat_type=soft_mask["types"], 
+            target_inst=inst_target, 
+            target_type=type_target, 
+            target_weight=self.edge_weight, 
+            edge_weight=target_weight,
+            device=self.device
         )
 
         type_acc = utils.metrics.accuracy(
-            argmax_and_flatten(yhat_inst), inst_target.view(1, -1)
+            argmax_and_flatten(soft_mask["instances"]), inst_target.view(1, -1)
         )
 
         return {
@@ -213,18 +215,30 @@ class SegModel(pl.LightningModule):
             "accuracy":type_acc[0],
         }
 
-    def epoch_end(self, outputs, phase):
-        accuracy = torch.stack([x[f"{phase}_accuracy"] for x in outputs]).mean()
-        loss = torch.stack([x["loss"] for x in outputs]).mean()
+    def step_return_dict(self, z, phase):
+        logs = {
+            f"{phase}_loss": z["loss"],
+            f"{phase}_accuracy": z["accuracy"]
+        }
 
-        tensorboard_logs = {
+        return {
+            "loss": z["loss"],
+            "accuracy": z["accuracy"],
+            "log": logs
+        }
+
+    def epoch_end(self, outputs, phase):
+        accuracy = torch.stack([x[f"accuracy"] for x in outputs]).mean()
+        loss = torch.stack([x[f"loss"] for x in outputs]).mean()
+
+        logs = {
             f"avg_{phase}_loss": loss,
             f"avg_{phase}_accuracy": accuracy,
         }
 
         return {
             "loss": loss,
-            "log": tensorboard_logs,
+            "log": logs,
         }
     
     def training_step(self, train_batch, batch_idx): 
@@ -268,17 +282,22 @@ class SegModel(pl.LightningModule):
         )
         
         # Lookahead optimizer
-        optimizer = Lookahead(base_optimizer)
+        optimizer = [Lookahead(base_optimizer)]
         
         # Scheduler
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, factor=self.factor, patience=self.patience
-        )
-        return [optimizer], [scheduler]
+        scheduler = [{
+            'scheduler': optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer[0], factor=self.factor, patience=self.patience
+            ),
+            'monitor': 'avg_val_loss',
+            'interval': 'epoch',
+            'frequency': 1
+        }]
+
+        return optimizer, scheduler 
     
     def prepare_data(self):
         # compose transforms
-        # transforms = compose([test_transforms()])
         train_transforms = compose([
             hue_saturation_transforms(),
             non_rigid_transforms(),

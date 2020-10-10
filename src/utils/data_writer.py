@@ -113,6 +113,13 @@ class PatchWriter(ProjectFileManager):
       
         return np.array(imgs), np.array(inst_maps), np.array(type_maps), np.array(overlays)
 
+    def __consep_classes(self, type_map: np.ndarray):
+        # Modify classes like in the paper
+        if len(self.classes) == 5:
+            type_map[(type_map == 3) | (type_map == 4)] = 3
+            type_map[(type_map == 5) | (type_map == 6) | (type_map == 7)] = 4
+        return type_map
+
     def __extract_patches(self, 
                           phase: str,
                           img_path: str,
@@ -121,6 +128,10 @@ class PatchWriter(ProjectFileManager):
         im = self.read_img(img_path)
         inst_map = self.read_mask(mask_path, key="inst_map")
         type_map = self.read_mask(mask_path, key="type_map")
+
+        if self.dataset == "consep":
+            type_map = self.__consep_classes(type_map)
+
         fd = np.concatenate([im, inst_map[..., None], type_map[..., None]], axis=-1)
 
         # calculate number of pixels in each class

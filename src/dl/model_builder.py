@@ -25,7 +25,10 @@ class SmpModelWithClsBranch(nn.Module):
        features = self.encoder(x)
        insts = self.inst_decoder(*features)
        types = self.type_decoder(*features)
-       return self.inst_seg_head(insts), self.type_seg_head(types)
+       return {
+           "instances": self.inst_seg_head(insts), 
+           "types": self.type_seg_head(types)
+       }
 
 
 class SmpGeneralModel(nn.Module):
@@ -43,4 +46,6 @@ class SmpGeneralModel(nn.Module):
    def forward(self, x):
        features = self.encoder(x)
        insts = self.inst_decoder(*features)
-       return self.inst_seg_head(insts)
+       return {
+           "instances": self.inst_seg_head(insts)
+       }

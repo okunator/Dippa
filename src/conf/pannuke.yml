@@ -2,7 +2,7 @@ class_types:
     binary:
         background: 0
         nuclei: 1
-    types:
+    semantic:
         background: 0
         neoplastic: 1
         inflammatory: 2
