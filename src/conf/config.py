@@ -8,7 +8,7 @@ CONFIG = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"Unet",
-            "experiment_version":"test_pannuke_unet_cls888",
+            "experiment_version":"test_pannuke_unet_cls_kakkipylly345",
         },
         
         # General dataset constants and args
@@ -18,10 +18,10 @@ CONFIG = OmegaConf.create(
             
             # This depends on the dataset. Binary segmentation can be done to all datasets
             # and semantic segmentation can be done to consep and pannuke datasets
-            # change this according to your needs. has to be one of ("binary", "types")
+            # change this according to your needs. has to be one of ("binary", "semantic")
             # Things won't crash even if types is used for a dataset that can be used only for 
             # binary segmentation
-            "class_types":"types", 
+            "class_types":"semantic", 
             
             # if phases = ["train", "valid", "test"]. The train set is also split to 
             # validation set. If phases = ["train", "test"], no splitting is done.
@@ -55,7 +55,7 @@ CONFIG = OmegaConf.create(
             "model_input_size":256,
             "tta":False, # use test time augmentation during training. Note: very slow w ttatch
             "resume_training":False, # continue training where you left off?
-            "num_epochs":3,
+            "num_epochs":1,
             "num_gpus":1,
             
             # optimizer args
@@ -76,15 +76,21 @@ CONFIG = OmegaConf.create(
         
         # Inference args
         "inference_args" : {
+            # For each experiment the model weights at the final epoch and best model against
+            # validation data will be saved. Choose one of ('best', 'last')
+            "model_weights": "best",
             "batch_size":6,
             "model_input_size":256,
-            "smoothen":False, # Inference time slightly slower. Gets rid of checkerboard. May lower PQ.
             "data_fold":"test", # what data fold (phase) to use in inference
-            "tta":False, # Inference time slightly slower
-            "threshold":0.5, # if smoothen is not used, then this is used for threshing soft masks
-            # For each experiment the model weights at the final epoch and best model against 
-            # validation data will be saved. Choose one of ('best', 'last')
-            "model_weights":"best",
+            # Inference time increases. Usually increases different metrics
+            "tta":False,
+            # Inference time increases. Gets rid of checkerboard. May lower PQ.
+            "smoothen": False,
+            # if smoothen is not used, then this is used for threshing soft masks. 
+            # Can be set to argmax also Union[float, str="argmax"]. 
+            "threshold":0.5,
+            # apply watershed based post_processing
+            "post_processing":True,
             "verbose":True,
         },
     }

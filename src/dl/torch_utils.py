@@ -38,7 +38,7 @@ def tensor_to_ndarray(tensor: torch.Tensor,
         squeeze (Optional[bool]): if batch size == 1. Squeeze it out. 
     """
     assert isinstance(tensor, torch.Tensor), f"Input type: {type(tensor)} is not torch.Tensor"
-    assert tensor.shape[1] < 2, f"tensor needs to have at least two channels. shape: {tensor.shape}" 
+    assert tensor.shape[1] >= 2, f"tensor needs to have at least two channels. shape: {tensor.shape}" 
 
     res_tensor = tensor.detach()
     if tensor.is_cuda:

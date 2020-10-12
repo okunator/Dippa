@@ -58,6 +58,7 @@ def activate_plus_dog(prob_map: np.ndarray) -> np.ndarray:
     prob_map = activation(prob_map, 'relu')
     prob_map = difference_of_gaussians(prob_map, 1, 10)
     prob_map = activation(prob_map, 'sigmoid')
+    return prob_map
 
 
 def to_inst_map(binary_mask: np.ndarray) -> np.ndarray:
@@ -269,8 +270,8 @@ def inv_dist_watershed(inst_map: np.ndarray, win_size: int = 13) -> np.ndarray:
 
     Args:
         inst_map (np.ndarray): The instance map to be segmented
-        win_size (int): window size used in niblack thresholding the distance maps to 
-                        find markers for watershed
+        win_size (int): window size used in niblack thresholding the 
+                        distance maps to find markers for watershed
     """
     
     seg = np.copy(inst_map)
@@ -314,14 +315,16 @@ def inv_dist_watershed(inst_map: np.ndarray, win_size: int = 13) -> np.ndarray:
 
 # Adapted from https://github.com/vqdang/hover_net/blob/master/src/process.py
 def combine_inst_semantic(inst_map: np.ndarray,
-                          type_map:np.ndarray) -> np.ndarray:
+                          type_map: np.ndarray) -> np.ndarray:
     """
     Takes in the outputs of the different segmentation heads and combines them into
     one panoptic segmentation result
     Args:
-        inst_map (np.ndarray): output from the instance segmentation head of a panoptic model
-                               or the post processed output of the instance seg head. Shape (H, W)
-        type_map (np.ndarray): output from the type segmentation head of a panoptic model Shape (H, W)
+        inst_map (np.ndarray): output from the instance segmentation head of 
+                               a panoptic model or the post processed output of 
+                               the instance seg head. Shape (H, W)
+        type_map (np.ndarray): output from the type segmentation head of 
+                               a panoptic model Shape (H, W)
     """
     inst_ids = {}
     pred_id_list = list(np.unique(inst_map))[1:]  # exclude background ID

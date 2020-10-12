@@ -17,7 +17,7 @@ from src.img_processing.augmentations import rigid_augs_and_crop
 
 
 # Lots of spadghetti b/c different datasets need different ad hoc processing to get stuff aligned
-class PatchWriter(ProjectFileManager):
+class PatchWriter(ProjectFileManager, PatchExtractor):
     def __init__(self, 
                  dataset_args: DictConfig,
                  experiment_args: DictConfig,
@@ -47,14 +47,6 @@ class PatchWriter(ProjectFileManager):
         self.verbose = patching_args.verbose
         self.crop_to_input = patching_args.crop_to_input       
         self.__validate_patch_args(self.patch_size, self.stride_size, self.input_size)
-        self.train_xtractor = PatchExtractor(
-            (self.patch_size, self.patch_size), 
-            (self.stride_size, self.stride_size)
-        )
-        self.test_xtractor = PatchExtractor(
-            (self.input_size, self.input_size),
-            (self.input_size, self.input_size)
-        )
 
     @classmethod
     def from_conf(cls, conf: DictConfig):
@@ -132,18 +124,22 @@ class PatchWriter(ProjectFileManager):
         if self.dataset == "consep":
             type_map = self.__consep_classes(type_map)
 
-        fd = np.concatenate([im, inst_map[..., None], type_map[..., None]], axis=-1)
+        full_data = np.concatenate([im, inst_map[..., None], type_map[..., None]], axis=-1)
 
-        # calculate number of pixels in each class
+        # compute number of pixels in each class
         totals = np.zeros((2, len(self.classes)))
         totals[0, :] = list(self.classes.values())
         for j, val in enumerate(self.classes.values()):
             totals[1, j] += sum(sum(type_map == val))
 
         if phase is not "test":
-            patches = self.train_xtractor.extract(fd, "mirror")
+            patches = self.extract_mirror(
+                full_data, 
+                (self.patch_size, self.patch_size),
+                (self.stride_size, self.stride_size)
+            )
         else:
-            patches = self.test_xtractor.extract_test_patches(fd, self.input_size)
+            patches = self.extract_test_patches(full_data, self.input_size)
 
         patches_im = patches[..., :3].astype("uint8")
         patches_mask = patches[..., 3:]
@@ -237,7 +233,7 @@ class PatchWriter(ProjectFileManager):
         # TODO
         pass
 
-    def viz_patched_img(self, 
+    def viz_patched_img(self,
                         phase: str,
                         img_type: str,
                         index: int) -> Tuple:
@@ -255,7 +251,8 @@ class PatchWriter(ProjectFileManager):
 
         img_path = self.data_folds[phase]["img"][index]
         mask_path = self.data_folds[phase]["mask"][index]
-        ims, imaps, tmaps, _ = self.__extract_patches(phase, img_path, mask_path)
+        ims, imaps, tmaps, _ = self.__extract_patches(
+            phase, img_path, mask_path)
 
         if img_type == "img":
             patches = ims
@@ -265,10 +262,7 @@ class PatchWriter(ProjectFileManager):
             patches = tmaps
         elif img_type == "overlay":
             patches = overlays(ims, imaps)
-
-        viz_patches(patches)
-        return patches.shape
-        
+            
     def viz_patch_from_db(self, phase: str, index: int) -> Tuple[np.ndarray]:
         """
         Opens the hdf5 file and queries for an image and a mask with an index and plots these.

@@ -1,6 +1,4 @@
-import cv2
 import torch
-import scipy.io
 import numpy as np
 import sklearn.feature_extraction.image
 import pandas as pd
@@ -10,30 +8,29 @@ import ttach as tta
 from torch import nn
 from pathlib import Path
 from omegaconf import DictConfig
-from skimage.filters import difference_of_gaussians
 from skimage.exposure import histogram
+from skimage.color import label2rgb
 from collections import OrderedDict
 from pathos.multiprocessing import ThreadPool as Pool
-from typing import List, Dict, Tuple, Callable, Any
+from typing import List, Dict, Tuple, Callable, Optional, Union
 
-from src.utils.file_manager import ProjectFileManager
-from src.img_processing.process_utils import remap_label
-from src.img_processing.viz_utils import draw_contours
+from src.utils.patch_extractor import PatchExtractor
+from src.utils.benchmarker import Benchmarker
+from src.dl.torch_utils import (
+    argmax_and_flatten, tensor_to_ndarray,
+    ndarray_to_tensor, to_device
+)
 
 from src.img_processing.post_processing import (
-    activation, naive_thresh_logits, smoothed_thresh, inv_dist_watershed
+    combine_inst_semantic, naive_thresh_prob, smoothed_thresh,
+    inv_dist_watershed, activate_plus_dog, activation
 )
 
 from src.img_processing.augmentations import (
     tta_augs, tta_deaugs, resize, tta_transforms, tta_five_crops
 )
-                                              
-from src.metrics.metrics import (
-    PQ, AJI, AJI_plus, DICE2, split_and_merge
-)
 
-# Got spaghetti?
-class Inferer(ProjectFileManager):
+class Inferer(Benchmarker, PatchExtractor):
     def __init__(self, 
                  model: nn.Module,
                  dataset_args: DictConfig,
@@ -59,8 +56,7 @@ class Inferer(ProjectFileManager):
                                          Check config.py for more info
 
         """
-        
-        
+    
         super(Inferer, self).__init__(dataset_args, experiment_args)
         self.model = model
         self.batch_size = inference_args.batch_size
@@ -70,11 +66,20 @@ class Inferer(ProjectFileManager):
         self.fold = inference_args.data_fold
         self.test_time_augs = inference_args.tta
         self.thresh = inference_args.threshold
+        self.post_proc = inference_args.post_processing
         
         # init containers for resluts
-        self.soft_maps = OrderedDict()
+        self.soft_insts = OrderedDict()
+        self.soft_types = OrderedDict()
         self.metrics = OrderedDict()
         self.inst_maps = OrderedDict()
+        self.type_maps = OrderedDict()
+        self.panoptic_maps = OrderedDict()
+
+        # Put SegModel to gpu|cpu and eval mode
+        self.model.cuda() if torch.cuda.is_available() else self.model.cpu()
+        self.model.model.eval()
+        torch.no_grad()
     
     
     @classmethod
@@ -91,79 +96,148 @@ class Inferer(ProjectFileManager):
             inference_args
         )
         
-    
     @property
     def stride_size(self) -> int:
         return self.input_size//2
     
-        
     @property
     def tta_model(self) -> nn.Module:
         return tta.SegmentationTTAWrapper(self.model, tta_transforms())
-    
     
     @property
     def images(self) -> List[str]:
         assert self.fold in self.phases, f"fold param: {self.fold} was not in given phases: {self.phases}" 
         return self.data_folds[self.fold]["img"]
     
-    
     @property
     def gt_masks(self) -> List[str]:
         assert self.fold in self.phases, f"fold param: {self.fold} was not in given phases: {self.phases}"
         return self.data_folds[self.fold]["mask"]
-    
-        
-    def __get_fn(self, path:str) -> Path:
-        return Path(path).name[:-4]
-    
-    
-    def __sample_idxs(self, n: int = 25) -> np.ndarray:
-        assert n <= len(self.images), "Cannot sample more integers than there are images in dataset"
-        # Dont plot more than 50 pannuke images
-        if self.dataset == "pannuke" and n > 50:
-            n = 50
-        return np.random.randint(low = 0, high=len(self.images), size=n)
-    
-    
-    def __to_device(self, tensor: torch.Tensor) -> torch.Tensor:
-        if torch.cuda.is_available():
-            tensor = tensor.type("torch.cuda.FloatTensor")
-        else:
-            tensor = tensor.type("torch.FloatTensor")
-        return tensor
-    
-    
-    def __predict_batch(self, batch: np.ndarray, batch_size: int) -> np.ndarray:
-        """
-        Do a prediction for a batch of size self.batch_size, or for a single patch i.e 
-        batch_size = 1. If tta is used or dataset is pannuke then batch_size = 1. Otherwise
-        batch size will be self.batch_size
-        """
-        if batch_size == 1:
-            tensor = self.__to_device(torch.from_numpy(batch.transpose(2, 0, 1))[None, ...])
-            out_batch = self.model(tensor).detach().cpu().numpy().squeeze().transpose(1, 2, 0)
-        else:
-            tensor = self.__to_device(torch.from_numpy(batch.transpose(0, 3, 1, 2)))
-            # out_batch = self.tta_model(batch) # ttach tta prediction
-            out_batch = self.model(tensor).detach().cpu().numpy()
-        return out_batch
-    
 
-    def __ensemble_predict(self, patch: np.ndarray) -> np.ndarray:
+    def __clear_predictions(self) -> None:
         """
-        Own implementation of tta ensemble prediction pipeline (memory issues with ttach).
-        This will loop every patch in a batch and do an ensemble prediction for every 
-        single patch.
+        Clear soft_masks if there are any
+        """
+        self.soft_insts.clear()
+
+    def __get_fn(self, path: str) -> Path:
+        return Path(path).name[:-4]
+
+    def __get_batch(self, arr: np.ndarray, batch_size: int) -> np.ndarray:
+        """
+        Divide patched image array into batches similarly to DataLoader in pytorch
+        convert it to torch.Tensor and move the the tensor to right device
+
+        Args:
+            arr (np.ndarray): patched array. Shape (num_patches, H, W, 3)
+            batch_size (int): size of the batch
+        Yields:
+            np.ndarray of shape (B, H, W, 3)
+        """
+        for i in range(0, arr.shape[0], batch_size):
+            yield arr[i:i + batch_size, ::]
+
+    def __get_patch(self, batch: np.ndarray) -> np.ndarray:
+        """
+        Divide a batch np.ndarray into patches 
+
+        Args:
+            batch (np.ndarray): inut image batch array. Shape (B, H, W, 3)
+        Yields:
+            a np.ndarray of shape (H, W, 3)
+        """
+        for i in range(batch.shape[0]):
+            yield i, batch[i]
+
+    def __apply_thresh_instmap(self,
+                               prob_map: np.ndarray,
+                               thresh: Optional[Union[float, str]]) -> np.ndarray:
+        """
+        Apply a thresholding or argmax to a instance segmentation soft mask
+
+        Args:
+            prob_map (np.ndarray): soft mask of shape (H, W, 2) for instance map
+            thresh (Uninon[float, str]): either a value between [0, 1] or "argmax".
+                                         If smoothen is used this is ignored.
+
+        Returns:
+            thresholded and labelled np.ndarray instance map of shape (H, W)
+        """
+        # TODO: add thresholding methods
+        assert prob_map.shape[2] == 2, f"Shape: {prob_map.shape} should have only two channels"
+        if self.smoothen:
+            mask = smoothed_thresh(prob_map)[..., 1]
+        elif self.thresh == "argmax":
+            mask = np.argmax(prob_map, axis=2)
+        elif isinstance(self.thresh, float):
+            mask = naive_thresh_prob(prob_map, thresh)[..., 1]
+        return mask
+
+    def __logits(self, patch: np.ndarray) -> Dict[str, torch.Tensor]:
+        """
+        Input an image patch or batch of patches to the network and return logits.
+
+        Args:
+            im (np.ndarray): image patch of shape (input_size, input_size, 3)
+                             or (B, input_size, input_size, 3)
+        Returns:
+            A dictionary {"instances":torch.Tensor, "types":Union[torch.Tensor, None]}
+        """
+        input_tensor = ndarray_to_tensor(patch)  # (1, 3, H, W)
+        input_tensor = to_device(input_tensor) # to cpu|gpu
+        return self.model(input_tensor)  # Dict[(B, 2, H, W), (B, C, H, W)]
+
+    def __gen_prediction(self, logits: torch.Tensor, squeeze: bool = False) -> np.ndarray:
+        """
+        Take in a patch or a batch of patches of logits produced by the model and
+        use sigmoid activation for instance logits and softmax for semantic logits
+        and convert the output to numpy nd.array.
+
+        Args:
+            logits (torch.Tensor): a tensor of logits produced by the network.
+                                   Shape: (B, C, input_size, input_size)
+            squeeze (bool): whether to squeeze the output batch if batch dim is 1
+        Returns:
+            np.ndarray of the result
+        """
+        if logits.shape[1] == 2:
+            pred = torch.sigmoid(logits)
+        else:
+            pred = torch.nn.functional.softmax(logits, dim=1)
+
+        return tensor_to_ndarray(pred, squeeze=squeeze)
+
+    def __smoothed_dog(self, patch: np.ndarray) -> np.ndarray:
+        """
+        Use DoG to smoothen soft mask patch.
+
+        Args:
+            patch (np.ndarray): the soft mask pach to smoothen. Shape (H, W, C)
+        """
+        for c in range(patch.shape[2]):
+            patch[..., c] = activate_plus_dog(patch[..., c])  # (H, W)
+        return patch
+         
+            
+    def __gen_ensemble_prediction(self, patch: np.ndarray) -> np.ndarray:
+        """
+        Tta ensemble prediction pipeline (memory issues with ttach).
+    
+        Args:
+            patch (np.ndarray): the img patch used for ensemble prediction. 
+                   shape (input_size, input_size, 3)
+        Returns:
+            np.ndarray soft mask of shape (input_size, input_size, C)
         
         Following instructions of 'beneficial augmentations' from:
         
         "Towards Principled Test-Time Augmentation"
         D. Shanmugam, D. Blalock, R. Sahoo, J. Guttag 
-        link : https://dmshanmugam.github.io/pdfs/icml_2020_testaug.pdf
+        https://dmshanmugam.github.io/pdfs/icml_2020_testaug.pdf
         
         1. vflip, hflip and transpose and rotations
         2. custom fivecrops aug
+        3. take the mean of predictions
         
         Idea for flips and rotations:
             1. flip or rotate, 
@@ -178,153 +252,156 @@ class Inferer(ProjectFileManager):
             5. Save result to result matrix
             6. Save result matrix to augmented results
         """
-        
-        soft_masks = []
+        soft_instances = []
+        soft_types = []
         
         # flip ttas
         for aug, deaug in zip(tta_augs(), tta_deaugs()):
-            aug_input = aug(image = patch)
-            aug_output = self.__predict_batch(aug_input["image"], 1)
-            deaug_output = deaug(image = aug_output)
-            soft_masks.append(deaug_output["image"])
+            aug_input = aug(image = patch) # (H, W, 3)
+            aug_logits = self.__logits(aug_input["image"]) # (1, C, H, W)
+            aug_insts = self.__gen_prediction(aug_logits["instances"], squeeze=True) # (H, W, C)
+            deaug_insts = deaug(image = aug_insts) # (H, W, C)
+            soft_instances.append(deaug_insts["image"])
+
+            if self.class_types == "semantic":
+                aug_types = self.__gen_prediction(aug_logits["types"], squeeze=True)# (H, W, C)
+                deaug_types = deaug(image=aug_types)  # (H, W, C)
+                soft_types.append(deaug_types["image"])
             
         # five crops tta
         scale_up = resize(patch.shape[0], patch.shape[1])
         scale_down = resize(patch.shape[0]//2, patch.shape[1]//2)
-        out = np.zeros((patch.shape[0], patch.shape[1], len(self.classes)))
+        out_insts = np.zeros((patch.shape[0], patch.shape[1], 2))
+        out_types = np.zeros((patch.shape[0], patch.shape[1], len(self.classes)))
         for crop in tta_five_crops(patch):
             cropped_im = crop(image = patch)
-            scaled_im = scale_up(image = cropped_im["image"])
-            output = self.__predict_batch(scaled_im["image"], 1)
-            downscaled_out = scale_down(image = output)
-            out[crop.y_min:crop.y_max, crop.x_min:crop.x_max] = downscaled_out["image"]
-            soft_masks.append(out)
+            scaled_im = scale_up(image = cropped_im["image"]) # (H, W, C)
+            aug_logits = self.__logits(scaled_im["image"])  # (1, C, H, W)
+            aug_insts = self.__gen_prediction(aug_logits["instances"], squeeze=True) # (H, W, C)
+            downscaled_insts = scale_down(image = aug_insts) # (H//2, W//2, C)
+            out_insts[crop.y_min:crop.y_max, crop.x_min:crop.x_max] = downscaled_insts["image"] # (H, W, C)
+            soft_instances.append(out_insts)
+
+            if self.class_types == "semantic":
+                aug_types = self.__gen_prediction(aug_logits["types"], squeeze=True) # (H, W, C)
+                downscaled_types = scale_down(image=aug_types)  # (H//2, W//2, C)
+                out_types[crop.y_min:crop.y_max,crop.x_min:crop.x_max] = downscaled_types["image"]  # (H, W, C)
+                soft_types.append(out_types)
+
+        # TODO:
+        # 16 crops tta
             
         # take the mean of all the predictions
-        return np.asarray(soft_masks).mean(axis=0).transpose(2, 0, 1)
-    
-    
-    def __smoothen(self, prob_map: np.ndarray) -> np.ndarray:
+        return {
+            "instances":np.asarray(soft_instances).mean(axis=0),
+            "types": np.asarray(soft_types).mean(axis=0)
+        }
+
+    def prediction_two_branch(self, batch: np.ndarray) -> np.ndarray:
         """
-        Use gaussian differences from skimage to smoothen out prediction.
-        Effectively removes checkerboard effect after the tiles are merged and eases
-        thresholding from the prediction histogram.
-        
-        prob_map.shape = (class, width, height)
+        Takes in an image batch of shape (B, input_size, input_size, 3) and
+        produces a prediction from a network with separate instance and semantic
+        segmentation branch.
+
+        Args:
+            batch (np.ndarray): image batch for prediction
         """
-        for c in range(len(self.classes)):
-            prob_map[c, ...] = difference_of_gaussians(prob_map[c, ...], 1, 50)
-            prob_map[c, ...] = activation(prob_map[c, ...], 'relu')
-            prob_map[c, ...] = difference_of_gaussians(prob_map[c, ...], 1, 10)
-            prob_map[c, ...] = activation(prob_map[c, ...], 'sigmoid')
-        return prob_map
-    
-    
-    def __divide_batch(self, arr: np.ndarray, batch_size: int) -> np.ndarray:
+        pred_batch_insts = np.zeros(
+            (batch.shape[0], self.input_size, self.input_size, 2)
+        )
+        pred_batch_types = np.zeros(
+            (batch.shape[0], self.input_size, self.input_size, len(self.classes))
+        )
+
+        if not self.test_time_augs:
+            pred_logits = self.__logits(batch)
+            pred_batch_insts = self.__gen_prediction(pred_logits["instances"]) # (B, H, W, 2)
+            pred_batch_types = self.__gen_prediction(pred_logits["types"]) # (B, H, W, C)
+        else:
+            for i, patch in self.__get_patch(batch):  # (H, W, 3)
+                ensemble = self.__gen_ensemble_prediction(patch)
+                pred_batch_insts[i, ...] = ensemble["instances"] # (H, W, 2)
+                pred_batch_types[i, ...] = ensemble["types"] # (H, W, C)
+
+        if self.smoothen:
+            for i, pred_patch in self.__get_patch(pred_batch_insts): # (H, W, C)
+                pred_patch = self.__smoothed_dog(pred_patch)
+                pred_batch_insts[i, ...] = pred_patch  # (H, W, C)
+
+            for i, pred_patch in self.__get_patch(pred_batch_types): # (H, W, C)
+                pred_patch = self.__smoothed_dog(pred_patch)
+                pred_batch_types[i, ...] = pred_patch  # (H, W, C)
+
+        return {
+            "instances":pred_batch_insts,
+            "types":pred_batch_types
+        }
+
+    def prediction_single_branch(self, batch: np.ndarray) -> np.ndarray:
         """
-        Divide patched image array into batches similarly to DataLoader in pytorch
+        Takes in an image batch of shape (B, input_size, input_size, 3) and produces
+        a prediction from a network with only an instance branch.
+        Args:
+            batch (np.ndarray): image batch for prediction
         """
-        for i in range(0, arr.shape[0], batch_size):  
-            yield arr[i:i + batch_size, ::] 
-    
-    
-    def __predict_patches(self, im_patches: np.ndarray) -> np.ndarray:
+        pred_batch_insts = np.zeros(
+            (batch.shape[0], self.input_size, self.input_size, 2)
+        )
+
+        if not self.test_time_augs:
+            pred_logits = self.__logits(batch)
+            pred_batch_insts = self.__gen_prediction(pred_logits["instances"]) # (B, H, W, 2)
+        else:
+            for i, patch in self.__get_patch(batch):  # (H, W, 3)
+                ensemble = self.ensemble_predict(patch)
+                pred_batch_insts[i, ...] = ensemble["instances"] # (H, W, 2)
+        if self.smoothen:
+            for i, pred_patch in self.__get_patch(pred_batch_insts): # (H, W, C)
+                pred_patch = self.__smoothed_dog(pred_patch)
+                pred_batch_insts[i, ...] = pred_patch  # (H, W, C)
+
+        return {
+            "instances":pred_batch_insts,
+        }
+
+    def predict_patches(self, im_patches: np.ndarray) -> np.ndarray:
         """
         Divide patched image array to batches and process and run predictions for batches.
-        Pannuke imgs are not divided to patches and are utilized as is.
-        """
-        pred_patches = np.zeros((0, len(self.classes), self.input_size, self.input_size))
-        for batch in self.__divide_batch(im_patches, self.batch_size):
-            
-            pred_batch = np.zeros(
-                (batch.shape[0], len(self.classes), self.input_size, self.input_size)
-            )
-            
-            if not self.test_time_augs:
-                pred_batch = self.__predict_batch(batch, self.batch_size)
+        Use tta and DoG smoothing if specified in config.py.
 
-            for i in range(batch.shape[0]):
-                if self.test_time_augs:
-                    pred_batch[i, ...] = self.__ensemble_predict(batch[i, ...])
+        Args:
+            im_patches (np.ndarray): patched input image of shape 
+                                    (num_patches, input_size, input_size, 3)
+        Returns:
+            np.ndarray containing patched soft mask of shape 
+            (num_patches, input_size, input_size, C)
+        """
+        pred_patches_insts = np.zeros((0, self.input_size, self.input_size, 2))
+        pred_patches_types = np.zeros((0, self.input_size, self.input_size, len(self.classes)))
+        for batch in self.__get_batch(im_patches, self.batch_size): # (B, H, W, 3)
+            if self.class_types == "semantic":
+                pred_patch = self.prediction_two_branch(batch)
+                insts = pred_patch["instances"]
+                types = pred_patch["types"]
+                pred_patches_insts = np.append(pred_patches_insts, insts, axis=0) # (B, H, W, C)
+                pred_patches_types = np.append(pred_patches_types, types, axis=0) # (B, H, W, C)
+            else:
+                pred_patch = self.prediction_single_branch(batch)
+                insts = pred_patch["instances"]
+                pred_patches_insts = np.append(pred_patches_insts, insts, axis=0) # (B, H, W, C)
 
-                if self.smoothen:
-                    pred_batch[i, ...] = self.__smoothen(pred_batch[i, ...])
-                else:
-                    pred_batch[i, ...] = activation(pred_batch[i, ...], "sigmoid")
-                    
-            pred_patches = np.append(pred_patches, pred_batch, axis=0)
-
-        pred_patches = pred_patches.transpose((0, 2, 3, 1))
-        return pred_patches
-    
-    
-    def __extract_patches(self, im: np.ndarray) -> np.ndarray:
+        return {
+            "instances":pred_patches_insts,
+            "types":pred_patches_types
+        }
+   
+    def run_predictions_all(self) -> None:
         """
-        Extract network input sized patches from images bigger than the network input size
-        """
-        # add reflection padding
-        pad = self.stride_size//2
-        io = np.pad(im, [(pad, pad), (pad, pad), (0, 0)], mode="reflect")
-
-        # add extra padding to match an exact multiple of 32 (unet) patch size, 
-        extra_pad_row = int(np.ceil(io.shape[0] / self.input_size)*self.input_size - io.shape[0])
-        extra_pad_col = int(np.ceil(io.shape[1] / self.input_size)*self.input_size - io.shape[1])
-        io = np.pad(io, [(0, extra_pad_row), (0, extra_pad_col), (0, 0)], mode="constant")
-        
-        # extract the patches from input images
-        arr_out = sklearn.feature_extraction.image.extract_patches(
-            io, (self.input_size, self.input_size, 3), self.stride_size
-        )
-        
-        # shape the dimensions to correct sizes for pytorch model
-        arr_out_shape = arr_out.shape
-        arr_out = arr_out.reshape(-1, self.input_size, self.input_size, 3)
-        return arr_out, arr_out_shape
-        
-    
-    def __stitch_patches(self, 
-                         pred_patches: np.ndarray, 
-                         im_shape: Tuple, 
-                         patches_shape: Tuple) -> np.ndarray:
-        """
-        Back stitch all the soft map patches to full size img
-        """
-        #turn from a single list into a matrix of tiles
-        pred_patches = pred_patches.reshape(
-            patches_shape[0], 
-            patches_shape[1], 
-            self.input_size, 
-            self.input_size,
-            pred_patches.shape[3]
-        )
-        
-        # remove the padding from each tile, we only keep the center
-        pad = self.stride_size//2
-        pred_patches = pred_patches[:, :, pad:-pad, pad:-pad, :]
-    
-        # turn all the tiles into an image
-        pred = np.concatenate(np.concatenate(pred_patches, 1), 1)
-    
-        # incase there was extra padding to get a multiple of patch size, remove that as well
-        # remove paddind, crop back
-        pred = pred[0:im_shape[0], 0:im_shape[1], :]
-        return pred
-
-    
-    def run(self) -> None:
-        """
-        Do inference on the given dataset, with a pytorch lightning model that 
-        has been trained. See lightning_model.py and Train_lightning.ipynb.
-        """
-        
-        # Put SegModel to gpu
-        self.model.cuda() if torch.cuda.is_available() else self.model.cpu()    
-        self.model.model.eval()
-        torch.no_grad()
-        
-        if self.soft_maps:
-            print("Clearing previous predictions")
-            self.clear_predictions()
+        Run predictions for all the images in the dataset defined in config.py.
+        Saves all the predictions to a container so this will take some memory.
+        """        
+        if self.soft_insts:
+            self.__clear_predictions()
                     
         for path in self.images:
             fn = self.__get_fn(path)
@@ -333,242 +410,156 @@ class Inferer(ProjectFileManager):
                 
             im = self.read_img(path)
             if self.dataset == "pannuke":
-                result_pred = self.__predict_patches(im[None, ...])
-                result_pred = result_pred.squeeze()
+                result_pred = self.predict_patches(im[None, ...])
+                res_insts = result_pred["instances"]
+                if self.class_types == "semantic":
+                    res_types = result_pred["types"]
             else:
-                im_patches, patches_shape = self.__extract_patches(im)
-                pred_patches = self.__predict_patches(im_patches)
-                result_pred = self.__stitch_patches(pred_patches, im.shape, patches_shape)
+                patches, shape = self.extract_inference_patches(im, self.stride_size, self.input_size)
+                pred_patches = self.predict_patches(patches)
+                insts = pred_patches["instances"]
+                res_insts = self.stitch_inference_patches(insts, self.stride_size, shape, im.shape)
+                if self.class_types == "semantic":
+                    types = pred_patches["types"]
+                    res_types = self.stitch_inference_patches(types, self.stride_size, shape, im.shape)
             
-            nuc_map = result_pred[..., 1]
-            bg_map = result_pred[..., 0]
-            self.soft_maps[f"{fn}_nuc_map"] = nuc_map
-            self.soft_maps[f"{fn}_bg_map"] = bg_map
+            if self.class_types == "semantic":
+                self.soft_types[f"{fn}_types"] = res_types
+                self.type_maps[f"{fn}_type_map"] = np.argmax(res_types, axis=2)
+
+            self.soft_insts[f"{fn}_instances"] = res_insts
+
             
-    
-    def _post_process_pipeline(self,
-                               prob_map: np.ndarray, 
-                               thresh: float, 
-                               postproc_func: Callable = inv_dist_watershed):
-        # threshold first
-        if self.smoothen:
-            mask = smoothed_thresh(prob_map)
-        else:
-            mask = naive_thresh_logits(prob_map, thresh)
+    def post_process_instmap(self,
+                             soft_inst: np.ndarray,
+                             thresh: Union[float, str],
+                             postproc_func: Optional[Callable] = inv_dist_watershed) -> np.ndarray:
+        """
+        Takes in a soft instance mask of shape (H, W, C) and thresholds it.
+        Post processing is applied if defined in config.py
+
+        Args:
+            soft_inst (np.ndarray): soft mask of instances. Shape (H, W, C)
+            thresh (Union[float, sty]): threshold value for naive thresholding or a str
+                                        specifying a thresholding method. For now only 
+                                        "argmax" is available.
+            postproc_func (Callable): a post processing function that takes in an 2D 
+                                      inst map. For now only inv_dist_watershed avail.
+
+        Returns:
+            np.ndarray with instances labelled
+        """
+
+        inst_map = self.__apply_thresh_instmap(soft_inst, thresh)
+        if self.post_proc:
+            inst_map = postproc_func(inst_map)
+        return inst_map
+
+    def panoptic_output(self,
+                        inst_map: np.ndarray,
+                        type_map: np.ndarray) -> np.ndarray:
+        """
+        For now only a wrapper for combine_inst_semantic from src.img_processing.post_processing
+        """
+        # TODO: optional different combining heuristics
+        return combine_inst_semantic(inst_map, type_map)
+
                 
-        # post-processing after thresholding
-        return postproc_func(mask)        
-    
-    
-    def _compute_metrics(self, true: np.ndarray, pred: np.ndarray) -> Dict:
-        # Count scores for each file if gt has annotations
-        if len(np.unique(true)) > 1: 
-            pq = PQ(remap_label(true), remap_label(pred))
-            aji = AJI(remap_label(true), remap_label(pred))
-            aji_p = AJI_plus(remap_label(true), remap_label(pred))
-            dice2 = DICE2(remap_label(true), remap_label(pred))
-            splits, merges = split_and_merge(remap_label(true), remap_label(pred))
-
-            return {
-                "AJI": aji, 
-                "AJI_plus": aji_p, 
-                "DICE2": dice2, 
-                "PQ": pq["pq"], # panoptic quality
-                "SQ": pq["sq"], # segmentation quality
-                "DQ": pq["dq"], # Detection quality i.e. F1-score
-                "inst_Sensitivity": pq["sensitivity"],
-                "inst_Precision": pq["precision"],
-                "splits":splits,
-                "merges":merges
-            }
-
-            
     def post_process(self) -> None:
         """
-        Run post processing pipeline for all the predictions from the network
+        Run post processing pipeline for all the predictions from the network.
+        Assumes that 'run_predictions_all' has been run beforehand. If semantic
+        classes exist this creates also a panoptic output from the semantic and
+        instance segmentations by applying heuristics to combine the outputs to
+        a single one. Heuristics are from the HoVer-net paper.
         """
         
-        assert self.soft_maps, f"{self.soft_maps}, No predictions found. Run predictions first"
-        self.model.cpu() # put model to cpu (avoid pool errors)
+        assert self.soft_insts, (
+            f"{self.soft_insts}, No predictions found. Run 'run_for_all' first"
+        )
         
-        preds = [(self.soft_maps[key], self.thresh) 
-                 for key in self.soft_maps.keys() 
-                 if key.endswith("nuc_map")]
+        inst_preds = [(self.soft_insts[key], self.thresh) 
+                      for key in self.soft_insts.keys() 
+                      if key.endswith("instances")]
                 
         # pickling issues in ProcessPool with typing, hard to fix.. Using ThreadPool instead        
         with Pool() as pool:
-            segs = pool.starmap(self._post_process_pipeline, preds)
+            segs = pool.starmap(self.post_process_instmap, inst_preds)
         
         for i, path in enumerate(self.images):
             fn = self.__get_fn(path)
             self.inst_maps[f"{fn}_inst_map"] = segs[i]
-            
-            
-    def benchmark(self, save: bool = False) -> pd.DataFrame:
-        """
-        Run benchmarking metrics for all of the files in the dataset
-        """
-        
-        assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
-        
-        inst_maps = [self.inst_maps[key].astype("uint16") for key in self.inst_maps.keys()]
-        gts = [self.read_mask(f) for f in self.gt_masks]
-        params_list = list(zip(gts, inst_maps))
-        
-        with Pool() as pool:
-            metrics = pool.starmap(self._compute_metrics, params_list)
-        
-        for i, path in enumerate(self.images):
-            fn = self.__get_fn(path)
-            self.metrics[f"{fn}_metrics"] = metrics[i]
-            
-        # Create pandas df of the result metrics        
-        score_df = pd.DataFrame(self.metrics).transpose()
-        score_df.loc["averages_for_the_set"] = score_df.mean(axis=0)
-        
-        if self.dataset == "pannuke":
-            df = score_df.rename_axis("fn").reset_index()
-            td = {f"{tis}_avg": df[df.fn.str.contains(f"{tis}")].mean(axis=0) for tis in self.pannuke_tissues}
-            score_df = pd.concat([score_df, pd.DataFrame(td).transpose()])
-        
-        if save:
-            result_dir = Path(self.experiment_dir / "benchmark_results")
-            self.create_dir(result_dir)
-            s = "smoothed" if self.smoothed else ""
-            t = "tta" if self.tta else ""
-            score_df.to_csv(Path(result_dir / f"{s}_{t}_benchmark_result.csv"))
-        
-        return score_df
-    
-    
-    def clear_predictions(self) -> None:
-        """
-        Clear soft_masks if there are any
-        """
-        self.soft_maps.clear()
-    
-        
-    def plot_predictions(self) -> None:
-        """
-        Plot the probability maps after running inference.
-        """
-        
-        assert len(self.soft_maps) != 0, "No predictions found"
-    
-        fig, axes = plt.subplots(len(self.images), 2, figsize=(65, len(self.images)*12))
-        fig.tight_layout(w_pad=4, h_pad=4)
-        for i, path in enumerate(self.images):
-            fn = self.__get_fn(path)
-            nuc_map = self.soft_maps[f"{fn}_nuc_map"]
-            bg_map = self.soft_maps[f"{fn}_bg_map"]
-            axes[i][0].imshow(nuc_map, interpolation="none")
-            axes[i][0].axis("off")
 
-            axes[i][1].imshow(bg_map, interpolation="none")
-            axes[i][1].axis("off")
-    
-    
-    def plot_histograms(self) -> None:
+        # combine semantic and instance segmentations
+        if self.class_types == "semantic":
+            maps = [(self.inst_maps[i].astype("uint16"), self.type_maps[t].astype("uint8"))
+                    for i, t in zip(self.inst_maps, self.type_maps)]
+
+            with Pool() as pool:
+                panops = pool.starmap(combine_inst_semantic, maps)
+
+            for i, path in enumerate(self.images):
+                fn = self.__get_fn(path)
+                self.panoptic_maps[f"{fn}_panoptic_map"] = panops[i]
+                        
+    def plot_outputs(self, 
+                     out_type: str,
+                     ixs: Union[List[int], int] = -1,
+                     save: bool = False) -> None:
         """
-        Plot the histograms of the probability maps after running inference.
-        """
-        
-        assert self.soft_maps, "No predictions found"
-        idxs = self.__sample_idxs(25)
-        images = np.asarray(self.images)[idxs] if self.dataset == "pannuke" else self.images 
-        
-        figg, axes = plt.subplots(len(images)//3, 4, figsize=(30,15))
-        axes = axes.flatten()
-        for j, path in enumerate(images):
-            fn = self.__get_fn(path)
-            nuc_map = self.soft_maps[f"{fn}_nuc_map"]
-            hist, hist_centers = histogram(nuc_map)
-            axes[j].plot(hist_centers, hist, lw=2)
-            
-            
-    def plot_segmentations(self) -> None:
-        """
-        Plot all the binary segmentations after running post_processing.
-        """
-        assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
-        idxs = self.__sample_idxs(15)
-        images = np.asarray(self.images)[idxs] if self.dataset == "pannuke" else self.images
-        gt_masks = np.asarray(self.gt_masks)[idxs] if self.dataset == "pannuke" else self.gt_masks
-    
-        fig, axes = plt.subplots(len(images), 4, figsize=(65, len(images)*12))
-        fig.tight_layout(w_pad=4, h_pad=4)
-        for j, path in enumerate(images):
-            fn = self.__get_fn(path)
-            im = self.read_img(images[j])
-            gt = self.read_mask(gt_masks[j])
-            inst_map = self.inst_maps[f"{fn}_inst_map"]
-            nuc_map = self.soft_maps[f"{fn}_nuc_map"]
-            axes[j][0].imshow(im, interpolation="none")
-            axes[j][0].axis("off")
-            axes[j][1].imshow(nuc_map, interpolation="none")
-            axes[j][1].axis("off")
-            axes[j][2].imshow(inst_map, interpolation="none")
-            axes[j][2].axis("off")
-            axes[j][3].imshow(gt, interpolation="none")
-            axes[j][3].axis("off")
-            
-            
-    def plot_overlays(self, ixs: Any =-1, save: bool = False) -> None:
-        """
-        Plot segmentation result and ground truth overlaid on the original image side by side
+        Plot different outputs this instance holds. Options are: inst_maps, type_maps,
+        soft_insts, soft_types, panoptic_maps.
+
         Args:
-            ixs (List or int): list of the indexes of the image files in Inferer.images. 
-                               default = -1 means all images in the data fold are plotted. If 
-                               dataset = "pannuke" and ixs = -1, then 25 random images are sampled.
-            save (bool): Save the plots
+            out_type (str): output type to plot. Options are listed above
+
         """
-        assert self.inst_maps, f"{self.inst_maps}, No instance maps found. Run post_processing first!"
-        
+
+        assert out_type in ("inst_maps", "type_maps",
+                            "soft_insts", "soft_types", "panoptic_maps")
+
+        assert self.__dict__[out_type], (
+            f"outputs for {out_type} not found. Run predictions and then" 
+            " post processing to get them all"
+        )
+
         message = (
-            f"param ixs: ({ixs}) needs to be a list of ints in"
+            f"param ixs: {ixs} needs to be a list of ints in"
             " the range of number of images in total or -1."
             f" number of images = {len(self.images)}"
         )
-        
+
         if isinstance(ixs, List):
             assert all(i <= len(self.images) for i in ixs), message
         elif isinstance(ixs, int):
             assert ixs == -1, message
-        
-            
+
         if ixs == -1:
             idxs = np.array(range(len(self.images)))
         elif ixs == -1 and self.dataset == "pannuke":
-            idxs = self.__sample_idxs(25)
+            idxs = self.sample_idxs(25)
         else:
             idxs = np.array(ixs)
-            
-        images = np.asarray(self.images)[idxs]
-        gt_masks = np.asarray(self.gt_masks)[idxs]
-        
-        fig, axes = plt.subplots(len(images), 2, figsize=(40, len(images)*20), squeeze=False)
-        for j, path in enumerate(images): 
-            fn = self.__get_fn(path)
-            im = self.read_img(path)
-            gt = self.read_mask(gt_masks[j])
-            inst_map = self.inst_maps[f"{fn}_inst_map"]
-            _, im_gt = draw_contours(gt, im)
-            _, im_res = draw_contours(inst_map, im)
-            
-            axes[j, 0].set_title(f"Ground truth: {fn}", fontsize=30)
-            axes[j, 0].imshow(im_gt, interpolation='none')
-            axes[j, 0].axis('off')
-            axes[j, 1].set_title(f"Segmentation result: {fn}", fontsize=30)
-            axes[j, 1].imshow(im_res, cmap='gray', interpolation='none')
-            axes[j, 1].axis('off')
-            
+
+        outputs = [list(self.__dict__[out_type].items())[i] for i in idxs]
+        ncol = outputs[0][1].shape[-1] if outputs[0][1].ndim > 2 else 1
+        fig, axes = plt.subplots(
+            len(outputs), ncol, figsize=(ncol*12, len(outputs)*10), squeeze=False
+        )
+
+        for j, (name, out) in enumerate(outputs):
+            for c in range(ncol):
+                x = out[..., c] if ncol > 1 else label2rgb(out, bg_label=0)
+                axes[j, c].set_title(f"{name}", fontsize=30)
+                axes[j, c].imshow(x, interpolation='none')
+                axes[j, c].axis('off')
+
         fig.tight_layout(w_pad=4, h_pad=10)
-        
+
         if save:
             plot_dir = Path(self.experiment_dir / "inference_plots")
             self.create_dir(plot_dir)
-            
+
             s = "smoothed" if self.smoothed else ""
             t = "tta" if self.tta else ""
-            fig.savefig(Path(plot_dir / f"{fn}_{t}_{s}result.png"))
-
+            fig.savefig(Path(plot_dir / f"{name}_{t}_{s}_result.png"))

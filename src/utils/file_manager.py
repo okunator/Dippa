@@ -133,7 +133,7 @@ class ProjectFileManager(FileHandler):
         return self.dsargs.phases
     
     @property
-    def classes(self) -> Dict[int, str]:
+    def classes(self) -> Dict[str, int]:
         assert self.dsargs.class_types in ("binary", "semantic")
         yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
         data_conf = OmegaConf.load(yml_path)
