@@ -139,16 +139,16 @@ class SegModel(pl.LightningModule):
         bin_w = to_device(self.binary_class_weights) if self.class_weights else None
         if self.fm.class_types != "binary":
             type_w = to_device(self.type_class_weights) if self.class_weights else None
-            # criterion = JointCELoss(
-            #     class_weights_binary=bin_w,
-            #     class_weights_types=type_w
-            # )
-            criterion = JointSymmetricCELoss(
-                alpha=1.0,
-                beta=1.0,
-                reduction=False,
-                class_weights_binary=bin_w
+            criterion = JointCELoss(
+                class_weights_binary=bin_w,
+                class_weights_types=type_w
             )
+            # criterion = JointSymmetricCELoss(
+            #     alpha=1.0,
+            #     beta=1.0,
+            #     reduction=False,
+            #     class_weights_binary=bin_w
+            # )
         else:
             criterion = WeightedCELoss(class_weights=bin_w)
         return criterion

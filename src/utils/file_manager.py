@@ -164,7 +164,15 @@ class ProjectFileManager(FileHandler):
     def pannuke_tissues(self) -> List:
         assert self.dataset == "pannuke", f"dataset: {self.dataset}. dataset not pannuke"
         return self.dsargs.tissues
-              
+
+    def consep_classes(self, type_map: np.ndarray) -> np.ndarray:
+        assert self.dataset == "consep", f"dataset: {self.dataset}. dataset not consep"
+        # Modify classes like in the paper
+        if len(self.classes) == 5:
+            type_map[(type_map == 3) | (type_map == 4)] = 3
+            type_map[(type_map == 5) | (type_map == 6) | (type_map == 7)] = 4
+        return type_map
+        
     @property
     def data_folds(self) -> Dict:
         """

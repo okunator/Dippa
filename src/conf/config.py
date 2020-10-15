@@ -8,7 +8,7 @@ CONFIG = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"Unet",
-            "experiment_version":"test_pannuke_unet_cls_kakkipylly345",
+            "experiment_version":"test_consep_DeepLabV3_presentation",
         },
         
         # General dataset constants and args
@@ -55,7 +55,7 @@ CONFIG = OmegaConf.create(
             "model_input_size":256,
             "tta":False, # use test time augmentation during training. Note: very slow w ttatch
             "resume_training":False, # continue training where you left off?
-            "num_epochs":1,
+            "num_epochs":13,
             "num_gpus":1,
             
             # optimizer args
@@ -78,7 +78,7 @@ CONFIG = OmegaConf.create(
         "inference_args" : {
             # For each experiment the model weights at the final epoch and best model against
             # validation data will be saved. Choose one of ('best', 'last')
-            "model_weights": "best",
+            "model_weights": "last",
             "batch_size":6,
             "model_input_size":256,
             "data_fold":"test", # what data fold (phase) to use in inference

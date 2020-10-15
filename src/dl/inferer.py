@@ -3,6 +3,7 @@ import numpy as np
 import sklearn.feature_extraction.image
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import ttach as tta
 
 from torch import nn
@@ -16,6 +17,7 @@ from typing import List, Dict, Tuple, Callable, Optional, Union
 
 from src.utils.patch_extractor import PatchExtractor
 from src.utils.benchmarker import Benchmarker
+from src.img_processing.viz_utils import draw_contours, KEY_COLORS, COLORS
 from src.dl.torch_utils import (
     argmax_and_flatten, tensor_to_ndarray,
     ndarray_to_tensor, to_device
@@ -23,7 +25,8 @@ from src.dl.torch_utils import (
 
 from src.img_processing.post_processing import (
     combine_inst_semantic, naive_thresh_prob, smoothed_thresh,
-    inv_dist_watershed, activate_plus_dog, activation
+    inv_dist_watershed, activate_plus_dog, activation,
+    shape_index_watershed
 )
 
 from src.img_processing.augmentations import (
@@ -71,7 +74,6 @@ class Inferer(Benchmarker, PatchExtractor):
         # init containers for resluts
         self.soft_insts = OrderedDict()
         self.soft_types = OrderedDict()
-        self.metrics = OrderedDict()
         self.inst_maps = OrderedDict()
         self.type_maps = OrderedDict()
         self.panoptic_maps = OrderedDict()
@@ -122,6 +124,12 @@ class Inferer(Benchmarker, PatchExtractor):
 
     def __get_fn(self, path: str) -> Path:
         return Path(path).name[:-4]
+
+    def __sample_idxs(self, n: int = 25) -> np.ndarray:
+        assert n <= len(self.images), "Cannot sample more ints than there are images in dataset"
+        # Dont plot more than 50 pannuke images
+        n = 50 if self.dataset == "pannuke" and n > 50 else n
+        return np.random.randint(low=0, high=len(self.images), size=n)
 
     def __get_batch(self, arr: np.ndarray, batch_size: int) -> np.ndarray:
         """
@@ -424,16 +432,16 @@ class Inferer(Benchmarker, PatchExtractor):
                     res_types = self.stitch_inference_patches(types, self.stride_size, shape, im.shape)
             
             if self.class_types == "semantic":
-                self.soft_types[f"{fn}_types"] = res_types
+                self.soft_types[f"{fn}_soft_types"] = res_types
                 self.type_maps[f"{fn}_type_map"] = np.argmax(res_types, axis=2)
 
-            self.soft_insts[f"{fn}_instances"] = res_insts
+            self.soft_insts[f"{fn}_soft_instances"] = res_insts
 
             
     def post_process_instmap(self,
                              soft_inst: np.ndarray,
                              thresh: Union[float, str],
-                             postproc_func: Optional[Callable] = inv_dist_watershed) -> np.ndarray:
+                             postproc_func: Optional[Callable] = shape_index_watershed) -> np.ndarray:
         """
         Takes in a soft instance mask of shape (H, W, C) and thresholds it.
         Post processing is applied if defined in config.py
@@ -444,15 +452,18 @@ class Inferer(Benchmarker, PatchExtractor):
                                         specifying a thresholding method. For now only 
                                         "argmax" is available.
             postproc_func (Callable): a post processing function that takes in an 2D 
-                                      inst map. For now only inv_dist_watershed avail.
+                                      inst map. Check post_processing.py for different ones
 
         Returns:
             np.ndarray with instances labelled
         """
 
         inst_map = self.__apply_thresh_instmap(soft_inst, thresh)
+
+        # TODO: Add postproc functions
         if self.post_proc:
-            inst_map = postproc_func(inst_map)
+            inst_map = shape_index_watershed(soft_inst[..., 1], inst_map)
+            # inst_map = inv_dist_watershed(inst_map)
         return inst_map
 
     def panoptic_output(self,
@@ -501,10 +512,40 @@ class Inferer(Benchmarker, PatchExtractor):
             for i, path in enumerate(self.images):
                 fn = self.__get_fn(path)
                 self.panoptic_maps[f"{fn}_panoptic_map"] = panops[i]
-                        
+
+    def run_benchmarks(self,
+                       save: bool = True) -> None:
+        """
+        Run benchmarks for instance and panoptic segmentations
+        
+        Args:
+            save (bool): save the results to csv
+        """
+        assert self.inst_maps, "No instance maps found, Run inference first"
+        gt_insts = OrderedDict((self.__get_fn(p), self.read_mask(p)) for p in self.gt_masks)
+        inst_metrics = self.benchmark_instmaps(self.inst_maps, gt_insts, save=save)
+        class_metrics = None
+        if self.class_types == "semantic":
+            gt_types = OrderedDict((self.__get_fn(p), self.read_mask(p, "type_map")) for p in self.gt_masks)
+            class_metrics = self.benchmark_panoptic_maps(
+                self.inst_maps, 
+                self.panoptic_maps,
+                gt_insts,
+                gt_types,
+                self.classes,
+                save=save
+            )
+        return {
+            "instance_metrics": inst_metrics,
+            "type_metrics": class_metrics
+        }
+            
+                  
     def plot_outputs(self, 
                      out_type: str,
                      ixs: Union[List[int], int] = -1,
+                     gt_mask: bool = False,
+                     contour: bool = False,
                      save: bool = False) -> None:
         """
         Plot different outputs this instance holds. Options are: inst_maps, type_maps,
@@ -512,9 +553,19 @@ class Inferer(Benchmarker, PatchExtractor):
 
         Args:
             out_type (str): output type to plot. Options are listed above
+            ixs (List or int): list of the indexes of the image files in the dataset. 
+                    default = -1 means all images in the data fold are 
+                    plotted. If dataset = "pannuke" and ixs = -1, then 25
+                    random images are sampled.
+            gt_mask (bool): plot the corresponding panoptic or instance gt next to the
+                            corresponding inst or panoptic map. Ignored if soft masks
+                            are plotted
+            contour (bool): Plots instance contours on top of the original image instead
+                            plotting a mask. Ignored if soft masks are plotted
+            save (bool): Save the plots
 
         """
-
+        # TODO someday make this pretty
         assert out_type in ("inst_maps", "type_maps",
                             "soft_insts", "soft_types", "panoptic_maps")
 
@@ -537,23 +588,79 @@ class Inferer(Benchmarker, PatchExtractor):
         if ixs == -1:
             idxs = np.array(range(len(self.images)))
         elif ixs == -1 and self.dataset == "pannuke":
-            idxs = self.sample_idxs(25)
+            idxs = self.__sample_idxs(25)
         else:
             idxs = np.array(ixs)
 
         outputs = [list(self.__dict__[out_type].items())[i] for i in idxs]
-        ncol = outputs[0][1].shape[-1] if outputs[0][1].ndim > 2 else 1
+        images = np.asarray(self.images)[idxs]
+        gt_masks = np.asarray(self.gt_masks)[idxs]
+
+        if "soft" in outputs[0][0]:
+            ncol = outputs[0][1].shape[-1]
+        elif gt_mask:
+            ncol = 2
+        else:
+            ncol = 1
+
         fig, axes = plt.subplots(
-            len(outputs), ncol, figsize=(ncol*12, len(outputs)*10), squeeze=False
+            len(outputs), ncol, figsize=(ncol*25, len(outputs)*25), squeeze=False
         )
 
         for j, (name, out) in enumerate(outputs):
             for c in range(ncol):
-                x = out[..., c] if ncol > 1 else label2rgb(out, bg_label=0)
+                if "soft" in outputs[0][0]:
+                    x = out[..., c]
+                else:
+                    if contour:
+                        x = out
+                        im = self.read_img(images[j])
+                        x = draw_contours(x, im)
+                        if gt_mask:
+                            if out_type == "panoptic_maps":
+                                if divmod(2, c+1)[0] == 1:
+                                    gt_inst = self.read_mask(gt_masks[j])
+                                    gt_type = self.read_mask(gt_masks[j], key="type_map")
+                                    if self.dataset == "consep":
+                                        gt_type = self.consep_classes(gt_type)
+                                    x = draw_contours(gt_inst, im, gt_type)
+                                    name = self.__get_fn(gt_masks[j])
+                                else:
+                                    inst = self.inst_maps[name.replace("panoptic", "inst")]
+                                    x = draw_contours(inst, im, out)
+                            elif out_type == "inst_maps":
+                                if divmod(2, c+1)[0] == 1:
+                                    gt_inst = self.read_mask(gt_masks[j])
+                                    x = draw_contours(gt_inst, im)
+                                    name = self.__get_fn(gt_masks[j])
+
+                    else:
+                        x = out
+                        if gt_mask:
+                            if out_type == "panoptic_maps":
+                                if divmod(2, c+1)[0] == 1:
+                                    gt_type = self.read_mask(gt_masks[j], key="type_map")
+                                    x = label2rgb(gt_type, bg_label=0)
+                                    name = self.__get_fn(gt_masks[j])
+                                else:
+                                    x = label2rgb(x, bg_label=0)
+                            elif out_type == "inst_maps":
+                                if divmod(2, c+1)[0] == 1:
+                                    gt_type = self.read_mask(gt_masks[j])
+                                    x = label2rgb(gt_type, bg_label=0)
+                                    name = self.__get_fn(gt_masks[j])
+                                else:
+                                    x = label2rgb(x, bg_label=0)
+
                 axes[j, c].set_title(f"{name}", fontsize=30)
                 axes[j, c].imshow(x, interpolation='none')
                 axes[j, c].axis('off')
-
+        
+        if out_type == "panoptic_segmetation" and contour:
+            colors = {k: KEY_COLORS[k] for k, v in self.classes.items()}
+            patches = [mpatches.Patch(color=np.array(colors[k])/255., label=k) for k, v in self.classes.items()]
+            fig.legend(handles=patches, loc=1, borderaxespad=0., bbox_to_anchor=(1.15, 1), fontsize=50,)
+        
         fig.tight_layout(w_pad=4, h_pad=10)
 
         if save:

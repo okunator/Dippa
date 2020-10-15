@@ -1,10 +1,45 @@
+import cv2
 import numpy as np
 import math
 import random
 import colorsys
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from matplotlib import pyplot as plt
-from src.img_processing.process_utils import *
+from src.img_processing.process_utils import bounding_box
+
+COLORS = np.array([
+    (255., 255., 255.),
+    (0., 200., 100.),
+    (165., 0., 255.),
+    (0., 0., 255.),
+    (255., 0., 0.),
+    (255., 100., 0.),
+    (100., 100., 0.),
+    (0., 255., 0.),
+    (0., 255., 255.),
+    (200., 30., 20.),
+    (0., 200., 100.),
+    (255., 0., 0.),
+    (255., 0., 255.)
+])
+
+KEY_COLORS = {
+    # consep classes:
+    "background": (255., 255., 255.),
+    "miscellanous": (0., 200., 100.),  # miscellanous
+    "inflammatory": (165., 0., 255.),
+    "epithelial": (255., 255., 0.),
+    "spindle": (255., 0., 0.),
+    "healthy_epithelial": (255., 100., 0.),
+    "malignant_epithelial": (100., 100., 0.),
+    "fibroblast": (0., 255., 0.),
+    "muscle": (0., 255., 255.),
+    "endothelial": (200., 30., 20.),
+    # pannuke classes
+    "neoplastic": (0., 200., 100.),
+    "connective": (255., 0., 0.),
+    "dead": (255., 0., 255.),
+}
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
 def random_colors(N: int, bright: bool = True) -> List[Tuple[float]]:
@@ -31,7 +66,8 @@ def draw_contours(mask: np.ndarray,
                   image: np.ndarray,
                   type_map: np.ndarray = None,
                   fill_contours: bool = False,
-                  thickness: int = 2) -> Tuple[np.ndarray]:
+                  thickness: int = 2,
+                  classes: Optional[Dict[str, int]] = None) -> Tuple[np.ndarray]:
     """
     Find contours for rgb mask to superimpose it the original image
     mask needs to be instance labelled.
@@ -40,11 +76,12 @@ def draw_contours(mask: np.ndarray,
         image (np.ndarray): image
         type_map (np.ndarray): type_map
         fill_contours (bool): If True, contours are filled
-        thickness (int): thickness ofthe contour line
+        thickness (int): thickness ofthe contour line,
+        classes (Dict[str, int]): classes dict e.g. {background:0, epithelial:1, ...}
     Returns:
         The background? and contours overlaid on top of original image.
     """
-    bg = np.full(mask.shape + (3,), 255, dtype=np.uint8)
+    bg = np.copy(image)
     
     shape = mask.shape[:2]
     nuc_list = list(np.unique(mask))
@@ -53,29 +90,32 @@ def draw_contours(mask: np.ndarray,
     if type_map is None:
         inst_colors = random_colors(len(nuc_list))
         inst_colors = np.array(inst_colors)
-    else:
-        inst_colors = np.array([
-            (255., 0., 0.), (0., 255., 0.), (0., 0., 255.),
-            (255., 255., 0.), (255., 165., 0.), (0., 255., 255.)
-        ])
-    
+
     for idx, nuc_id in enumerate(nuc_list): 
         inst_map = np.array(mask == nuc_id, np.uint8)
         
         y1, y2, x1, x2  = bounding_box(inst_map)
         y1 = y1 - 2 if y1 - 2 >= 0 else y1 
         x1 = x1 - 2 if x1 - 2 >= 0 else x1 
-        x2 = x2 + 2 if x2 + 2 <= mask.shape[1] - 1 else x2 
-        y2 = y2 + 2 if y2 + 2 <= mask.shape[0] - 1 else y2
+        x2 = x2 + 2 if x2 + 2 <= shape[1] - 1 else x2 
+        y2 = y2 + 2 if y2 + 2 <= shape[0] - 1 else y2
         
         inst_map_crop = inst_map[y1:y2, x1:x2]
         inst_bg_crop = bg[y1:y2, x1:x2]
         contours, hierarchy = cv2.findContours(
             inst_map_crop, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
+        
+        if classes is None:
+            k = idx if type_map is None else np.unique(type_map[inst_map > 0].astype("uint8"))[0]
+            inst_color = COLORS[k]
+        else:
+            #clumsy
+            class_nums = np.unique(type_map[inst_map > 0].astype("uint8"))
+            for i, (key, val) in enumerate(classes.items()):
+                if val == class_nums[i]:
+                    inst_color = KEY_COLORS[key]
 
-        k = idx if type_map is None else np.unique(type_map[inst_map > 0])[0]
-        inst_color = inst_colors[k]
         if fill_contours:
             contoured_rgb = cv2.drawContours(
                 inst_bg_crop, [max(contours, key = cv2.contourArea)], 
@@ -88,10 +128,8 @@ def draw_contours(mask: np.ndarray,
             )
             
         bg[y1:y2, x1:x2] = inst_bg_crop
-    
-    image_overlayed = np.where(bg, image, 255)
 
-    return bg, image_overlayed
+    return bg
 
 
 def viz_patches(patches: np.ndarray) -> Tuple[int]:

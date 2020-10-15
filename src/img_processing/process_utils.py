@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from typing import List
+from typing import List, Tuple
 from skimage.morphology import opening 
 from scipy import ndimage as ndi
 from scipy.ndimage.morphology import (
@@ -11,7 +11,17 @@ from scipy.ndimage.morphology import (
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/misc/utils.py
-def cropping_center(x, crop_shape, batch=False):   
+def cropping_center(x: np.ndarray,
+                    crop_shape: Tuple[int],
+                    batch: bool = False) -> np.ndarray:
+    """
+    Crop an input image from the center
+
+    Args:
+        x (np.ndarray): input img
+        crop_shape (Tuple[int]): the shape of the crop
+        batch: (bool): batch dim is included in input img
+    """
     orig_shape = x.shape
     if not batch:
         h0 = int((orig_shape[0] - crop_shape[0]) * 0.5)
@@ -29,6 +39,9 @@ def bounding_box(inst_map: np.ndarray) -> List[int]:
     """
     Bounding box coordinates for nuclei instance
     that is given as input.
+
+    Args:
+        inst_map (np.ndarray): instance labels
     """
     rows = np.any(inst_map, axis=1)
     cols = np.any(inst_map, axis=0)
@@ -49,6 +62,7 @@ def remap_label(pred: np.ndarray, by_size: bool = False) -> np.ndarray:
     not [0, 2, 4, 6]. The ordering of instances (which one comes first) 
     is preserved unless by_size=True, then the instances will be reordered
     so that bigger nucler has smaller ID
+
     Args:
         pred    : the 2d array contain instances where each instances is marked
                   by non-zero integer
@@ -78,6 +92,7 @@ def remap_label(pred: np.ndarray, by_size: bool = False) -> np.ndarray:
 def get_inst_centroid(inst_map: np.ndarray) -> np.ndarray:
     """
     Get centroid x, y coordinates from each unique nuclei instance
+
     Args:
         inst_map (np.ndarray): nuclei instance map
     """
@@ -93,20 +108,26 @@ def get_inst_centroid(inst_map: np.ndarray) -> np.ndarray:
 
 
 # Adapted from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
-def instance_contours(label_img, thickness=2):
-    """Find a contour for each nuclei instance in a mask"""
+def instance_contours(inst_map: np.ndarray, thickness: int = 2):
+    """
+    Find a contour for each nuclei instance in a mask
+
+    Args:
+        inst_map (np.ndarray): instance map
+        thickness (int): thickness of the contour line
+    """
 
     # Padding first to avoid contouring the image borders
-    label_img2 = np.pad(
-        label_img.copy(), ((thickness, thickness), (thickness, thickness)), 'edge')
-    bg = np.zeros(label_img2.shape, dtype=np.uint8)
-    for j, nuc_id in enumerate(np.unique(label_img)):
-        inst_map = np.array(label_img2 == nuc_id, np.uint8)
+    inst_map2 = np.pad(
+        inst_map.copy(), ((thickness, thickness), (thickness, thickness)), 'edge')
+    bg = np.zeros(inst_map2.shape, dtype=np.uint8)
+    for j, nuc_id in enumerate(np.unique(inst_map)):
+        inst_map = np.array(inst_map2 == nuc_id, np.uint8)
         y1, y2, x1, x2 = bounding_box(inst_map)
         y1 = y1 - 2 if y1 - 2 >= 0 else y1
         x1 = x1 - 2 if x1 - 2 >= 0 else x1
-        x2 = x2 + 2 if x2 + 2 <= label_img.shape[1] - 1 else x2
-        y2 = y2 + 2 if y2 + 2 <= label_img.shape[0] - 1 else y2
+        x2 = x2 + 2 if x2 + 2 <= inst_map.shape[1] - 1 else x2
+        y2 = y2 + 2 if y2 + 2 <= inst_map.shape[0] - 1 else y2
 
         inst_map_crop = inst_map[y1:y2, x1:x2]
         inst_bg_crop = bg[y1:y2, x1:x2]
@@ -124,16 +145,41 @@ def instance_contours(label_img, thickness=2):
     return bg
 
 
-def get_type_instances(inst_map, type_map, class_num):
-    t = type_map == class_num
+def get_type_instances(inst_map: np.ndarray,
+                       type_map: np.ndarray,
+                       class_num: int) -> np.ndarray:
+    """
+    Get the instances from an instance map belonging to class_num
+    Drop everything else.
+    
+    Args:
+        inst_map (np.ndarray): instance map of shape (H, W)
+        type_map (np.ndarray): type map of shape (H, W). Labels are indices.
+        class_num (int): class label  
+    """
+    t = type_map.astype("uint8") == class_num
     imap = np.copy(inst_map)
     imap[~t] = 0
     return imap
 
-
-def overlays(im, mask):
+def one_hot(type_map: np.ndarray, num_classes: int) -> np.ndarray:
     """
+    Convert type map of shape (H, W) to one hot encoded types of shape (H, W, C)
+    Args:
+        type_map (np.ndarray): type map of shape (H, W). Labels are indices.
+        num_classes (int): number of classes in the dataset
+    """
+    return np.eye(num_classes+1)[type_map]
+
+
+def overlays(im: np.ndarray, mask:np.ndarray) -> np.ndarray:
+    """
+    Overlay mask with original image where there is no background
     mask is assumed to have shape (HxW)
+
+    Args:
+        im (np.ndarray): original image of shape (H, W, C)
+        mask (np.ndarray): instance or type mask of the nucleis in the image
     """
     return np.where(mask[..., None], im, 0)
 
@@ -141,6 +187,7 @@ def overlays(im, mask):
 def binarize(inst_map: np.ndarray) -> np.ndarray:
     """
     Binarize an labelled instance map
+
     Args:
         inst_map (np.ndarray): instance map to be binarized
     """
@@ -152,6 +199,7 @@ def type_map_flatten(type_map: np.ndarray) -> np.ndarray:
     """
     Convert a type map of shape (H, W, C) to a single channel map of shape (H, W)
     where the class types are indexes of the new map
+
     Args:
         type_map (np.ndarray): type_map to be flattened
     """

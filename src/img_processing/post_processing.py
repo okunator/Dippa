@@ -6,7 +6,7 @@ import pandas as pd
 import skimage.morphology as morph
 import skimage.segmentation as segm
 from skimage.exposure import histogram
-from skimage.filters import difference_of_gaussians
+from skimage.feature import shape_index
 from skimage import filters
 from scipy.spatial import distance_matrix
 from torch import nn
@@ -54,9 +54,9 @@ def activate_plus_dog(prob_map: np.ndarray) -> np.ndarray:
     Args:
         prob_map (np.ndarray): logit or probability map of shape (H, W) 
     """
-    prob_map = difference_of_gaussians(prob_map, 1, 50)
+    prob_map = filters.difference_of_gaussians(prob_map, 1, 50)
     prob_map = activation(prob_map, 'relu')
-    prob_map = difference_of_gaussians(prob_map, 1, 10)
+    prob_map = filters.difference_of_gaussians(prob_map, 1, 10)
     prob_map = activation(prob_map, 'sigmoid')
     return prob_map
 
@@ -171,34 +171,103 @@ def smoothed_thresh(prob_map: np.ndarray) -> np.ndarray:
     return mask
 
 
-def cv2_opening(mask: np.ndarray) -> np.ndarray:
+def cv2_opening(mask: np.ndarray, iterations: int = 2) -> np.ndarray:
     """
     Takes in an inst_map -> binarize -> apply morphological opening (2 iterations) -> label
     Seems to increase segmentation metrics
     Args:
         mask (np.ndarray): instance map to be opened. Shape (H, W)
+        iterations: int: number of iterations for the operation
     """
     mask = binarize(mask)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5))
     new_mask = (mask*255).astype(np.uint8)
-    new_mask = cv2.morphologyEx(new_mask, cv2.MORPH_OPEN, kernel, iterations=2)
+    new_mask = cv2.morphologyEx(new_mask, cv2.MORPH_OPEN, kernel, iterations=iterations)
     inst_map = ndi.label(new_mask)[0]
     return inst_map
 
 
-
-def cv2_closing(mask: np.ndarray) -> np.ndarray:
+def cv2_closing(mask: np.ndarray, iterations: int = 2) -> np.ndarray:
     """
     Takes in an inst_map -> binarize -> apply morphological closing (2 iterations) -> label
     Args:
         mask (np.ndarray): instance map to be opened. Shape (H, W)
+        iterations: int: number of iterations for the operation
     """
     mask = binarize(mask)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5))
     new_mask = (mask*255).astype(np.uint8)
-    new_mask = cv2.morphologyEx(new_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+    new_mask = cv2.morphologyEx(new_mask, cv2.MORPH_CLOSE, kernel, iterations=iterations)
     inst_map = ndi.label(new_mask)[0]
     return inst_map
+
+
+def shape_index_watershed(prob_map: np.ndarray,
+                          inst_map: np.ndarray,
+                          win_size: int = 13) -> np.ndarray:
+    """
+    After thresholding, this function can be used to compute distance maps for each nuclei instance.
+    This uses shape index to find local curvature from the probability map and uses that information
+    to separate overlapping nuclei before the watershed segmentatiton. Markers for the
+    distance maps are computed using niblack thresholding on the distance map.
+
+    Args:
+        prob_map (np.ndarray): the soft mask outputted from the network. Shape (H, W)
+        inst_map (np.ndarray): The instance map to be segmented. Shape (H, W)
+        win_size (int): window size used in niblack thresholding the distance maps to
+                        find markers for watershed
+    """
+    # Morphological opening for smoothing the likely jagged edges
+    # This typically improves PQ
+    seg = np.copy(inst_map)
+    new_mask = cv2_opening(seg)
+    ann = ndi.label(new_mask)[0]
+
+    shape = seg.shape[:2]
+    nuc_list = list(np.unique(ann))
+    nuc_list.remove(0)
+
+    # find the distance map per nuclei instance
+    distmap = np.zeros(shape, dtype=np.uint8)
+    for nuc_id in nuc_list:
+        nuc_map = np.copy(ann == nuc_id)
+
+        # Do operations to the bounded box of the nuclei
+        # rather than the full size matrix
+        y1, y2, x1, x2 = bounding_box(nuc_map)
+        y1 = y1 - 2 if y1 - 2 >= 0 else y1
+        x1 = x1 - 2 if x1 - 2 >= 0 else x1
+        x2 = x2 + 2 if x2 + 2 <= ann.shape[1] - 1 else x2
+        y2 = y2 + 2 if y2 + 2 <= ann.shape[0] - 1 else y2
+        nuc_map_crop = nuc_map[y1:y2, x1:x2]
+
+        # Find distance transform of the bounding box and normalize it
+        distance = ndi.distance_transform_edt(nuc_map_crop)
+        distance = 255 * (distance / np.amax(distance))
+        distmap[y1:y2, x1:x2] += distance.astype('uint8')
+
+    # find markers for ws
+    markers = np.copy(distmap)
+    markers = niblack_thresh(distmap, win_size)
+
+    # Find local curvature with shape index
+    # use it to separate clumps
+    s = shape_index(prob_map)
+    s[s > 0] = 1
+    s[s <= 0] = 0
+    s = ndi.binary_fill_holes(s)
+    mask = ndi.label(s*ann)[0]
+    mask = cv2_opening(mask, iterations=2)
+
+    mask = segm.watershed(-distmap, markers, mask=mask, watershed_line=True)
+    mask[mask > 0] = 1
+    mask = ndi.binary_fill_holes(mask)
+    inst_map = ndi.label(mask)[0]
+    inst_map = cv2_opening(mask, iterations=2)
+
+    return inst_map
+
+
 
 
 def sobel_watershed(prob_map: np.ndarray,
@@ -206,12 +275,12 @@ def sobel_watershed(prob_map: np.ndarray,
                     win_size: int = 13) -> np.ndarray:
     """
     After thresholding, this function can be used to compute distance maps for each nuclei instance
-    and watershed segment the elevation map of the prob_map (aobel). Before computing distance maps
+    and watershed segment the elevation map of the prob_map (sobel). Before computing distance maps
     a binary opening is performed to the instance map (seems to increase metrics). Markers for the
     distance maps are computed using niblack thresholding on the distance map.
 
     Args:
-
+        prob_map (np.ndarray): the soft mask outputted from the network
         inst_map (np.ndarray): The instance map to be segmented. Shape (H, W)
         win_size (int): window size used in niblack thresholding the distance maps to
                         find markers for watershed
