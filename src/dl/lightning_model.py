@@ -117,7 +117,7 @@ class SegModel(pl.LightningModule):
 
     @property
     def step(self):
-        return self.step_singlebranch if self.fm.class_types == "binary" else self.step_twobranch
+        return self.step_singlebranch if self.fm.class_types == "instance" else self.step_twobranch
 
     @property
     def binary_class_weights(self):
@@ -134,10 +134,10 @@ class SegModel(pl.LightningModule):
     @property
     def CE_loss_func(self):
         """
-        Choose loss function. Depends on objective (binary, semantic). 
+        Choose loss function. Depends on objective (instance, panoptic). 
         """
         bin_w = to_device(self.binary_class_weights) if self.class_weights else None
-        if self.fm.class_types != "binary":
+        if self.fm.class_types != "instance":
             type_w = to_device(self.type_class_weights) if self.class_weights else None
             criterion = JointCELoss(
                 class_weights_binary=bin_w,
@@ -171,7 +171,12 @@ class SegModel(pl.LightningModule):
         target = target.long()
         
         soft_mask = self.forward(x)
-        loss = self.criterion(soft_mask["instances"], target)
+        loss = self.criterion(
+            yhat=soft_mask["instances"], 
+            target=target,
+            target_weight=target_weight,
+            edge_weight=self.edge_weight
+        )
         accuracy = utils.metrics.accuracy(
             argmax_and_flatten(soft_mask["instances"]), target.view(1, -1)
         )
@@ -195,14 +200,13 @@ class SegModel(pl.LightningModule):
         type_target = type_target.long()
         
         soft_mask = self.forward(x)
-
         loss = self.criterion(
             yhat_inst=soft_mask["instances"], 
             yhat_type=soft_mask["types"], 
             target_inst=inst_target, 
             target_type=type_target, 
-            target_weight=self.edge_weight, 
-            edge_weight=target_weight,
+            target_weight=target_weight,
+            edge_weight=self.edge_weight,
             device=self.device
         )
 
