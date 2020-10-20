@@ -57,22 +57,22 @@ class PatchExtractor:
         #### Deal with valid block
         for row in range(0, h_last, stride_size[0]):
             for col in range(0, w_last, stride_size[1]):
-                win = self.__get_patch(x, (row, col), patch_size[0])
+                win = self.__get_patch(x, (row, col), patch_size)
                 sub_patches.append(win)  
         #### Deal with edge case
         if h_flag:
             row = im_h - patch_size[0]
             for col in range(0, w_last, stride_size[1]):
-                win = self.__get_patch(x, (row, col), patch_size[0])
+                win = self.__get_patch(x, (row, col), patch_size)
                 sub_patches.append(win)  
         if w_flag:
             col = im_w - patch_size[1]
             for row in range(0, h_last, stride_size[0]):
-                win = self.__get_patch(x, (row, col), patch_size[0])
+                win = self.__get_patch(x, (row, col), patch_size)
                 sub_patches.append(win)  
         if h_flag and w_flag:
             ptx = (im_h - patch_size[0], im_w - patch_size[1])
-            win = self.__get_patch(x, ptx, patch_size[0])
+            win = self.__get_patch(x, ptx, patch_size)
             sub_patches.append(win)  
         return np.asarray(sub_patches)
     
@@ -103,6 +103,7 @@ class PatchExtractor:
         pad_type = 'reflect'
         x = np.lib.pad(x, ((padt, padb), (padl, padr), (0, 0)), pad_type)
         sub_patches = self.extract_valid(x, patch_size, stride_size)
+        # sub_patches = self.extract_valid(x, (patch_size, patch_size), (stride_size, stride_size))
         return sub_patches
 
     @staticmethod

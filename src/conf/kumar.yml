@@ -1,8 +1,8 @@
 class_types:
-    binary: 
+    instance: 
         background: 0
         nuclei: 1
-    semantic:
+    panoptic:
         background: 0
         nuclei: 1
 

@@ -240,8 +240,7 @@ class PatchWriter(ProjectFileManager, PatchExtractor):
 
         img_path = self.data_folds[phase]["img"][index]
         mask_path = self.data_folds[phase]["mask"][index]
-        ims, imaps, tmaps, _ = self.__extract_patches(
-            phase, img_path, mask_path)
+        ims, imaps, tmaps, _ = self.__extract_patches(phase, img_path, mask_path)
 
         if img_type == "img":
             patches = ims
@@ -251,6 +250,8 @@ class PatchWriter(ProjectFileManager, PatchExtractor):
             patches = tmaps
         elif img_type == "overlay":
             patches = overlays(ims, imaps)
+
+        viz_patches(patches)
             
     def viz_patch_from_db(self, phase: str, index: int) -> Tuple[np.ndarray]:
         """
