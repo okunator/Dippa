@@ -16,12 +16,12 @@ CONFIG = OmegaConf.create(
             # What dataset you want to use? Has to be one of ("kumar", "consep", "pannuke")
             "dataset":"consep", 
             
-            # This depends on the dataset. Binary segmentation can be done to all datasets
-            # and semantic segmentation can be done to consep and pannuke datasets
-            # change this according to your needs. has to be one of ("binary", "semantic")
+            # This depends on the dataset. instance segmentation can be done to all datasets
+            # and panoptic segmentation can be done to consep and pannuke datasets
+            # change this according to your needs. has to be one of ("instance", "panopotic")
             # Things won't crash even if types is used for a dataset that can be used only for 
             # binary segmentation
-            "class_types":"semantic", 
+            "class_types":"panoptic", 
             
             # if phases = ["train", "valid", "test"]. The train set is also split to 
             # validation set. If phases = ["train", "test"], no splitting is done.

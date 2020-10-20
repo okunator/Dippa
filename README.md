@@ -67,6 +67,9 @@ pip install -r requirements.txt
             - `datasets.py` pytorch DataSet class for the experiments
             - `inferer.py` class for inference, post processing and benchmarking of the trained models
             - `lightning_model.py` pytorch lightning class abstraction for any pytorch model used in this project
+            - `losses.py` classes for different losses that can be used for diff models
+            - `model_builder.py` wrapper classes to modify different backbone models to do instance or panoptic seg
+            - `torch_utils.py` utility functions for torch tensors
         - `img_processing/`
             - `augmentations.py` data augmentations
             - `post_processing.py` functions used in post processing inst maps 
@@ -78,10 +81,13 @@ pip install -r requirements.txt
         - `tune/`
             - `tune_experiment.py` TODO
         - `utils/`
+            - `adhoc_conversions.py` functions to move the and modify the downloaded data around the repo
+            - `benchmarker.py` class for benchmarking segmentation results
+            - `data_downloader` class for downloading and converting data to right format
             - `data_writer.py` class for writing image and mask patches for training
             - `file_manager.py` class for handling the downloaded data and managing all files and paths
             - `patch_extractor.py` class for extracting patches from images
-        - `convert.py` Convert the downloaded data to right format
+        - `download.py` Download the datasets and convert the downloaded data to right format
         - `infer.py` Run inference, post processing and benchmarking
         - `patch.py` Run patching for downloaded images
         - `settings.py` A convention for building paths

@@ -134,7 +134,7 @@ class ProjectFileManager(FileHandler):
     
     @property
     def classes(self) -> Dict[str, int]:
-        assert self.dsargs.class_types in ("binary", "semantic")
+        assert self.dsargs.class_types in ("instance", "panoptic")
         yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
         data_conf = OmegaConf.load(yml_path)
         if self.dataset == "consep":

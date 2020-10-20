@@ -271,7 +271,7 @@ class Inferer(Benchmarker, PatchExtractor):
             deaug_insts = deaug(image = aug_insts) # (H, W, C)
             soft_instances.append(deaug_insts["image"])
 
-            if self.class_types == "semantic":
+            if self.class_types == "panoptic":
                 aug_types = self.__gen_prediction(aug_logits["types"], squeeze=True)# (H, W, C)
                 deaug_types = deaug(image=aug_types)  # (H, W, C)
                 soft_types.append(deaug_types["image"])
@@ -290,7 +290,7 @@ class Inferer(Benchmarker, PatchExtractor):
             out_insts[crop.y_min:crop.y_max, crop.x_min:crop.x_max] = downscaled_insts["image"] # (H, W, C)
             soft_instances.append(out_insts)
 
-            if self.class_types == "semantic":
+            if self.class_types == "panoptic":
                 aug_types = self.__gen_prediction(aug_logits["types"], squeeze=True) # (H, W, C)
                 downscaled_types = scale_down(image=aug_types)  # (H//2, W//2, C)
                 out_types[crop.y_min:crop.y_max,crop.x_min:crop.x_max] = downscaled_types["image"]  # (H, W, C)
@@ -387,7 +387,7 @@ class Inferer(Benchmarker, PatchExtractor):
         pred_patches_insts = np.zeros((0, self.input_size, self.input_size, 2))
         pred_patches_types = np.zeros((0, self.input_size, self.input_size, len(self.classes)))
         for batch in self.__get_batch(im_patches, self.batch_size): # (B, H, W, 3)
-            if self.class_types == "semantic":
+            if self.class_types == "panoptic":
                 pred_patch = self.prediction_two_branch(batch)
                 insts = pred_patch["instances"]
                 types = pred_patch["types"]
@@ -420,18 +420,18 @@ class Inferer(Benchmarker, PatchExtractor):
             if self.dataset == "pannuke":
                 result_pred = self.predict_patches(im[None, ...])
                 res_insts = result_pred["instances"]
-                if self.class_types == "semantic":
+                if self.class_types == "panoptic":
                     res_types = result_pred["types"]
             else:
                 patches, shape = self.extract_inference_patches(im, self.stride_size, self.input_size)
                 pred_patches = self.predict_patches(patches)
                 insts = pred_patches["instances"]
                 res_insts = self.stitch_inference_patches(insts, self.stride_size, shape, im.shape)
-                if self.class_types == "semantic":
+                if self.class_types == "panoptic":
                     types = pred_patches["types"]
                     res_types = self.stitch_inference_patches(types, self.stride_size, shape, im.shape)
             
-            if self.class_types == "semantic":
+            if self.class_types == "panoptic":
                 self.soft_types[f"{fn}_soft_types"] = res_types
                 self.type_maps[f"{fn}_type_map"] = np.argmax(res_types, axis=2)
 
@@ -502,7 +502,7 @@ class Inferer(Benchmarker, PatchExtractor):
             self.inst_maps[f"{fn}_inst_map"] = segs[i]
 
         # combine semantic and instance segmentations
-        if self.class_types == "semantic":
+        if self.class_types == "panoptic":
             maps = [(self.inst_maps[i].astype("uint16"), self.type_maps[t].astype("uint8"))
                     for i, t in zip(self.inst_maps, self.type_maps)]
 
@@ -525,7 +525,7 @@ class Inferer(Benchmarker, PatchExtractor):
         gt_insts = OrderedDict((self.__get_fn(p), self.read_mask(p)) for p in self.gt_masks)
         inst_metrics = self.benchmark_instmaps(self.inst_maps, gt_insts, save=save)
         class_metrics = None
-        if self.class_types == "semantic":
+        if self.class_types == "panoptic":
             gt_types = OrderedDict((self.__get_fn(p), self.read_mask(p, "type_map")) for p in self.gt_masks)
             class_metrics = self.benchmark_panoptic_maps(
                 self.inst_maps, 
