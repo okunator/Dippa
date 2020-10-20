@@ -38,7 +38,8 @@ def cropping_center(x: np.ndarray,
 def bounding_box(inst_map: np.ndarray) -> List[int]:
     """
     Bounding box coordinates for nuclei instance
-    that is given as input.
+    that is given as input. This assumes that the inst_map 
+    has only one instance in it.
 
     Args:
         inst_map (np.ndarray): instance labels
@@ -186,7 +187,7 @@ def overlays(im: np.ndarray, mask:np.ndarray) -> np.ndarray:
 
 def binarize(inst_map: np.ndarray) -> np.ndarray:
     """
-    Binarize an labelled instance map
+    Binarize a labelled instance map
 
     Args:
         inst_map (np.ndarray): instance map to be binarized

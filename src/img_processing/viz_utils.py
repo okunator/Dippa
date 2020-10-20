@@ -7,21 +7,6 @@ from typing import List, Dict, Tuple, Optional
 from matplotlib import pyplot as plt
 from src.img_processing.process_utils import bounding_box
 
-COLORS = np.array([
-    (255., 255., 255.),
-    (0., 200., 100.),
-    (165., 0., 255.),
-    (0., 0., 255.),
-    (255., 0., 0.),
-    (255., 100., 0.),
-    (100., 100., 0.),
-    (0., 255., 0.),
-    (0., 255., 255.),
-    (200., 30., 20.),
-    (0., 200., 100.),
-    (255., 0., 0.),
-    (255., 0., 255.)
-])
 
 KEY_COLORS = {
     # consep classes:
@@ -39,6 +24,7 @@ KEY_COLORS = {
     "neoplastic": (0., 200., 100.),
     "connective": (255., 0., 0.),
     "dead": (255., 0., 255.),
+    "nuclei":(255., 0., 0.)
 }
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
@@ -79,7 +65,7 @@ def draw_contours(mask: np.ndarray,
         thickness (int): thickness ofthe contour line,
         classes (Dict[str, int]): classes dict e.g. {background:0, epithelial:1, ...}
     Returns:
-        The background? and contours overlaid on top of original image.
+        The contours overlaid on top of original image.
     """
     bg = np.copy(image)
     
@@ -106,15 +92,16 @@ def draw_contours(mask: np.ndarray,
             inst_map_crop, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
         
-        if classes is None:
-            k = idx if type_map is None else np.unique(type_map[inst_map > 0].astype("uint8"))[0]
-            inst_color = COLORS[k]
-        else:
+
+        if classes is not None:
             #clumsy
             class_nums = np.unique(type_map[inst_map > 0].astype("uint8"))
-            for i, (key, val) in enumerate(classes.items()):
-                if val == class_nums[i]:
-                    inst_color = KEY_COLORS[key]
+            for key, val in classes.items():
+                for num in class_nums:
+                    if val == num:
+                        inst_color = KEY_COLORS[key]
+        else:
+            inst_color = inst_colors[idx]
 
         if fill_contours:
             contoured_rgb = cv2.drawContours(

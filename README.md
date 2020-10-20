@@ -27,22 +27,19 @@ pip install -r requirements.txt
 
 
 ##  Instructions for running the experiments
-1. Download the data.
+1. Download the data `src/download.py`.
 2. Run an experiment.
-    1. Convert the data that you downloaded. `src/convert.py`
-    2. Modify the parameters in the config file. `src/conf/config.py`
-    3. Extract patches from the downloaded images and save them to hdf5 or numpy files. `src/patch.py`
-    4. Train a model with the extracted patches.  `src/train.py`
-    5. Infer, post process and benchmark.  `src/infer.py`
+    1. Modify the parameters in the config file. `src/conf/config.py`
+    2. Extract patches from the downloaded images and save them to hdf5 or numpy files. `src/patch.py`
+    3. Train a model with the extracted patches.  `src/train.py`
+    4. Infer, post process and benchmark.  `src/infer.py`
     - Optionally you can just run the notebooks in `notebooks/` which do the exact same.
     - **Note:** you don't have to repeat part **i** and **ii** if you've already done them and you want to run new experiments. If you want to patch the images differently (different stride or window size) for your experiments then modify the config and run part **ii** again.
 
 ## Instructions for downloading the datasets
-1. Download the datsets from the links below
-2. Move the downloaded zips or extract the zips to the corresponding folders in `datasets/`
-3. Move to **Part 2** in the instructions above
+1. Download the datsets by running the convert.py script or the corresponding notebook
 
-#### Data download links:
+#### The data is downloaded from the following links automatically:
 1. **kumar**  
           - Train: https://drive.google.com/file/d/1JZN9Jq9km0rZNiYNEukE_8f0CsSK3Pe4/view .   
           - Test: https://drive.google.com/file/d/1NKkSQ5T0ZNQ8aUhh0a8Dt2YKYCQXIViw/view  
@@ -50,11 +47,11 @@ pip install -r requirements.txt
 2. **consep** - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/hovernet/
 3. **cpm** - TODO
 4. **pannuke** - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/pannuke
-5. **kaggle dsb 2018**: https://bbbc.broadinstitute.org/BBBC038
+5. **kaggle dsb 2018**: TODO. https://bbbc.broadinstitute.org/BBBC038
 
 ## Repository structure
 - `Dippa`/
-    - `datasets/` Location for the raw and processed datasets after downloading and running `src/convert.py`
+    - `datasets/` Location for the datasets after running `src/download.py` 
     - `notebooks/` Notebooks for running the codes instead of running the pyton scripts 
     - `patches/` Location for the patched datasets after running `src/write_patches.py`
     - `results/` Location for the results from training and inference

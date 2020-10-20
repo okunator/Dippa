@@ -8,7 +8,7 @@ CONFIG = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"Unet",
-            "experiment_version":"test_consep_DeepLabV3_presentation",
+            "experiment_version":"test_consep_PSPNet_presentation",
         },
         
         # General dataset constants and args
@@ -69,7 +69,7 @@ CONFIG = OmegaConf.create(
             "patience":2,
             
             # loss args
-            "edge_weight": 1.0, # How much weight is applied to nuclei borders  
+            "edge_weight": 1.1, # How much weight is applied to nuclei borders  
             "class_weights":True
             
         },
@@ -88,7 +88,7 @@ CONFIG = OmegaConf.create(
             "smoothen": False,
             # if smoothen is not used, then this is used for threshing soft masks. 
             # Can be set to argmax also Union[float, str="argmax"]. 
-            "threshold":0.5,
+            "threshold":"argmax",
             # apply watershed based post_processing
             "post_processing":True,
             "verbose":True,

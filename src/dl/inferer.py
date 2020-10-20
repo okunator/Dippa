@@ -554,9 +554,9 @@ class Inferer(Benchmarker, PatchExtractor):
         Args:
             out_type (str): output type to plot. Options are listed above
             ixs (List or int): list of the indexes of the image files in the dataset. 
-                    default = -1 means all images in the data fold are 
-                    plotted. If dataset = "pannuke" and ixs = -1, then 25
-                    random images are sampled.
+                               default = -1 means all images in the data fold are 
+                               plotted. If dataset = "pannuke" and ixs = -1, then 25
+                               random images are sampled.
             gt_mask (bool): plot the corresponding panoptic or instance gt next to the
                             corresponding inst or panoptic map. Ignored if soft masks
                             are plotted
@@ -656,7 +656,7 @@ class Inferer(Benchmarker, PatchExtractor):
                 axes[j, c].imshow(x, interpolation='none')
                 axes[j, c].axis('off')
         
-        if out_type == "panoptic_segmetation" and contour:
+        if out_type == "panoptic_maps" and contour:
             colors = {k: KEY_COLORS[k] for k, v in self.classes.items()}
             patches = [mpatches.Patch(color=np.array(colors[k])/255., label=k) for k, v in self.classes.items()]
             fig.legend(handles=patches, loc=1, borderaxespad=0., bbox_to_anchor=(1.15, 1), fontsize=50,)
