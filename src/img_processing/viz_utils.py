@@ -48,7 +48,7 @@ def random_colors(N: int, bright: bool = True) -> List[Tuple[float]]:
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
 # minor mods
-def draw_contours(mask: np.ndarray, 
+def draw_contours(label: np.ndarray, 
                   image: np.ndarray,
                   type_map: np.ndarray = None,
                   fill_contours: bool = False,
@@ -58,7 +58,7 @@ def draw_contours(mask: np.ndarray,
     Find contours for rgb mask to superimpose it the original image
     mask needs to be instance labelled.
     Args: 
-        mask (np.ndarray): inst_map
+        label (np.ndarray): inst_map
         image (np.ndarray): image
         type_map (np.ndarray): type_map
         fill_contours (bool): If True, contours are filled
@@ -69,16 +69,16 @@ def draw_contours(mask: np.ndarray,
     """
     bg = np.copy(image)
     
-    shape = mask.shape[:2]
-    nuc_list = list(np.unique(mask))
+    shape = label.shape[:2]
+    nuc_list = list(np.unique(label))
     nuc_list.remove(0) # 0 is background
     
-    if type_map is None:
+    if type_map is None or classes is None:
         inst_colors = random_colors(len(nuc_list))
         inst_colors = np.array(inst_colors)
 
     for idx, nuc_id in enumerate(nuc_list): 
-        inst_map = np.array(mask == nuc_id, np.uint8)
+        inst_map = np.array(label == nuc_id, np.uint8)
         
         y1, y2, x1, x2  = bounding_box(inst_map)
         y1 = y1 - 2 if y1 - 2 >= 0 else y1 

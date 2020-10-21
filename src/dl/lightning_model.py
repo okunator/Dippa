@@ -4,6 +4,7 @@ import pandas as pd
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 import ttach as tta
+import src.dl.losses as losses
 
 from pathlib import Path
 from omegaconf import DictConfig
@@ -20,11 +21,6 @@ from typing import List, Dict
 from src.utils.file_manager import ProjectFileManager
 from src.dl.datasets import SegmentationDataset
 from src.dl.torch_utils import to_device, argmax_and_flatten
-
-from src.dl.losses import (
-    JointCELoss, WeightedCELoss, JointSymmetricCELoss,
-    WeightedSymmetricCELoss
-)
 
 from src.img_processing.augmentations import (
     hue_saturation_transforms, non_rigid_transforms,
@@ -67,6 +63,7 @@ class SegModel(pl.LightningModule):
         self.model = tta.SegmentationTTAWrapper(model, tta_transforms()) if training_args["tta"] else model
         self.batch_size = training_args["batch_size"]
         self.input_size = training_args["model_input_size"]
+        self.loss_name = training_args["loss_name"]
         self.edge_weight = training_args["edge_weight"]
         self.class_weights = training_args["class_weights"]
         self.lr = training_args["lr"]
@@ -83,11 +80,11 @@ class SegModel(pl.LightningModule):
             experiment_args
         )
         
-        self.criterion = self.CE_loss_func
+        self.criterion = self.set_loss(self.loss_name)
 
         
     @classmethod
-    def from_conf(cls, model, conf):
+    def from_conf(cls, model: nn.Module, conf: DictConfig):
         model = model
         dataset_args = conf.dataset_args
         experiment_args = conf.experiment_args
@@ -130,35 +127,55 @@ class SegModel(pl.LightningModule):
     def type_class_weights(self):
         class_pixels = self.fm.get_class_pixels_num(self.train_data.as_posix())
         return 1-class_pixels/class_pixels.sum()
+    
+    def set_loss(self, loss_name, **kwargs):
+        """
+        This is used to set the loss function to one of the choices available.
+        Panoptic segmentation and instance segmentation have distinct losses.
+        This uses the info in config.py to set a loss for the training depending
+        on the segmentation objective. This sets a default for both instance and
+        panoptic objectives but you can change this when initializing the SegModel
+        object
 
-    @property
-    def CE_loss_func(self):
+        Args:
+            loss_name (str): one of ("wCE", "symmetric_wCE", "IoU_wCE", "IoU_symmetric_wCE")
+                             wCE = cross entropy with weights at the nuclei borders.
+                             symmetric_wCE = symmetric cross entropy with weights at the nuclei borders
+                             IoU_wCE = IoU combined with nuclei border weighted CE
+                             IoU_symmetric_wCE = IoU combined with nuclei border weighted symmetric CE
+            
         """
-        Choose loss function. Depends on objective (instance, panoptic). 
-        """
-        bin_w = to_device(self.binary_class_weights) if self.class_weights else None
-        if self.fm.class_types != "instance":
-            type_w = to_device(self.type_class_weights) if self.class_weights else None
-            criterion = JointCELoss(
-                class_weights_binary=bin_w,
-                class_weights_types=type_w
-            )
-            # criterion = JointSymmetricCELoss(
-            #     alpha=1.0,
-            #     beta=1.0,
-            #     reduction=False,
-            #     class_weights_binary=bin_w
-            # )
+        loss_lookup = {
+            "wCE": {"instance":"WeightedCELoss", "panoptic":"JointCELoss"},
+            "symmetric_wCE":{"instance":"WeightedSymmetricCELoss", "panoptic":"JointSymmetricCELoss"},
+            "IoU_wCE": {"instance": "TODO", "panoptic": "TODO"},
+            "IoU_symmetric_wCE": {"instance": "TODO", "panoptic": "TODO"}
+        }
+
+        # kwargs = kwargs.copy()
+        
+        # KLUDGE. Will generalize the losses at some point
+        kwargs = {}
+        if "symmetric" in loss_name:
+            kwargs.setdefault("alpha", 0.5)
+            kwargs.setdefault("beta", 2.0)
+            kwargs.setdefault("reduction", False)
         else:
-            criterion = WeightedCELoss(class_weights=bin_w)
-        return criterion
+            if self.class_weights:
+                bin_weights = to_device(self.binary_class_weights)
+                kwargs.setdefault("class_weights_binary", bin_weights)
+                if self.fm.class_types == "panoptic":
+                    type_weights = to_device(self.type_class_weights)
+                    kwargs.setdefault("class_weights_types", type_weights)
 
+        loss_key = loss_lookup[loss_name][self.fm.class_types]
+        return losses.__dict__[loss_key](**kwargs)
 
     # Lightning framework stuff:
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         return self.model(x)
     
-    def step_singlebranch(self, batch, batch_idx):
+    def step_singlebranch(self, batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
         """
         For models with only one segmentation branch for instance segmentation.
         """
@@ -185,7 +202,7 @@ class SegModel(pl.LightningModule):
             "accuracy":accuracy[0],
         }
 
-    def step_twobranch(self, batch, batch_idx):
+    def step_twobranch(self, batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
         """
         For models with two decoder branches, one for inst segmentation, one for semantic. 
         """
@@ -219,7 +236,7 @@ class SegModel(pl.LightningModule):
             "accuracy":type_acc[0],
         }
 
-    def step_return_dict(self, z, phase):
+    def step_return_dict(self, z: torch.Tensor, phase: str) -> Dict[str, torch.Tensor]:
         logs = {
             f"{phase}_loss": z["loss"],
             f"{phase}_accuracy": z["accuracy"]
@@ -231,7 +248,7 @@ class SegModel(pl.LightningModule):
             "log": logs
         }
 
-    def epoch_end(self, outputs, phase):
+    def epoch_end(self, outputs: torch.Tensor, phase: str) -> Dict[str, torch.Tensor]:
         accuracy = torch.stack([x[f"accuracy"] for x in outputs]).mean()
         loss = torch.stack([x[f"loss"] for x in outputs]).mean()
 
@@ -245,30 +262,30 @@ class SegModel(pl.LightningModule):
             "log": logs,
         }
     
-    def training_step(self, train_batch, batch_idx): 
+    def training_step(self, train_batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
         z = self.step(train_batch, batch_idx)
         return_dict = self.step_return_dict(z, "train")
         return return_dict
 
-    def validation_step(self, val_batch, batch_idx):
+    def validation_step(self, val_batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
         z = self.step(val_batch, batch_idx)
         return_dict = self.step_return_dict(z, "val")
         return return_dict
 
-    def test_step(self, test_batch, batch_idx):
+    def test_step(self, test_batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
         z = self.step(test_batch, batch_idx)
         return_dict = self.step_return_dict(z, "test")
         return return_dict
     
-    def training_epoch_end(self, outputs):
+    def training_epoch_end(self, outputs: torch.Tensor) -> Dict[str, torch.Tensor]:
         return_dict = self.epoch_end(outputs, "train")
         return return_dict
 
-    def validation_epoch_end(self, outputs):
+    def validation_epoch_end(self, outputs: torch.Tensor) -> Dict[str, torch.Tensor]:
         return_dict = self.epoch_end(outputs, "val")
         return return_dict
 
-    def test_epoch_end(self, outputs):
+    def test_epoch_end(self, outputs: torch.Tensor) -> Dict[str, torch.Tensor]:
         return_dict = self.epoch_end(outputs, "test")
         return return_dict
 

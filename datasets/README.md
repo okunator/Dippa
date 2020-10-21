@@ -1,3 +1,3 @@
 ### Location for img and mask files.
 
-Move the downloaded zip files or extract the contents of the zip files to their corresponding folders.
+After running `src/download.py` these folders will get filled with img and mask files

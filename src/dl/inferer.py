@@ -17,7 +17,7 @@ from typing import List, Dict, Tuple, Callable, Optional, Union
 
 from src.utils.patch_extractor import PatchExtractor
 from src.utils.benchmarker import Benchmarker
-from src.img_processing.viz_utils import draw_contours, KEY_COLORS, COLORS
+from src.img_processing.viz_utils import draw_contours, KEY_COLORS
 from src.dl.torch_utils import (
     argmax_and_flatten, tensor_to_ndarray,
     ndarray_to_tensor, to_device
@@ -548,11 +548,13 @@ class Inferer(Benchmarker, PatchExtractor):
                      contour: bool = False,
                      save: bool = False) -> None:
         """
-        Plot different outputs this instance holds. Options are: inst_maps, type_maps,
+        Plot different outputs this instance holds. Options are: inst_maps,
         soft_insts, soft_types, panoptic_maps.
 
         Args:
-            out_type (str): output type to plot. Options are listed above
+            out_type (str): output type to plot. Options are listed above.
+                            If soft_types are soft_insts are used then gt_masks and
+                            contour args will be ignored.
             ixs (List or int): list of the indexes of the image files in the dataset. 
                                default = -1 means all images in the data fold are 
                                plotted. If dataset = "pannuke" and ixs = -1, then 25
@@ -565,9 +567,8 @@ class Inferer(Benchmarker, PatchExtractor):
             save (bool): Save the plots
 
         """
-        # TODO someday make this pretty
-        assert out_type in ("inst_maps", "type_maps",
-                            "soft_insts", "soft_types", "panoptic_maps")
+        # THIS IS A HUGE KLUDGE. TODO someday make this pretty
+        assert out_type in ("inst_maps", "soft_insts", "soft_types", "panoptic_maps")
 
         assert self.__dict__[out_type], (
             f"outputs for {out_type} not found. Run predictions and then" 
@@ -609,49 +610,32 @@ class Inferer(Benchmarker, PatchExtractor):
 
         for j, (name, out) in enumerate(outputs):
             for c in range(ncol):
+                kwargs = {}
                 if "soft" in outputs[0][0]:
                     x = out[..., c]
                 else:
-                    if contour:
-                        x = out
-                        im = self.read_img(images[j])
-                        x = draw_contours(x, im)
-                        if gt_mask:
-                            if out_type == "panoptic_maps":
-                                if divmod(2, c+1)[0] == 1:
-                                    gt_inst = self.read_mask(gt_masks[j])
-                                    gt_type = self.read_mask(gt_masks[j], key="type_map")
-                                    if self.dataset == "consep":
-                                        gt_type = self.consep_classes(gt_type)
-                                    x = draw_contours(gt_inst, im, gt_type)
-                                    name = self.__get_fn(gt_masks[j])
-                                else:
-                                    inst = self.inst_maps[name.replace("panoptic", "inst")]
-                                    x = draw_contours(inst, im, out)
-                            elif out_type == "inst_maps":
-                                if divmod(2, c+1)[0] == 1:
-                                    gt_inst = self.read_mask(gt_masks[j])
-                                    x = draw_contours(gt_inst, im)
-                                    name = self.__get_fn(gt_masks[j])
-
+                    if gt_mask and divmod(2, c+1)[0] == 1:
+                        inst = self.read_mask(gt_masks[j])
                     else:
-                        x = out
-                        if gt_mask:
-                            if out_type == "panoptic_maps":
-                                if divmod(2, c+1)[0] == 1:
-                                    gt_type = self.read_mask(gt_masks[j], key="type_map")
-                                    x = label2rgb(gt_type, bg_label=0)
-                                    name = self.__get_fn(gt_masks[j])
-                                else:
-                                    x = label2rgb(x, bg_label=0)
-                            elif out_type == "inst_maps":
-                                if divmod(2, c+1)[0] == 1:
-                                    gt_type = self.read_mask(gt_masks[j])
-                                    x = label2rgb(gt_type, bg_label=0)
-                                    name = self.__get_fn(gt_masks[j])
-                                else:
-                                    x = label2rgb(x, bg_label=0)
+                        n = name if out_type == "inst_maps" else name.replace("panoptic", "inst")
+                        inst = self.inst_maps[n]
+                    kwargs.setdefault("label", inst)
+                    
+                    if out_type == "panoptic_maps":
+                        if gt_mask and divmod(2, c+1)[0] == 1:
+                            type_map = self.read_mask(gt_masks[j], key="type_map")
+                        else:
+                            type_map = out.astype("uint8")
+                        kwargs.setdefault("type_map", type_map)
+                        kwargs.setdefault("classes", self.classes)
 
+                    if contour:
+                        im = self.read_img(images[j])
+                        kwargs.setdefault("image", im)
+                        x = draw_contours(**kwargs)
+                    else:
+                        x = label2rgb(inst, bg_label=0)
+                    
                 axes[j, c].set_title(f"{name}", fontsize=30)
                 axes[j, c].imshow(x, interpolation='none')
                 axes[j, c].axis('off')
@@ -659,7 +643,7 @@ class Inferer(Benchmarker, PatchExtractor):
         if out_type == "panoptic_maps" and contour:
             colors = {k: KEY_COLORS[k] for k, v in self.classes.items()}
             patches = [mpatches.Patch(color=np.array(colors[k])/255., label=k) for k, v in self.classes.items()]
-            fig.legend(handles=patches, loc=1, borderaxespad=0., bbox_to_anchor=(1.15, 1), fontsize=50,)
+            fig.legend(handles=patches, loc=1, borderaxespad=0., bbox_to_anchor=(1.25, 1), fontsize=50,)
         
         fig.tight_layout(w_pad=4, h_pad=10)
 

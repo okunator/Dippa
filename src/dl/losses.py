@@ -1,7 +1,7 @@
 import torch
 from typing import List, Optional
 from torch import nn
-from torch.nn.modules.loss import _Loss
+from torch.nn.modules.loss import _Loss, _WeightedLoss
 from src.dl.torch_utils import one_hot
 
 # adapted these from:

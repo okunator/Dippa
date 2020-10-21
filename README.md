@@ -31,13 +31,13 @@ pip install -r requirements.txt
 2. Run an experiment.
     1. Modify the parameters in the config file. `src/conf/config.py`
     2. Extract patches from the downloaded images and save them to hdf5 or numpy files. `src/patch.py`
-    3. Train a model with the extracted patches.  `src/train.py`
-    4. Infer, post process and benchmark.  `src/infer.py`
+    3. Train a model with the extracted patches.  `src/train.py` (use notebook for now)
+    4. Infer, post process and benchmark.  `src/infer.py` (use notebook for now)
     - Optionally you can just run the notebooks in `notebooks/` which do the exact same.
     - **Note:** you don't have to repeat part **i** and **ii** if you've already done them and you want to run new experiments. If you want to patch the images differently (different stride or window size) for your experiments then modify the config and run part **ii** again.
 
 ## Instructions for downloading the datasets
-1. Download the datsets by running the convert.py script or the corresponding notebook
+1. Download the datsets by running the `download.py` script or the corresponding notebook
 
 #### The data is downloaded from the following links automatically:
 1. **kumar**  
@@ -45,9 +45,8 @@ pip install -r requirements.txt
           - Test: https://drive.google.com/file/d/1NKkSQ5T0ZNQ8aUhh0a8Dt2YKYCQXIViw/view  
           
 2. **consep** - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/hovernet/
-3. **cpm** - TODO
-4. **pannuke** - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/pannuke
-5. **kaggle dsb 2018**: TODO. https://bbbc.broadinstitute.org/BBBC038
+3. **pannuke** - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/pannuke
+4. **kaggle dsb 2018**: TODO. https://bbbc.broadinstitute.org/BBBC038
 
 ## Repository structure
 - `Dippa`/

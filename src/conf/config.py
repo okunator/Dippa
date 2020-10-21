@@ -7,8 +7,8 @@ CONFIG = OmegaConf.create(
         # Define the model name and the experiment
         # These will be used to write the result files to the right folders
         "experiment_args":{
-            "model_name":"Unet",
-            "experiment_version":"test_pannuke_UNET",
+            "model_name":"FPN",
+            "experiment_version":"test_consep_FPN",
         },
         
         # General dataset constants and args
@@ -20,7 +20,7 @@ CONFIG = OmegaConf.create(
             # and panoptic segmentation can be done to consep and pannuke datasets
             # change this according to your needs. has to be one of ("instance", "panopotic")
             # Things won't crash even if types is used for a dataset that can be used only for 
-            # isntance segmentation
+            # instance segmentation
             "class_types":"panoptic", 
             
             # if phases = ["train", "valid", "test"]. The train set is also split to 
@@ -55,7 +55,7 @@ CONFIG = OmegaConf.create(
             "model_input_size":256,
             "tta":False, # use test time augmentation during training. Note: very slow w ttatch
             "resume_training":False, # continue training where you left off?
-            "num_epochs":2,
+            "num_epochs":10,
             "num_gpus":1,
             
             # optimizer args
@@ -69,7 +69,11 @@ CONFIG = OmegaConf.create(
             "patience":2,
             
             # loss args
-            "edge_weight": 1.1, # How much weight is applied to nuclei borders  
+            # One of ("wCE", "symmetric_wCE", TODO: "IoU_wCE", "IoU_symmetric_wCE")
+            # More of these in losses.py. 
+            "loss_name":"wCE",
+            # How much weight is applied to nuclei borders. 1.0 = no weight
+            "edge_weight": 1.1,  
             "class_weights":True
             
         },
