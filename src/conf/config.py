@@ -8,7 +8,7 @@ CONFIG = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"FPN",
-            "experiment_version":"test_consep_FPN",
+            "experiment_version":"test_sCE_panoptic_False_False",
         },
         
         # General dataset constants and args
@@ -21,8 +21,7 @@ CONFIG = OmegaConf.create(
             # change this according to your needs. has to be one of ("instance", "panopotic")
             # Things won't crash even if types is used for a dataset that can be used only for 
             # instance segmentation
-            "class_types":"panoptic", 
-            
+            "class_types":"panoptic",
             # if phases = ["train", "valid", "test"]. The train set is also split to 
             # validation set. If phases = ["train", "test"], no splitting is done.
             # If dataset = 'pannuke' and phases = ["train", "valid", "test"] the folds
@@ -71,11 +70,16 @@ CONFIG = OmegaConf.create(
             # loss args
             # One of ("wCE", "symmetric_wCE", TODO: "IoU_wCE", "IoU_symmetric_wCE")
             # More of these in losses.py. 
-            "loss_name":"wCE",
-            # How much weight is applied to nuclei borders. 1.0 = no weight
-            "edge_weight": 1.1,  
-            "class_weights":True
-            
+            "loss_name":"symmetric_wCE",
+            # Whether to apply weights at nuclei borders when computing the loss
+            "edge_weights":False,
+            # How much weight is applied to nuclei borders. 1.0 = no weight.
+            # This is ignored if "edge_weights" is False
+            "edge_weight": 1.1,
+            # Apply weights to different classes. Weights are computed by from the number of pixels
+            # belonging to each class and the less number of pixels there is in a class the bigger
+            # weight it will get. All weights are b/w [0, 1] 
+            "class_weights":False
         },
         
         # Inference args

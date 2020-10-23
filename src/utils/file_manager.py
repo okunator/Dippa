@@ -151,6 +151,7 @@ class ProjectFileManager(FileHandler):
 
     @property
     def class_types(self):
+        assert self.dsargs.class_types in ("instance", "panoptic")
         return self.dsargs.class_types
     
     @property

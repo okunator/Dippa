@@ -4,7 +4,6 @@ import pandas as pd
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 import ttach as tta
-import src.dl.losses as losses
 
 from pathlib import Path
 from omegaconf import DictConfig
@@ -21,7 +20,7 @@ from typing import List, Dict
 from src.utils.file_manager import ProjectFileManager
 from src.dl.datasets import SegmentationDataset
 from src.dl.torch_utils import to_device, argmax_and_flatten
-
+from src.dl.loss_builder import LossBuilder
 from src.img_processing.augmentations import (
     hue_saturation_transforms, non_rigid_transforms,
     blur_transforms, random_crop, to_tensor, tta_transforms,
@@ -42,9 +41,9 @@ class SegModel(pl.LightningModule):
         in this project.
         
         Args:
-            model (nn.Module) : Pytorch model specification. Can be from smp, toolbelt, or a 
-                                custom model. ttatch wrappers work also. Basically any model 
-                                that inherits nn.Module should work
+            model (nn.Module): Pytorch model specification. Can be from smp, toolbelt, or a 
+                               custom model. ttatch wrappers work also. Basically any model 
+                               that inherits nn.Module should work
             dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
                                        related to the dataset that is being used.
                                        config.py for more info
@@ -64,6 +63,7 @@ class SegModel(pl.LightningModule):
         self.batch_size = training_args["batch_size"]
         self.input_size = training_args["model_input_size"]
         self.loss_name = training_args["loss_name"]
+        self.edge_weights = training_args["edge_weights"]
         self.edge_weight = training_args["edge_weight"]
         self.class_weights = training_args["class_weights"]
         self.lr = training_args["lr"]
@@ -80,7 +80,7 @@ class SegModel(pl.LightningModule):
             experiment_args
         )
         
-        self.criterion = self.set_loss(self.loss_name)
+        self.criterion = self._criterion
 
         
     @classmethod
@@ -121,56 +121,32 @@ class SegModel(pl.LightningModule):
         num_class_pixels = self.fm.get_class_pixels_num(self.train_data.as_posix())
         num_binary_pixels = np.sum(num_class_pixels, where=[False] + [True]*(len(num_class_pixels)-1))
         class_pixels = np.array([num_class_pixels[0], num_binary_pixels])
-        return 1-class_pixels/class_pixels.sum()
+        return to_device(1-class_pixels/class_pixels.sum())
 
     @property
     def type_class_weights(self):
         class_pixels = self.fm.get_class_pixels_num(self.train_data.as_posix())
-        return 1-class_pixels/class_pixels.sum()
-    
-    def set_loss(self, loss_name, **kwargs):
-        """
-        This is used to set the loss function to one of the choices available.
-        Panoptic segmentation and instance segmentation have distinct losses.
-        This uses the info in config.py to set a loss for the training depending
-        on the segmentation objective. This sets a default for both instance and
-        panoptic objectives but you can change this when initializing the SegModel
-        object
+        return to_device(1-class_pixels/class_pixels.sum())
 
-        Args:
-            loss_name (str): one of ("wCE", "symmetric_wCE", "IoU_wCE", "IoU_symmetric_wCE")
-                             wCE = cross entropy with weights at the nuclei borders.
-                             symmetric_wCE = symmetric cross entropy with weights at the nuclei borders
-                             IoU_wCE = IoU combined with nuclei border weighted CE
-                             IoU_symmetric_wCE = IoU combined with nuclei border weighted symmetric CE
-            
-        """
-        loss_lookup = {
-            "wCE": {"instance":"WeightedCELoss", "panoptic":"JointCELoss"},
-            "symmetric_wCE":{"instance":"WeightedSymmetricCELoss", "panoptic":"JointSymmetricCELoss"},
-            "IoU_wCE": {"instance": "TODO", "panoptic": "TODO"},
-            "IoU_symmetric_wCE": {"instance": "TODO", "panoptic": "TODO"}
-        }
-
-        # kwargs = kwargs.copy()
-        
-        # KLUDGE. Will generalize the losses at some point
-        kwargs = {}
-        if "symmetric" in loss_name:
-            kwargs.setdefault("alpha", 0.5)
-            kwargs.setdefault("beta", 2.0)
-            kwargs.setdefault("reduction", False)
+    @property
+    def _criterion(self):
+        if self.class_weights:
+            criterion = LossBuilder.set_loss(
+                loss_name=self.loss_name, 
+                class_types=self.fm.class_types,
+                edge_weights=self.edge_weights,
+                binary_weights=self.binary_class_weights,
+                type_weights=self.type_class_weights
+            )
         else:
-            if self.class_weights:
-                bin_weights = to_device(self.binary_class_weights)
-                kwargs.setdefault("class_weights_binary", bin_weights)
-                if self.fm.class_types == "panoptic":
-                    type_weights = to_device(self.type_class_weights)
-                    kwargs.setdefault("class_weights_types", type_weights)
-
-        loss_key = loss_lookup[loss_name][self.fm.class_types]
-        return losses.__dict__[loss_key](**kwargs)
-
+            criterion = LossBuilder.set_loss(
+                loss_name=self.loss_name,
+                class_types=self.fm.class_types,
+                edge_weights=self.edge_weights,
+            )
+        return criterion
+            
+    
     # Lightning framework stuff:
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         return self.model(x)
@@ -192,7 +168,8 @@ class SegModel(pl.LightningModule):
             yhat=soft_mask["instances"], 
             target=target,
             target_weight=target_weight,
-            edge_weight=self.edge_weight
+            edge_weight=self.edge_weight,
+            device=self.device
         )
         accuracy = utils.metrics.accuracy(
             argmax_and_flatten(soft_mask["instances"]), target.view(1, -1)

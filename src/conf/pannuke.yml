@@ -1,5 +1,5 @@
 class_types:
-    isntance:
+    instance:
         background: 0
         nuclei: 1
     panoptic:

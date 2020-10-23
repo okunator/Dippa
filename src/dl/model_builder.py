@@ -56,7 +56,6 @@ class SmpGeneralModel(nn.Module):
 
 class ModelBuilder(ProjectFileManager):
     def __init__(self,
-                 model_name: str,
                  dataset_args: DictConfig,
                  experiment_args: DictConfig) -> None:
         """
@@ -68,7 +67,6 @@ class ModelBuilder(ProjectFileManager):
         smp models, toolbelt models or any models with distinct encoder and decoder
         specifications
         Args:
-            model_name (str): model name. Right now smp model names are allowed
             dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
                             related to the dataset that is being used.
                             config.py for more info
@@ -96,7 +94,7 @@ class ModelBuilder(ProjectFileManager):
         dataset_args = conf.dataset_args
         experiment_args = conf.experiment_args
 
-        c = cls(model_name, dataset_args, experiment_args)
+        c = cls(dataset_args, experiment_args)
 
         if c.class_types == "panoptic":
             model_inst = c.init_model(model_name, 2, **kwargs)
