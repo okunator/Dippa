@@ -28,7 +28,7 @@ def tensor_to_ndarray(tensor: torch.Tensor,
                       channel: Optional[int] = None,
                       squeeze: Optional[bool] = False) -> np.ndarray:
     """
-    Convert img or network output tensor (B, C, H, W) to ndarray 
+    Convert img or network output tensor (B, C, H, W) or (B, H, W) to ndarray 
     of shape (B, H, W, C)|(B, H, W)|(H, W, C)|(H, W)
 
     Args:
@@ -38,18 +38,23 @@ def tensor_to_ndarray(tensor: torch.Tensor,
         squeeze (Optional[bool]): if batch size == 1. Squeeze it out. 
     """
     assert isinstance(tensor, torch.Tensor), f"Input type: {type(tensor)} is not torch.Tensor"
+    assert 3 <= tensor.dim() <= 4, f"tensor needs to have shape (B, H, W) or (B, C, H, W). Shape {tensor.shape}"
     assert tensor.shape[1] >= 2, f"tensor needs to have at least two channels. shape: {tensor.shape}" 
+    
 
     res_tensor = tensor.detach()
     if tensor.is_cuda:
         res_tensor = res_tensor.cpu()
 
-    res_tensor = res_tensor.numpy().transpose(0, 2, 3, 1) # (B, H, W, C)
+    if res_tensor.dim() == 4:
+        res_tensor = res_tensor.numpy().transpose(0, 2, 3, 1) # (B, H, W, C)
+    else:
+        res_tensor = res_tensor.numpy().transpose(1, 2, 0) # (H, W, B) 
 
     if squeeze:
-        res_tensor = res_tensor.squeeze() # if B == 1 -> (H, W, C) 
+        res_tensor = res_tensor.squeeze() # if B == 1 -> (H, W, C) or (H, W) 
 
-    if channel is not None:
+    if channel is not None and len(res_tensor.shape) != 2:
         res_tensor = res_tensor[..., channel] # -> (H, W) or (B, H, W)
 
     return res_tensor
@@ -76,18 +81,20 @@ def argmax():
     pass
 
 
-def one_hot(type_map: torch.Tensor,
-            n_classes: int, 
-            device: Optional[torch.device]) -> torch.Tensor:
+def one_hot(type_map: torch.Tensor, n_classes: int) -> torch.Tensor:
     """
     Take in a type map of shape (B, H, W) with class indices as values and reshape it
     into a tensor of shape (B, C, H, W)
+
     Args:
         type_map (torch.Tensor): type map
         n_classes (int): number of classes in type_map
-        device (torch.Device): sets the device for the torch.zeros
+
+    Returns
+        torch.Tensor onet hot tensor from the type map of shape (B, C, H, W)
     """
-    one_hot = torch.zeros(type_map.shape[0], n_classes, *type_map.shape[1:], device=device)
+    assert type_map.dtype == torch.int64, f"Wrong type_map dtype: {type_map.dtype}. Should be torch.int64"
+    one_hot = torch.zeros(type_map.shape[0], n_classes, *type_map.shape[1:], device=type_map.device, dtype=type_map.dtype)
     return one_hot.scatter_(dim=1, index=type_map.unsqueeze(1), value=1.0) + 1e-6
 
 

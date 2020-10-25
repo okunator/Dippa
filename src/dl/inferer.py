@@ -1,4 +1,6 @@
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 import sklearn.feature_extraction.image
 import pandas as pd
@@ -6,7 +8,6 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import ttach as tta
 
-from torch import nn
 from pathlib import Path
 from omegaconf import DictConfig
 from skimage.exposure import histogram
@@ -211,7 +212,7 @@ class Inferer(Benchmarker, PatchExtractor):
         if logits.shape[1] == 2:
             pred = torch.sigmoid(logits)
         else:
-            pred = torch.nn.functional.softmax(logits, dim=1)
+            pred = F.softmax(logits, dim=1)
 
         return tensor_to_ndarray(pred, squeeze=squeeze)
 
@@ -608,11 +609,13 @@ class Inferer(Benchmarker, PatchExtractor):
             len(outputs), ncol, figsize=(ncol*25, len(outputs)*25), squeeze=False
         )
 
+        class_names = {y: x for x, y in self.classes.items()}
         for j, (name, out) in enumerate(outputs):
             for c in range(ncol):
                 kwargs = {}
                 if "soft" in outputs[0][0]:
                     x = out[..., c]
+                    # name = f"{n}_{class_names[c]}"
                 else:
                     if gt_mask and divmod(2, c+1)[0] == 1:
                         inst = self.read_mask(gt_masks[j])
@@ -643,7 +646,7 @@ class Inferer(Benchmarker, PatchExtractor):
         if out_type == "panoptic_maps" and contour:
             colors = {k: KEY_COLORS[k] for k, v in self.classes.items()}
             patches = [mpatches.Patch(color=np.array(colors[k])/255., label=k) for k, v in self.classes.items()]
-            fig.legend(handles=patches, loc=1, borderaxespad=0., bbox_to_anchor=(1.25, 1), fontsize=50,)
+            fig.legend(handles=patches, loc=1, borderaxespad=0., bbox_to_anchor=(1.26, 1), fontsize=50,)
         
         fig.tight_layout(w_pad=4, h_pad=10)
 

@@ -1,20 +1,21 @@
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from typing import List, Optional
-from torch import nn
 from torch.nn.modules.loss import _Loss, _WeightedLoss
 from src.dl.torch_utils import one_hot
 
 
-# adapted these from:
-# https: // github.com/BloodAxe/pytorch-toolbelt/blob/master/pytorch_toolbelt/losses/joint_loss.py
-class WeightedCELoss(_WeightedLoss):
+class WeightedCELoss(nn.Module):
     def __init__(self, 
                  edge_weights: bool = True,
-                 class_weights: Optional[torch.Tensor] = None):
+                 class_weights: Optional[torch.Tensor] = None,
+                 **kwargs) -> None:
         """
         Wrapper class around CE loss function that applies weights with fixed factor.
         This class adds nuclei border weights to the final computed loss on a feature map generated
         from a H&E image.
+
         Args:
             edge_weights (bool): Add weight to nuclei borders like in Unet paper
             class_weights (torch.Tensor): Optional tensor of size n_classes for class weights
@@ -31,16 +32,19 @@ class WeightedCELoss(_WeightedLoss):
                 target: torch.Tensor, 
                 target_weight: Optional[torch.Tensor] = None,
                 edge_weight: Optional[float] = 1.1,
-                device: Optional[torch.device] = None) -> torch.Tensor:
+                **kwargs) -> torch.Tensor:
         """
+        Computes the cross entropy loss
+
         Args:
             yhat (torch.Tensor): The feature map generated from the forward() of the model
             target (torch.Tensor): the ground truth annotations of the input patch
             target_weight (torch.Tensor): The weight map that points the pixels in clumped nuclei
                                           that are overlapping.
             edge_weight (float): weights applied to the nuclei edges: edge_weight^target_weight
-            device (Optional[torch.Device]): Dummy device argument. So that lightning model can
-                                             compute the loss... 
+
+        Returns:
+            torch.Tensor: computed CE loss (scalar)
         """
         if self.edge_weights:
             loss_matrix = self.loss(yhat, target)
@@ -68,7 +72,8 @@ class WeightedSCELoss(nn.Module):
                  alpha: float = 0.5,
                  beta: float = 1.0,
                  edge_weights: bool = True,
-                 class_weights: Optional[torch.Tensor] = None) -> None:
+                 class_weights: Optional[torch.Tensor] = None,
+                 **kwargs) -> None:
         """
         Args:
             alpha(float): corresponds to overfitting issue of CE
@@ -87,24 +92,25 @@ class WeightedSCELoss(nn.Module):
                 target: torch.Tensor,
                 target_weight: Optional[torch.Tensor] = None,
                 edge_weight: Optional[float] = 1.1,
-                device: Optional[torch.device] = None) -> torch.Tensor:
-        """Calculates loss between ``yhat`` and ``target`` tensors.
+                **kwargs) -> torch.Tensor:
+        """
+        Computes the symmetric cross entropy loss between ``yhat`` and ``target`` tensors.
 
         Args:
             yhat: input tensor of size (B, C, H, W)
-            target: target tensor of size (batch_size), where
+            target: target tensor of size (B, H, W), where
                     values of a vector correspond to class index
             target_weight (torch.Tensor): The weight map that points the pixels in clumped nuclei
                                 that are overlapping.
             edge_weight (float): weights applied to the nuclei edges: edge_weight^target_weight
-            device: the used one_hot function needs to know the device as input
+
         Returns:
-            torch.Tensor: computed loss
+            torch.Tensor: computed SCE loss (scalar)
         """
         H = yhat.shape[2]
         W = yhat.shape[3]
         num_classes = yhat.shape[1]
-        target_one_hot = one_hot(target, num_classes, device)
+        target_one_hot = one_hot(target, num_classes)
         assert target_one_hot.shape == yhat.shape
 
         yhat = torch.clamp(yhat, min=1e-7, max=1.0)
@@ -133,6 +139,41 @@ class WeightedSCELoss(nn.Module):
         return loss
 
 
+class DiceLoss(nn.Module):
+    def __init__(self, **kwargs) -> None:
+        """
+        Sørensen-Dice Coefficient Loss criterion. Optionally applies weights
+        at the nuclei edges and weights for different classes.
+        """
+        super(DiceLoss, self).__init__()
 
+    def forward(self, 
+                yhat: torch.Tensor,
+                target: torch.Tensor,
+                eps: float = 1e-7,
+                **kwargs):
+        """
+        Computes the DICE coefficient
 
+        Args:
+            yhat: input tensor of size (B, C, H, W)
+            target: target tensor of size (B, H, W), where
+                    values of a vector correspond to class index
 
+        Returns:
+            torch.Tensor: computed DICE loss (scalar)
+        """
+
+        # activation
+        yhat_soft = F.softmax(yhat, dim=1)
+
+        # one hot target
+        target_one_hot = one_hot(target, n_classes=yhat.shape[1])
+        
+        # dice components
+        intersection = torch.sum(yhat_soft * target_one_hot, (1, 2, 3))
+        union = torch.sum(yhat_soft + target_one_hot, (1, 2, 3))
+
+        # dice score
+        dice = 2.0 * intersection / union.clamp_min(eps)
+        return torch.mean(1.0 - dice)

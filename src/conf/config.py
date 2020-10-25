@@ -7,8 +7,8 @@ CONFIG = OmegaConf.create(
         # Define the model name and the experiment
         # These will be used to write the result files to the right folders
         "experiment_args":{
-            "model_name":"FPN",
-            "experiment_version":"test_sCE_panoptic_False_False",
+            "model_name":"UNET",
+            "experiment_version":"panoptic_DICEloss_test",
         },
         
         # General dataset constants and args
@@ -54,7 +54,7 @@ CONFIG = OmegaConf.create(
             "model_input_size":256,
             "tta":False, # use test time augmentation during training. Note: very slow w ttatch
             "resume_training":False, # continue training where you left off?
-            "num_epochs":10,
+            "num_epochs":16,
             "num_gpus":1,
             
             # optimizer args
@@ -68,18 +68,22 @@ CONFIG = OmegaConf.create(
             "patience":2,
             
             # loss args
-            # One of ("wCE", "symmetric_wCE", TODO: "IoU_wCE", "IoU_symmetric_wCE")
-            # More of these in losses.py. 
-            "loss_name":"symmetric_wCE",
+            # One of ("wCE", "wSCE", "IoU_wCE", "IoU_wSCE", "DICE_wCE", "DICE_wSCE")
+            # More of these in losses.py. This loss will be used for instance segmentation branch
+            "inst_branch_loss":"DICE_wCE",
+            # One of ("wCE", "wSCE", "IoU_wCE", "IoU_wSCE", "DICE_wCE", "DICE_wSCE")
+            # This loss will be used for type segmentation branch. This is optional
+            "semantic_branch_loss":"DICE_wCE",
+            "aux_branch_loss":"DICE_wCE",
             # Whether to apply weights at nuclei borders when computing the loss
-            "edge_weights":False,
+            "edge_weights":True,
             # How much weight is applied to nuclei borders. 1.0 = no weight.
             # This is ignored if "edge_weights" is False
-            "edge_weight": 1.1,
+            "edge_weight": 2.5,
             # Apply weights to different classes. Weights are computed by from the number of pixels
             # belonging to each class and the less number of pixels there is in a class the bigger
             # weight it will get. All weights are b/w [0, 1] 
-            "class_weights":False
+            "class_weights":True
         },
         
         # Inference args

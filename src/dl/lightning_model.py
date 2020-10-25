@@ -7,8 +7,6 @@ import ttach as tta
 
 from pathlib import Path
 from omegaconf import DictConfig
-from sklearn.metrics import confusion_matrix
-from catalyst.contrib.nn import DiceLoss, IoULoss
 from catalyst.contrib.nn import Ralamb, RAdam, Lookahead
 from torch import nn
 from torch import optim
@@ -19,8 +17,8 @@ from typing import List, Dict
 
 from src.utils.file_manager import ProjectFileManager
 from src.dl.datasets import SegmentationDataset
-from src.dl.torch_utils import to_device, argmax_and_flatten
 from src.dl.loss_builder import LossBuilder
+from src.dl.torch_utils import to_device, argmax_and_flatten
 from src.img_processing.augmentations import (
     hue_saturation_transforms, non_rigid_transforms,
     blur_transforms, random_crop, to_tensor, tta_transforms,
@@ -62,7 +60,9 @@ class SegModel(pl.LightningModule):
         self.model = tta.SegmentationTTAWrapper(model, tta_transforms()) if training_args["tta"] else model
         self.batch_size = training_args["batch_size"]
         self.input_size = training_args["model_input_size"]
-        self.loss_name = training_args["loss_name"]
+        self.loss_name_inst = training_args["inst_branch_loss"]
+        self.loss_name_type = training_args["semantic_branch_loss"]
+        self.loss_name_aux = training_args["aux_branch_loss"]
         self.edge_weights = training_args["edge_weights"]
         self.edge_weight = training_args["edge_weight"]
         self.class_weights = training_args["class_weights"]
@@ -132,7 +132,8 @@ class SegModel(pl.LightningModule):
     def _criterion(self):
         if self.class_weights:
             criterion = LossBuilder.set_loss(
-                loss_name=self.loss_name, 
+                loss_name_inst=self.loss_name_inst,
+                loss_name_type=self.loss_name_type,
                 class_types=self.fm.class_types,
                 edge_weights=self.edge_weights,
                 binary_weights=self.binary_class_weights,
@@ -140,7 +141,8 @@ class SegModel(pl.LightningModule):
             )
         else:
             criterion = LossBuilder.set_loss(
-                loss_name=self.loss_name,
+                loss_name_inst=self.loss_name_inst,
+                loss_name_type=self.loss_name_type,
                 class_types=self.fm.class_types,
                 edge_weights=self.edge_weights,
             )
@@ -168,8 +170,7 @@ class SegModel(pl.LightningModule):
             yhat=soft_mask["instances"], 
             target=target,
             target_weight=target_weight,
-            edge_weight=self.edge_weight,
-            device=self.device
+            edge_weight=self.edge_weight
         )
         accuracy = utils.metrics.accuracy(
             argmax_and_flatten(soft_mask["instances"]), target.view(1, -1)
@@ -200,8 +201,7 @@ class SegModel(pl.LightningModule):
             target_inst=inst_target, 
             target_type=type_target, 
             target_weight=target_weight,
-            edge_weight=self.edge_weight,
-            device=self.device
+            edge_weight=self.edge_weight
         )
 
         type_acc = utils.metrics.accuracy(
