@@ -58,7 +58,6 @@ pip install -r requirements.txt
         - `conf/`
             - `config.py` THE CONFIG FILE TO MODIFY FOR DIFFERENT EXPERIMENTS
             - `consep.yml` data related to consep dataset
-            - `cpm.yml` data related to cpm dataset TODO
             - `dsb2018.yml` data related to dsb2018 dataset TODO
             - `kumar.yml` data related to the kumar dataset
             - `pannuke.yml` data related to the pannuke dataset
@@ -67,6 +66,7 @@ pip install -r requirements.txt
             - `inferer.py` class for inference, post processing and benchmarking of the trained models
             - `lightning_model.py` pytorch lightning class abstraction for any pytorch model used in this project
             - `losses.py` classes for different losses that can be used for diff models
+            - `loss_builder.py` wrapper classes to combine different loss functions into one joint loss.
             - `model_builder.py` wrapper classes to modify different backbone models to do instance or panoptic seg
             - `torch_utils.py` utility functions for torch tensors
         - `img_processing/`

@@ -38,6 +38,7 @@ class SmpGeneralModel(nn.Module):
    def __init__(self, inst_model):
        """
         Wrapper for smp model for binary or semantic segmentation.
+
         Args:
             inst_model (nn.Module): smp mode for binary segmentation
         """
@@ -66,6 +67,7 @@ class ModelBuilder(ProjectFileManager):
         semantic segmentation decoder branch. This can take in your own model specs,
         smp models, toolbelt models or any models with distinct encoder and decoder
         specifications
+
         Args:
             dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
                             related to the dataset that is being used.
@@ -87,6 +89,7 @@ class ModelBuilder(ProjectFileManager):
         deduce how many classes for a specific dataset are needed and if objective
         is to do panoptic or instance segmentation. For now these models can be used
         ("FPN", "DeepLabV3", "LinkNet", "Unet", "PAN", "PSPNet")
+        
         Example:
             >>> from src.conf.config import CONFIG
             >>> ModelBuilder.get_model("FPN", CONFIG)

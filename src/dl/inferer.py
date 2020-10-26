@@ -16,6 +16,8 @@ from collections import OrderedDict
 from pathos.multiprocessing import ThreadPool as Pool
 from typing import List, Dict, Tuple, Callable, Optional, Union
 
+import src.img_processing.post_processing as post_proc
+
 from src.utils.patch_extractor import PatchExtractor
 from src.utils.benchmarker import Benchmarker
 from src.img_processing.viz_utils import draw_contours, KEY_COLORS
@@ -24,11 +26,12 @@ from src.dl.torch_utils import (
     ndarray_to_tensor, to_device
 )
 
-from src.img_processing.post_processing import (
-    combine_inst_semantic, naive_thresh_prob, smoothed_thresh,
-    inv_dist_watershed, activate_plus_dog, activation,
-    shape_index_watershed
-)
+
+# from src.img_processing.post_processing import (
+#     combine_inst_semantic, naive_thresh_prob, smoothed_thresh,
+#     inv_dist_watershed, activate_plus_dog, activation,
+#     shape_index_watershed, sobel_watershed
+# )
 
 from src.img_processing.augmentations import (
     tta_augs, tta_deaugs, resize, tta_transforms, tta_five_crops
@@ -69,8 +72,10 @@ class Inferer(Benchmarker, PatchExtractor):
         self.verbose = inference_args.verbose
         self.fold = inference_args.data_fold
         self.test_time_augs = inference_args.tta
+        self.thresh_method = inference_args.thresh_method
         self.thresh = inference_args.threshold
         self.post_proc = inference_args.post_processing
+        self.post_proc_method = inference_args.post_proc_method
         
         # init containers for resluts
         self.soft_insts = OrderedDict()
@@ -174,12 +179,14 @@ class Inferer(Benchmarker, PatchExtractor):
         """
         # TODO: add thresholding methods
         assert prob_map.shape[2] == 2, f"Shape: {prob_map.shape} should have only two channels"
+        assert self.thresh_method in ("argmax", "sauvola_thresh", "niblack_thresh", None)
         if self.smoothen:
-            mask = smoothed_thresh(prob_map)[..., 1]
-        elif self.thresh == "argmax":
-            mask = np.argmax(prob_map, axis=2)
-        elif isinstance(self.thresh, float):
-            mask = naive_thresh_prob(prob_map, thresh)[..., 1]
+            mask = post_proc.smoothed_thresh(prob_map)
+        elif self.thresh_method is not None:
+            mask = post_proc.__dict__[self.thresh_method](prob_map=prob_map)
+        else:
+            assert isinstance(self.thresh, float)
+            mask = post_proc.naive_thresh_prob(prob_map, thresh)
         return mask
 
     def __logits(self, patch: np.ndarray) -> Dict[str, torch.Tensor]:
@@ -224,7 +231,7 @@ class Inferer(Benchmarker, PatchExtractor):
             patch (np.ndarray): the soft mask pach to smoothen. Shape (H, W, C)
         """
         for c in range(patch.shape[2]):
-            patch[..., c] = activate_plus_dog(patch[..., c])  # (H, W)
+            patch[..., c] = post_proc.activate_plus_dog(patch[..., c])  # (H, W)
         return patch
          
             
@@ -441,8 +448,7 @@ class Inferer(Benchmarker, PatchExtractor):
             
     def post_process_instmap(self,
                              soft_inst: np.ndarray,
-                             thresh: Union[float, str],
-                             postproc_func: Optional[Callable] = shape_index_watershed) -> np.ndarray:
+                             thresh: Union[float, str]) -> np.ndarray:
         """
         Takes in a soft instance mask of shape (H, W, C) and thresholds it.
         Post processing is applied if defined in config.py
@@ -452,8 +458,6 @@ class Inferer(Benchmarker, PatchExtractor):
             thresh (Union[float, sty]): threshold value for naive thresholding or a str
                                         specifying a thresholding method. For now only 
                                         "argmax" is available.
-            postproc_func (Callable): a post processing function that takes in an 2D 
-                                      inst map. Check post_processing.py for different ones
 
         Returns:
             np.ndarray with instances labelled
@@ -463,8 +467,15 @@ class Inferer(Benchmarker, PatchExtractor):
 
         # TODO: Add postproc functions
         if self.post_proc:
-            inst_map = shape_index_watershed(soft_inst[..., 1], inst_map)
-            # inst_map = inv_dist_watershed(inst_map)
+            assert self.post_proc_method in (
+                "shape_index_watershed", "shape_index_watershed2", "inv_dist_watershed", "sobel_watershed"
+            ), f"post_proc_method: {self.post_proc_method} not found. Check config.py"
+            
+            kwargs = {}
+            kwargs.setdefault("inst_map", inst_map)
+            kwargs.setdefault("prob_map", soft_inst[..., 1])
+            inst_map = post_proc.__dict__[self.post_proc_method](**kwargs)
+            
         return inst_map
 
     def panoptic_output(self,
@@ -474,7 +485,7 @@ class Inferer(Benchmarker, PatchExtractor):
         For now only a wrapper for combine_inst_semantic from src.img_processing.post_processing
         """
         # TODO: optional different combining heuristics
-        return combine_inst_semantic(inst_map, type_map)
+        return post_proc.combine_inst_semantic(inst_map, type_map)
 
                 
     def post_process(self) -> None:
@@ -508,7 +519,7 @@ class Inferer(Benchmarker, PatchExtractor):
                     for i, t in zip(self.inst_maps, self.type_maps)]
 
             with Pool() as pool:
-                panops = pool.starmap(combine_inst_semantic, maps)
+                panops = pool.starmap(post_proc.combine_inst_semantic, maps)
 
             for i, path in enumerate(self.images):
                 fn = self.__get_fn(path)
@@ -569,7 +580,7 @@ class Inferer(Benchmarker, PatchExtractor):
 
         """
         # THIS IS A HUGE KLUDGE. TODO someday make this pretty
-        assert out_type in ("inst_maps", "soft_insts", "soft_types", "panoptic_maps")
+        assert out_type in ("inst_maps", "soft_insts", "soft_types", "panoptic_maps", "type_maps")
 
         assert self.__dict__[out_type], (
             f"outputs for {out_type} not found. Run predictions and then" 
@@ -609,7 +620,7 @@ class Inferer(Benchmarker, PatchExtractor):
             len(outputs), ncol, figsize=(ncol*25, len(outputs)*25), squeeze=False
         )
 
-        class_names = {y: x for x, y in self.classes.items()}
+        # class_names = {y: x for x, y in self.classes.items()}
         for j, (name, out) in enumerate(outputs):
             for c in range(ncol):
                 kwargs = {}
@@ -620,7 +631,12 @@ class Inferer(Benchmarker, PatchExtractor):
                     if gt_mask and divmod(2, c+1)[0] == 1:
                         inst = self.read_mask(gt_masks[j])
                     else:
-                        n = name if out_type == "inst_maps" else name.replace("panoptic", "inst")
+                        if out_type == "inst_maps":
+                            n = name  
+                        elif out_type == "panoptic_maps":
+                            n = name.replace("panoptic", "inst")
+                        elif out_type == "type_maps":
+                            n = name.replace("type", "inst")
                         inst = self.inst_maps[n]
                     kwargs.setdefault("label", inst)
                     
@@ -646,7 +662,7 @@ class Inferer(Benchmarker, PatchExtractor):
         if out_type == "panoptic_maps" and contour:
             colors = {k: KEY_COLORS[k] for k, v in self.classes.items()}
             patches = [mpatches.Patch(color=np.array(colors[k])/255., label=k) for k, v in self.classes.items()]
-            fig.legend(handles=patches, loc=1, borderaxespad=0., bbox_to_anchor=(1.26, 1), fontsize=50,)
+            fig.legend(handles=patches, loc=1, borderaxespad=0.2, bbox_to_anchor=(1.26, 1), fontsize=50,)
         
         fig.tight_layout(w_pad=4, h_pad=10)
 

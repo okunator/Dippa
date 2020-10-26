@@ -13,7 +13,7 @@ from torch import nn
 from scipy import ndimage as ndi
 
 from src.img_processing.process_utils import (
-    bounding_box, get_inst_centroid, binarize
+    bounding_box, get_inst_centroid, binarize, remap_label
 )
 
 
@@ -21,6 +21,7 @@ def activation(prob_map: np.ndarray, method: str = 'sigmoid') -> np.ndarray:
     """
     torch activations functions for logit/soft mask that has been converted to 
     np.ndarray array
+
     Args:
         prob_map (np.ndarray): the soft mask to be activated. shape (H, W)
         method (str): one of ('relu', 'celu', 'sigmoid', 'relu-sigmoid', 'celu-sigmoid', 'None')  
@@ -51,6 +52,7 @@ def activate_plus_dog(prob_map: np.ndarray) -> np.ndarray:
     Also Effectively removes checkerboard effect after predicted tiles are merged
     and makes the thresholding of the soft maps trivial with the histogram. However
     the metrics might get worse...
+
     Args:
         prob_map (np.ndarray): logit or probability map of shape (H, W) 
     """
@@ -64,18 +66,27 @@ def activate_plus_dog(prob_map: np.ndarray) -> np.ndarray:
 def to_inst_map(binary_mask: np.ndarray) -> np.ndarray:
     """
     Takes in a binary mask -> fill holes -> removes small objects -> label connected components
+    If class channel is included this assumes that binary_mask[..., 0] is the bg channel and
+    binary_mask[..., 1] the foreground.
+
     Args:
-        binary_mask (np.ndarray): a binary mask to be labelled. Shape (H, W)
+        binary_mask (np.ndarray): a binary mask to be labelled. Shape (H, W) or (H, W, C)
+    Return a np.ndarray of shape (H, W)
     """
+    if len(binary_mask.shape) == 3:
+        binary_mask = binary_mask[..., 1]
+
     mask = ndi.binary_fill_holes(binary_mask)
-    mask = morph.remove_small_objects(binary_mask.astype(bool), min_size=64)
+    mask = morph.remove_small_objects(binary_mask.astype(bool), min_size=30)
     inst_map = ndi.label(mask)[0]
+
     return inst_map
 
 
-def naive_thresh_prob(prob_map: np.ndarray, threshold: float = 0.5) -> np.ndarray:
+def naive_thresh_prob(prob_map: np.ndarray, threshold: float = 0.5, **kwargs) -> np.ndarray:
     """
     Threshold an activated soft mask with probability values [0, 1].
+
     Args:
         prob_map (np.ndarray): soft mask to be thresholded. Shape (H, W)
         threshold (float): thresholding cutoff between [0, 1]
@@ -87,9 +98,10 @@ def naive_thresh_prob(prob_map: np.ndarray, threshold: float = 0.5) -> np.ndarra
     return inst_map
 
 
-def naive_thresh(prob_map: np.ndarray, threshold: int = 2) -> np.ndarray:
+def naive_thresh(prob_map: np.ndarray, threshold: int = 2, **kwargs) -> np.ndarray:
     """
     Threshold a soft mask. Values can be logits or probabilites
+
     Args:
         prob_map (np.ndarray): soft mask to be thresholded. Shape (H, W)
         threshold (int): value used to divide the max value of the mask
@@ -101,7 +113,7 @@ def naive_thresh(prob_map: np.ndarray, threshold: int = 2) -> np.ndarray:
     return inst_map
 
 
-def niblack_thresh(prob_map: np.ndarray, win_size: int = 13) -> np.ndarray:
+def niblack_thresh(prob_map: np.ndarray, win_size: int = 13, **kwargs) -> np.ndarray:
     """
     Wrapper for skimage niblack thresholding method
     https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_niblack_sauvola.html
@@ -117,7 +129,7 @@ def niblack_thresh(prob_map: np.ndarray, win_size: int = 13) -> np.ndarray:
     return inst_map
     
 
-def sauvola_thresh(prob_map, win_size=33):
+def sauvola_thresh(prob_map, win_size=33, **kwargs):
     """
     Wrapper for skimage sauvola thresholding method
     https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_niblack_sauvola.html
@@ -133,10 +145,11 @@ def sauvola_thresh(prob_map, win_size=33):
     return inst_map
 
 
-def morph_chan_vese_thresh(prob_map: np.ndarray) -> np.ndarray:
+def morph_chan_vese_thresh(prob_map: np.ndarray, **kwargs) -> np.ndarray:
     """
     Morphological chan vese method for thresholding. Skimage wrapper
     https://scikit-image.org/docs/dev/api/skimage.segmentation.html#skimage.segmentation.morphological_chan_vese
+
     Args: 
         prob_map (np.ndarray): soft mask to be thresholded. Shape (H, W)
     """
@@ -149,6 +162,19 @@ def morph_chan_vese_thresh(prob_map: np.ndarray) -> np.ndarray:
         
     inst_map = to_inst_map(ls)
     return inst_map
+
+
+def argmax(prob_map: np.ndarray, **kwargs) -> np.ndarray:
+    """
+    Wrapper to take argmax of a one_hot logits or prob map
+
+    Args:
+        prob_map (np.ndarray) : the probability map of shape (H, W, C)
+
+    Returns:
+        a mask of indices shaped (H, W)
+    """
+    return to_inst_map(np.argmax(prob_map, axis=2))
 
 
 def smoothed_thresh(prob_map: np.ndarray) -> np.ndarray:
@@ -175,6 +201,7 @@ def cv2_opening(mask: np.ndarray, iterations: int = 2) -> np.ndarray:
     """
     Takes in an inst_map -> binarize -> apply morphological opening (2 iterations) -> label
     Seems to increase segmentation metrics
+
     Args:
         mask (np.ndarray): instance map to be opened. Shape (H, W)
         iterations: int: number of iterations for the operation
@@ -190,6 +217,7 @@ def cv2_opening(mask: np.ndarray, iterations: int = 2) -> np.ndarray:
 def cv2_closing(mask: np.ndarray, iterations: int = 2) -> np.ndarray:
     """
     Takes in an inst_map -> binarize -> apply morphological closing (2 iterations) -> label
+    
     Args:
         mask (np.ndarray): instance map to be opened. Shape (H, W)
         iterations: int: number of iterations for the operation
@@ -202,9 +230,67 @@ def cv2_closing(mask: np.ndarray, iterations: int = 2) -> np.ndarray:
     return inst_map
 
 
+def shape_index_watershed2(prob_map: np.ndarray,
+                           inst_map: np.ndarray,
+                           **kwargs) -> np.ndarray:
+    """
+    blblbl
+
+    Args:
+        prob_map (np.ndarray): the soft mask outputted from the network. Shape (H, W)
+        inst_map (np.ndarray): The instance map to be segmented. Shape (H, W)
+    """
+    s = shape_index(prob_map)
+    s[s > 0] = 1
+    s[s <= 0] = 0
+    s = ndi.binary_fill_holes(s*inst_map)
+    s = ndi.label(s)[0]
+
+    shape = s.shape[:2]
+    nuc_list = list(np.unique(s))
+    nuc_list.remove(0)
+
+    mask = np.zeros(shape, dtype=np.int32)
+    for nuc_id in nuc_list:
+
+        nuc_map = np.copy(s == nuc_id)
+        y1, y2, x1, x2 = bounding_box(nuc_map)
+        y1 = y1 - 2 if y1 - 2 >= 0 else y1
+        x1 = x1 - 2 if x1 - 2 >= 0 else x1
+        x2 = x2 + 2 if x2 + 2 <= inst_map.shape[1] - 1 else x2
+        y2 = y2 + 2 if y2 + 2 <= inst_map.shape[0] - 1 else y2
+        nuc_map_crop = nuc_map[y1:y2, x1:x2]
+
+        marker = morph.binary_erosion(binarize(nuc_map_crop))
+        marker = morph.binary_erosion(marker)
+        marker = morph.binary_opening(marker)
+
+        distance = ndi.distance_transform_edt(marker)
+        distance = 255 * (distance / np.amax(distance))
+        distance = cv2.GaussianBlur(ndi.filters.maximum_filter(distance, 7), (3, 3), 0)
+
+        marker = ndi.label(marker)[0].astype("uint8")
+        ws_temp = segm.watershed(-distance, mask=nuc_map_crop, markers=marker, watershed_line=True)
+        ws_inst_temp = ndi.label(ws_temp)[0]*nuc_id
+
+        mask_new = np.zeros(ws_inst_temp.shape[:2], dtype=np.int32)
+        for i, sub_nuc_id in enumerate(list(np.unique(ws_inst_temp))[1:]):
+            sub_mask = np.copy(ws_inst_temp == sub_nuc_id)
+            sub_mask = filters.rank.median(sub_mask.astype("int32"), morph.disk(2))
+            sub_mask = morph.binary_dilation(binarize(sub_mask))
+            sub_mask = ndi.binary_fill_holes(sub_mask)
+            sub_mask_inst = sub_mask*(sub_nuc_id+i)
+            mask_new += sub_mask_inst
+
+        mask[y1:y2, x1:x2] += mask_new
+
+    inst_map = remap_label(mask)
+    return inst_map
+
 def shape_index_watershed(prob_map: np.ndarray,
                           inst_map: np.ndarray,
-                          win_size: int = 13) -> np.ndarray:
+                          win_size: int = 13,
+                          **kwargs) -> np.ndarray:
     """
     After thresholding, this function can be used to compute distance maps for each nuclei instance.
     This uses shape index to find local curvature from the probability map and uses that information
@@ -217,28 +303,28 @@ def shape_index_watershed(prob_map: np.ndarray,
         win_size (int): window size used in niblack thresholding the distance maps to
                         find markers for watershed
     """
-    # Morphological opening for smoothing the likely jagged edges
-    # This typically improves PQ
-    seg = np.copy(inst_map)
-    new_mask = cv2_opening(seg)
-    ann = ndi.label(new_mask)[0]
 
-    shape = seg.shape[:2]
-    nuc_list = list(np.unique(ann))
+    # This typically improves PQ
+    # seg = np.copy(inst_map)
+    # new_mask = cv2_opening(seg)
+    # ann = ndi.label(new_mask)[0]
+
+    shape = inst_map.shape[:2]
+    nuc_list = list(np.unique(inst_map))
     nuc_list.remove(0)
 
     # find the distance map per nuclei instance
     distmap = np.zeros(shape, dtype=np.uint8)
     for nuc_id in nuc_list:
-        nuc_map = np.copy(ann == nuc_id)
+        nuc_map = np.copy(inst_map == nuc_id)
 
         # Do operations to the bounded box of the nuclei
         # rather than the full size matrix
         y1, y2, x1, x2 = bounding_box(nuc_map)
         y1 = y1 - 2 if y1 - 2 >= 0 else y1
         x1 = x1 - 2 if x1 - 2 >= 0 else x1
-        x2 = x2 + 2 if x2 + 2 <= ann.shape[1] - 1 else x2
-        y2 = y2 + 2 if y2 + 2 <= ann.shape[0] - 1 else y2
+        x2 = x2 + 2 if x2 + 2 <= inst_map.shape[1] - 1 else x2
+        y2 = y2 + 2 if y2 + 2 <= inst_map.shape[0] - 1 else y2
         nuc_map_crop = nuc_map[y1:y2, x1:x2]
 
         # Find distance transform of the bounding box and normalize it
@@ -256,23 +342,22 @@ def shape_index_watershed(prob_map: np.ndarray,
     s[s > 0] = 1
     s[s <= 0] = 0
     s = ndi.binary_fill_holes(s)
-    mask = ndi.label(s*ann)[0]
+    mask = ndi.label(s*inst_map)[0]
     mask = cv2_opening(mask, iterations=2)
 
     mask = segm.watershed(-distmap, markers, mask=mask, watershed_line=True)
     mask[mask > 0] = 1
     mask = ndi.binary_fill_holes(mask)
     inst_map = ndi.label(mask)[0]
-    inst_map = cv2_opening(mask, iterations=2)
+    # inst_map = cv2_opening(mask, iterations=2)
 
     return inst_map
 
 
-
-
 def sobel_watershed(prob_map: np.ndarray,
                     inst_map: np.ndarray,
-                    win_size: int = 13) -> np.ndarray:
+                    win_size: int = 13,
+                    **kwargs) -> np.ndarray:
     """
     After thresholding, this function can be used to compute distance maps for each nuclei instance
     and watershed segment the elevation map of the prob_map (sobel). Before computing distance maps
@@ -285,7 +370,7 @@ def sobel_watershed(prob_map: np.ndarray,
         win_size (int): window size used in niblack thresholding the distance maps to
                         find markers for watershed
     """
-    # Morphological opening for smoothing the likely jagged edges
+
     # This typically improves PQ
     seg = np.copy(inst_map)
     new_mask = cv2_opening(seg)
@@ -321,16 +406,11 @@ def sobel_watershed(prob_map: np.ndarray,
     elevation_map = filters.sobel(prob_map)
     inst_map = segm.watershed(elevation_map, markers, mask=ann, watershed_line=True)
     
-    # remove small objs. Will enhance PQ a lot '(HACKish)'
-    # mask[mask > 0] = 1
-    # mask = morph.remove_small_objects(mask.astype(bool), min_size=100)
-    # inst_map = ndi.label(mask)[0]
-    
     return inst_map
 
 
 # adapted from https://github.com/vqdang/hover_net/blob/master/src/postproc/other.py
-def inv_dist_watershed(inst_map: np.ndarray, win_size: int = 13) -> np.ndarray:
+def inv_dist_watershed(inst_map: np.ndarray, win_size: int = 13, **kwargs) -> np.ndarray:
     """
     After thresholding, this function can be used to compute distance maps for each nuclei instance
     and watershed segment the inverse distmaps. Before computing distance maps a binary opening
@@ -373,12 +453,7 @@ def inv_dist_watershed(inst_map: np.ndarray, win_size: int = 13) -> np.ndarray:
                     
     # watershed
     inst_map = segm.watershed(-distmap, markers, mask=ann, watershed_line=True)
-    
-    # remove small cells. Will enhance PQ in kumar a lot (HACKish)
-    # mask[mask > 0] = 1
-    # mask = morph.remove_small_objects(mask.astype(bool), min_size=100)
-    # inst_map = ndi.label(mask)[0]
-    
+        
     return inst_map
 
 
@@ -388,6 +463,7 @@ def combine_inst_semantic(inst_map: np.ndarray,
     """
     Takes in the outputs of the different segmentation heads and combines them into
     one panoptic segmentation result
+
     Args:
         inst_map (np.ndarray): output from the instance segmentation head of 
                                a panoptic model or the post processed output of 
