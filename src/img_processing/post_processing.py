@@ -1,3 +1,4 @@
+from src.img_processing.post_processing import *
 import torch
 import scipy
 import cv2
@@ -8,6 +9,7 @@ import skimage.segmentation as segm
 from skimage.exposure import histogram
 from skimage.feature import shape_index
 from skimage import filters
+from skimage import util
 from scipy.spatial import distance_matrix
 from torch import nn
 from scipy import ndimage as ndi
@@ -231,8 +233,8 @@ def cv2_closing(mask: np.ndarray, iterations: int = 2) -> np.ndarray:
 
 
 def shape_index_watershed2(prob_map: np.ndarray,
-                           inst_map: np.ndarray,
-                           **kwargs) -> np.ndarray:
+                            inst_map: np.ndarray,
+                            **kwargs) -> np.ndarray:
     """
     blblbl
 
@@ -251,6 +253,7 @@ def shape_index_watershed2(prob_map: np.ndarray,
     nuc_list.remove(0)
 
     mask = np.zeros(shape, dtype=np.int32)
+    markers = np.zeros(shape, dtype=np.int32)
     for nuc_id in nuc_list:
 
         nuc_map = np.copy(s == nuc_id)
@@ -260,32 +263,87 @@ def shape_index_watershed2(prob_map: np.ndarray,
         x2 = x2 + 2 if x2 + 2 <= inst_map.shape[1] - 1 else x2
         y2 = y2 + 2 if y2 + 2 <= inst_map.shape[0] - 1 else y2
         nuc_map_crop = nuc_map[y1:y2, x1:x2]
+        nuc_map_crop = morph.remove_small_objects(
+            nuc_map_crop.astype(bool), 15, connectivity=1).astype("int32")
+        marker_crop = np.copy(nuc_map_crop)
 
-        marker = morph.binary_erosion(binarize(nuc_map_crop))
+        # Erode to get markers
+        marker = morph.binary_erosion(binarize(marker_crop))
+        marker = morph.binary_erosion(marker)
         marker = morph.binary_erosion(marker)
         marker = morph.binary_opening(marker)
 
+        # if the erosion removed the whole label
+        # just use the original as a marker
+        nuc_id_map = ndi.label(marker)[0]
+        nuc_ids = np.unique(nuc_id_map)
+        if len(nuc_ids) == 1:
+            nuc_id_map = binarize(nuc_map_crop)
+            nuc_ids = np.unique(nuc_id_map)
+
+        # relabel the new instances after erosion
+        # starting from the max id + 1 of the already
+        # iterated nucelis.
+        new_nucs = nuc_ids[1:]
+        num_new_nucs = len(new_nucs)
+        nuc_ids_so_far = np.unique(markers)
+        start = np.max(nuc_ids_so_far) + 1
+        end = start + num_new_nucs
+        if end - start == 1:
+            new_nuc_ids = np.array([start])
+        else:
+            new_nuc_ids = np.arange(start, end)
+
+        for old_id, new_id in list(zip(new_nucs, new_nuc_ids)):
+            nuc_id_map[nuc_id_map == old_id] = new_id
+
+
+        markers[y1:y2, x1:x2] = nuc_id_map
+
+        # compute distance map from the marker
         distance = ndi.distance_transform_edt(marker)
         distance = 255 * (distance / np.amax(distance))
-        distance = cv2.GaussianBlur(ndi.filters.maximum_filter(distance, 7), (3, 3), 0)
+        distance = cv2.GaussianBlur(
+            ndi.filters.maximum_filter(distance, 7), (3, 3), 0)
 
-        marker = ndi.label(marker)[0].astype("uint8")
-        ws_temp = segm.watershed(-distance, mask=nuc_map_crop, markers=marker, watershed_line=True)
-        ws_inst_temp = ndi.label(ws_temp)[0]*nuc_id
+        ws_temp = segm.watershed(-distance, mask=nuc_map_crop,
+                                 markers=nuc_id_map, watershed_line=True)
 
-        mask_new = np.zeros(ws_inst_temp.shape[:2], dtype=np.int32)
-        for i, sub_nuc_id in enumerate(list(np.unique(ws_inst_temp))[1:]):
-            sub_mask = np.copy(ws_inst_temp == sub_nuc_id)
-            sub_mask = filters.rank.median(sub_mask.astype("int32"), morph.disk(2))
+        cell_ids = np.unique(ws_temp)[1:]
+        mask_new = np.zeros(ws_temp.shape[:2], dtype=np.int32)
+        for sub_nuc_id in cell_ids:
+            sub_mask = np.copy(ws_temp == sub_nuc_id).astype("int32")
+
+            # Gets rid of small stuff
+            sub_mask = filters.rank.median(util.img_as_ubyte(sub_mask), morph.disk(3))
+
+            # Dilate
             sub_mask = morph.binary_dilation(binarize(sub_mask))
+            # sub_mask = morph.binary_dilation(binarize(sub_mask))
+
+            # Fill holes
             sub_mask = ndi.binary_fill_holes(sub_mask)
-            sub_mask_inst = sub_mask*(sub_nuc_id+i)
+
+            # Remove possible lonely pixels
+            sub_mask = morph.remove_small_objects(
+                sub_mask.astype(bool), 10, connectivity=1).astype("int32")
+
+            sub_mask_inst = sub_mask*sub_nuc_id
             mask_new += sub_mask_inst
+
+        # if cells end up overlapping after dilations then remove the overlaps
+        # so no new ids are created when summing overlapping ids to the mask
+        overlap_ids = np.unique(mask_new)[1:]
+
+        if len(overlap_ids) > len(cell_ids):
+            for ix in np.setxor1d(overlap_ids, cell_ids):
+                mask_new[mask_new == ix] = overlap_ids[0]
 
         mask[y1:y2, x1:x2] += mask_new
 
     inst_map = remap_label(mask)
     return inst_map
+
 
 def shape_index_watershed(prob_map: np.ndarray,
                           inst_map: np.ndarray,
@@ -303,12 +361,6 @@ def shape_index_watershed(prob_map: np.ndarray,
         win_size (int): window size used in niblack thresholding the distance maps to
                         find markers for watershed
     """
-
-    # This typically improves PQ
-    # seg = np.copy(inst_map)
-    # new_mask = cv2_opening(seg)
-    # ann = ndi.label(new_mask)[0]
-
     shape = inst_map.shape[:2]
     nuc_list = list(np.unique(inst_map))
     nuc_list.remove(0)
@@ -349,7 +401,6 @@ def shape_index_watershed(prob_map: np.ndarray,
     mask[mask > 0] = 1
     mask = ndi.binary_fill_holes(mask)
     inst_map = ndi.label(mask)[0]
-    # inst_map = cv2_opening(mask, iterations=2)
 
     return inst_map
 
