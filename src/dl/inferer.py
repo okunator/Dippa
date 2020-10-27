@@ -26,13 +26,6 @@ from src.dl.torch_utils import (
     ndarray_to_tensor, to_device
 )
 
-
-# from src.img_processing.post_processing import (
-#     combine_inst_semantic, naive_thresh_prob, smoothed_thresh,
-#     inv_dist_watershed, activate_plus_dog, activation,
-#     shape_index_watershed, sobel_watershed
-# )
-
 from src.img_processing.augmentations import (
     tta_augs, tta_deaugs, resize, tta_transforms, tta_five_crops
 )

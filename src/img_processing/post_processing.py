@@ -264,7 +264,7 @@ def shape_index_watershed2(prob_map: np.ndarray,
         y2 = y2 + 2 if y2 + 2 <= inst_map.shape[0] - 1 else y2
         nuc_map_crop = nuc_map[y1:y2, x1:x2]
         nuc_map_crop = morph.remove_small_objects(
-            nuc_map_crop.astype(bool), 15, connectivity=1).astype("int32")
+            nuc_map_crop.astype(bool), 10, connectivity=1).astype("int32")
         marker_crop = np.copy(nuc_map_crop)
 
         # Erode to get markers
