@@ -232,9 +232,33 @@ def cv2_closing(mask: np.ndarray, iterations: int = 2) -> np.ndarray:
     return inst_map
 
 
+def remove_debris(inst_map: np.ndarray, min_size: int = 10):
+    """
+    Remove small objects from an image
+
+    Args:
+        inst_map (np.ndarray): instance map to be binarized
+        min_size (int): min_size for the objects that are left untouched
+    """
+    res = np.zeros(inst_map.shape, np.int32)
+    for ix in np.unique(inst_map)[1:]:
+        nuc_map = np.copy(inst_map == ix)
+        y1, y2, x1, x2 = bounding_box(nuc_map)
+        y1 = y1 - 2 if y1 - 2 >= 0 else y1
+        x1 = x1 - 2 if x1 - 2 >= 0 else x1
+        x2 = x2 + 2 if x2 + 2 <= inst_map.shape[1] - 1 else x2
+        y2 = y2 + 2 if y2 + 2 <= inst_map.shape[0] - 1 else y2
+        nuc_map_crop = nuc_map[y1:y2, x1:x2].astype("int32")
+        nuc_map_crop = morph.remove_small_objects(
+            nuc_map_crop.astype(bool), min_size, connectivity=1).astype("int32")
+        nuc_map_crop[nuc_map_crop > 0] = ix
+        res[y1:y2, x1:x2] += nuc_map_crop
+    return res
+
+
 def shape_index_watershed2(prob_map: np.ndarray,
-                            inst_map: np.ndarray,
-                            **kwargs) -> np.ndarray:
+                           inst_map: np.ndarray,
+                           **kwargs) -> np.ndarray:
     """
     blblbl
 
@@ -246,6 +270,7 @@ def shape_index_watershed2(prob_map: np.ndarray,
     s[s > 0] = 1
     s[s <= 0] = 0
     s = ndi.binary_fill_holes(s*inst_map)
+    s = morph.remove_small_objects(s.astype(bool), 8, connectivity=1)
     s = ndi.label(s)[0]
 
     shape = s.shape[:2]
@@ -262,9 +287,9 @@ def shape_index_watershed2(prob_map: np.ndarray,
         x1 = x1 - 2 if x1 - 2 >= 0 else x1
         x2 = x2 + 2 if x2 + 2 <= inst_map.shape[1] - 1 else x2
         y2 = y2 + 2 if y2 + 2 <= inst_map.shape[0] - 1 else y2
-        nuc_map_crop = nuc_map[y1:y2, x1:x2]
-        nuc_map_crop = morph.remove_small_objects(
-            nuc_map_crop.astype(bool), 10, connectivity=1).astype("int32")
+        nuc_map_crop = nuc_map[y1:y2, x1:x2].astype("int32")
+        # nuc_map_crop = morph.remove_small_objects(
+        #     nuc_map_crop.astype(bool), 10, connectivity=1).astype("int32")
         marker_crop = np.copy(nuc_map_crop)
 
         # Erode to get markers
@@ -297,11 +322,10 @@ def shape_index_watershed2(prob_map: np.ndarray,
         for old_id, new_id in list(zip(new_nucs, new_nuc_ids)):
             nuc_id_map[nuc_id_map == old_id] = new_id
 
-
         markers[y1:y2, x1:x2] = nuc_id_map
 
         # compute distance map from the marker
-        distance = ndi.distance_transform_edt(marker)
+        distance = ndi.distance_transform_edt(nuc_id_map)
         distance = 255 * (distance / np.amax(distance))
         distance = cv2.GaussianBlur(
             ndi.filters.maximum_filter(distance, 7), (3, 3), 0)
@@ -309,6 +333,7 @@ def shape_index_watershed2(prob_map: np.ndarray,
         ws_temp = segm.watershed(-distance, mask=nuc_map_crop,
                                  markers=nuc_id_map, watershed_line=True)
 
+        id_count = 1
         cell_ids = np.unique(ws_temp)[1:]
         mask_new = np.zeros(ws_temp.shape[:2], dtype=np.int32)
         for sub_nuc_id in cell_ids:
@@ -319,28 +344,24 @@ def shape_index_watershed2(prob_map: np.ndarray,
 
             # Dilate
             sub_mask = morph.binary_dilation(binarize(sub_mask))
-            # sub_mask = morph.binary_dilation(binarize(sub_mask))
 
             # Fill holes
             sub_mask = ndi.binary_fill_holes(sub_mask)
 
-            # Remove possible lonely pixels
-            sub_mask = morph.remove_small_objects(
-                sub_mask.astype(bool), 10, connectivity=1).astype("int32")
-
             sub_mask_inst = sub_mask*sub_nuc_id
             mask_new += sub_mask_inst
 
-        # if cells end up overlapping after dilations then remove the overlaps
-        # so no new ids are created when summing overlapping ids to the mask
-        overlap_ids = np.unique(mask_new)[1:]
-
-        if len(overlap_ids) > len(cell_ids):
-            for ix in np.setxor1d(overlap_ids, cell_ids):
-                mask_new[mask_new == ix] = overlap_ids[0]
+            # if cells end up overlapping after dilations then remove the overlaps
+            # so no new ids are created when summing overlapping ids to the mask
+            new_ids = np.unique(mask_new)[1:]
+            if id_count < len(new_ids):
+                for ix in new_ids[int(np.where(new_ids == sub_nuc_id)[0]+1):]:
+                    mask_new[mask_new == ix] = 0
+            id_count += 1
 
         mask[y1:y2, x1:x2] += mask_new
 
+    inst_map = remove_debris(mask, 18)
     inst_map = remap_label(mask)
     return inst_map
 

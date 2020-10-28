@@ -3,11 +3,7 @@ import numpy as np
 from typing import List, Tuple
 from skimage.morphology import opening 
 from scipy import ndimage as ndi
-from scipy.ndimage.morphology import (
-    distance_transform_cdt,
-    distance_transform_edt,
-    binary_dilation
-)
+import skimage.morphology as morph
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/misc/utils.py
@@ -209,6 +205,5 @@ def type_map_flatten(type_map: np.ndarray) -> np.ndarray:
         type_tmp = type_map == t
         type_out += (type_tmp * t)
     return type_out
-
 
 

@@ -125,7 +125,7 @@ CONFIG = OmegaConf.create(
             #  is the argument below this.
             "thresh_method":"argmax",
 
-            # if smoothen is not used or 'thresh_method' is None then naive thresholding
+            # if 'smoothen' is False or 'thresh_method' is None then naive thresholding
             # with this threshold is used to theshold the soft masks 
             "threshold": 0.5,
 
