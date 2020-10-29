@@ -109,12 +109,14 @@ class LossBuilder:
             "DICE": "DiceLoss",
             "wCE": "WeightedCELoss",
             "wSCE": "WeightedSCELoss",
+            "wFocal": "WeightedFocalLoss"
         }
         self.joint_losses = [
             "IoU_wCE",
             "IoU_wSCE",
             "DICE_wCE",
-            "DICE_wSCE"
+            "DICE_wSCE",
+            "DICE_wFocal"
         ]
 
     @classmethod

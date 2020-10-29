@@ -260,7 +260,10 @@ def shape_index_watershed2(prob_map: np.ndarray,
                            inst_map: np.ndarray,
                            **kwargs) -> np.ndarray:
     """
-    blblbl
+    After thresholding, this function can be used to post process each nuclei instance.
+    This uses shape index to find local curvature from the probability map and uses that information
+    to separate overlapping nuclei. This is an updated version of 'shape_index_watershed' where closing
+    operations remove a lot small cells. This focuses on not removing those smaller cells.
 
     Args:
         prob_map (np.ndarray): the soft mask outputted from the network. Shape (H, W)
@@ -288,8 +291,6 @@ def shape_index_watershed2(prob_map: np.ndarray,
         x2 = x2 + 2 if x2 + 2 <= inst_map.shape[1] - 1 else x2
         y2 = y2 + 2 if y2 + 2 <= inst_map.shape[0] - 1 else y2
         nuc_map_crop = nuc_map[y1:y2, x1:x2].astype("int32")
-        # nuc_map_crop = morph.remove_small_objects(
-        #     nuc_map_crop.astype(bool), 10, connectivity=1).astype("int32")
         marker_crop = np.copy(nuc_map_crop)
 
         # Erode to get markers
@@ -352,7 +353,7 @@ def shape_index_watershed2(prob_map: np.ndarray,
             mask_new += sub_mask_inst
 
             # if cells end up overlapping after dilations then remove the overlaps
-            # so no new ids are created when summing overlapping ids to the mask
+            # so no new ids are created when summing overlapping ids to the result mask
             new_ids = np.unique(mask_new)[1:]
             if id_count < len(new_ids):
                 for ix in new_ids[int(np.where(new_ids == sub_nuc_id)[0]+1):]:
@@ -371,7 +372,7 @@ def shape_index_watershed(prob_map: np.ndarray,
                           win_size: int = 13,
                           **kwargs) -> np.ndarray:
     """
-    After thresholding, this function can be used to compute distance maps for each nuclei instance.
+    After thresholding, this function can be used topost process each nuclei instance.
     This uses shape index to find local curvature from the probability map and uses that information
     to separate overlapping nuclei before the watershed segmentatiton. Markers for the
     distance maps are computed using niblack thresholding on the distance map.
@@ -443,7 +444,6 @@ def sobel_watershed(prob_map: np.ndarray,
                         find markers for watershed
     """
 
-    # This typically improves PQ
     seg = np.copy(inst_map)
     new_mask = cv2_opening(seg)
     ann = ndi.label(new_mask)[0]
@@ -523,7 +523,6 @@ def inv_dist_watershed(inst_map: np.ndarray, win_size: int = 13, **kwargs) -> np
     markers = np.copy(distmap)
     markers = niblack_thresh(distmap, win_size)
                     
-    # watershed
     inst_map = segm.watershed(-distmap, markers, mask=ann, watershed_line=True)
         
     return inst_map
@@ -544,7 +543,7 @@ def combine_inst_semantic(inst_map: np.ndarray,
                                a panoptic model Shape (H, W)
     """
     inst_ids = {}
-    pred_id_list = list(np.unique(inst_map))[1:]  # exclude background ID
+    pred_id_list = list(np.unique(inst_map))[1:]
     for inst_id in pred_id_list:
         inst_tmp = inst_map == inst_id
         inst_type = type_map[inst_map == inst_id].astype("uint16")

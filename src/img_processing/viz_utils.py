@@ -50,9 +50,9 @@ def random_colors(N: int, bright: bool = True) -> List[Tuple[float]]:
 # minor mods
 def draw_contours(label: np.ndarray, 
                   image: np.ndarray,
-                  type_map: np.ndarray = None,
-                  fill_contours: bool = False,
-                  thickness: int = 2,
+                  type_map: Optional[np.ndarray] = None,
+                  fill_contours: Optional[bool] = False,
+                  thickness: Optional[int] = 2,
                   classes: Optional[Dict[str, int]] = None) -> Tuple[np.ndarray]:
     """
     Find contours for rgb mask to superimpose it the original image
@@ -122,6 +122,14 @@ def draw_contours(label: np.ndarray,
 def viz_patches(patches: np.ndarray) -> Tuple[int]:
     """
     patches is assumed to be of shape (n_patches, H, W, n_channels)
+    This function vizualizes those patches. Don't put too many patches in
+    or everything willl crash.
+
+    Args:
+        patches (np.ndarray): numpy array of stacked image patches
+
+    Returns:
+        Shape of the patches array (just for shit and giggles)
     """
     fignum = 200
     low=0
@@ -138,3 +146,29 @@ def viz_patches(patches: np.ndarray) -> Tuple[int]:
         cl = plt.clim(pmin, pmax)
     plt.show()
     return patches.shape
+
+
+def viz_instance(inst_map: np.ndarray, ix: int = 1) -> Tuple[int]:
+    """
+    This function will visualize a single instance with id 'ix' from the 'inst_map'
+
+    Args:
+        inst_map (np.ndarray): the instance map
+        ix (int): the index/id of an instance
+
+    Returns:
+        Shape of the patches array
+    """
+
+    nuc_map = np.copy(inst_map == ix)
+    y1, y2, x1, x2 = bounding_box(nuc_map)
+    y1 = y1 - 2 if y1 - 2 >= 0 else y1
+    x1 = x1 - 2 if x1 - 2 >= 0 else x1
+    x2 = x2 + 2 if x2 + 2 <= inst_map.shape[1] - 1 else x2
+    y2 = y2 + 2 if y2 + 2 <= inst_map.shape[0] - 1 else y2
+    nuc_map_crop = nuc_map[y1:y2, x1:x2].astype("int32")
+
+    fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+    ax.imshow(nuc_map_crop)
+
+    return nuc_map_crop.shape

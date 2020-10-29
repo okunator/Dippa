@@ -68,7 +68,7 @@ def argmax_and_flatten(pred_map: torch.Tensor) -> torch.Tensor:
     Args:
         pred_map (torch.Tensor): logits or softmaxed tensor of shape (B, C, H, W)
     Returns:
-         a tensor that can be inputted to different classification metrics 
+         a tensor that can be inputted to different classification metrics. Shape (H, W)
     """
     return torch.argmax(pred_map, dim=1).view(1, -1)
 
@@ -76,9 +76,6 @@ def argmax_and_flatten(pred_map: torch.Tensor) -> torch.Tensor:
 def thresh_and_flatten(pred_map: torch.Tensor) -> torch.Tensor:
     pass
 
-
-def argmax():
-    pass
 
 
 def one_hot(type_map: torch.Tensor, n_classes: int) -> torch.Tensor:

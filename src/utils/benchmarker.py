@@ -131,39 +131,38 @@ class Benchmarker(ProjectFileManager):
             |img2_type2  |.5|.4|.6|.6 |
 
         """
+        # assert self.dataset_args.class_types == "panoptic", "You can only use this when doing panoptic segmentation"
         assert isinstance(inst_maps, dict), f"inst_maps: {type(inst_maps)} is not a dict of inst_maps"
         assert isinstance(panoptic_maps, dict), f"inst_maps: {type(panoptic_maps)} is not a dict of panoptic_maps"
         assert isinstance(gt_mask_insts, dict), f"inst_maps: {type(gt_mask_insts)} is not a dict of inst_maps"
         assert isinstance(gt_mask_types, dict), f"inst_maps: {type(gt_mask_types)} is not a dict of inst_maps"
 
         df_total = pd.DataFrame()
-        for c, ix in classes.items():
-            # skip the background
-            if ix != 0:
-                gts_per_class = [get_type_instances(i, t, ix) 
-                                 for i, t in zip(gt_mask_insts.values(), gt_mask_types.values())]
+        for c, ix in list(classes.items())[1:]: # skip bg
+            gts_per_class = [get_type_instances(i, t, ix) 
+                                for i, t in zip(gt_mask_insts.values(), gt_mask_types.values())]
 
-                insts_per_class = [get_type_instances(i, t, ix) 
-                                   for i, t in zip(inst_maps.values(), panoptic_maps.values())]
+            insts_per_class = [get_type_instances(i, t, ix) 
+                                for i, t in zip(inst_maps.values(), panoptic_maps.values())]
 
-                params_list = list(zip(gts_per_class, insts_per_class))
+            params_list = list(zip(gts_per_class, insts_per_class))
 
-                with Pool() as pool:
-                    metrics = pool.starmap(self.compute_metrics, params_list)
+            with Pool() as pool:
+                metrics = pool.starmap(self.compute_metrics, params_list)
 
-                for i, fn in enumerate(gt_mask_insts.keys()): 
-                    self.type_metrics[f"{fn}_{c}_metrics"] = metrics[i]
+            for i, fn in enumerate(gt_mask_insts.keys()): 
+                self.type_metrics[f"{fn}_{c}_metrics"] = metrics[i]
 
-                score_df = pd.DataFrame(self.type_metrics).transpose()
-                score_df.loc[f"{c}_avg_for_the_set"] = score_df.mean(axis=0)
+            score_df = pd.DataFrame(self.type_metrics).transpose()
+            score_df.loc[f"{c}_avg_for_the_set"] = score_df.mean(axis=0)
 
-                if self.dataset == "pannuke":
-                    df = score_df.rename_axis("fn").reset_index()
-                    td = {f"{tissue}_avg": df[df.fn.str.contains(f"{tissue}")].mean(axis=0) 
-                        for tissue in self.pannuke_tissues}
-                    score_df = pd.concat([score_df, pd.DataFrame(td).transpose()])
+            if self.dataset == "pannuke":
+                df = score_df.rename_axis("fn").reset_index()
+                td = {f"{tissue}_avg": df[df.fn.str.contains(f"{tissue}")].mean(axis=0) 
+                    for tissue in self.pannuke_tissues}
+                score_df = pd.concat([score_df, pd.DataFrame(td).transpose()])
 
-                df_total = pd.concat([df_total, score_df])
+            df_total = pd.concat([df_total, score_df])
 
         if save:
             result_dir = Path(self.experiment_dir / "benchmark_results")

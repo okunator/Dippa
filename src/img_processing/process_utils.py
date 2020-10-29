@@ -4,6 +4,7 @@ from typing import List, Tuple
 from skimage.morphology import opening 
 from scipy import ndimage as ndi
 import skimage.morphology as morph
+from scipy.optimize import linear_sum_assignment
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/misc/utils.py
@@ -92,6 +93,18 @@ def get_inst_centroid(inst_map: np.ndarray) -> np.ndarray:
 
     Args:
         inst_map (np.ndarray): nuclei instance map
+
+    Returns:
+        an np.ndarray of shape (num_instances, 2)
+
+        Example:
+            array([[780.05089286, 609.11741071],
+                   [890.64603817, 237.89589358],
+                   [944.37971014, 541.3942029 ],
+                   ...,
+                   [ 77.5       , 536.        ],
+                   [ 78.21428571, 541.64285714],
+                   [485.        , 893.        ]])
     """
     inst_centroid_list = []
     inst_id_list = list(np.unique(inst_map))
@@ -102,6 +115,37 @@ def get_inst_centroid(inst_map: np.ndarray) -> np.ndarray:
                          (inst_moment["m01"] / inst_moment["m00"])]
         inst_centroid_list.append(inst_centroid)
     return np.array(inst_centroid_list)
+
+
+# Adapted from Hover-net repo
+def get_inst_types(inst_map: np.ndarray, type_map: np.ndarray) -> np.ndarray:
+    """
+    Get the types of every single instance in an instance map
+    and write them to a 1D-Array
+    
+    Args:
+        inst_map (np.ndarray): instance map of shape (H, W)
+        type_map (np.ndarray): type map of shape (H, W). Labels are indices.
+
+    Returns:
+        an np.ndarray of shape (num_instances, 1)
+
+        Example:
+            array([[3],
+                   [3],
+                   [3],
+                   ...,
+                   [1],
+                   [1],
+                   [1]], dtype=int32)
+    """
+    inst_ids = list(np.unique(inst_map))
+    inst_ids.remove(0)
+    inst_types = np.full((len(inst_ids), 1), 0, dtype=np.int32)
+    for j, id_ in enumerate(inst_ids):
+        inst_type = np.unique(type_map[inst_map == id_])[0]
+        inst_types[j] = inst_type
+    return inst_types
 
 
 # Adapted from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
@@ -146,7 +190,7 @@ def get_type_instances(inst_map: np.ndarray,
                        type_map: np.ndarray,
                        class_num: int) -> np.ndarray:
     """
-    Get the instances from an instance map belonging to class_num
+    Get the instances from an instance map that belong to class 'class_num'
     Drop everything else.
     
     Args:
@@ -158,6 +202,7 @@ def get_type_instances(inst_map: np.ndarray,
     imap = np.copy(inst_map)
     imap[~t] = 0
     return imap
+
 
 def one_hot(type_map: np.ndarray, num_classes: int) -> np.ndarray:
     """

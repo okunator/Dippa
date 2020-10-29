@@ -106,7 +106,7 @@ class ProjectFileManager(FileHandler):
     
     @property
     def dataset(self) -> str:
-        assert self.dsargs.dataset in ("kumar","consep","pannuke","dsb2018","cpm")
+        assert self.dsargs.dataset in ("kumar","consep","pannuke","dsb2018")
         return self.dsargs.dataset
     
     @property

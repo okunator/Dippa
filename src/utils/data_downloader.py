@@ -9,7 +9,7 @@ from omegaconf import DictConfig
 from src.utils.file_manager import ProjectFileManager
 from google_drive_downloader import GoogleDriveDownloader as gdd
 from src.img_processing.viz_utils import draw_contours
-from src.img_processing.process_utils import get_inst_centroid, bounding_box
+from src.img_processing.process_utils import get_inst_centroid, bounding_box, get_inst_types
 from src.utils.adhoc_conversions import (
     handle_consep, handle_cpm, handle_dsb2018,
     handle_kumar, handle_pannuke, kumar_xml2mat
@@ -196,11 +196,7 @@ class Downloader(ProjectFileManager):
             inst_ids.remove(0)
             centroids = get_inst_centroid(inst_map)
             bboxes = np.array([bounding_box(np.array(inst_map == id_, np.uint8)) for id_ in inst_ids])
-
-            inst_types = np.full((len(inst_ids), 1), 0, dtype=np.int32)
-            for j, id_ in enumerate(inst_ids):
-                inst_type = np.unique(type_map[inst_map == id_])[0]
-                inst_types[j] = inst_type
+            inst_types = get_inst_types(inst_map, type_map)
 
             scipy.io.savemat(
                 file_name=ann_path,
