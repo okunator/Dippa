@@ -160,7 +160,7 @@ class Inferer(Benchmarker, PatchExtractor):
                                prob_map: np.ndarray,
                                thresh: Optional[Union[float, str]]) -> np.ndarray:
         """
-        Apply a thresholding or argmax to a instance segmentation soft mask
+        Apply a thresholding or argmax to an instance segmentation soft mask
 
         Args:
             prob_map (np.ndarray): soft mask of shape (H, W, 2) for instance map
@@ -173,6 +173,7 @@ class Inferer(Benchmarker, PatchExtractor):
         # TODO: add thresholding methods
         assert prob_map.shape[2] == 2, f"Shape: {prob_map.shape} should have only two channels"
         assert self.thresh_method in ("argmax", "sauvola_thresh", "niblack_thresh", None)
+        
         if self.smoothen:
             mask = post_proc.smoothed_thresh(prob_map)
         elif self.thresh_method is not None:

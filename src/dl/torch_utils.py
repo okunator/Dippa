@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 import numpy as np
 from torch import nn
 from typing import Union, Optional
@@ -60,39 +61,29 @@ def tensor_to_ndarray(tensor: torch.Tensor,
     return res_tensor
 
 
-def argmax_and_flatten(pred_map: torch.Tensor) -> torch.Tensor:
+def argmax_and_flatten(yhat: torch.Tensor, activation: Optional[str] = None) -> torch.Tensor:
     """
-    Get an output from a prediction by argmaxing a pred_map of shape (B, C, H, W)
+    Get an output from a prediction by argmaxing a yhat of shape (B, C, H, W)
     and flatten the result to tensor of shape (1, n_pixels). Where each value represents
     a class for a pixel.
     Args:
-        pred_map (torch.Tensor): logits or softmaxed tensor of shape (B, C, H, W)
+        yhat (torch.Tensor): logits or softmaxed tensor of shape (B, C, H, W)
+        activation (Optional[str]): apply sigmoid or softmax activation before taking argmax
     Returns:
          a tensor that can be inputted to different classification metrics. Shape (H, W)
     """
-    return torch.argmax(pred_map, dim=1).view(1, -1)
+    if activation is not None:
+        assert activation in ("sigmoid", "softmax"), f"activation: {activation} sigmoid and softmax allowed."
+        if activation == "sigmoid":
+            yhat = torch.sigmoid(yhat)
+        elif activation == "softmax":
+            yhat = F.softmax(yhat, dim=1)
+
+    return torch.argmax(yhat, dim=1).view(1, -1)
 
 
-def thresh_and_flatten(pred_map: torch.Tensor) -> torch.Tensor:
+def thresh_and_flatten(yhat: torch.Tensor) -> torch.Tensor:
     pass
-
-
-
-def one_hot(type_map: torch.Tensor, n_classes: int) -> torch.Tensor:
-    """
-    Take in a type map of shape (B, H, W) with class indices as values and reshape it
-    into a tensor of shape (B, C, H, W)
-
-    Args:
-        type_map (torch.Tensor): type map
-        n_classes (int): number of classes in type_map
-
-    Returns
-        torch.Tensor onet hot tensor from the type map of shape (B, C, H, W)
-    """
-    assert type_map.dtype == torch.int64, f"Wrong type_map dtype: {type_map.dtype}. Should be torch.int64"
-    one_hot = torch.zeros(type_map.shape[0], n_classes, *type_map.shape[1:], device=type_map.device, dtype=type_map.dtype)
-    return one_hot.scatter_(dim=1, index=type_map.unsqueeze(1), value=1.0) + 1e-6
 
 
 def to_device(tensor: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
@@ -108,3 +99,93 @@ def to_device(tensor: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
     else:
         tensor = tensor.type("torch.FloatTensor")
     return tensor
+
+
+# Adapted from: https: // kornia.readthedocs.io/en/latest/_modules/kornia/utils/metrics/confusion_matrix.html
+def confusion_mat(yhat: torch.Tensor, 
+                  target: torch.Tensor, 
+                  activation: Optional[str] = None) -> torch.Tensor:
+    """
+    Computes confusion matrix from the soft mask and target tensor
+
+    Args:
+        yhat (torch.Tensor): the soft mask from the network of shape (B, C, H, W)
+        target (torch.Tensor): the target matrix of shape (B, H, W)
+        activation (Optional[str]): apply sigmoid or softmax activation before taking argmax
+
+    Returns:
+        torch.Tensor of shape (B, num_classes, num_classes)
+    """
+
+    if activation is not None:
+        assert activation in (
+            "sigmoid", "softmax"), f"activation: {activation} sigmoid and softmax allowed."
+        if activation == "sigmoid":
+            yhat_soft = torch.sigmoid(yhat)
+        elif activation == "softmax":
+            yhat_soft = F.softmax(yhat, dim=1)
+        else:
+            yhat_soft = yhat
+    
+    n_classes = yhat_soft.shape[1]
+    batch_size = yhat_soft.shape[0]
+    bins = target + torch.argmax(yhat_soft, dim=1)*n_classes
+    bins_vec = bins.view(batch_size, -1)
+
+    confusion_list = []
+    for iter_id in range(batch_size):
+        pb = bins_vec[iter_id]
+        bin_count = torch.bincount(pb, minlength=n_classes**2)
+        confusion_list.append(bin_count)
+
+    confusion_vec = torch.stack(confusion_list)
+    confusion_mat = confusion_vec.view(batch_size, n_classes, n_classes).to(torch.float32)
+
+    return confusion_mat
+
+
+# from https://kornia.readthedocs.io/en/latest/_modules/kornia/utils/one_hot.html#one_hot
+def one_hot(type_map: torch.Tensor, n_classes: int) -> torch.Tensor:
+    """
+    Take in a type map of shape (B, H, W) with class indices as values and reshape it
+    into a tensor of shape (B, C, H, W)
+
+    Args:
+        type_map (torch.Tensor): type map
+        n_classes (int): number of classes in type_map
+
+    Returns:
+        torch.Tensor onet hot tensor from the type map of shape (B, C, H, W)
+    """
+    assert type_map.dtype == torch.int64, f"Wrong type_map dtype: {type_map.dtype}. Should be torch.int64"
+    one_hot = torch.zeros(type_map.shape[0], n_classes, *type_map.shape[1:], device=type_map.device, dtype=type_map.dtype)
+    return one_hot.scatter_(dim=1, index=type_map.unsqueeze(1), value=1.0) + 1e-6
+
+
+# from: https://kornia.readthedocs.io/en/latest/_modules/kornia/utils/metrics/mean_iou.html#mean_iou
+def mean_iou(yhat: torch.Tensor, 
+             target: torch.Tensor,
+             activation: Optional[str] = None,
+             eps: Optional[float] = 1e-7) -> torch.Tensor:
+    """
+    Compute the mean iou for each class in the segmented image
+
+    Args:
+        yhat (torch.Tensor): the soft mask from the network of shape (B, C, H, W)
+        target (torch.Tensor): the target matrix of shape (B, H, W)
+        activation (Optional[str]): apply sigmoid or softmax activation before taking argmax
+
+    Returns:
+        torch.Tensor of shape (B, num_classes, num_classes)
+    """
+    conf_mat = confusion_mat(yhat, target, activation)
+    sum_over_row = torch.sum(conf_mat, dim=1)
+    sum_over_col = torch.sum(conf_mat, dim=2)
+    conf_mat_diag = torch.diagonal(conf_mat, dim1=-2, dim2=-1)
+    denominator = sum_over_row + sum_over_col - conf_mat_diag
+
+    # NOTE: we add epsilon so that samples that are neither in the
+    # prediction or ground truth are taken into account.
+    ious = (conf_mat_diag + eps) / (denominator + eps)
+    return ious
+

@@ -1,4 +1,3 @@
-from src.img_processing.post_processing import *
 import torch
 import scipy
 import cv2
@@ -79,7 +78,7 @@ def to_inst_map(binary_mask: np.ndarray) -> np.ndarray:
         binary_mask = binary_mask[..., 1]
 
     mask = ndi.binary_fill_holes(binary_mask)
-    mask = morph.remove_small_objects(binary_mask.astype(bool), min_size=30)
+    mask = morph.remove_small_objects(binary_mask.astype(bool), min_size=20)
     inst_map = ndi.label(mask)[0]
 
     return inst_map
@@ -179,7 +178,7 @@ def argmax(prob_map: np.ndarray, **kwargs) -> np.ndarray:
     return to_inst_map(np.argmax(prob_map, axis=2))
 
 
-def smoothed_thresh(prob_map: np.ndarray) -> np.ndarray:
+def smoothed_thresh(prob_map: np.ndarray, eps: float = 0.01) -> np.ndarray:
     """
     Thresholding probability map after it has been smoothed with gaussian differences
     After dog the prob_map histogram has a notable discontinuity which can be found by
@@ -188,13 +187,14 @@ def smoothed_thresh(prob_map: np.ndarray) -> np.ndarray:
 
     Args:
         prob_map (np.ndarray): soft mask to be thresholded. Shape (H, W)
+        eps (int): increase the threshold a little with this
     """
     # Find the steepest drop in the histogram
     hist, hist_centers = histogram(prob_map)
     d = np.diff(hist)
     b = d == np.min(d)
     b = np.append(b, False) # append one since np.diff loses one element in arr
-    thresh = hist_centers[b][0] + 0.07
+    thresh = hist_centers[b][0] + eps
     mask = naive_thresh_prob(prob_map, thresh)
     return mask
 
@@ -272,7 +272,7 @@ def shape_index_watershed2(prob_map: np.ndarray,
     s = shape_index(prob_map)
     s[s > 0] = 1
     s[s <= 0] = 0
-    s = ndi.binary_fill_holes(s*inst_map)
+    s = ndi.binary_fill_holes(np.nan_to_num(s*inst_map))
     s = morph.remove_small_objects(s.astype(bool), 8, connectivity=1)
     s = ndi.label(s)[0]
 

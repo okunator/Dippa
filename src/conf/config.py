@@ -8,7 +8,7 @@ CONFIG = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"UNET",
-            "experiment_version": "panoptic_DICE_focal_loss_test_edge_w10",
+            "experiment_version": "panoptic_DICE_Focal_testtt",
         },
         
         # General dataset constants and args
@@ -59,7 +59,7 @@ CONFIG = OmegaConf.create(
 
             "tta":False, # use test time augmentation during training. Note: very slow w ttatch
             "resume_training":False, # continue training where you left off?
-            "num_epochs":13,
+            "num_epochs":16,
             "num_gpus":1,
             
             # optimizer args

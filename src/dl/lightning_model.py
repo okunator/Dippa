@@ -18,7 +18,7 @@ from typing import List, Dict
 from src.utils.file_manager import ProjectFileManager
 from src.dl.datasets import SegmentationDataset
 from src.dl.loss_builder import LossBuilder
-from src.dl.torch_utils import to_device, argmax_and_flatten
+from src.dl.torch_utils import to_device, argmax_and_flatten, mean_iou
 from src.img_processing.augmentations import (
     hue_saturation_transforms, non_rigid_transforms,
     blur_transforms, random_crop, to_tensor, tta_transforms,
@@ -173,11 +173,15 @@ class SegModel(pl.LightningModule):
             edge_weight=self.edge_weight
         )
         accuracy = utils.metrics.accuracy(
-            argmax_and_flatten(soft_mask["instances"]), target.view(1, -1)
+            argmax_and_flatten(soft_mask["instances"], "sigmoid"), target.view(1, -1)
         )
+
+        iou = mean_iou(soft_mask["instances"], target, "sigmoid")
+
         return {
             "loss":loss,
             "accuracy":accuracy[0],
+            "mean_iou":iou.mean()
         }
 
     def step_twobranch(self, batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
@@ -205,33 +209,40 @@ class SegModel(pl.LightningModule):
         )
 
         type_acc = utils.metrics.accuracy(
-            argmax_and_flatten(soft_mask["instances"]), inst_target.view(1, -1)
+            argmax_and_flatten(soft_mask["instances"], "softmax"), inst_target.view(1, -1)
         )
+
+        type_iou = mean_iou(soft_mask["types"], type_target, "softmax")
 
         return {
             "loss":loss,
             "accuracy":type_acc[0],
+            "mean_iou":type_iou.mean()
         }
 
     def step_return_dict(self, z: torch.Tensor, phase: str) -> Dict[str, torch.Tensor]:
         logs = {
             f"{phase}_loss": z["loss"],
-            f"{phase}_accuracy": z["accuracy"]
+            f"{phase}_accuracy": z["accuracy"],
+            f"{phase}_mean_iou": z["mean_iou"]
         }
 
         return {
             "loss": z["loss"],
             "accuracy": z["accuracy"],
+            "mean_iou": z["mean_iou"],
             "log": logs
         }
 
     def epoch_end(self, outputs: torch.Tensor, phase: str) -> Dict[str, torch.Tensor]:
-        accuracy = torch.stack([x[f"accuracy"] for x in outputs]).mean()
-        loss = torch.stack([x[f"loss"] for x in outputs]).mean()
+        accuracy = torch.stack([x["accuracy"] for x in outputs]).mean()
+        iou = torch.stack([x["mean_iou"] for x in outputs]).mean()
+        loss = torch.stack([x["loss"] for x in outputs]).mean()
 
         logs = {
             f"avg_{phase}_loss": loss,
             f"avg_{phase}_accuracy": accuracy,
+            f"avg_{phase}_iou": iou,
         }
 
         return {
@@ -360,7 +371,6 @@ def plot_metrics(conf, scale: str = "log", metric: str = "loss", save:bool = Fal
     avg_valid_accuracies_all = {}
     avg_train_accuracies_all = {}
     epochs_all = {}
-
 
     try:
         train_losses_all = []

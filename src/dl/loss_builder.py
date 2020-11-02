@@ -107,6 +107,7 @@ class LossBuilder:
         self.loss_lookup = {
             "Iou": "IoULoss",
             "DICE": "DiceLoss",
+            "Tversky": "TverskyLoss",
             "wCE": "WeightedCELoss",
             "wSCE": "WeightedSCELoss",
             "wFocal": "WeightedFocalLoss"
@@ -116,7 +117,10 @@ class LossBuilder:
             "IoU_wSCE",
             "DICE_wCE",
             "DICE_wSCE",
-            "DICE_wFocal"
+            "DICE_wFocal",
+            "Tversky_wCE",
+            "Tversky_wSCE",
+            "Tversky_wFocal",
         ]
 
     @classmethod
