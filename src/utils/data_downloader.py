@@ -48,13 +48,13 @@ class Downloader(ProjectFileManager):
         A class that uses pooch and google_drive_downloader to download all the data
         files used in the project
         
-            Args:
-                dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                           related to the dataset that is being used.
-                                           Check config.py for more info
-                experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                              that are used for creating result folders
-                                              files. Check config.py for more info           
+        Args:
+            dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                        related to the dataset that is being used.
+                                        Check config.py for more info
+            experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                            that are used for creating result folders
+                                            files. Check config.py for more info           
         """
 
         super(Downloader, self).__init__(dataset_args, experiment_args)

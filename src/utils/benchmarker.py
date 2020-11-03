@@ -17,7 +17,17 @@ class Benchmarker(ProjectFileManager):
     def __init__(self,
                  dataset_args: DictConfig,
                  experiment_args: DictConfig) -> None:
+        """
+        A classs for benchmarking segmentations against their ground truth annotations
 
+        Args:
+            dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
+                            related to the dataset that is being used.
+                            config.py for more info
+            experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                          that are used for creating result folders and
+                                          files. Check config.py for more info
+        """
         super(Benchmarker, self).__init__(dataset_args, experiment_args)
         self.inst_metrics = OrderedDict()
         self.type_metrics = OrderedDict()

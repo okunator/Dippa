@@ -191,7 +191,8 @@ def get_type_instances(inst_map: np.ndarray,
                        class_num: int) -> np.ndarray:
     """
     Get the instances from an instance map that belong to class 'class_num'
-    Drop everything else.
+    Drop everything else. The type map and inst map need to have the exact same 
+    non-zero pixels.
     
     Args:
         inst_map (np.ndarray): instance map of shape (H, W)
