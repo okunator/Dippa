@@ -131,6 +131,11 @@ class ProjectFileManager(FileHandler):
     def phases(self) -> List[str]:
         assert self.dsargs.phases in (["train", "valid", "test"], ["train", "test"]), f"{self.dsargs.phases}"
         return self.dsargs.phases
+
+    @property
+    def aux_branch(self) -> str:
+        assert self.dsargs.aux_branch in (None, "hover", "micro")
+        return self.dsargs.aux_branch
     
     @property
     def classes(self) -> Dict[str, int]:

@@ -9,7 +9,7 @@ from scipy.optimize import linear_sum_assignment
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/misc/utils.py
 def cropping_center(x: np.ndarray,
-                    crop_shape: Tuple[int],
+                    crop_shape: Tuple[int] = (256, 256),
                     batch: bool = False) -> np.ndarray:
     """
     Crop an input image from the center

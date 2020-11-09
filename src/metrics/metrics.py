@@ -311,7 +311,7 @@ def PQ(true, pred, match_iou=0.4):
     FP = len(unpaired_pred)
     FN = len(unpaired_true)
 
-    sensitivity = TP/(TP+FN+1.0e-6)
+    recall = TP/(TP+FN+1.0e-6)
     precision = TP/(TP+FP+1.0e-6)
 
     # get the F1-score i.e DQ
@@ -324,7 +324,7 @@ def PQ(true, pred, match_iou=0.4):
     res['pq'] = pq
     res['sq'] = sq
     res['dq'] = dq
-    res['sensitivity'] = sensitivity
+    res['recall'] = recall
     res['precision'] = precision
     return res
 

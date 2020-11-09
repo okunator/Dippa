@@ -55,8 +55,8 @@ class Benchmarker(ProjectFileManager):
                 "PQ": pq["pq"],  # panoptic quality
                 "SQ": pq["sq"],  # segmentation quality
                 "DQ": pq["dq"],  # Detection quality i.e. F1-score
-                "inst_Sensitivity": pq["sensitivity"],
-                "inst_Precision": pq["precision"],
+                "inst_recall": pq["recall"],
+                "inst_precision": pq["precision"],
                 "splits": splits,
                 "merges": merges
             }

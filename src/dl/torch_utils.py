@@ -189,3 +189,50 @@ def mean_iou(yhat: torch.Tensor,
     ious = (conf_mat_diag + eps) / (denominator + eps)
     return ious
 
+
+def sobel_hv(tensor: torch.Tensor, kernel_size: int = 5, direction: str = "x"):
+    """
+    Computes first order derviatives in x or y direction using same sobel kernel
+    as in the HoVer-net paper.   
+
+    Args:
+        tensor (torch.Tensor): input tensor. Shape (B, 1, H, W) or (B, H, W)
+        kernel_size (int): size of the convolution kernel
+        direction (str): direction of the derivative. One of ("x", "y")
+
+    Returns:
+        torch.Tensor computed 1st order derivatives of the input tensor. Shape (B, 2, H, W)
+    """
+
+    # Add channel dimension if shape (B, H, W)
+    if len(tensor.shape) == 3:
+        tensor = tensor.unsqueeze(1)
+    assert tensor.shape[1] == 1, f"Input tensor shape expected to have shape (B, H, W) or (B, 1, H, W). Got: {tensor.shape}" 
+    assert kernel_size % 2 == 1, f"size must be odd. size: {kernel_size}"
+    assert direction in ("x", "y"), "direction need to be one of ('x', 'y')"
+
+    # Generate the sobel kernels
+    range_h = torch.arange(-kernel_size//2+1, kernel_size//2+1, dtype=torch.float32, device=tensor.device)
+    range_v = torch.arange(-kernel_size//2+1, kernel_size//2+1, dtype=torch.float32, device=tensor.device)
+    h, v = torch.meshgrid(range_h, range_v)
+
+    if direction == "x":
+        kernel = h / (h*h + v*v + 1e-7)
+        kernel = kernel.flip(0).unsqueeze(0).unsqueeze(0)
+    elif direction == "y":
+        kernel = v / (h*h + v*v + 1e-7)
+        kernel = kernel.flip(1).unsqueeze(0).unsqueeze(0)
+
+    # "SAME" padding to avoid losing height and width
+    pad = [
+        kernel.size(2) // 2,
+        kernel.size(2) // 2,
+        kernel.size(3) // 2,
+        kernel.size(3) // 2
+    ]
+    pad_tensor = F.pad(tensor, pad, "replicate")
+
+    # Compute the gradient
+    grad = F.conv2d(pad_tensor, kernel)
+    return grad
+

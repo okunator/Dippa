@@ -62,7 +62,6 @@ class SegModel(pl.LightningModule):
         self.input_size = training_args["model_input_size"]
         self.loss_name_inst = training_args["inst_branch_loss"]
         self.loss_name_type = training_args["semantic_branch_loss"]
-        self.loss_name_aux = training_args["aux_branch_loss"]
         self.edge_weights = training_args["edge_weights"]
         self.edge_weight = training_args["edge_weight"]
         self.class_weights = training_args["class_weights"]
@@ -137,7 +136,8 @@ class SegModel(pl.LightningModule):
                 class_types=self.fm.class_types,
                 edge_weights=self.edge_weights,
                 binary_weights=self.binary_class_weights,
-                type_weights=self.type_class_weights
+                type_weights=self.type_class_weights,
+                aux_branch=self.fm.aux_branch
             )
         else:
             criterion = LossBuilder.set_loss(
@@ -145,6 +145,7 @@ class SegModel(pl.LightningModule):
                 loss_name_type=self.loss_name_type,
                 class_types=self.fm.class_types,
                 edge_weights=self.edge_weights,
+                aux_branch=self.fm.aux_branch
             )
         return criterion
             
@@ -164,14 +165,26 @@ class SegModel(pl.LightningModule):
         x = x.float()
         target_weight = target_weight.float()
         target = target.long()
-        
+
+        if self.fm.aux_branch == "hover":
+            xmap = batch["xmap"].float() 
+            ymap = batch["ymap"].float()
+            target_aux = torch.stack([xmap, ymap], dim=1)
+        elif self.fm.aux_branch == "micro":
+            pass
+        else:
+            target_aux = None
+
         soft_mask = self.forward(x)
         loss = self.criterion(
             yhat=soft_mask["instances"], 
             target=target,
             target_weight=target_weight,
-            edge_weight=self.edge_weight
+            edge_weight=self.edge_weight,
+            yhat_aux=soft_mask["aux"],
+            target_aux=target_aux
         )
+
         accuracy = utils.metrics.accuracy(
             argmax_and_flatten(soft_mask["instances"], "sigmoid"), target.view(1, -1)
         )
@@ -197,6 +210,15 @@ class SegModel(pl.LightningModule):
         target_weight = target_weight.float()
         inst_target = inst_target.long()
         type_target = type_target.long()
+
+        if self.fm.aux_branch == "hover":
+            xmap = batch["xmap"].float()
+            ymap = batch["ymap"].float()
+            target_aux = torch.stack([xmap, ymap], dim=1)
+        elif self.fm.aux_branch == "micro":
+            pass
+        else:
+            target_aux = None
         
         soft_mask = self.forward(x)
         loss = self.criterion(
@@ -205,7 +227,9 @@ class SegModel(pl.LightningModule):
             target_inst=inst_target, 
             target_type=type_target, 
             target_weight=target_weight,
-            edge_weight=self.edge_weight
+            edge_weight=self.edge_weight,
+            yhat_aux=soft_mask["aux"],
+            target_aux=target_aux,
         )
 
         type_acc = utils.metrics.accuracy(
@@ -320,17 +344,20 @@ class SegModel(pl.LightningModule):
         
         self.trainset = SegmentationDataset(
             fname=self.train_data.as_posix(), 
-            transforms=train_transforms
+            transforms=train_transforms,
+            aux_branch=self.fm.aux_branch
         )
         
         self.validset = SegmentationDataset(
             fname=self.valid_data.as_posix(), 
-            transforms=test_transforms
+            transforms=test_transforms,
+            aux_branch=self.fm.aux_branch
         )
         
         self.testset = SegmentationDataset(
             fname=self.test_data.as_posix(), 
-            transforms=test_transforms
+            transforms=test_transforms,
+            aux_branch=self.fm.aux_branch
         )
     
     def train_dataloader(self):

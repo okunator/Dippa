@@ -1,58 +1,104 @@
 import segmentation_models_pytorch as smp
 import torch
+from typing import Optional
 from torch import nn
 from omegaconf import DictConfig
 from src.utils.file_manager import ProjectFileManager
 
 
 class SmpModelWithClsBranch(nn.Module):
-   def __init__(self, inst_model: nn.Module, type_model: nn.Module):
-       """
-       This class adds a semantic segmentation decoder branch to any smp model
-       that is specified to do binary segmentation.
-       smp = segmentation_models_pytorch. More at:
-       https://github.com/qubvel/segmentation_models.pytorch
-       
-       Args:
-            inst_model (nn.Module): smp model used for binary segmentation. n_classes needs to be 2
-            type_model (nn.Module): smp model used for semantic segmentation with n_classes 
-       """
-       super().__init__()
-       self.encoder = inst_model.encoder
-       self.inst_decoder = inst_model.decoder
-       self.type_decoder = type_model.decoder
-       self.inst_seg_head = inst_model.segmentation_head
-       self.type_seg_head = type_model.segmentation_head
+    def __init__(self, inst_model: nn.Module, type_model: nn.Module, aux_model: Optional[nn.Module] = None):
+        """
+        This class adds a semantic segmentation decoder branch to any smp model
+        that is specified to do binary segmentation.
+        smp = segmentation_models_pytorch. More at:
+        https://github.com/qubvel/segmentation_models.pytorch
+        
+        Args:
+             inst_model (nn.Module): smp model used for binary segmentation. n_classes needs to be 2
+             type_model (nn.Module): smp model used for semantic segmentation with n_classes 
+             aux_model (str): Optional smp model for regression branch.
+        """
+        super().__init__()
+        self.aux_model = aux_model
+        self.encoder = inst_model.encoder
+        self.inst_decoder = inst_model.decoder
+        self.type_decoder = type_model.decoder
+        self.inst_seg_head = inst_model.segmentation_head
+        self.type_seg_head = type_model.segmentation_head
+        self.aux_decoder, self.aux_seg_head = self.aux_branch
 
-   def forward(self, x):
-       features = self.encoder(x)
-       insts = self.inst_decoder(*features)
-       types = self.type_decoder(*features)
-       return {
-           "instances": self.inst_seg_head(insts), 
-           "types": self.type_seg_head(types)
-       }
+    @property
+    def aux_branch(self):
+        if self.aux_model is not None:
+            aux_decoder = self.aux_model.decoder
+            aux_seg_head = self.aux_model.segmentation_head
+        else:
+            aux_decoder = None
+            aux_seg_head = None
+        
+        return aux_decoder, aux_seg_head
+
+    def forward(self, x):
+        features = self.encoder(x)
+        insts = self.inst_decoder(*features)
+        insts = self.inst_seg_head(insts)
+        types = self.type_decoder(*features)
+        types = self.type_seg_head(types)
+
+        aux = None
+        if self.aux_decoder is not None:
+            aux = self.aux_decoder(*features)
+            aux = self.aux_seg_head(aux)
+
+        return {
+            "instances":insts, 
+            "types":types,
+            "aux":aux
+        }
 
 
 class SmpGeneralModel(nn.Module):
-   def __init__(self, inst_model):
-       """
-        Wrapper for smp model for binary or semantic segmentation.
-
-        Args:
-            inst_model (nn.Module): smp mode for binary segmentation
+    def __init__(self, inst_model: nn.Module, aux_model: Optional[nn.Module] = None):
         """
-       super().__init__()
-       self.encoder = inst_model.encoder
-       self.inst_decoder = inst_model.decoder
-       self.inst_seg_head = inst_model.segmentation_head
+         Wrapper for smp model for binary or semantic segmentation.
+ 
+         Args:
+             inst_model (nn.Module): smp mode for binary segmentation
+             aux_model (str): Optional smp model for regression branch.
+         """
+        super().__init__()
+        self.aux_model = aux_model
+        self.encoder = inst_model.encoder
+        self.inst_decoder = inst_model.decoder
+        self.inst_seg_head = inst_model.segmentation_head
+        self.aux_decoder, self.aux_seg_head = self.aux_branch
 
-   def forward(self, x):
-       features = self.encoder(x)
-       insts = self.inst_decoder(*features)
-       return {
-           "instances": self.inst_seg_head(insts)
-       }
+    @property
+    def aux_branch(self):
+        if self.aux_model is not None:
+            aux_decoder = self.aux_model.decoder
+            aux_seg_head = self.aux_model.segmentation_head
+        else:
+            aux_decoder = None
+            aux_seg_head = None
+
+        return aux_decoder, aux_seg_head
+    
+    def forward(self, x):
+        features = self.encoder(x)
+        insts = self.inst_decoder(*features)
+        insts = self.inst_seg_head(insts)
+
+        aux = None
+        if self.aux_decoder is not None:
+            aux = self.aux_decoder(*features)
+            aux = self.aux_seg_head(aux)
+
+        return {
+            "instances": insts,
+            "aux":aux
+        }
 
 
 class ModelBuilder(ProjectFileManager):
@@ -83,7 +129,11 @@ class ModelBuilder(ProjectFileManager):
         return len(self.classes)
 
     @classmethod
-    def set_model(cls, model_name: str, conf: DictConfig, **kwargs) -> nn.Module:
+    def set_model(cls, 
+                  model_name: str,
+                  conf: DictConfig,
+                  aux_branch: Optional[str] = None,
+                  **kwargs) -> nn.Module:
         """
         Use this method to get the model you want. This uses the config.py file to
         deduce how many classes for a specific dataset are needed and if objective
@@ -102,10 +152,21 @@ class ModelBuilder(ProjectFileManager):
         if c.class_types == "panoptic":
             model_inst = c.init_model(model_name, 2, **kwargs)
             model_type = c.init_model(model_name, c.nclasses, **kwargs)
-            return SmpModelWithClsBranch(model_inst, model_type)
+
+            model_aux = None
+            if c.aux_branch is not None:
+                model_aux = c.init_model(model_name, 2, **kwargs)
+
+            return SmpModelWithClsBranch(model_inst, model_type, model_aux)
+
         elif c.class_types == "instance":
             model_inst = c.init_model(model_name, 2, **kwargs)
-            return SmpGeneralModel(model_inst)
+
+            model_aux = None
+            if c.aux_branch is not None:
+                model_aux = c.init_model(model_name, 2, **kwargs)
+
+            return SmpGeneralModel(model_inst, model_aux)
 
     @staticmethod
     def init_model(model_name: str,

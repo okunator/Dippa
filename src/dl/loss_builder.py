@@ -39,12 +39,18 @@ class JointLoss(nn.Module):
         return torch.sum(losses)
 
 
+class JointInstHoverLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+    def forward(self):
+        pass
+
 class JointPanopticLoss(_WeightedLoss):
     def __init__(self,
                  inst_loss: nn.Module,
                  type_loss: nn.Module,
                  aux_loss: Optional[nn.Module] = None,
-                 loss_weights: Optional[List[float]] = [1.0, 1.0]) -> None:
+                 loss_weights: Optional[List[float]] = [1.0, 1.0, 1.0]) -> None:
         """
         Combines two losses: one from instance segmentation branch and another 
         from semantic segmentation branch to one joint loss.
@@ -73,25 +79,49 @@ class JointPanopticLoss(_WeightedLoss):
                 target_type: torch.Tensor,
                 target_weight: Optional[torch.Tensor] = None,
                 edge_weight: Optional[float] = 1.1,
+                yhat_aux: Optional[torch.Tensor] = None,
+                target_aux: Optional[torch.Tensor] = None,
                 **kwargs) -> torch.Tensor:
+        """
+        Computes the joint loss when objective is to do panoptic segmentation
+
+        Args:
+            yhat_inst (torch.Tensor): output of instance segmentation decoder branch. Shape: (B, 2, H, W) 
+            yhat_type (torch.Tensor): output if semantic segmetnation decoder branch. Shape: (B, C, H, W)
+            target_inst (torch.Tensor): ground truth annotations for instance segmentation. Shape: (B, H, W)
+            target_type (torch.Tensor): ground truth annotaions for semantic segmentation. Shape: (B, H, W)
+            target_weight (torch.Tensor, optional): weight map for nuclei borders. Shape (B, H, W)
+            edge_weight (float, optional): weight applied at the nuclei borders. (edge_weight**target_weight)
+            yhat_hover (torch.Tensor, optional): HoVer predictions (Check HoVer-Net paper). Shape: (B, 2, H, W)
+            target_hover (torch.Tensor, optional): HoVer maps ground truth (Check HoVer-Net paper). Shape: (B, H, W)
+        """
 
         iw = self.weights[0]
         tw = self.weights[1]
+        aw = self.weights[2]
+
         l1 = self.inst_loss(
-            yhat=yhat_inst, target=target_inst, target_weight=target_weight,
-            edge_weight=edge_weight, **kwargs
+            yhat=yhat_inst, target=target_inst, target_weight=target_weight, edge_weight=edge_weight, **kwargs
         )
+
         l2 = self.type_loss(
-            yhat=yhat_type, target=target_type, target_weight=target_weight,
-            edge_weight=edge_weight, **kwargs
+            yhat=yhat_type, target=target_type, target_weight=target_weight, edge_weight=edge_weight, **kwargs
         )
-        return tw*l1 + iw*l2
+
+        loss = tw*l1 + iw*l2
+
+        if self.aux_loss is not None:
+            l3 = self.aux_loss(yhat=yhat_aux, target=target_aux, target_inst=target_inst, **kwargs)
+            loss += l3*aw
+
+        return loss
 
 
 class LossBuilder:
     def __init__(self,
                  class_types: str,
-                 edge_weights: bool = True) -> None:
+                 edge_weights: bool = True,
+                 aux_branch: Optional[str] = None) -> None:
         """
         Initializes the loss function for instance or panoptic segmentation.
         This uses the loss functions available in the losses.py and parses the
@@ -104,14 +134,18 @@ class LossBuilder:
         """
         self.class_types = class_types
         self.edge_weights = edge_weights
+        self.aux_branch = aux_branch
+
         self.loss_lookup = {
             "Iou": "IoULoss",
             "DICE": "DiceLoss",
             "Tversky": "TverskyLoss",
             "wCE": "WeightedCELoss",
             "wSCE": "WeightedSCELoss",
-            "wFocal": "WeightedFocalLoss"
+            "wFocal": "WeightedFocalLoss",
+            "hover":"HoVerLoss"
         }
+
         self.joint_losses = [
             "IoU_wCE",
             "IoU_wSCE",
@@ -129,9 +163,10 @@ class LossBuilder:
                  class_types: str,
                  edge_weights: bool = True,
                  loss_name_type: Optional[str] = None,
-                 loss_weights: Optional[List[float]] = [1.0, 1.0],
+                 loss_weights: Optional[List[float]] = [1.0, 1.0, 1.0],
                  binary_weights: Optional[torch.Tensor] = None,
                  type_weights: Optional[torch.Tensor] = None,
+                 aux_branch: Optional[str] = None,
                  **kwargs) -> nn.Module:
         """
         Initialize the loss function.
@@ -162,7 +197,7 @@ class LossBuilder:
                 loss_keys = [key]
             return loss_keys
 
-        c = cls(class_types, edge_weights)
+        c = cls(class_types, edge_weights, aux_branch)
 
         # set up kwargs
         kwargs = kwargs.copy()
@@ -176,8 +211,7 @@ class LossBuilder:
         if c.class_types == "panoptic":
 
             # Set instance segmentation branch loss
-            loss_inst = JointLoss([losses.__dict__[cl_key](**kwargs)
-                                   for cl_key in loss_names_inst])
+            loss_inst = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_inst])
 
             # Take off the nuclei edge weights from the type loss
             kwargs["edge_weights"] = False
@@ -185,19 +219,33 @@ class LossBuilder:
             # Set the class weights. Can be None
             kwargs["class_weights"] = type_weights
 
-            # set type loss if it was defined
+            # set semantic loss if it was defined
             if loss_name_type is not None:
                 loss_keys_type = solve_loss_key(loss_name_type, c.joint_losses)
-                loss_names_type = [c.loss_lookup[key]
-                                   for key in loss_keys_type]
+                loss_names_type = [c.loss_lookup[key] for key in loss_keys_type]
             else:
                 loss_names_type = loss_names_inst
 
-            # Use JointLoss to define the loss
-            loss_type = JointLoss([losses.__dict__[cl_key](**kwargs)
-                                   for cl_key in loss_names_type])
-            loss = JointPanopticLoss(loss_inst, loss_type, loss_weights)
+            # Use JointLoss to define the semantic seg loss
+            loss_type = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_type])
+
+            # set auxilliary loss if that aux branch is used
+            loss_aux = None
+            if c.aux_branch == "hover":
+                loss_aux = losses.HoVerLoss(**kwargs)
+
+            loss = JointPanopticLoss(loss_inst, loss_type, loss_aux, loss_weights)
+
         elif c.class_types == "instance":
-            loss = JointLoss([losses.__dict__[cl_key](**kwargs)
-                              for cl_key in loss_names_inst])
+
+            # set instance seg loss
+            loss_list = [losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_inst]
+
+            # set auxilliary loss
+            loss_aux = None
+            if c.aux_branch == "hover":
+                loss_list.append(losses.HoVerLoss(**kwargs))
+
+            loss = JointLoss(loss_list)
+
         return loss

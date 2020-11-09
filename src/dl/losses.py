@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import List, Optional
 from torch.nn.modules.loss import _Loss, _WeightedLoss
-from src.dl.torch_utils import one_hot
+from src.dl.torch_utils import one_hot, sobel_hv
 
 
 class WeightedCELoss(nn.Module):
@@ -311,7 +311,7 @@ class TverskyLoss(nn.Module):
             yhat: input tensor of size (B, C, H, W)
             target: target tensor of size (B, H, W), where
                     values of a vector correspond to class index
-
+                    
         Returns:
             torch.Tensor: computed Tversky loss (scalar)
         """
@@ -327,3 +327,54 @@ class TverskyLoss(nn.Module):
         denom = intersection + self.alpha * fps + self.beta * fns
         tversky_loss = intersection / denom.clamp_min(eps)
         return torch.mean(1.0 - tversky_loss)
+
+
+class HoVerLoss(nn.Module):
+    def __init__(self, **kwargs) -> None:
+        """
+        Computes the loss for Horizontal and vertical branch from HoVer-Net.
+        See: https://arxiv.org/abs/1812.06499
+        """
+        super(HoVerLoss, self).__init__()
+
+    def forward(self,
+                yhat: torch.Tensor,
+                target: torch.Tensor,
+                target_inst: torch.Tensor,
+                eps: float = 1e-7,
+                **kwargs) -> torch.Tensor:
+        """
+        Computes the HoVer loss. I.e. mse for regressed HoVer maps against GT HoVer maps and
+        gradient mse for the same inputs where 1st order sobel derivative is computed on the inputs
+
+        Args:
+            yhat (torch.Tensor): input tensor of size (B, 2, H, W). Regressed HoVer map 
+            target (torch.Tensor): target tensor of shape (B, 2, H, W). Contains GT HoVer-maps 
+            target_inst (torch.Tensor): target for instance segmentation used to focus loss to the
+                                        correct nucleis. Shape (B, H, W)
+
+        Returns:
+            torch.Tensor: computed HoVer loss (scalar)
+        """
+        # Compute mse loss
+        loss_mse = yhat - target
+        loss_mse = (loss_mse*loss_mse).mean()
+
+        # Compute msge loss
+        pred_grad_x = sobel_hv(yhat[:, 0, ...], direction="x")
+        pred_grad_y = sobel_hv(yhat[:, 1, ...], direction="y")
+        pred_grad = torch.stack([pred_grad_x.squeeze(1), pred_grad_y.squeeze(1)], dim=1)
+
+        target_grad_x = sobel_hv(target[:, 0, ...], direction="x")
+        target_grad_y = sobel_hv(target[:, 1, ...], direction="y")
+        target_grad = torch.stack([target_grad_x.squeeze(1), target_grad_y.squeeze(1)], dim=1)
+
+        focus = torch.stack([target_inst, target_inst], dim=1)
+        loss_msge = pred_grad - target_grad
+        loss_msge = focus*(loss_msge * loss_msge)
+        loss_msge = loss_msge.sum() / focus.clamp_min(eps).sum()
+
+        # Compute the total loss
+        loss = loss_msge + loss_mse 
+        return loss
+

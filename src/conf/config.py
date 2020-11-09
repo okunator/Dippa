@@ -8,7 +8,7 @@ CONFIG = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"UNET",
-            "experiment_version": "panoptic_DICE_Focal_testtt",
+            "experiment_version": "panoptic_hover_test5th",
         },
         
         # General dataset constants and args
@@ -34,7 +34,11 @@ CONFIG = OmegaConf.create(
             "phases":["train", "test"], # ["train", "valid", "test"] or ["train", "test"]
             
             # Use either patches written to hdf5 db or .npy files. One of ("npy", "hdf5")
-            "patches_dtype":"hdf5"
+            "patches_dtype":"hdf5",
+
+            # Use auxilliary regression branch in the model. One of (None, "hover", TODO:"micro")
+            # Requires special GT masks
+            "aux_branch": None,
         },
               
         # Change these according to your needs. The more there are patches (trtaining data).
@@ -78,13 +82,9 @@ CONFIG = OmegaConf.create(
             # More about these in losses.py. This loss will be used for instance segmentation branch
             "inst_branch_loss":"DICE_wFocal",
 
-            # One of ("wCE", "wSCE", "IoU_wCE", "IoU_wSCE", "DICE_wCE", "DICE_wSCE")
+            # One of ("wCE", "wSCE", "wFocal", "IoU_wCE", "IoU_wSCE", "DICE_wCE", "DICE_wSCE", "DICE_wFocal")
             # This loss will be used for type segmentation branch. This is optional
             "semantic_branch_loss":"DICE_wFocal",
-
-            # One of ("wCE", "wSCE", "IoU_wCE", "IoU_wSCE", "DICE_wCE", "DICE_wSCE")
-            # This loss will be used for auxilliary branch. This is optional
-            "aux_branch_loss":"DICE_wCE",
 
             # Whether to apply weights at nuclei borders when computing the loss
             "edge_weights":False,
@@ -133,7 +133,7 @@ CONFIG = OmegaConf.create(
             "post_processing":True,
 
             # Choose the post processing method
-            # One of ("shape_index_watershed", "shape_index_watershed2", "sobel_watershed", "inv_dist_watershed").
+            # One of ("shape_index_watershed", "shape_index_watershed2", "sobel_watershed", "inv_dist_watershed", "hover").
             # This is ignored if post_processing=False. Then only thresholding is applied
             # To the softmasks
             "post_proc_method": "shape_index_watershed2",
