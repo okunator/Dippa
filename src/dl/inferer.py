@@ -75,6 +75,7 @@ class Inferer(Benchmarker, PatchExtractor):
         self.soft_types = OrderedDict()
         self.inst_maps = OrderedDict()
         self.type_maps = OrderedDict()
+        self.soft_aux = OrderedDict()
         self.panoptic_maps = OrderedDict()
 
         # Put SegModel to gpu|cpu and eval mode
@@ -190,6 +191,7 @@ class Inferer(Benchmarker, PatchExtractor):
         Args:
             im (np.ndarray): image patch of shape (input_size, input_size, 3)
                              or (B, input_size, input_size, 3)
+
         Returns:
             A dictionary {"instances":torch.Tensor, "types":Union[torch.Tensor, None]}
         """
@@ -207,6 +209,7 @@ class Inferer(Benchmarker, PatchExtractor):
             logits (torch.Tensor): a tensor of logits produced by the network.
                                    Shape: (B, C, input_size, input_size)
             squeeze (bool): whether to squeeze the output batch if batch dim is 1
+
         Returns:
             np.ndarray of the result
         """
@@ -236,6 +239,7 @@ class Inferer(Benchmarker, PatchExtractor):
         Args:
             patch (np.ndarray): the img patch used for ensemble prediction. 
                    shape (input_size, input_size, 3)
+
         Returns:
             np.ndarray soft mask of shape (input_size, input_size, C)
         
@@ -255,7 +259,7 @@ class Inferer(Benchmarker, PatchExtractor):
             3. deaugment prediction,
             4. save to augmented results
         Idea for five_crops:
-            1. crop to one fourth of network input size (corner crop or center crop)
+            1. crop to one fourtinf.plot_outputs("panoptic_maps", ixs = [0, 2, 3, 4], contour=True, gt_mask=True) network input size (corner crop or center crop)
             2. scale to network input size
             3. predict
             4. downscale to crop size
@@ -298,13 +302,19 @@ class Inferer(Benchmarker, PatchExtractor):
                 out_types[crop.y_min:crop.y_max,crop.x_min:crop.x_max] = downscaled_types["image"]  # (H, W, C)
                 soft_types.append(out_types)
 
+        aux = None
+        if self.aux_branch == "hover":
+            logits = self.__logits(patch) # (1, C, H, W)
+            aux = tensor_to_ndarray(logits["aux"], squeeze=True)  # (H, W, C)
+
         # TODO:
         # 16 crops tta
             
         # take the mean of all the predictions
         return {
             "instances":np.asarray(soft_instances).mean(axis=0),
-            "types": np.asarray(soft_types).mean(axis=0)
+            "types": np.asarray(soft_types).mean(axis=0),
+            "aux": aux
         }
 
     def prediction_two_branch(self, batch: np.ndarray) -> np.ndarray:
@@ -319,6 +329,9 @@ class Inferer(Benchmarker, PatchExtractor):
         pred_batch_insts = np.zeros(
             (batch.shape[0], self.input_size, self.input_size, 2)
         )
+        pred_batch_aux = np.zeros(
+            (batch.shape[0], self.input_size, self.input_size, 2)
+        )
         pred_batch_types = np.zeros(
             (batch.shape[0], self.input_size, self.input_size, len(self.classes))
         )
@@ -327,11 +340,17 @@ class Inferer(Benchmarker, PatchExtractor):
             pred_logits = self.__logits(batch)
             pred_batch_insts = self.__gen_prediction(pred_logits["instances"]) # (B, H, W, 2)
             pred_batch_types = self.__gen_prediction(pred_logits["types"]) # (B, H, W, C)
+
+            if self.aux_branch is not None:
+                pred_batch_aux = tensor_to_ndarray(pred_logits["aux"])  # (B, H, W, 2)
         else:
             for i, patch in self.__get_patch(batch):  # (H, W, 3)
                 ensemble = self.__gen_ensemble_prediction(patch)
                 pred_batch_insts[i, ...] = ensemble["instances"] # (H, W, 2)
                 pred_batch_types[i, ...] = ensemble["types"] # (H, W, C)
+                
+                if self.aux_branch is not None:
+                    pred_batch_aux[i, ...] = ensemble["aux"] # (H, W, 2)
 
         if self.smoothen:
             for i, pred_patch in self.__get_patch(pred_batch_insts): # (H, W, C)
@@ -344,13 +363,16 @@ class Inferer(Benchmarker, PatchExtractor):
 
         return {
             "instances":pred_batch_insts,
-            "types":pred_batch_types
+            "types":pred_batch_types,
+            "aux":pred_batch_aux
+
         }
 
     def prediction_single_branch(self, batch: np.ndarray) -> np.ndarray:
         """
         Takes in an image batch of shape (B, input_size, input_size, 3) and produces
         a prediction from a network with only an instance branch.
+
         Args:
             batch (np.ndarray): image batch for prediction
         """
@@ -358,13 +380,25 @@ class Inferer(Benchmarker, PatchExtractor):
             (batch.shape[0], self.input_size, self.input_size, 2)
         )
 
+        pred_batch_aux = np.zeros(
+            (batch.shape[0], self.input_size, self.input_size, 2)
+        )
+
         if not self.test_time_augs:
             pred_logits = self.__logits(batch)
             pred_batch_insts = self.__gen_prediction(pred_logits["instances"]) # (B, H, W, 2)
+
+            if self.aux_branch is not None:
+                pred_batch_aux = tensor_to_ndarray(pred_logits["aux"])  # (B, H, W, 2)
         else:
             for i, patch in self.__get_patch(batch):  # (H, W, 3)
-                ensemble = self.ensemble_predict(patch)
+                ensemble = self.__gen_ensemble_prediction(patch)
                 pred_batch_insts[i, ...] = ensemble["instances"] # (H, W, 2)
+                pred_batch_aux[i, ...] = ensemble["instances"] # (H, W, 2)
+
+                if self.aux_branch is not None:
+                    pred_batch_aux[i, ...] = ensemble["aux"] # (H, W, 2)
+                
         if self.smoothen:
             for i, pred_patch in self.__get_patch(pred_batch_insts): # (H, W, C)
                 pred_patch = self.__smoothed_dog(pred_patch)
@@ -372,6 +406,7 @@ class Inferer(Benchmarker, PatchExtractor):
 
         return {
             "instances":pred_batch_insts,
+            "aux":pred_batch_aux
         }
 
     def predict_patches(self, im_patches: np.ndarray) -> np.ndarray:
@@ -387,6 +422,7 @@ class Inferer(Benchmarker, PatchExtractor):
             (num_patches, input_size, input_size, C)
         """
         pred_patches_insts = np.zeros((0, self.input_size, self.input_size, 2))
+        pred_patches_aux = np.zeros((0, self.input_size, self.input_size, 2))
         pred_patches_types = np.zeros((0, self.input_size, self.input_size, len(self.classes)))
         for batch in self.__get_batch(im_patches, self.batch_size): # (B, H, W, 3)
             if self.class_types == "panoptic":
@@ -400,9 +436,14 @@ class Inferer(Benchmarker, PatchExtractor):
                 insts = pred_patch["instances"]
                 pred_patches_insts = np.append(pred_patches_insts, insts, axis=0) # (B, H, W, C)
 
+            if self.aux_branch is not None:
+                aux = pred_patch["aux"]
+                pred_patches_aux = np.append(pred_patches_aux, aux, axis=0)  # (B, H, W, C)
+
         return {
             "instances":pred_patches_insts,
-            "types":pred_patches_types
+            "types":pred_patches_types,
+            "aux":pred_patches_aux
         }
    
     def run_predictions_all(self) -> None:
@@ -432,6 +473,10 @@ class Inferer(Benchmarker, PatchExtractor):
                 if self.class_types == "panoptic":
                     types = pred_patches["types"]
                     res_types = self.stitch_inference_patches(types, self.stride_size, shape, im.shape)
+                
+                if self.aux_branch is not None:
+                    aux = pred_patches["aux"]
+                    res_aux = self.stitch_inference_patches(aux, self.stride_size, shape, im.shape)
             
             if self.class_types == "panoptic":
                 self.soft_types[f"{fn}_soft_types"] = res_types
@@ -439,10 +484,13 @@ class Inferer(Benchmarker, PatchExtractor):
 
             self.soft_insts[f"{fn}_soft_instances"] = res_insts
 
-            
+            if self.aux_branch is not None:
+                self.soft_aux[f"{fn}_soft_aux"] = res_aux
+
     def post_process_instmap(self,
                              soft_inst: np.ndarray,
-                             thresh: Union[float, str]) -> np.ndarray:
+                             thresh: Union[float, str],
+                             soft_aux: np.ndarray = None) -> np.ndarray:
         """
         Takes in a soft instance mask of shape (H, W, C) and thresholds it.
         Post processing is applied if defined in config.py
@@ -452,6 +500,7 @@ class Inferer(Benchmarker, PatchExtractor):
             thresh (Union[float, sty]): threshold value for naive thresholding or a str
                                         specifying a thresholding method. For now only 
                                         "argmax" is available.
+            soft_aux: (np.ndarray): aux branch output if used
 
         Returns:
             np.ndarray with instances labelled
@@ -462,12 +511,14 @@ class Inferer(Benchmarker, PatchExtractor):
         # TODO: Add postproc functions
         if self.post_proc:
             assert self.post_proc_method in (
-                "shape_index_watershed", "shape_index_watershed2", "inv_dist_watershed", "sobel_watershed"
+                "shape_index_watershed", "shape_index_watershed2", "inv_dist_watershed", 
+                "sobel_watershed", "post_proc_hover", "post_proc_hover2"
             ), f"post_proc_method: {self.post_proc_method} not found. Check config.py"
             
             kwargs = {}
             kwargs.setdefault("inst_map", inst_map)
             kwargs.setdefault("prob_map", soft_inst[..., 1])
+            kwargs.setdefault("aux_map", soft_aux)
             inst_map = post_proc.__dict__[self.post_proc_method](**kwargs)
             
         return inst_map
@@ -481,7 +532,6 @@ class Inferer(Benchmarker, PatchExtractor):
         # TODO: optional different combining heuristics
         return post_proc.combine_inst_semantic(inst_map, type_map)
 
-                
     def post_process(self) -> None:
         """
         Run post processing pipeline for all the predictions from the network.
@@ -498,7 +548,14 @@ class Inferer(Benchmarker, PatchExtractor):
         inst_preds = [(self.soft_insts[key], self.thresh) 
                       for key in self.soft_insts.keys() 
                       if key.endswith("instances")]
-                
+
+        # Add aux branch preds
+        if self.aux_branch is not None:
+            inst_aux = [self.soft_aux[key] for key in self.soft_aux.keys() if key.endswith("aux")]
+            for i, inst in enumerate(inst_preds):
+                inst = inst + (inst_aux[i], )
+                inst_preds[i] = inst
+
         # pickling issues in ProcessPool with typing, hard to fix.. Using ThreadPool instead        
         with Pool() as pool:
             segs = pool.starmap(self.post_process_instmap, inst_preds)
@@ -574,7 +631,7 @@ class Inferer(Benchmarker, PatchExtractor):
 
         """
         # THIS IS A HUGE KLUDGE. TODO someday make this pretty
-        assert out_type in ("inst_maps", "soft_insts", "soft_types", "panoptic_maps", "type_maps")
+        assert out_type in ("inst_maps", "soft_insts", "soft_types", "panoptic_maps", "type_maps", "soft_aux")
 
         assert self.__dict__[out_type], (
             f"outputs for {out_type} not found. Run predictions and then" 

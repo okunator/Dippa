@@ -57,16 +57,16 @@ class SegmentationDataset(Dataset, FileHandler):
 
         datalist = []
         inst_map, weight = gen_unet_labels(inst_patch)
-        datalist.append(inst_map)
+        datalist.append(inst_patch)
         datalist.append(type_patch)
         datalist.append(weight)
 
         # pre-process the inst_maps if aux branch is not None
         if self.aux_branch == "micro":
-            contour = instance_contours(inst_map)
+            contour = instance_contours(inst_patch)
             datalist.append(contour)
         elif self.aux_branch == "hover":
-            hvmaps = gen_hv_maps(inst_map)
+            hvmaps = gen_hv_maps(inst_patch)
             datalist.append(hvmaps["ymap"])
             datalist.append(hvmaps["xmap"])
                 

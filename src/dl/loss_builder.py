@@ -39,11 +39,63 @@ class JointLoss(nn.Module):
         return torch.sum(losses)
 
 
-class JointInstHoverLoss(nn.Module):
-    def __init__(self):
+class JointInstLoss(nn.Module):
+    def __init__(self,                
+                 inst_loss: nn.Module,
+                 aux_loss: Optional[nn.Module] = None,
+                 loss_weights: Optional[List[float]] = [1.0, 1.0]) -> None:
+        """
+        Abstraction for instance segmentation loss. If aux branch is used 
+        then aux branch loss is also included to the joint loss.
+
+        Args:
+            inst_loss (nn.Module): loss function for the instance segmentation head
+            aux_loss (nn.Module): loss function for the auxilliary regression head
+            loss_weights (List[float]): List of weights for loss functions of instance,
+                                        semantic and auxilliary branches in this order.
+                                        If there is no auxilliary branch such as HoVer-branch
+                                        then only two weights are needed.
+        """
         super().__init__()
-    def forward(self):
-        pass
+        assert 1 < len(loss_weights) <= 2, f"Too many weights in the loss_weights list: {loss_weights}"
+        self.inst_loss = inst_loss
+        self.aux_loss = aux_loss
+        self.weights = loss_weights
+
+    def forward(self,
+                yhat_inst: torch.Tensor,
+                target_inst: torch.Tensor,
+                target_weight: Optional[torch.Tensor] = None,
+                edge_weight: Optional[float] = 1.1,
+                yhat_aux: Optional[torch.Tensor] = None,
+                target_aux: Optional[torch.Tensor] = None,
+                **kwargs) -> torch.Tensor:
+        """
+        Computes the joint loss when objective is to do instance segmentation
+
+        Args:
+            yhat_inst (torch.Tensor): output of instance segmentation decoder branch. Shape: (B, 2, H, W)
+            target_inst (torch.Tensor): ground truth annotations for instance segmentation. Shape: (B, H, W)
+            target_weight (torch.Tensor, optional): weight map for nuclei borders. Shape (B, H, W)
+            edge_weight (float, optional): weight applied at the nuclei borders. (edge_weight**target_weight)
+            yhat_hover (torch.Tensor, optional): HoVer predictions (Check HoVer-Net paper). Shape: (B, 2, H, W)
+            target_hover (torch.Tensor, optional): HoVer maps ground truth (Check HoVer-Net paper). Shape: (B, H, W)
+        """
+
+        iw = self.weights[0]
+        aw = self.weights[1]
+
+        loss = self.inst_loss(
+            yhat=yhat_inst, target=target_inst, target_weight=target_weight, edge_weight=edge_weight, **kwargs
+        )
+        loss = loss*iw
+
+        if self.aux_loss is not None:
+            aux_loss = self.aux_loss(yhat=yhat_aux, target=target_aux, target_inst=target_inst, **kwargs)
+            loss += aux_loss*aw
+        
+        return loss
+
 
 class JointPanopticLoss(_WeightedLoss):
     def __init__(self,
@@ -53,7 +105,8 @@ class JointPanopticLoss(_WeightedLoss):
                  loss_weights: Optional[List[float]] = [1.0, 1.0, 1.0]) -> None:
         """
         Combines two losses: one from instance segmentation branch and another 
-        from semantic segmentation branch to one joint loss.
+        from semantic segmentation branch to one joint loss. If aux branch is used 
+        then third aux branch loss is also included
 
         Args:
             inst_loss (nn.Module): loss function for the instance segmentation head
@@ -64,8 +117,7 @@ class JointPanopticLoss(_WeightedLoss):
                                         If there is no auxilliary branch such as HoVer-branch
                                         then only two weights are needed.
         """
-        assert 1 < len(
-            loss_weights) <= 3, f"Too many weights in the loss_weights list: {loss_weights}"
+        assert 1 < len(loss_weights) <= 3, f"Too many weights in the loss_weights list: {loss_weights}"
         super().__init__()
         self.inst_loss = inst_loss
         self.type_loss = type_loss
@@ -178,13 +230,13 @@ class LossBuilder:
             edge_weight: (float): weight to be applied to nuclei edges
             loss_name_type (str): one of one of "wCE", "symmetric_wCE", "IoU_wCE", "IoU_symmetric_wCE", 
                                   "DICE_wCE", "DICE_symmetric_wCE". Optionally you can set the type_loss
-                                   to be a different loss func than the `loss_name_inst`. If this arg is
-                                   not provided then the type loss will be the same as the inst_loss if
-                                   panoptic segmentation is the segmentation task.
+                                  to be a different loss func than the `loss_name_inst`. If this arg is
+                                  not provided then the type loss will be the same as the inst_loss if
+                                  panoptic segmentation is the segmentation task.
             loss_weights (List[float]): List of weights for loss functions of instance,
-                            semantic and auxilliary branches in this order.
-                            If there is no auxilliary branch such as HoVer-branch
-                            then only two weights are needed.
+                                        semantic and auxilliary branches in this order.
+                                        If there is no auxilliary branch such as HoVer-branch
+                                        then only two weights are needed.                     
             binary_weights (Optional[torch.Tensor]): Tensor of size 2. Weights for background
                                                      and foreground.
             type_weights (Optional[torch.Tensor]): Tensor of size C. Each slot indicates
@@ -226,7 +278,7 @@ class LossBuilder:
             else:
                 loss_names_type = loss_names_inst
 
-            # Use JointLoss to define the semantic seg loss
+            # Set semantic seg branch loss
             loss_type = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_type])
 
             # set auxilliary loss if that aux branch is used
@@ -239,13 +291,13 @@ class LossBuilder:
         elif c.class_types == "instance":
 
             # set instance seg loss
-            loss_list = [losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_inst]
+            loss_inst = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_inst])
 
-            # set auxilliary loss
+            # set auxilliary branch loss
             loss_aux = None
             if c.aux_branch == "hover":
-                loss_list.append(losses.HoVerLoss(**kwargs))
+                loss_aux = losses.HoVerLoss(**kwargs)
 
-            loss = JointLoss(loss_list)
+            loss = JointInstLoss(loss_inst, loss_aux)
 
         return loss

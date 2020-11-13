@@ -226,7 +226,7 @@ def DICE2(true, pred):
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
-def PQ(true, pred, match_iou=0.4):
+def PQ(true, pred, match_iou=0.5):
     """
     `match_iou` is the IoU threshold level to determine the pairing between
     GT instances `p` and prediction instances `g`. `p` and `g` is a pair

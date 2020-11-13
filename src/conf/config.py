@@ -8,7 +8,7 @@ CONFIG = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"UNET",
-            "experiment_version": "panoptic_hover_test5th",
+            "experiment_version": "panoptic_hover_testtt",
         },
         
         # General dataset constants and args
@@ -38,7 +38,7 @@ CONFIG = OmegaConf.create(
 
             # Use auxilliary regression branch in the model. One of (None, "hover", TODO:"micro")
             # Requires special GT masks
-            "aux_branch": None,
+            "aux_branch": "hover",
         },
               
         # Change these according to your needs. The more there are patches (trtaining data).
@@ -56,14 +56,14 @@ CONFIG = OmegaConf.create(
     
         # Model training args
         "training_args": {
-            "batch_size":6,
+            "batch_size":8,
 
             # This needs to be same as in the patching args
             "model_input_size":256,
 
             "tta":False, # use test time augmentation during training. Note: very slow w ttatch
-            "resume_training":False, # continue training where you left off?
-            "num_epochs":16,
+            "resume_training":True, # continue training where you left off?
+            "num_epochs":40,
             "num_gpus":1,
             
             # optimizer args
@@ -102,7 +102,7 @@ CONFIG = OmegaConf.create(
         # Inference args
         "inference_args" : {
             
-            "batch_size": 6,
+            "batch_size": 8,
 
             # This needs to be same as in the patching args
             "model_input_size": 256,
@@ -123,20 +123,21 @@ CONFIG = OmegaConf.create(
             # One of ("argmax", "sauvola_thresh", "niblack_thresh", None)
             # If this is None then naive thresholding is used and thresh level
             #  is the argument below this.
-            "thresh_method":"argmax",
+            "thresh_method":None,
 
             # if 'smoothen' is False or 'thresh_method' is None then naive thresholding
             # with this threshold is used to theshold the soft masks 
             "threshold": 0.5,
 
-            # apply watershed based post_processing
+            # apply watershed based post_processing. If False then only thresholding or argmax is used
             "post_processing":True,
 
             # Choose the post processing method
-            # One of ("shape_index_watershed", "shape_index_watershed2", "sobel_watershed", "inv_dist_watershed", "hover").
-            # This is ignored if post_processing=False. Then only thresholding is applied
-            # To the softmasks
-            "post_proc_method": "shape_index_watershed2",
+            # One of ("shape_index_watershed", "shape_index_watershed2", "sobel_watershed", "inv_dist_watershed",
+            # "post_proc_hover", "post_proc_hover2").
+            # This is ignored if post_processing=False. Then only thresholding is applied to the softmasks.
+            # This is also ignored if aux_branch is "hover" or "micro" which use dedicated post proc pipelines 
+            "post_proc_method": "post_proc_hover",
 
             # Print inference progress
             "verbose":True,

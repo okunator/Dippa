@@ -32,4 +32,5 @@ src/old/
 .DS_Store
 README.txt
 Dippa.egg-info
+DippaEnv
 .vscode
