@@ -13,11 +13,11 @@ scikit-learn==0.22.1
 omegaconf==2.0.2
 catalyst==20.6
 ttach==0.0.2
-segmentation-models-pytorch==0.1.0
+git+https://github.com/qubvel/segmentation_models.pytorch
 pytorch-lightning==0.8.5
 albumentations==0.4.3
 pathos==0.2.6
-dataclasses==0.7
+pytorch-toolbelt==0.4.0
 ray==0.8.7
 test-tube==0.7.5
 -e ./

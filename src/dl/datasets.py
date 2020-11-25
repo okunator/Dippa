@@ -37,15 +37,13 @@ class SegmentationDataset(Dataset, FileHandler):
     def __getitem__(self, index: int) -> Dict[str, np.ndarray]:
         """
         Patched images and masks are stored in the pytables HDF5 
-        database as numpy arrays of shape:
-
-        See the database_prep_notebooks for more info.
+        database as numpy arrays of shape
         
         1. Read inst_map, type_map and an image from the pytables database corresponding to index
-        2. Create instance contours for the instance mask that are used as a weight map for the nuclei edges
-        3. Process the mask as described in the Unet paper
-        4. Augment the image, mask and mask weight and the rest
-        5. insert maps to a dict
+        2. Pre process input masks as in Unet paper (remove touching borders and create weight maps)
+        3. If aux branch is used in the network then create the input maps for that branch.
+        4. Augment the image, mask, mask weight and the rest of the input data
+        5. insert input maps to a dict
 
         Args:
             index (int) : the index where to slice the numpy array in the database
@@ -54,22 +52,25 @@ class SegmentationDataset(Dataset, FileHandler):
             result (dict) : dictionary containing the augmented image, mask, weight map and filename  
         """
         im_patch, inst_patch, type_patch = self.read_hdf5_patch(self.fname, index)
+        unet_inst, weight = gen_unet_labels(inst_patch)
 
         datalist = []
-        inst_map, weight = gen_unet_labels(inst_patch)
-        datalist.append(inst_patch)
         datalist.append(type_patch)
         datalist.append(weight)
 
         # pre-process the inst_maps if aux branch is not None
         if self.aux_branch == "micro":
+            datalist.append(unet_inst)
             contour = instance_contours(inst_patch)
             datalist.append(contour)
         elif self.aux_branch == "hover":
+            datalist.append(inst_patch)
             hvmaps = gen_hv_maps(inst_patch)
             datalist.append(hvmaps["ymap"])
             datalist.append(hvmaps["xmap"])
-                
+        else:
+            datalist.append(unet_inst)
+
         # Augment
         augmented = self.transforms(image=im_patch, masks=datalist)
         img_new = augmented['image']
@@ -77,10 +78,10 @@ class SegmentationDataset(Dataset, FileHandler):
         
         result = {}
         result['image'] = img_new
-        result['inst_map'] = masks_new[0]
-        result['binary_map'] = binarize(masks_new[0])
-        result['type_map'] = masks_new[1]
-        result['weight_map'] = masks_new[2]
+        result['type_map'] = masks_new[0]
+        result['weight_map'] = masks_new[1]
+        result['inst_map'] = masks_new[2]
+        result['binary_map'] = binarize(masks_new[2])
         result['filename'] = self.fname
         
         if self.aux_branch == "micro":

@@ -30,6 +30,7 @@ from src.img_processing.augmentations import (
     tta_augs, tta_deaugs, resize, tta_transforms, tta_five_crops
 )
 
+# slipped to spaghetti
 class Inferer(Benchmarker, PatchExtractor):
     def __init__(self, 
                  model: nn.Module,

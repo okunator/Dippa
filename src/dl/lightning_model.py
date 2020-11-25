@@ -17,7 +17,7 @@ from typing import List, Dict
 
 from src.utils.file_manager import ProjectFileManager
 from src.dl.datasets import SegmentationDataset
-from src.dl.loss_builder import LossBuilder
+from src.dl.losses.loss_builder import LossBuilder
 from src.dl.torch_utils import to_device, argmax_and_flatten, mean_iou
 from src.img_processing.augmentations import (
     hue_saturation_transforms, non_rigid_transforms,
@@ -80,7 +80,7 @@ class SegModel(pl.LightningModule):
         )
         
         self.criterion = self._criterion
-
+        # torch.autograd.set_detect_anomaly(True)
         
     @classmethod
     def from_conf(cls, model: nn.Module, conf: DictConfig):
@@ -176,7 +176,6 @@ class SegModel(pl.LightningModule):
             target_aux = None
 
         soft_mask = self.forward(x)
-
         loss = self.criterion(
             yhat_inst=soft_mask["instances"], 
             target_inst=target,
