@@ -11,8 +11,8 @@ Also borrowing a lot of utilities from:
 * [x] [Kumar](https://ieeexplore.ieee.org/document/7872382) (Kumar et al.)
 * [x] [CoNSep](https://arxiv.org/pdf/1812.06499) (Graham, Vu, et al.)
 * [x] [Pannuke](https://arxiv.org/abs/2003.10778) (Gamper et al.)
-* [] [MoNuSac](https://monusac-2020.grand-challenge.org/) (Not yet published) (coming)
-* [] [Dsb2018](https://www.kaggle.com/c/data-science-bowl-2018) (Caicedo et al.) (coming)
+* [ ] [MoNuSac](https://monusac-2020.grand-challenge.org/) (Not yet published) (coming)
+* [ ] [Dsb2018](https://www.kaggle.com/c/data-science-bowl-2018) (Caicedo et al.) (coming)
 
 ## Set Up
 1. Clone the repository
@@ -53,12 +53,20 @@ pip install -r requirements.txt
 
 #### The data is downloaded from the following links automatically:
 1. **kumar**  
-          - Train: https://drive.google.com/file/d/1JZN9Jq9km0rZNiYNEukE_8f0CsSK3Pe4/view .   
-          - Test: https://drive.google.com/file/d/1NKkSQ5T0ZNQ8aUhh0a8Dt2YKYCQXIViw/view  
+* [x] Train: https://drive.google.com/file/d/1JZN9Jq9km0rZNiYNEukE_8f0CsSK3Pe4/view .   
+* [x] Test: https://drive.google.com/file/d/1NKkSQ5T0ZNQ8aUhh0a8Dt2YKYCQXIViw/view  
           
-2. **consep** - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/hovernet/
-3. **pannuke** - https://warwick.ac.uk/fac/sci/dcs/research/tia/data/pannuke
-4. **kaggle dsb 2018**: TODO. https://bbbc.broadinstitute.org/BBBC038
+2. **consep** 
+* [x] https://warwick.ac.uk/fac/sci/dcs/research/tia/data/hovernet/
+
+3. **pannuke** 
+* [x] https://warwick.ac.uk/fac/sci/dcs/research/tia/data/pannuke
+
+4. **MoNuSac** 
+* [x] https://monusac-2020.grand-challenge.org/
+
+5. **kaggle dsb 2018**: 
+* [x] https://bbbc.broadinstitute.org/BBBC038
 
 ## Repository structure
 - `Dippa`/
