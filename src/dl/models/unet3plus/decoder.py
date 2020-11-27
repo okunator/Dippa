@@ -99,7 +99,7 @@ class Unet3pEncoderSkipBlock(nn.ModuleDict):
         """
         encoder_skips = self.center_crop(encoder_skips, target_size)
         features = []
-        for i, (name, layer) in enumerate(self.items()):
+        for i, layer in enumerate(self.values()):
             new_features = layer(encoder_skips[i])
             features.append(new_features)
         return features
@@ -181,6 +181,9 @@ class Unet3pDecoder(nn.ModuleDict):
         """
         UNET3+ decoder part
         https://arxiv.org/pdf/2004.08790.pdf
+        The decoder part deviates from the original implementation such that
+        the decoder upsampling part concatenates the different sized feature maps
+        like in dense net to reduce memory footprint.  
 
         Args:
             encoder_channels (List[int]): List of the number of channels in each encoder block

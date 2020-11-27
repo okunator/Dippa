@@ -1,6 +1,18 @@
 # Dippa
 Benchmarking of deep learning and other segmentation methods for H&amp;E images  
-Borrowing a lot of utilities from HoVer-Net [repo](https://github.com/vqdang/hover_net)
+Most of the models are just wrappers for models implemented in: [](https://github.com/qubvel/segmentation_models.pytorch).
+
+Also borrowing a lot of utilities from:
+
+- HoVer-Net [repository](https://github.com/vqdang/hover_net)
+- pytorch-toolbelt [repository](https://github.com/BloodAxe/pytorch-toolbelt) 
+
+## Supported datasets
+* [x] [Kumar](https://ieeexplore.ieee.org/document/7872382) (Kumar et al.)
+* [x] [CoNSep](https://arxiv.org/pdf/1812.06499) (Graham, Vu, et al.)
+* [x] [Pannuke](https://arxiv.org/abs/2003.10778) (Gamper et al.)
+* [] [MoNuSac](https://monusac-2020.grand-challenge.org/) (Not yet published) (coming)
+* [] [Dsb2018](https://www.kaggle.com/c/data-science-bowl-2018) (Caicedo et al.) (coming)
 
 ## Set Up
 1. Clone the repository
@@ -62,12 +74,12 @@ pip install -r requirements.txt
             - `kumar.yml` data related to the kumar dataset
             - `pannuke.yml` data related to the pannuke dataset
         - `dl/`
+            - `filters/` couple files containing utilities for convolving kernels on matrices
+            - `losses/` contains all different losses and utilities for them
+            - `models/` contains all the different models and utilities for them
             - `datasets.py` pytorch DataSet class for the experiments
             - `inferer.py` class for inference, post processing and benchmarking of the trained models
             - `lightning_model.py` pytorch lightning class abstraction for any pytorch model used in this project
-            - `losses.py` classes for different losses that can be used for diff models
-            - `loss_builder.py` wrapper classes to combine different loss functions into one joint loss.
-            - `model_builder.py` wrapper classes to modify different backbone models to do instance or panoptic seg
             - `torch_utils.py` utility functions for torch tensors
         - `img_processing/`
             - `augmentations.py` data augmentations
@@ -78,7 +90,7 @@ pip install -r requirements.txt
         - `metrics/`
             - `metrics.py` benchmarking metrics functions 
         - `tune/`
-            - `tune_experiment.py` TODO
+            - `tune_experiment.py` Hyper parameter tuning (TODO)
         - `utils/`
             - `adhoc_conversions.py` functions to move the and modify the downloaded data around the repo
             - `benchmarker.py` class for benchmarking segmentation results
