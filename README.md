@@ -1,6 +1,6 @@
 # Dippa
 Benchmarking of deep learning and other segmentation methods for H&amp;E images  
-Most of the models are just wrappers for models implemented in: [](https://github.com/qubvel/segmentation_models.pytorch).
+Most of the models are just wrappers for models implemented in: [segmentation_models_pytorch](https://github.com/qubvel/segmentation_models.pytorch).
 
 Also borrowing a lot of utilities from:
 
