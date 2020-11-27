@@ -8,7 +8,7 @@ CONFIG = OmegaConf.create(
         # These will be used to write the result files to the right folders
         "experiment_args":{
             "model_name":"UNET",
-            "experiment_version": "unettest_instance",
+            "experiment_version": "attention-unet-hover",
         },
         
         # General dataset constants and args
@@ -20,8 +20,6 @@ CONFIG = OmegaConf.create(
             # This depends on the dataset. instance segmentation can be done to all datasets
             # and panoptic segmentation can be done to consep and pannuke datasets
             # change this according to your needs. has to be one of ("instance", "panopotic")
-            # Things won't crash even if types is used for a dataset that can be used only for 
-            # instance segmentation
             "class_types":"panoptic",
             
             # if phases = ["train", "valid", "test"]. The train set is also split to 
@@ -29,8 +27,8 @@ CONFIG = OmegaConf.create(
             # If dataset = 'pannuke' and phases = ["train", "valid", "test"] the folds
             # of your choosing are treated as train, valid and test folds. If dataset 
             # = 'pannuke' and phases = ["train", "test"] then two folds that are set for
-            # train and valid are combined to one big training set remaining fold is the 
-            # test set. Folds can be modified in pannyke.yml
+            # train and valid are combined to one big training set  and the remaining fold
+            # is the test set. Folds can be modified in conf/pannyke.yml
             "phases":["train", "test"], # ["train", "valid", "test"] or ["train", "test"]
             
             # Use either patches written to hdf5 db or .npy files. One of ("npy", "hdf5")
@@ -61,14 +59,17 @@ CONFIG = OmegaConf.create(
             # This needs to be same as in the patching args
             "model_input_size":256,
 
-            "tta": False,  # use test time augmentation during training. Note: very slow w ttatchFalse
-            "resume_training":False, # continue training where you left off?
+            # use test time augmentation during training. Note: Training gets very slow
+            "tta": False,
+
+            # continue training where you left off?  
+            "resume_training":False, 
             "num_epochs":10,
             "num_gpus":1,
             
             # optimizer args
-            "lr":0.001,
-            "encoder_lr":0.0005,
+            "lr":0.0005,
+            "encoder_lr":0.00005,
             "weight_decay":0.0003,
             "encoder_weight_decay":0.00003,
             
@@ -78,32 +79,39 @@ CONFIG = OmegaConf.create(
             
             # loss args
 
-            # One of ("wCE", "wSCE", "wFocal", "IoU_wCE", "IoU_wSCE", "DICE_wCE", "DICE_wSCE", "DICE_wFocal",
-            # "DICE_wFocal_MS-SSIM, "Tversky_wCE", "Tversky_wSCE", "Tversky_wFocal", "Tversky_wFocal_MS-SSIM)
-            # More about these in losses.py. This loss will be used for instance segmentation branch
-            "inst_branch_loss":"DICE_wFocal",
+            # NOTE: combination losses need to be separated by underscore '_'
 
-            # One of ("wCE", "wSCE", "wFocal", "IoU_wCE", "IoU_wSCE", "DICE_wCE", "DICE_wSCE", "DICE_wFocal")
-            # This loss will be used for type segmentation branch. This is optional
-            "semantic_branch_loss":"Tversky_wFocal",
+            # One of ("ce", "sce", "focal", "iou", "dice", "tversky", "ssim", "msssim") 
+            # Or a combination of these to create a joint loss. Example: "focal_dice_ssim"
+            # This loss will be used for instance segmentation branch.
+            "inst_branch_loss":"dice_focal_ssim",
 
-            # Whether to apply weights at nuclei borders when computing the loss
-            "edge_weights":False,
+            # One of ("ce", "sce", "focal", "iou", "dice", "tversky", "ssim", "msssim") 
+            # Or a combination of these to create a joint loss. Example: "wfocal_dice_ssim"
+            # This loss will be used for type segmentation branch. This is optional. If there is no
+            # separate type segmentation branch then this will be ignored.
+            "semantic_branch_loss":"tversky_focal",
+
+            # One of the regression losses ("mse", "gmse", "ssim", "msssim")
+            # Or a combination of these to create a joint loss. Example: "mse_gmse_ssim"
+            # This loss will be used for auxilliary regression branch. This is optional. If
+            # there is no separate auxilliary regression branch then this will be ignored.
+            "aux_branch_loss":"mse_ssim",
 
             # How much weight is applied to nuclei borders. 1.0 = no weight.
-            # This is ignored if "edge_weights" is False
-            "edge_weight": 1.0,
+            # edge_weight needs to be float or None. Weights are assigned as loss*edge_weight**weight_map
+            "edge_weight": 1.2,
 
-            # Apply weights to different classes. Weights are computed by from the number of pixels
-            # belonging to each class and the less number of pixels there is in a class the bigger
-            # weight it will get. All weights are b/w [0, 1] 
-            "class_weights":True
+            # Apply weights to different classes. Weights are computed from the number of pixels
+            # belonging to each class int the training data set. The less the  number of pixels there
+            # in a class the bigger the weight it will get. All weights are b/w [0, 1].
+            "class_weights": False
         },
         
         # Inference args
         "inference_args" : {
             
-            "batch_size": 2,
+            "batch_size": 3,
 
             # This needs to be same as in the patching args
             "model_input_size": 256,
@@ -138,7 +146,7 @@ CONFIG = OmegaConf.create(
             # "post_proc_hover", "post_proc_hover2").
             # This is ignored if post_processing=False. Then only thresholding is applied to the softmasks.
             # This is also ignored if aux_branch is "hover" or "micro" which use dedicated post proc pipelines 
-            "post_proc_method": "shape_index_watershed2",
+            "post_proc_method": "post_proc_hover",
 
             # Print inference progress
             "verbose":True,

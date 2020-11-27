@@ -4,12 +4,16 @@ from typing import Optional
 from torch import nn
 from omegaconf import DictConfig
 from src.utils.file_manager import ProjectFileManager
+from src.dl.models.utils import convert_relu_to_mish
+from src.dl.models.linknet.model import LinknetSmp, LinknetSmpWithClsBranch
 from src.dl.models.unet.model import UnetSmp, UnetSmpWithClsBranch
 from src.dl.models.unet3plus.model import Unet3pInst, Unet3pWithClsBranch
+from src.dl.models.unetplusplus.model import UnetPlusPlusSmp, UnetPlusPlusSmpWithClsBranch
 from src.dl.models.pspnet.model import PSPNetSmp, PSPNetSmpWithClsBranch 
 from src.dl.models.fpn.model import FpnSmp, FpnSmpWithClsBranch 
 from src.dl.models.pan.model import PanSmp, PanSmpWithClsBranch 
 from src.dl.models.deeplabv3.model import DeepLabV3Smp, DeepLabV3SmpWithClsBranch 
+from src.dl.models.deeplabv3plus.model import DeepLabV3PlusSmp, DeepLabV3PlusSmpWithClsBranch 
 
 
 class ModelBuilder(ProjectFileManager):
@@ -20,7 +24,7 @@ class ModelBuilder(ProjectFileManager):
         Takes in a pytorch model specification that has an encoder branch and
         a decoder branch. Then converts the model for panoptic segmentation task
         if specified in the config.py file. If objective is to do only instance
-        segmentation then this just returns a wrapper for the model without
+        segmentation then this just model = s a wrapper for the model without
         semantic segmentation decoder branch. This can take in your own model specs,
         smp models, toolbelt models or any models with distinct encoder and decoder
         specifications
@@ -45,6 +49,7 @@ class ModelBuilder(ProjectFileManager):
                   conf: DictConfig,
                   encoder_name: str = "resnext50_32x4d",
                   encoder_weights: str = "imagenet",
+                  relu_to_mish: bool = False,
                   **kwargs) -> nn.Module:
         """
         Initializes smp or other pytorch model specifications
@@ -64,7 +69,10 @@ class ModelBuilder(ProjectFileManager):
             >>> ModelBuilder.get_model("FPN", CONFIG)
         """
 
-        models = ("FPN", "DeepLabV3", "DeepLabV3+", "LinkNet", "Unet", "PAN", "PSPNet", "Unet3+", "Attention-Unet")
+        models = (
+            "FPN", "DeepLabV3", "DeepLabV3+", "LinkNet", "Unet", "PAN", 
+            "PSPNet", "Unet3+", "Attention-Unet", "Unet++", "HoverNet"
+        )
         assert model_name in models, (
             f"model name: {model_name} not recognized. Available models: {models}"
         )
@@ -81,48 +89,54 @@ class ModelBuilder(ProjectFileManager):
 
         if c.class_types == "instance":
             if model_name == "Unet":
-                return UnetSmp(**kwargs)
+                model = UnetSmp(**kwargs)
             elif model_name == "Unet3+":
-                return Unet3pInst(**kwargs)
+                model = Unet3pInst(**kwargs)
             elif model_name == "Unet++":
-                pass
+                model = UnetPlusPlusSmp(**kwargs)
             elif model_name == "Attention-Unet":
                 kwargs.setdefault("decoder_attention_type", "scse")
-                return UnetSmp(**kwargs)
+                model = UnetSmp(**kwargs)
             elif model_name == "FPN":
                 kwargs.setdefault("decoder_merge_policy", "cat")
-                return FpnSmp(**kwargs)
+                model = FpnSmp(**kwargs)
             elif model_name == "DeepLabV3":
-                pass
+                model = DeepLabV3Smp(**kwargs)
             elif model_name == "DeepLabV3+":
-                return DeepLabV3Smp(**kwargs)
+                model = DeepLabV3PlusSmp(**kwargs)
             elif model_name == "LinkNet":
-                pass
+                model = LinknetSmp(**kwargs)
             elif model_name == "PAN":
-                return PanSmp(**kwargs)
+                model = PanSmp(**kwargs)
             elif model_name == "PSPNet":
-                return PSPNetSmp(**kwargs)
+                model = PSPNetSmp(**kwargs)
 
         elif c.class_types == "panoptic":
             if model_name == "Unet":
-                return UnetSmpWithClsBranch(**kwargs)
+                model = UnetSmpWithClsBranch(**kwargs)
             elif model_name == "Unet3+":
-                return Unet3pWithClsBranch(**kwargs)
+                model = Unet3pWithClsBranch(**kwargs)
             elif model_name == "Unet++":
-                pass
+                model = UnetPlusPlusSmpWithClsBranch(**kwargs)
             elif model_name == "Attention-Unet":
                 kwargs.setdefault("decoder_attention_type", "scse")
-                return UnetSmpWithClsBranch(**kwargs)
+                model = UnetSmpWithClsBranch(**kwargs)
             elif model_name == "FPN":
                 kwargs.setdefault("decoder_merge_policy", "cat")
-                return FpnSmpWithClsBranch(**kwargs)
+                model = FpnSmpWithClsBranch(**kwargs)
             elif model_name == "DeepLabV3":
-                return DeepLabV3SmpWithClsBranch(**kwargs)
+                model = DeepLabV3SmpWithClsBranch(**kwargs)
             elif model_name == "DeepLabV3+":
-                pass
+                model = DeepLabV3PlusSmpWithClsBranch(**kwargs)
             elif model_name == "LinkNet":
-                pass
+                model = LinknetSmpWithClsBranch(**kwargs)
             elif model_name == "PAN":
-                return PanSmpWithClsBranch(**kwargs)
+                model = PanSmpWithClsBranch(**kwargs)
             elif model_name == "PSPNet":
-                return PSPNetSmpWithClsBranch(**kwargs)
+                model = PSPNetSmpWithClsBranch(**kwargs)
+
+            if relu_to_mish:
+                convert_relu_to_mish(model)
+            
+            return model
+

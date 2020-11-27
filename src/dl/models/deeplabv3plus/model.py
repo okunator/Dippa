@@ -7,6 +7,7 @@ from segmentation_models_pytorch.base import SegmentationHead
 from segmentation_models_pytorch.deeplabv3.decoder import DeepLabV3PlusDecoder
 from src.dl.models.base_model import InstSegModel, InstSegModelWithClsBranch
 
+
 class DeepLabV3PlusSmp(InstSegModel):
     def __init__(self,
                  encoder_name: str = "resnet34",
@@ -54,6 +55,7 @@ class DeepLabV3PlusSmp(InstSegModel):
         """
 
         super().__init__()
+        self.aux_branch_name = aux_branch_name
 
         self.encoder = get_encoder(
             encoder_name,
@@ -166,6 +168,7 @@ class DeepLabV3PlusSmpWithClsBranch(InstSegModelWithClsBranch):
         """
 
         super().__init__()
+        self.aux_branch_name = aux_branch_name
 
         self.encoder = get_encoder(
             encoder_name,

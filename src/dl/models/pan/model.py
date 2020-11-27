@@ -54,6 +54,7 @@ class PanSmp(InstSegModel):
         """
 
         super().__init__()
+        self.aux_branch_name = aux_branch_name
 
         self.encoder = get_encoder(
             encoder_name,
@@ -147,6 +148,7 @@ class PanSmpWithClsBranch(InstSegModelWithClsBranch):
         """
 
         super().__init__()
+        self.aux_branch_name = aux_branch_name
 
         self.encoder = get_encoder(
             encoder_name,

@@ -3,7 +3,7 @@ import torch.nn as nn
 from typing import List, Dict, Optional
 
 
-class JointLoss(nn.Module):
+class JointLoss(nn.ModuleDict):
     def __init__(self,
                  losses: List[nn.Module],
                  weights: Optional[List[float]] = None) -> None:
@@ -22,14 +22,17 @@ class JointLoss(nn.Module):
         if weights is not None:
             assert all(
                 0 <= val <= 1.0 for val in weights), "Weights need to be 0 <= weight <= 1"
-        self.losses = losses
+
         self.weights = weights
+        for i in range(len(losses)):
+            self.add_module('loss%d' % (i + 1), losses[i])
 
     def forward(self, **kwargs):
         if self.weights is not None:
-            l = list(zip(self.losses, self.weigths))
+            l = list(zip(self.values(), self.weigths))
         else:
-            l = list(zip(self.losses, [1.0]*len(self.losses)))
+            l = list(zip(self.values(), [1.0]*len(self.values())))
+
         losses = torch.stack([loss(**kwargs)*weight for loss, weight in l])
         return torch.sum(losses)
 

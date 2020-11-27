@@ -20,6 +20,9 @@ class Unet3pInst(InstSegModel):
         """
         UNET3+
         https://arxiv.org/pdf/2004.08790.pdf
+
+        This implementation deviates from the original one such that the decoder path
+        is dense and not as memory expensive as in the original 
         
         Class for Unet3+ for segmentation with optional aux branch for regressing outputs
         Adjusted to use pre-trained encoders from the pytorch_segmentation_models library

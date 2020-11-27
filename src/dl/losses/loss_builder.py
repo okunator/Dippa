@@ -1,143 +1,185 @@
 
 import torch
 import torch.nn as nn
-import src.dl.losses.losses as losses
+import src.dl.losses as losses
 from typing import List, Dict, Optional
 from src.dl.losses.joint_losses import JointLoss, JointInstLoss, JointPanopticLoss
+
+
+loss_lookup = {
+    "iou": "IoULoss",
+    "dice": "DiceLoss",
+    "tversky": "TverskyLoss",
+    "ce": "WeightedCELoss",
+    "sce": "WeightedSCELoss",
+    "focal": "WeightedFocalLoss",
+    "mse": "MSE",
+    "gmse": "GradMSE",
+    "ssim": "SSIM",
+    "msssim": "MSSSIM"
+}
+
+joint_seg_losses = [
+    "iou",
+    "dice",
+    "tversky",
+    "ce",
+    "sce",
+    "focal",
+    "iou_ce",
+    "iou_sce",
+    "iou_focal",
+    "dice_ce",
+    "dice_sce",
+    "dice_focal",
+    "tversky_ce",
+    "tversky_sce",
+    "tversky_focal",
+    "iou_ce_ssim",
+    "iou_sce_ssim",
+    "iou_focal_ssim",
+    "dice_ce_ssim",
+    "dice_sce_ssim",
+    "dice_focal_ssim",
+    "tversky_ce_ssim",
+    "tversky_sce_ssim",
+    "tversky_focal_ssim",
+    "iou_ce_msssim",
+    "iou_sce_msssim",
+    "iou_focal_msssim",
+    "dice_ce_msssim",
+    "dice_sce_msssim",
+    "dice_focal_msssim",
+    "tversky_ce_msssim",
+    "tversky_sce_msssim",
+    "tversky_focal_msssim",
+]
+
+joint_aux_losses = [
+    "mse",
+    "gmse",
+    "ssim",
+    "msssim",
+    "mse_ssim",
+    "mse_gmse",
+    "mse_msssim",
+    "gmse_ssim",
+    "gmse_msssim",
+    "ssim_msssim",
+    "mse_gmse_ssim",
+    "mse_gmse_msssim"
+]
 
 
 class LossBuilder:
     def __init__(self,
                  class_types: str,
-                 edge_weights: bool = True,
-                 aux_branch: Optional[str] = None) -> None:
+                 aux_branch_name: Optional[str] = None) -> None:
         """
         Initializes the loss function for instance or panoptic segmentation.
-        This uses the loss functions available in the losses.py and parses the
+        This uses the loss functions available in the src/dl/losses and parses the
         args in config.py to build a loss functions from the args specified for
         the segmentation task.
 
         Args:
             class_types (str): one of "instance" or "panoptic"
-            edge_weight (float): weight to be applied to nuclei edges
-            aux_branch (str, optional): one of ("hover", "micro", None)
+            aux_branch_name (str, optional): one of ("hover", "micro", None)
         """
         self.class_types = class_types
-        self.edge_weights = edge_weights
-        self.aux_branch = aux_branch
+        self.aux_branch = aux_branch_name
 
-        self.loss_lookup = {
-            "Iou": "IoULoss",
-            "DICE": "DiceLoss",
-            "Tversky": "TverskyLoss",
-            "wCE": "WeightedCELoss",
-            "wSCE": "WeightedSCELoss",
-            "wFocal": "WeightedFocalLoss",
-            "hover":"HoVerLoss",
-            "MS-SSIM": "MSSSIM"
-        }
 
-        self.joint_losses = [
-            "IoU_wCE",
-            "IoU_wSCE",
-            "DICE_wCE",
-            "DICE_wSCE",
-            "DICE_wFocal",
-            "DICE_wFocal_MS-SSIM",
-            "Tversky_wCE",
-            "Tversky_wSCE",
-            "Tversky_wFocal",
-            "Tversky_wFocal_MS-SSIM",
-        ]
+    def solve_loss_key(self, key: str, joint_losses: List[str]) -> List[str]:
+        if key in joint_losses:
+            loss_keys = key.split("_")
+        else:
+            loss_keys = [key]
+        return loss_keys
+
 
     @classmethod
     def set_loss(cls,
-                 loss_name_inst: str,
                  class_types: str,
-                 edge_weights: bool = True,
+                 loss_name_inst: str,
                  loss_name_type: Optional[str] = None,
+                 loss_name_aux: Optional[str] = None,
                  loss_weights: Optional[List[float]] = [1.0, 1.0, 1.0],
                  binary_weights: Optional[torch.Tensor] = None,
                  type_weights: Optional[torch.Tensor] = None,
-                 aux_branch: Optional[str] = None,
+                 edge_weight: Optional[float] = None,
+                 aux_branch_name: Optional[str] = None,
                  **kwargs) -> nn.Module:
         """
-        Initialize the loss function.
+        Initialize the joint loss function.
 
         Args:
-            loss_name_inst (str): one of "wCE", "symmetric_wCE", "IoU_wCE", "IoU_symmetric_wCE", "DICE_wCE",
-                                 "DICE_symmetric_wCE", "DICE_wFocal_MS-SSIM", "Tversky_wFocal_MS-SSIM"
-            class_types (str): one of "instance" or "panoptic"
-            edge_weight: (float): weight to be applied to nuclei edges
-            loss_name_type (str): one of the elements in self.joint_losses. Optionally you can set
-                                  the type_loss to be a different loss func than the `loss_name_inst`.
-                                  If this arg is not provided then the type loss will be the same as
-                                  the inst_loss if panoptic segmentation is the segmentation task.
+            class_type (str): One of ("panoptic", "instance") adds type branch loss to joint loss if "panoptic"
+            loss_name_inst (str): the inst branch loss name. This is defined in config.py
+            loss_name_type (str): the type branch loss name. This is defined in config.py
             loss_weights (List[float]): List of weights for loss functions of instance,
                                         semantic and auxilliary branches in this order.
-                                        If there is no auxilliary branch such as HoVer-branch
-                                        then only two weights are needed.                     
-            binary_weights (Optional[torch.Tensor]): Tensor of size 2. Weights for background
-                                                     and foreground.
-            type_weights (Optional[torch.Tensor]): Tensor of size C. Each slot indicates
-                                                   the weight to be applied for each class
+            binary_weights (torch.Tensor): Tensor of size (2, ). Weights for background and foreground.
+            type_weights (torch.Tensor): Tensor of size (C, ). Each slot indicates
+                                         the weight to be applied for each class
+            edge_weight (float): weight given at the nuclei edges
+            aux_branch_name (str): one of ("hover", "micro", None)
         """
-        def solve_loss_key(key: str, joint_losses: List[str]) -> List[str]:
-            if key in joint_losses:
-                loss_keys = key.split("_")
-            else:
-                loss_keys = [key]
-            return loss_keys
+        assert class_types in ("instance", "panoptic")
+        assert loss_name_inst in joint_seg_losses, f"loss_name_inst need to be one of {joint_seg_losses}"
+        assert loss_name_type in joint_seg_losses, f"loss_name_type need to be one of {joint_seg_losses}"
+        assert loss_name_aux in joint_aux_losses, f"loss_name_aux need to be one of {joint_aux_losses}"
+        assert aux_branch_name in (None, "hover", "micro"), "aux_branch name need to be one of (None, 'hover', 'micro')"
 
-        c = cls(class_types, edge_weights, aux_branch)
+        c = cls(class_types, aux_branch_name)
 
         # set up kwargs
         kwargs = kwargs.copy()
-        kwargs.setdefault("edge_weights", edge_weights)
         kwargs.setdefault("class_weights", binary_weights)
+        kwargs.setdefault("edge_weight", edge_weight)
 
         # get losses that are mentioned in the inst_loss_name
-        loss_keys_inst = solve_loss_key(loss_name_inst, c.joint_losses)
-        loss_names_inst = [c.loss_lookup[key] for key in loss_keys_inst]
+        loss_keys_inst = c.solve_loss_key(loss_name_inst, joint_seg_losses)
+        loss_names_inst = [loss_lookup[key] for key in loss_keys_inst]
 
-        if c.class_types == "panoptic":
+        if c.class_types == "instance":
+            # set instance seg loss
+            loss_inst = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_inst])
 
+            # set auxilliary branch loss
+            loss_aux = None
+            if aux_branch_name is not None:
+                loss_keys_aux = c.solve_loss_key(loss_name_aux, joint_aux_losses)
+                loss_names_aux = [loss_lookup[key] for key in loss_keys_aux]
+                loss_aux = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_aux])
+
+            loss = JointInstLoss(loss_inst, loss_aux)
+
+        elif c.class_types == "panoptic":
+        
             # Set instance segmentation branch loss
             loss_inst = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_inst])
 
             # Take off the nuclei edge weights from the type loss
-            kwargs["edge_weights"] = False
+            kwargs["edge_weight"] = None
 
-            # Set the class weights. Can be None
+            # Set the class weights.
             kwargs["class_weights"] = type_weights
 
-            # set semantic loss if it was defined
-            if loss_name_type is not None:
-                loss_keys_type = solve_loss_key(loss_name_type, c.joint_losses)
-                loss_names_type = [c.loss_lookup[key] for key in loss_keys_type]
-            else:
-                loss_names_type = loss_names_inst
+            # set semantic loss
+            loss_keys_type = c.solve_loss_key(loss_name_type, joint_seg_losses)
+            loss_names_type = [loss_lookup[key] for key in loss_keys_type]
 
             # Set semantic seg branch loss
             loss_type = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_type])
 
             # set auxilliary loss if that aux branch is used
             loss_aux = None
-            if c.aux_branch == "hover":
-                loss_aux = losses.HoVerLoss(**kwargs)
+            if aux_branch_name is not None:
+                loss_keys_aux = c.solve_loss_key(loss_name_aux, joint_aux_losses)
+                loss_names_aux = [loss_lookup[key] for key in loss_keys_aux]
+                loss_aux = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_aux])
 
             loss = JointPanopticLoss(loss_inst, loss_type, loss_aux, loss_weights)
 
-        elif c.class_types == "instance":
-
-            # set instance seg loss
-            loss_inst = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_inst])
-
-            # set auxilliary branch loss
-            loss_aux = None
-            if c.aux_branch == "hover":
-                loss_aux = losses.HoVerLoss(**kwargs)
-
-            loss = JointInstLoss(loss_inst, loss_aux)
-
         return loss
+

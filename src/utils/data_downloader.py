@@ -166,8 +166,6 @@ class Downloader(ProjectFileManager):
             if change_consep_classes:
                 self.__change_consep_classes(anns_train_dir)
                 self.__change_consep_classes(anns_test_dir)            
-        elif self.dataset == "cpm":
-            pass # TODO
         elif self.dataset == "dsb2018":
             pass # TODO
         

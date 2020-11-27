@@ -4,23 +4,6 @@ import torch.nn.functional as F
 from src.dl.torch_utils import one_hot
 
 
-def dice(yhat: torch.Tensor, target: torch.Tensor, eps: float = 1e-6):
-    # activation
-    yhat_soft = F.softmax(yhat, dim=1)
-
-    # one hot target
-    target_one_hot = one_hot(target, n_classes=yhat.shape[1])
-    assert target_one_hot.shape == yhat.shape
-
-    # dice components
-    intersection = torch.sum(yhat_soft * target_one_hot, (1, 2, 3))
-    union = torch.sum(yhat_soft + target_one_hot, (1, 2, 3))
-
-    # dice score
-    dice = 2.0 * intersection / union.clamp_min(eps)
-    return torch.mean(1.0 - dice)
-
-
 class DiceLoss(nn.Module):
     def __init__(self, **kwargs) -> None:
         """
@@ -46,4 +29,17 @@ class DiceLoss(nn.Module):
             torch.Tensor: computed DICE loss (scalar)
         """
         
-        return dice(yhat, target, self.eps)
+        # activation
+        yhat_soft = F.softmax(yhat, dim=1)
+
+        # one hot target
+        target_one_hot = one_hot(target, n_classes=yhat.shape[1])
+        assert target_one_hot.shape == yhat.shape
+
+        # dice components
+        intersection = torch.sum(yhat_soft * target_one_hot, (1, 2, 3))
+        union = torch.sum(yhat_soft + target_one_hot, (1, 2, 3))
+
+        # dice score
+        dice = 2.0 * intersection / union.clamp_min(self.eps)
+        return torch.mean(1.0 - dice)

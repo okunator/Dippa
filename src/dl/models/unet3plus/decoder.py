@@ -33,8 +33,7 @@ class Unet3pConvBlock(nn.Module):
         if batch_norm:
             block.append(nn.BatchNorm2d(out_channels))
 
-        # block.append(nn.ReLU(inplace=True))
-        block.append(Mish(inplace=False))
+        block.append(nn.ReLU(inplace=True))
         self.block = nn.Sequential(*block)
 
     def forward(self, x):
@@ -76,7 +75,7 @@ class Unet3pEncoderSkipBlock(nn.ModuleDict):
 
         Args:
             features (List[torch.Tensor]): the encoder side features that will be cat to fused vector
-            target_size (Tuple[int]): Tuple of the spatial dims (H, W) of the features
+            target_size (Tuple[int]): the target spatial dim all the features are cropped to
         """
 
         cropped_features = []
@@ -96,6 +95,7 @@ class Unet3pEncoderSkipBlock(nn.ModuleDict):
         """
         Args:
             encoder_skips (List[torch.Tensor]): List of the encoder skip connection tensors
+            target_size (Tuple[int]): the target spatial dim all the features are cropped to
         """
         encoder_skips = self.center_crop(encoder_skips, target_size)
         features = []

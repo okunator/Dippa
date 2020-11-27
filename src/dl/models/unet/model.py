@@ -212,7 +212,7 @@ class UnetSmpWithClsBranch(InstSegModelWithClsBranch):
             )
             self.aux_seg_head = SegmentationHead(
                 in_channels=decoder_channels[-1],
-                out_channels=classes,
+                out_channels=2,
                 activation=activation,
                 kernel_size=1,
             )

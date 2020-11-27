@@ -51,6 +51,7 @@ class DeepLabV3Smp(InstSegModel):
             https://arxiv.org/abs/1706.05587
         """
         super().__init__()
+        self.aux_branch_name = aux_branch_name
 
         self.encoder = get_encoder(
             encoder_name,
@@ -142,6 +143,7 @@ class DeepLabV3SmpWithClsBranch(InstSegModelWithClsBranch):
             https://arxiv.org/abs/1706.05587
         """
         super().__init__()
+        self.aux_branch_name = aux_branch_name
 
         self.encoder = get_encoder(
             encoder_name,

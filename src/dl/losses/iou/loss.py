@@ -10,11 +10,11 @@ class IoULoss(nn.Module):
         at the nuclei edges and weights for different classes.
         """
         super(IoULoss, self).__init__()
+        self.eps = 1e-6
 
     def forward(self, 
                 yhat: torch.Tensor,
                 target: torch.Tensor,
-                eps: float = 1e-7,
                 **kwargs) -> torch.Tensor:
         """
         Computes the DICE coefficient
@@ -38,5 +38,5 @@ class IoULoss(nn.Module):
         union = torch.sum(yhat_soft + target_one_hot, (1, 2, 3))
 
         # iou score
-        iou = intersection / union.clamp_min(eps)
+        iou = intersection / union.clamp_min(self.eps)
         return torch.mean(1.0 - iou)

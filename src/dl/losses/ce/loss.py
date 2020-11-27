@@ -1,34 +1,32 @@
 import torch
 import torch.nn as nn
 from typing import List, Optional
+from src.dl.losses.weighted_base_loss import WeightedBaseLoss
 
 
-class WeightedCELoss(nn.Module):
+class WeightedCELoss(WeightedBaseLoss):
     def __init__(self, 
-                 edge_weights: bool = True,
+                 edge_weight: Optional[float] = None,
                  class_weights: Optional[torch.Tensor] = None,
                  **kwargs) -> None:
         """
         Wrapper class around CE loss function that applies weights with fixed factor.
-        This class adds nuclei border weights to the final computed loss on a feature map generated
-        from a H&E image.
+        This class adds nuclei border weights to the final computed loss
 
         Args:
-            edge_weights (bool): Add weight to nuclei borders like in Unet paper
-            class_weights (torch.Tensor): Optional tensor of size n_classes for class weights
+            edge_weight (float, optional): weight to be added to nuclei borders like in Unet paper
+            class_weights (torch.Tensor, optional): Optional tensor of size (n_classes,) for class weights
         """
-        super().__init__()
+        super().__init__(class_weights, edge_weight)
         self.loss = nn.CrossEntropyLoss(
             reduction="none",
             weight=class_weights
         )
-        self.edge_weights = edge_weights
 
     def forward(self, 
                 yhat: torch.Tensor,
                 target: torch.Tensor, 
                 target_weight: Optional[torch.Tensor] = None,
-                edge_weight: Optional[float] = 1.1,
                 **kwargs) -> torch.Tensor:
         """
         Computes the cross entropy loss
@@ -43,9 +41,9 @@ class WeightedCELoss(nn.Module):
         Returns:
             torch.Tensor: computed CE loss (scalar)
         """
-        if self.edge_weights:
-            loss_matrix = self.loss(yhat, target)
-            loss = (loss_matrix * (edge_weight**target_weight)).mean()
-        else:
-            loss = self.loss(yhat, target).mean()
-        return loss
+        loss = self.loss(yhat, target)
+
+        if self.edge_weight is not None:
+            loss = self.apply_edge_weights(loss, target_weight)
+ 
+        return loss.mean()

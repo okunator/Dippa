@@ -227,6 +227,3 @@ def handle_dsb2018() -> None:
     pass
 
 
-def handle_cpm() -> None:
-    pass
-

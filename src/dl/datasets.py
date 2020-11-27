@@ -73,19 +73,19 @@ class SegmentationDataset(Dataset, FileHandler):
 
         # Augment
         augmented = self.transforms(image=im_patch, masks=datalist)
-        img_new = augmented['image']
+        img_new = augmented["image"]
         masks_new = augmented["masks"]
         
         result = {}
-        result['image'] = img_new
-        result['type_map'] = masks_new[0]
-        result['weight_map'] = masks_new[1]
-        result['inst_map'] = masks_new[2]
-        result['binary_map'] = binarize(masks_new[2])
-        result['filename'] = self.fname
+        result["image"] = img_new
+        result["type_map"] = masks_new[0]
+        result["weight_map"] = masks_new[1]
+        result["inst_map"] = masks_new[2]
+        result["binary_map"] = binarize(masks_new[2])
+        result["filename"] = self.fname
         
         if self.aux_branch == "micro":
-            result['contour'] = masks_new[-1]
+            result["contour"] = masks_new[-1]
         elif self.aux_branch == "hover":
             result["xmap"] = masks_new[-1]
             result["ymap"] = masks_new[-2]

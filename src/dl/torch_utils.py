@@ -268,7 +268,7 @@ def gaussian_kernel2d(window_size: int,
         device (torch.device): device for the kernel
 
     Returns:
-        torch.Tensor of shape (1, 1, win_size, win_size)
+        torch.Tensor of shape (C, 1, win_size, win_size)
     """
     kernel_x = gaussian(window_size, sigma, device=device)
     kernel_y = gaussian(window_size, sigma, device=device)

@@ -62,7 +62,7 @@ class SegModel(pl.LightningModule):
         self.input_size = training_args["model_input_size"]
         self.loss_name_inst = training_args["inst_branch_loss"]
         self.loss_name_type = training_args["semantic_branch_loss"]
-        self.edge_weights = training_args["edge_weights"]
+        self.loss_name_aux = training_args["aux_branch_loss"]
         self.edge_weight = training_args["edge_weight"]
         self.class_weights = training_args["class_weights"]
         self.lr = training_args["lr"]
@@ -133,19 +133,21 @@ class SegModel(pl.LightningModule):
             criterion = LossBuilder.set_loss(
                 loss_name_inst=self.loss_name_inst,
                 loss_name_type=self.loss_name_type,
+                loss_name_aux=self.loss_name_aux,
                 class_types=self.fm.class_types,
-                edge_weights=self.edge_weights,
                 binary_weights=self.binary_class_weights,
                 type_weights=self.type_class_weights,
-                aux_branch=self.fm.aux_branch
+                edge_weight=self.edge_weight,
+                aux_branch_name=self.fm.aux_branch
             )
         else:
             criterion = LossBuilder.set_loss(
                 loss_name_inst=self.loss_name_inst,
                 loss_name_type=self.loss_name_type,
+                loss_name_aux=self.loss_name_aux,
                 class_types=self.fm.class_types,
-                edge_weights=self.edge_weights,
-                aux_branch=self.fm.aux_branch
+                edge_weight=self.edge_weight,
+                aux_branch_name=self.fm.aux_branch
             )
         return criterion
             
@@ -180,7 +182,6 @@ class SegModel(pl.LightningModule):
             yhat_inst=soft_mask["instances"], 
             target_inst=target,
             target_weight=target_weight,
-            edge_weight=self.edge_weight,
             yhat_aux=soft_mask["aux"],
             target_aux=target_aux
         )
@@ -228,7 +229,6 @@ class SegModel(pl.LightningModule):
             target_inst=inst_target, 
             target_type=type_target, 
             target_weight=target_weight,
-            edge_weight=self.edge_weight,
             yhat_aux=soft_mask["aux"],
             target_aux=target_aux,
         )

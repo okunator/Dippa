@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from typing import List, Tuple, Optional, Union
 from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.base import SegmentationHead
-from segmentation_models_pytorch.deeplabv3.decoder import LinknetDecoder
+from segmentation_models_pytorch.linknet.decoder import LinknetDecoder
 from src.dl.models.base_model import InstSegModel, InstSegModelWithClsBranch
 
 
@@ -49,9 +49,8 @@ class LinknetSmp(InstSegModel):
         .. _Linknet:
             https://arxiv.org/pdf/1707.03718.pdf
         """
-
-
         super().__init__()
+        self.aux_branch_name = aux_branch_name
 
         self.encoder = get_encoder(
             encoder_name,
@@ -135,9 +134,8 @@ class LinknetSmpWithClsBranch(InstSegModelWithClsBranch):
         .. _Linknet:
             https://arxiv.org/pdf/1707.03718.pdf
         """
-
-
         super().__init__()
+        self.aux_branch_name = aux_branch_name
 
         self.encoder = get_encoder(
             encoder_name,
