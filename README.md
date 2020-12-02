@@ -48,26 +48,6 @@ pip install -r requirements.txt
     - Optionally you can just run the notebooks in `notebooks/` which do the exact same.
     - **Note:** you don't have to repeat part **i** and **ii** if you've already done them and you want to run new experiments. If you want to patch the images differently (different stride or window size) for your experiments then modify the config and run part **ii** again.
 
-## Instructions for downloading the datasets
-1. Download the datsets by running the `download.py` script or the corresponding notebook
-
-#### The data is downloaded from the following links automatically:
-1. **kumar**  
-    * [x] Train: https://drive.google.com/file/d/1JZN9Jq9km0rZNiYNEukE_8f0CsSK3Pe4/view .   
-    * [x] Test: https://drive.google.com/file/d/1NKkSQ5T0ZNQ8aUhh0a8Dt2YKYCQXIViw/view  
-          
-2. **consep** 
-    * [x] https://warwick.ac.uk/fac/sci/dcs/research/tia/data/hovernet/
-
-3. **pannuke** 
-    * [x] https://warwick.ac.uk/fac/sci/dcs/research/tia/data/pannuke
-
-4. **MoNuSac** 
-    * [ ] https://monusac-2020.grand-challenge.org/
-
-5. **kaggle dsb 2018**: 
-    * [ ] https://bbbc.broadinstitute.org/BBBC038
-
 ## Repository structure
 - `Dippa`/
     - `datasets/` Location for the datasets after running `src/download.py` 
