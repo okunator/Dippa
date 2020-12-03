@@ -1,6 +1,5 @@
 import torch
 
-# Ported from https://github.com/kornia/kornia/blob/master/kornia/filters/kernels.py
 def gaussian(window_size: int, sigma: float, device: torch.device = None) -> torch.Tensor:
     """
     Create a gaussian 1D tensor
@@ -20,7 +19,6 @@ def gaussian(window_size: int, sigma: float, device: torch.device = None) -> tor
     return gauss / gauss.sum()
 
 
-# Ported from https://github.com/kornia/kornia/blob/master/kornia/filters/kernels.py
 def gaussian_kernel2d(window_size: int, 
                       sigma: float,
                       n_channels: int = 1,

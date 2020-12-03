@@ -159,9 +159,6 @@ class LossBuilder:
             # Set instance segmentation branch loss
             loss_inst = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_inst])
 
-            # Take off the nuclei edge weights from the type loss
-            kwargs["edge_weight"] = None
-
             # Set the class weights.
             kwargs["class_weights"] = type_weights
 
