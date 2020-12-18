@@ -227,17 +227,6 @@ def overlays(im: np.ndarray, mask:np.ndarray) -> np.ndarray:
     return np.where(mask[..., None], im, 0)
 
 
-def binarize(inst_map: np.ndarray) -> np.ndarray:
-    """
-    Binarize a labelled instance map
-
-    Args:
-        inst_map (np.ndarray): instance map to be binarized
-    """
-    inst_map[inst_map > 0] = 1
-    return inst_map
-
-
 def type_map_flatten(type_map: np.ndarray) -> np.ndarray:
     """
     Convert a type map of shape (H, W, C) to a single channel map of shape (H, W)
@@ -253,3 +242,12 @@ def type_map_flatten(type_map: np.ndarray) -> np.ndarray:
     return type_out
 
 
+def binarize(inst_map: np.ndarray) -> np.ndarray:
+    """
+    Binarize a labelled instance map
+
+    Args:
+        inst_map (np.ndarray): instance map to be binarized
+    """
+    inst_map[inst_map > 0] = 1
+    return inst_map.astype("uint8")

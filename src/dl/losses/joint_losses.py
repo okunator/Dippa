@@ -137,7 +137,7 @@ class JointPanopticLoss(nn.Module):
 
         Args:
             yhat_inst (torch.Tensor): output of instance segmentation decoder branch. Shape: (B, 2, H, W) 
-            yhat_type (torch.Tensor): output if semantic segmetnation decoder branch. Shape: (B, C, H, W)
+            yhat_type (torch.Tensor): output of semantic segmetnation decoder branch. Shape: (B, C, H, W)
             target_inst (torch.Tensor): ground truth annotations for instance segmentation. Shape: (B, H, W)
             target_type (torch.Tensor): ground truth annotaions for semantic segmentation. Shape: (B, H, W)
             target_weight (torch.Tensor, optional): weight map for nuclei borders. Shape (B, H, W)

@@ -7,7 +7,9 @@ CONFIG = OmegaConf.create(
         # Define the model name and the experiment
         # These will be used to write the result files to the right folders
         "experiment_args":{
-            "model_name":"UNET",
+            # Available models:
+            # (unet, unet3+, unet++, hovernet, pan, pspnet, deeplabv3, deeplabv3+, fpn, linknet)
+            "model_name":"unet",
             "experiment_version": "attention-unet-hover",
         },
         
@@ -17,9 +19,9 @@ CONFIG = OmegaConf.create(
             # What dataset you want to use? Has to be one of ("kumar", "consep", "pannuke")
             "dataset":"consep", 
             
-            # This depends on the dataset. instance segmentation can be done to all datasets
-            # and panoptic segmentation can be done to consep and pannuke datasets
-            # change this according to your needs. has to be one of ("instance", "panopotic")
+            # This depends on the dataset. naive instance segmentation can be done to all datasets
+            # and instance segmentation can be done to consep and pannuke datasets. panoptic is TODO
+            # change this according to your needs. has to be one of ("naive_instance", "instance", "panopotic")
             "class_types":"panoptic",
             
             # if phases = ["train", "valid", "test"]. The train set is also split to 
@@ -37,6 +39,23 @@ CONFIG = OmegaConf.create(
             # Use auxilliary regression branch in the model. One of (None, "hover", TODO:"micro")
             # Requires special GT masks
             "aux_branch": "hover",
+
+            # There are several ways data can be pre processed before inputting it to network
+            # Supported ones are ("hover", "unet", "micro", "basic"). If "hover" or "micro" is 
+            # used, an auxilliary regression branch will be added to the model for 
+            "pre_process":"hover",
+
+            # List of augmentations used for input image patches. (from albumentations)
+            # available ones: 
+            # ("rigid", "non_rigid", "affine", "hue_sat", "blur", "center_crop", "random_crop", "non_spatial")
+            # more info in img_processing/augmentations/augmentations.py
+            "augmentations": [
+                "hue_sat",
+                "non_rigid",
+                "blur",
+                "non_spatial",
+                "random_crop",
+            ]
         },
               
         # Change these according to your needs. The more there are patches (trtaining data).
@@ -64,7 +83,7 @@ CONFIG = OmegaConf.create(
 
             # continue training where you left off?  
             "resume_training":False, 
-            "num_epochs":10,
+            "num_epochs":3,
             "num_gpus":1,
             
             # optimizer args
@@ -84,7 +103,7 @@ CONFIG = OmegaConf.create(
             # One of ("ce", "sce", "focal", "iou", "dice", "tversky", "ssim", "msssim") 
             # Or a combination of these to create a joint loss. Example: "focal_dice_ssim"
             # This loss will be used for instance segmentation branch.
-            "inst_branch_loss":"dice_focal_ssim",
+            "inst_branch_loss":"dice_focal",
 
             # One of ("ce", "sce", "focal", "iou", "dice", "tversky", "ssim", "msssim") 
             # Or a combination of these to create a joint loss. Example: "wfocal_dice_ssim"
@@ -96,11 +115,11 @@ CONFIG = OmegaConf.create(
             # Or a combination of these to create a joint loss. Example: "mse_gmse_ssim"
             # This loss will be used for auxilliary regression branch. This is optional. If
             # there is no separate auxilliary regression branch then this will be ignored.
-            "aux_branch_loss":"mse_ssim",
+            "aux_branch_loss":"mse",
 
             # How much weight is applied to nuclei borders. 1.0 = no weight.
             # edge_weight needs to be float or None. Weights are assigned as loss*edge_weight**weight_map
-            "edge_weight": 1.2,
+            "edge_weight": None,
 
             # Apply weights to different classes. Weights are computed from the number of pixels
             # belonging to each class int the training data set. The less the  number of pixels there
@@ -111,7 +130,7 @@ CONFIG = OmegaConf.create(
         # Inference args
         "inference_args" : {
             
-            "batch_size": 3,
+            "batch_size": 2,
 
             # This needs to be same as in the patching args
             "model_input_size": 256,

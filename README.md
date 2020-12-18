@@ -49,49 +49,6 @@ pip install -r requirements.txt
     - Optionally you can just run the notebooks in `notebooks/` which do the exact same.
     - **Note:** you don't have to repeat part **i** and **ii** if you've already done them and you want to run new experiments. If you want to patch the images differently (different stride or window size) for your experiments then modify the config and run part **ii** again.
 
-## Repository structure
-- `Dippa`/
-    - `datasets/` Location for the datasets after running `src/download.py` 
-    - `notebooks/` Notebooks for running the codes instead of running the pyton scripts 
-    - `patches/` Location for the patched datasets after running `src/write_patches.py`
-    - `results/` Location for the results from training and inference
-    - `src/` 
-        - `conf/`
-            - `config.py` THE CONFIG FILE TO MODIFY FOR DIFFERENT EXPERIMENTS
-            - `consep.yml` data related to consep dataset
-            - `dsb2018.yml` data related to dsb2018 dataset TODO
-            - `kumar.yml` data related to the kumar dataset
-            - `pannuke.yml` data related to the pannuke dataset
-        - `dl/`
-            - `filters/` couple files containing utilities for convolving kernels on matrices
-            - `losses/` contains all different losses and utilities for them
-            - `models/` contains all the different models and utilities for them
-            - `datasets.py` pytorch DataSet class for the experiments
-            - `inferer.py` class for inference, post processing and benchmarking of the trained models
-            - `lightning_model.py` pytorch lightning class abstraction for any pytorch model used in this project
-            - `torch_utils.py` utility functions for torch tensors
-        - `img_processing/`
-            - `augmentations.py` data augmentations
-            - `post_processing.py` functions used in post processing inst maps 
-            - `pre_processing.py` functions used for pre processing patches before training
-            - `process_utils.py` utility functions for img and mask processing
-            - `viz_utils.py` utility functions for plotting results
-        - `metrics/`
-            - `metrics.py` benchmarking metrics functions 
-        - `tune/`
-            - `tune_experiment.py` Hyper parameter tuning (TODO)
-        - `utils/`
-            - `adhoc_conversions.py` functions to move the and modify the downloaded data around the repo
-            - `benchmarker.py` class for benchmarking segmentation results
-            - `data_downloader` class for downloading and converting data to right format
-            - `data_writer.py` class for writing image and mask patches for training
-            - `file_manager.py` class for handling the downloaded data and managing all files and paths
-            - `patch_extractor.py` class for extracting patches from images
-        - `download.py` Download the datasets and convert the downloaded data to right format
-        - `infer.py` Run inference, post processing and benchmarking
-        - `patch.py` Run patching for downloaded images
-        - `settings.py` A convention for building paths
-        - `train.py` Run training for pytorch models
 
 ## References
 

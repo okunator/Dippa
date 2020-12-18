@@ -28,16 +28,16 @@ class PatchWriter(ProjectFileManager, PatchExtractor):
         or .npy files that are are used in the training of the networks used in this project. 
         The torch dataset class is written to read from the files created by this class.
         
-            Args:
-                dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                           related to the dataset that is being used.
-                                           Check config.py for more info
-                experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                              that are used for creating result folders
-                                              files. Check config.py for more info
-                patching_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                            that are used for patching input images.
-                                            Check config.py for more info
+        Args:
+            dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                        related to the dataset that is being used.
+                                        Check config.py for more info
+            experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                            that are used for creating result folders
+                                            files. Check config.py for more info
+            patching_args (DictConfig): omegaconfig DictConfig specifying arguments
+                                        that are used for patching input images.
+                                        Check config.py for more info
                 
         """
         super(PatchWriter, self).__init__(dataset_args, experiment_args)
@@ -228,10 +228,12 @@ class PatchWriter(ProjectFileManager, PatchExtractor):
                         index: int) -> Tuple:
         """
         Visualize an image in patches.
+
         Args:
             phase (str): one of ('train', 'valid', 'test')
             img_type (str): one of ("img", "inst_map", "type_map", "overlay")
             index (int): index number for file path list
+
         Returns:
             the shape of patches.
         """
@@ -256,9 +258,11 @@ class PatchWriter(ProjectFileManager, PatchExtractor):
     def viz_patch_from_db(self, phase: str, index: int) -> Tuple[np.ndarray]:
         """
         Opens the hdf5 file and queries for an image and a mask with an index and plots these.
+
         Args:
             phase (str): one of ('train', 'valid', 'test')
             index (int): index for the patch array in the hdf5 db
+
         Returns:
             the unique labels of the mask
         """

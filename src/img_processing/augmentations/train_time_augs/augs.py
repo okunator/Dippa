@@ -1,0 +1,117 @@
+import cv2
+import numpy as np
+import albumentations as A
+from typing import List
+from albumentations.pytorch import ToTensorV2
+from albumentations.core.transforms_interface import BasicTransform
+
+# TODO: add docs
+
+def rigid_transforms(input_size: int = 256) -> List[BasicTransform]:
+    return [
+        A.OneOf([
+            A.RandomRotate90(),
+            A.Flip(),
+            A.Transpose(),
+            A.ShiftScaleRotate(
+                    shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2
+            )
+        ])
+    ]
+
+
+def non_rigid_transforms() -> List[BasicTransform]:
+    return [
+        A.OneOf([
+            A.ElasticTransform(alpha=120, sigma=120*0.05, alpha_affine=120*0.03, p=0.3),
+            A.GridDistortion(p=0.6),
+            A.OpticalDistortion(distort_limit=2, shift_limit=0.5, p=0.2)
+        ], p=0.25)
+    ]
+
+
+def affine_transforms() -> List[BasicTransform]:
+    return [A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2)]
+
+
+def hue_saturation_transforms() -> List[BasicTransform]:
+    return [A.HueSaturationValue(hue_shift_limit=(0,15), sat_shift_limit=0, val_shift_limit=0, p=.5)]
+
+
+def blur_transforms() -> List[BasicTransform]:
+    return [
+        A.OneOf([
+            A.MotionBlur(p=0.5),
+            A.MedianBlur(blur_limit=3, p=0.5),
+            A.Blur(blur_limit=3, p=0.5),
+        ], p=0.2)
+    ]
+
+
+def center_crop(input_size: int) -> List[BasicTransform]:
+    return [A.CenterCrop(input_size, input_size, always_apply=True, p=1)]
+
+
+def random_crop(input_size: int) -> List[BasicTransform]:
+    return [A.RandomCrop(input_size, input_size, always_apply=True, p=1)]
+
+
+def non_spatial_transforms() -> List[BasicTransform]:
+    return [
+        A.OneOf([
+            A.CLAHE(p=0.8),
+            A.RandomBrightnessContrast(p=0.8),    
+            A.RandomGamma(p=0.8)
+        ], p=0.2)
+    ]
+
+
+def to_tensor() -> List[BasicTransform]:
+    return [ToTensorV2()]
+
+
+def compose(transforms_to_compose: List[BasicTransform]) -> A.Compose:
+    # combine all augmentations into one single pipeline
+    result = A.Compose([item for sublist in transforms_to_compose for item in sublist])
+    return result
+
+
+def no_transforms() -> List[BasicTransform]:
+    # convert to torch.Tensor only
+    return [ToTensorV2()]
+
+
+def resize(height: int, width: int) -> A.Resize:
+    return A.Resize(height, width)
+
+
+def rigid_augs_and_crop(image: np.ndarray, mask: np.ndarray, input_size: int) -> A.Compose:
+    """
+    Do rigid augmentations and crop the patch to the size of the input_size.
+    These are used after before patches are saved to hdf5 databases.
+    The database access is several times faster if the patches are smaller.
+    """
+    transforms = compose([
+        rigid_transforms(),
+        #random_crop(input_size),
+        center_crop(input_size)
+    ])
+
+    return transforms(image=image, mask=mask)
+
+
+def pre_transforms(image_size: int = 256) -> List[BasicTransform]:
+    return [A.Resize(image_size, image_size, p=1)]
+
+
+def test_transforms(input_size: int = 256) -> List[BasicTransform]:
+    result = [
+        A.VerticalFlip(p=.5),
+        A.HorizontalFlip(p=.5),
+        A.HueSaturationValue(hue_shift_limit=(0,10), sat_shift_limit=0, val_shift_limit=0, p=1),
+        A.Rotate(p=1, border_mode=cv2.BORDER_CONSTANT, value=0),
+        A.RandomSizedCrop((input_size, input_size), input_size, input_size),
+        ToTensorV2()
+    ]
+
+    return result

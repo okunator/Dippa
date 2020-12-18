@@ -1,4 +1,6 @@
 import torch
+import torch.nn as nn
+import torch.optim as optim
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
@@ -6,17 +8,15 @@ import matplotlib.pyplot as plt
 import ttach as tta
 
 from pathlib import Path
+from typing import List, Dict
 from omegaconf import DictConfig
 from catalyst.contrib.nn import Ralamb, RAdam, Lookahead
-from torch import nn
-from torch import optim
 from torch.utils.data import DataLoader
 from catalyst.dl import utils
 from catalyst.contrib.tools.tensorboard import SummaryItem, SummaryReader
-from typing import List, Dict
 
 from src.utils.file_manager import ProjectFileManager
-from src.dl.datasets import SegmentationDataset
+from src.dl.dataset import SegmentationDataset
 from src.dl.losses.loss_builder import LossBuilder
 from src.dl.torch_utils import to_device, argmax_and_flatten, mean_iou
 from src.img_processing.augmentations import (
@@ -40,19 +40,14 @@ class SegModel(pl.LightningModule):
         
         Args:
             model (nn.Module): Pytorch model specification. Can be from smp, toolbelt, or a 
-                               custom model. ttatch wrappers work also. Basically any model 
-                               that inherits nn.Module should work
-            dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                       related to the dataset that is being used.
-                                       config.py for more info
-            experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                          that are used for creating result folders and
-                                          files. Check config.py for more info
-            training_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                        that are used for training a network.
-                                        Check config.py for more info
-            
-            
+                custom model. ttatch wrappers work also. Basically any model that inherits 
+                nn.Module should work
+            dataset_args (DictConfig): omegaconfig DictConfig specifying arguments related 
+                to the dataset that is being used. config.py for more info
+            experiment_args (DictConfig): omegaconfig DictConfig specifying arguments that
+                are used for creating result folders and files. Check config.py for more info
+            training_args (DictConfig): omegaconfig DictConfig specifying arguments that are
+                used for training a network. Check config.py for more info
         """
         super(SegModel, self).__init__()
         
@@ -129,6 +124,8 @@ class SegModel(pl.LightningModule):
 
     @property
     def _criterion(self):
+        # TODO get rid off if else
+        # bw = if self.class_weights
         if self.class_weights:
             criterion = LossBuilder.set_loss(
                 loss_name_inst=self.loss_name_inst,
@@ -387,7 +384,7 @@ class SegModel(pl.LightningModule):
             metrics (str): One of the averaged metrics ("loss", "accuracy", "TNR", "TPR").
             save (bool): Save result image
         """
-        
+        # cludge
         assert scale in ("log", "linear"), "y-scale not in ('log', 'linear')"
         assert metric in ("loss", "accuracy", "mean_iou"), "metric not in ('loss', 'accuracy', 'mean_iou')"
         folder = f"{self.fm.experiment_dir}"
@@ -440,17 +437,15 @@ class SegModel(pl.LightningModule):
         np_train_iou = np.array(avg_train_iou_all)
         np_epochs = np.unique(np.array(epochs_all))
         
-        df = pd.DataFrame(
-        {
-                "training loss": np_train_losses, 
-                "validation loss": np_valid_losses,
-                "training acc":np_train_accuracy,
-                "validation acc":np_valid_accuracy,
-                "training iou":np_train_iou,
-                "validation iou":np_valid_iou,
-                "epoch": np_epochs[0:len(np_train_losses)]
-        }
-        )
+        df = pd.DataFrame({
+            "training loss": np_train_losses, 
+            "validation loss": np_valid_losses,
+            "training acc":np_train_accuracy,
+            "validation acc":np_valid_accuracy,
+            "training iou":np_train_iou,
+            "validation iou":np_valid_iou,
+            "epoch": np_epochs[0:len(np_train_losses)]
+        })
 
         if metric == "accuracy":
             y1 = "training acc"

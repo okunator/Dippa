@@ -6,71 +6,6 @@ from typing import List, Dict, Optional
 from src.dl.losses.joint_losses import JointLoss, JointInstLoss, JointPanopticLoss
 
 
-loss_lookup = {
-    "iou": "IoULoss",
-    "dice": "DiceLoss",
-    "tversky": "TverskyLoss",
-    "ce": "WeightedCELoss",
-    "sce": "WeightedSCELoss",
-    "focal": "WeightedFocalLoss",
-    "mse": "MSE",
-    "gmse": "GradMSE",
-    "ssim": "SSIM",
-    "msssim": "MSSSIM"
-}
-
-joint_seg_losses = [
-    "iou",
-    "dice",
-    "tversky",
-    "ce",
-    "sce",
-    "focal",
-    "iou_ce",
-    "iou_sce",
-    "iou_focal",
-    "dice_ce",
-    "dice_sce",
-    "dice_focal",
-    "tversky_ce",
-    "tversky_sce",
-    "tversky_focal",
-    "iou_ce_ssim",
-    "iou_sce_ssim",
-    "iou_focal_ssim",
-    "dice_ce_ssim",
-    "dice_sce_ssim",
-    "dice_focal_ssim",
-    "tversky_ce_ssim",
-    "tversky_sce_ssim",
-    "tversky_focal_ssim",
-    "iou_ce_msssim",
-    "iou_sce_msssim",
-    "iou_focal_msssim",
-    "dice_ce_msssim",
-    "dice_sce_msssim",
-    "dice_focal_msssim",
-    "tversky_ce_msssim",
-    "tversky_sce_msssim",
-    "tversky_focal_msssim",
-]
-
-joint_aux_losses = [
-    "mse",
-    "gmse",
-    "ssim",
-    "msssim",
-    "mse_ssim",
-    "mse_gmse",
-    "mse_msssim",
-    "gmse_ssim",
-    "gmse_msssim",
-    "ssim_msssim",
-    "mse_gmse_ssim",
-    "mse_gmse_msssim"
-]
-
-
 class LossBuilder:
     def __init__(self,
                  class_types: str,
@@ -124,10 +59,10 @@ class LossBuilder:
             edge_weight (float): weight given at the nuclei edges
             aux_branch_name (str): one of ("hover", "micro", None)
         """
-        assert class_types in ("instance", "panoptic")
-        assert loss_name_inst in joint_seg_losses, f"loss_name_inst need to be one of {joint_seg_losses}"
-        assert loss_name_type in joint_seg_losses, f"loss_name_type need to be one of {joint_seg_losses}"
-        assert loss_name_aux in joint_aux_losses, f"loss_name_aux need to be one of {joint_aux_losses}"
+        assert class_types in ("naive_instance", "instance", "panoptic")
+        assert loss_name_inst in losses.JOINT_SEG_LOSSES, f"loss_name_inst need to be one of {losses.JOINT_SEG_LOSSES}"
+        assert loss_name_type in losses.JOINT_SEG_LOSSES, f"loss_name_type need to be one of {losses.JOINT_SEG_LOSSES}"
+        assert loss_name_aux in losses.JOINT_AUX_LOSSES, f"loss_name_aux need to be one of {losses.JOINT_AUX_LOSSES}"
         assert aux_branch_name in (None, "hover", "micro"), "aux_branch name need to be one of (None, 'hover', 'micro')"
 
         c = cls(class_types, aux_branch_name)
@@ -138,8 +73,8 @@ class LossBuilder:
         kwargs.setdefault("edge_weight", edge_weight)
 
         # get losses that are mentioned in the inst_loss_name
-        loss_keys_inst = c.solve_loss_key(loss_name_inst, joint_seg_losses)
-        loss_names_inst = [loss_lookup[key] for key in loss_keys_inst]
+        loss_keys_inst = c.solve_loss_key(loss_name_inst, losses.JOINT_SEG_LOSSES)
+        loss_names_inst = [losses.LOSS_LOOKUP[key] for key in loss_keys_inst]
 
         if c.class_types == "instance":
             # set instance seg loss
@@ -148,8 +83,8 @@ class LossBuilder:
             # set auxilliary branch loss
             loss_aux = None
             if aux_branch_name is not None:
-                loss_keys_aux = c.solve_loss_key(loss_name_aux, joint_aux_losses)
-                loss_names_aux = [loss_lookup[key] for key in loss_keys_aux]
+                loss_keys_aux = c.solve_loss_key(loss_name_aux, losses.JOINT_AUX_LOSSES)
+                loss_names_aux = [losses.LOSS_LOOKUP[key] for key in loss_keys_aux]
                 loss_aux = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_aux])
 
             loss = JointInstLoss(loss_inst, loss_aux)
@@ -163,8 +98,8 @@ class LossBuilder:
             kwargs["class_weights"] = type_weights
 
             # set semantic loss
-            loss_keys_type = c.solve_loss_key(loss_name_type, joint_seg_losses)
-            loss_names_type = [loss_lookup[key] for key in loss_keys_type]
+            loss_keys_type = c.solve_loss_key(loss_name_type, losses.JOINT_SEG_LOSSES)
+            loss_names_type = [losses.LOSS_LOOKUP[key] for key in loss_keys_type]
 
             # Set semantic seg branch loss
             loss_type = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_type])
@@ -172,8 +107,8 @@ class LossBuilder:
             # set auxilliary loss if that aux branch is used
             loss_aux = None
             if aux_branch_name is not None:
-                loss_keys_aux = c.solve_loss_key(loss_name_aux, joint_aux_losses)
-                loss_names_aux = [loss_lookup[key] for key in loss_keys_aux]
+                loss_keys_aux = c.solve_loss_key(loss_name_aux, losses.JOINT_AUX_LOSSES)
+                loss_names_aux = [losses.LOSS_LOOKUP[key] for key in loss_keys_aux]
                 loss_aux = JointLoss([losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_aux])
 
             loss = JointPanopticLoss(loss_inst, loss_type, loss_aux, loss_weights)

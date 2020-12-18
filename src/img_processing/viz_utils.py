@@ -55,8 +55,9 @@ def draw_contours(label: np.ndarray,
                   thickness: Optional[int] = 2,
                   classes: Optional[Dict[str, int]] = None) -> Tuple[np.ndarray]:
     """
-    Find contours for rgb mask to superimpose it the original image
+    Find coloured contours for a mask and superimpose it on the original image
     mask needs to be instance labelled.
+
     Args: 
         label (np.ndarray): inst_map
         image (np.ndarray): image

@@ -44,11 +44,10 @@ def gaussian_kernel2d(window_size: int,
 
 def sobel_hv(window_size: int = 5, device: torch.device = None):
     """
-    Creates a kernel that is used to comput 1st order derivatives 
+    Creates a kernel that is used to compute 1st order derivatives 
     as in the HoVer-net paper.   
 
     Args:
-        tensor (torch.Tensor): input tensor. Shape (B, 1, H, W) or (B, H, W)
         window_size (int): size of the convolution kernel
         direction (str): direction of the derivative. One of ("x", "y")
 

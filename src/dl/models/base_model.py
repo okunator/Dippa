@@ -1,5 +1,7 @@
 import torch.nn as nn
-import src.dl.models.initialization as init
+from . import initialize_decoder
+from . import initialize_head
+
 
 # Adapted from https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/base/model.py
 class InstSegModel(nn.Module):
@@ -7,11 +9,11 @@ class InstSegModel(nn.Module):
     Base class for instance seg models with optional aux branch
     """
     def initialize(self):
-        init.initialize_decoder(self.inst_decoder)
-        init.initialize_head(self.inst_seg_head)
+        initialize_decoder(self.inst_decoder)
+        initialize_head(self.inst_seg_head)
         if self.aux_branch_name is not None:
-            init.initialize_decoder(self.aux_decoder)
-            init.initialize_head(self.aux_seg_head)
+            initialize_decoder(self.aux_decoder)
+            initialize_head(self.aux_seg_head)
 
     def forward(self, x):
         features = self.encoder(x)
@@ -35,13 +37,13 @@ class InstSegModelWithClsBranch(nn.Module):
     and an optional aux branch
     """
     def initialize(self):
-        init.initialize_decoder(self.inst_decoder)
-        init.initialize_head(self.inst_seg_head)
-        init.initialize_decoder(self.type_decoder)
-        init.initialize_head(self.type_seg_head)
+        initialize_decoder(self.inst_decoder)
+        initialize_head(self.inst_seg_head)
+        initialize_decoder(self.type_decoder)
+        initialize_head(self.type_seg_head)
         if self.aux_branch_name is not None:
-            init.initialize_decoder(self.aux_decoder)
-            init.initialize_head(self.aux_seg_head)
+            initialize_decoder(self.aux_decoder)
+            initialize_head(self.aux_seg_head)
 
     def forward(self, x):
         features = self.encoder(x)

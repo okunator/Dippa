@@ -106,9 +106,20 @@ class ProjectFileManager(FileHandler):
     
     @property
     def dataset(self) -> str:
-        assert self.dsargs.dataset in ("kumar","consep","pannuke","dsb2018")
+        assert self.dsargs.dataset in ("kumar","consep","pannuke","dsb2018", "monusac")
         return self.dsargs.dataset
-    
+
+    @property
+    def model_name(self) -> str:
+        models = (
+            "fpn", "deeplabv3", "deeplabv3+", "linknet", "unet", "pan", 
+            "pspnet", "unet3+", "unet3-", "unet3+-", "unet++", "hovernet"
+        )
+        assert self.exargs.model_name in models, (
+            f"model name: {self.exargs.model_name} not recognized. Available models: {models}"
+        )
+        return self.exargs.model_name
+
     @property
     def data_dirs(self) -> Dict:
         assert Path(DATA_DIR / self.dataset).exists(), (
@@ -136,6 +147,19 @@ class ProjectFileManager(FileHandler):
     def aux_branch(self) -> str:
         assert self.dsargs.aux_branch in (None, "hover", "micro")
         return self.dsargs.aux_branch
+
+    @property
+    def pre_proc_style(self) -> str:
+        assert self.dsargs.pre_process in ("hover", "micro", "basic", "unet")
+        return self.dsargs.aux_branch
+
+    @property
+    def train_augs(self) -> List[str]:
+        augs = ["rigid", "non_rigid", "affine", "hue_sat", "blur", "center_crop", "random_crop", "non_spatial"]
+        assert all([aug_name in augs for aug_name in self.dsargs.augmentations]), (
+            f"all augmentations need to be in {augs}, your augs {self.dsargs.augmentations}"
+        )
+        return self.dsargs.augmentations
     
     @property
     def classes(self) -> Dict[str, int]:
@@ -156,7 +180,7 @@ class ProjectFileManager(FileHandler):
 
     @property
     def class_types(self):
-        assert self.dsargs.class_types in ("instance", "panoptic")
+        assert self.dsargs.class_types in ("naive_instance", "instance", "panoptic")
         return self.dsargs.class_types
     
     @property
@@ -266,8 +290,7 @@ class ProjectFileManager(FileHandler):
         Returns:
             Path object to the pytorch checkpoint file.
         """
-        assert which in (
-            "best", "last"), f"param which: {which} not one of ('best', 'last')"
+        assert which in ("best", "last"), f"param which: {which} not one of ('best', 'last')"
         assert self.experiment_dir.exists(), (
             f"Experiment dir: {self.experiment_dir} does not exist. Train the model first."
         )
