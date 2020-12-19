@@ -1,3 +1,4 @@
+import numpy as np
 import albumentations as A
 from typing import List
 from albumentations.core.transforms_interface import BasicTransform

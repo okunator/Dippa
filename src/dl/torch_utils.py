@@ -8,6 +8,7 @@ from typing import Union, Optional
 def ndarray_to_tensor(array: np.ndarray) -> torch.Tensor:
     """
     Convert img or mask of shape (H, W)|(H, W, C)|(B, H, W, C) to tensor (B, C, H, W)
+
     Args:
         array (np.ndarray) : numpy matrix of shape (H, W) or (H, W, C)
     """
@@ -66,6 +67,7 @@ def argmax_and_flatten(yhat: torch.Tensor, activation: Optional[str] = None) -> 
     Get an output from a prediction by argmaxing a yhat of shape (B, C, H, W)
     and flatten the result to tensor of shape (1, n_pixels). Where each value represents
     a class for a pixel.
+
     Args:
         yhat (torch.Tensor): logits or softmaxed tensor of shape (B, C, H, W)
         activation (Optional[str]): apply sigmoid or softmax activation before taking argmax
@@ -85,6 +87,9 @@ def argmax_and_flatten(yhat: torch.Tensor, activation: Optional[str] = None) -> 
 def to_device(tensor: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
     """
     Push torch.Tensor or np.ndarray to GPU if it is available.
+
+    Args:
+        tensor (torch.Tensor or np.ndarray): multi dim array to be pushed to gpu
     """
     # TODO: implement other types too
     if isinstance(tensor, np.ndarray):

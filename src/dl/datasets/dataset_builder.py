@@ -1,47 +1,64 @@
 import src.img_processing.augmentations as augs
-import src.dl.dataset as ds
+import src.dl.datasets as ds
+from typing import List, Optional
 from torch.utils.data import Dataset
 from omegaconf import DictConfig
-from src.utils.file_manager import ProjectFileManager
 
-class DatasetBuilder(ProjectFileManager):
-    def __init__(self,
-                 dataset_args: DictConfig,
-                 experiment_args: DictConfig) -> None:
+
+class DatasetBuilder:
+    def __init__(self, preproc_style: str) -> None:
         """
-        Takes in 
+        Class to initialize train and test dataset for the lightning model
 
         Args:
-            dataset_args (DictConfig): omegaconfig DictConfig specifying arguments related to the dataset
-                that is being used. config.py for more info
-            experiment_args (DictConfig): omegaconfig DictConfig specifying argumentst hat are used for 
-                creating result folders and files. Check config.py for more info
-            """
-        super(DatasetBuilder, self).__init__(dataset_args, experiment_args)
+            preproc_style (str): One of ("basic", "hover", "unet", "micro")
+        """
+        self.preproc_style = preproc_style
 
-
-    def get_augs(self, augs_list):
+    def get_augs(self, augs_list: Optional[List[str]] = None):
         """
         Compose the augmentations in config.py to a augmentation pipeline
 
         Args:
-            aug_list (List[str]): List of augmentations specified in config.py
+            augs_list (List[str], optional): List of augmentations specified in config.py
         """
-        aug_list = [augs.__dict__[ds.AUGS_LOOKUP[aug_name]] for aug_name in augs_list] 
+        
+        aug_list = [augs.__dict__[ds.AUGS_LOOKUP[aug_name]]() for aug_name in augs_list] if augs_list else []
+        aug_list.append(augs.to_tensor()) 
         return augs.compose(aug_list)
 
-
     @classmethod
-    def set_dataset(cls, fname:str, conf: DictConfig, **kwargs) -> Dataset:
+    def set_train_dataset(cls, 
+                          fname: str,
+                          preproc_style: str = "basic", 
+                          augs_list: Optional[List[str]] = None,
+                          **kwargs) -> Dataset:
         """
-        Set the dataset according to config.py params
+        Init the train dataset. Chooses the data pre-processing style and augmentations from config.py 
 
         Args:
-            conf (DictConfig): the config.py file
+            fname (str): path to the hdf5 database file
+            preproc_style (str): One of ("basic", "hover", "unet", "micro")
+            augs_list (List[str], optional): List of augmentations specified in config.py
         """
+        c = cls(preproc_style)
+        aug = c.get_augs(augs_list)
+        return ds.__dict__[ds.DS_LOOKUP[preproc_style]](fname=fname, transforms=aug)
 
-        dataset_args = conf.dataset_args
-        experiment_args = conf.experiment_args
-        c = cls(dataset_args, experiment_args)
-        augs = c.get_augs(c.augmentations)
+    @classmethod
+    def set_test_dataset(cls, 
+                         fname: str,
+                         preproc_style: str = "basic", 
+                         **kwargs) -> Dataset:
+        """
+        Init the test dataset. Chooses the data pre-processing style from config.py but data augmentation 
+        is ignored.  
+
+        Args:
+            fname (str): path to the hdf5 database file
+            preproc_style (str): One of ("basic", "hover", "unet", "micro")
+        """
+        c = cls(preproc_style)
+        aug = c.get_augs()
+        return ds.__dict__[ds.DS_LOOKUP[c.preproc_style]](fname=fname, transforms=aug)
         

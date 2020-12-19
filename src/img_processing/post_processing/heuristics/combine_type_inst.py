@@ -12,11 +12,10 @@ def combine_inst_semantic(inst_map: np.ndarray,
     one panoptic segmentation result
 
     Args:
-        inst_map (np.ndarray): output from the instance segmentation head of 
-                               a panoptic model or the post processed output of 
-                               the instance seg head. Shape (H, W)
-        type_map (np.ndarray): output from the type segmentation head of 
-                               a panoptic model Shape (H, W)
+        inst_map (np.ndarray): output from the instance segmentation head of a panoptic
+            model or the post processed output of the instance seg head. Shape (H, W)
+        type_map (np.ndarray): output from the type segmentation head of a panoptic 
+            model Shape (H, W)
     """
     inst_ids = {}
     pred_id_list = list(np.unique(inst_map))[1:]

@@ -16,7 +16,7 @@ class JointLoss(nn.ModuleDict):
             weights (List[float]): List of weights for each loss
 
         Returns:
-            torch.Tensor: computed joint loss from summed from losses in the input List
+            torch.Tensor: computed joint loss from summed losses in the input List
         """
         super().__init__()
         if weights is not None:
@@ -50,9 +50,8 @@ class JointInstLoss(nn.Module):
             inst_loss (nn.Module): loss function for the instance segmentation head
             aux_loss (nn.Module): loss function for the auxilliary regression head
             loss_weights (List[float]): List of weights for loss functions of instance,
-                                        semantic and auxilliary branches in this order.
-                                        If there is no auxilliary branch such as HoVer-branch
-                                        then only two weights are needed.
+                semantic and auxilliary branches in this order. If there is no auxilliary
+                branch such as HoVer-branch then only two weights are needed.
         """
         super().__init__()
         assert 1 < len(loss_weights) <= 2, f"Too many weights in the loss_weights list: {loss_weights}"
@@ -111,9 +110,8 @@ class JointPanopticLoss(nn.Module):
             type_loss (nn.Module): loss function for the semantic segmentation head
             aux_loss (nn.Module): loss function for the auxilliary regression head
             loss_weights (List[float]): List of weights for loss functions of instance,
-                                        semantic and auxilliary branches in this order.
-                                        If there is no auxilliary branch such as HoVer-branch
-                                        then only two weights are needed.
+                semantic and auxilliary branches in this order. If there is no auxilliary
+                branch such as HoVer-branch then only two weights are needed.
         """
         assert 1 < len(loss_weights) <= 3, f"Too many weights in the loss_weights list: {loss_weights}"
         super().__init__()

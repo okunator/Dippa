@@ -54,7 +54,6 @@ CONFIG = OmegaConf.create(
                 "non_rigid",
                 "blur",
                 "non_spatial",
-                "random_crop",
             ]
         },
               
@@ -64,8 +63,8 @@ CONFIG = OmegaConf.create(
         # small enough stride size. Training will get slower though...
         "patching_args":{
             "batch_size":6,
-            "model_input_size":256,
-            "patch_size":512, # Size of an image patch that gets written to hdf5 db
+            "patch_size":512, # Size of an initial image patch 
+            "model_input_size":256, # size of an augmented patch that gets written to hdf5
             "stride_size":80, # Size of window stride
             "crop_to_input":True,
             "verbose":False

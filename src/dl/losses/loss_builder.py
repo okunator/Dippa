@@ -12,9 +12,8 @@ class LossBuilder:
                  aux_branch_name: Optional[str] = None) -> None:
         """
         Initializes the loss function for instance or panoptic segmentation.
-        This uses the loss functions available in the src/dl/losses and parses the
-        args in config.py to build a loss functions from the args specified for
-        the segmentation task.
+        This uses the loss functions available in the src/dl/losses.Builds 
+        a loss functions from the args specified for the segmentation task.
 
         Args:
             class_types (str): one of "instance" or "panoptic"
@@ -48,14 +47,16 @@ class LossBuilder:
         Initialize the joint loss function.
 
         Args:
-            class_type (str): One of ("panoptic", "instance") adds type branch loss to joint loss if "panoptic"
+            class_type (str): One of ("naive instance", "panoptic", "instance") adds type
+                branch loss to joint loss if "panoptic" or "instance"
             loss_name_inst (str): the inst branch loss name. This is defined in config.py
             loss_name_type (str): the type branch loss name. This is defined in config.py
-            loss_weights (List[float]): List of weights for loss functions of instance,
-                                        semantic and auxilliary branches in this order.
-            binary_weights (torch.Tensor): Tensor of size (2, ). Weights for background and foreground.
-            type_weights (torch.Tensor): Tensor of size (C, ). Each slot indicates
-                                         the weight to be applied for each class
+            loss_weights (List[float]): List of weights for loss functions of instance, 
+                semantic and auxilliary branches in this order.
+            binary_weights (torch.Tensor): Tensor of size (2, ). Weights for background
+                 and foreground.
+            type_weights (torch.Tensor): Tensor of size (C, ). Each slot indicates the 
+                weight to be applied for each class
             edge_weight (float): weight given at the nuclei edges
             aux_branch_name (str): one of ("hover", "micro", None)
         """

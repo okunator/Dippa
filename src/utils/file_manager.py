@@ -149,7 +149,7 @@ class ProjectFileManager(FileHandler):
         return self.dsargs.aux_branch
 
     @property
-    def pre_proc_style(self) -> str:
+    def preproc_style(self) -> str:
         assert self.dsargs.pre_process in ("hover", "micro", "basic", "unet")
         return self.dsargs.aux_branch
 
@@ -284,6 +284,7 @@ class ProjectFileManager(FileHandler):
     def model_checkpoint(self, which: str = "last") -> Path:
         """
         Get the best or last checkpoint of a trained network.
+
         Args:
             which (str): one of ("best", "last"). Specifies whether to use last epoch model or best model on
                          validation data.

@@ -5,25 +5,19 @@ import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
-import ttach as tta
 
 from pathlib import Path
 from typing import List, Dict
 from omegaconf import DictConfig
-from catalyst.contrib.nn import Ralamb, RAdam, Lookahead
 from torch.utils.data import DataLoader
+from catalyst.contrib.nn import Ralamb, RAdam, Lookahead
 from catalyst.dl import utils
 from catalyst.contrib.tools.tensorboard import SummaryItem, SummaryReader
 
 from src.utils.file_manager import ProjectFileManager
-from src.dl.dataset import SegmentationDataset
+from src.dl.datasets.dataset_builder import DatasetBuilder
 from src.dl.losses.loss_builder import LossBuilder
 from src.dl.torch_utils import to_device, argmax_and_flatten, mean_iou
-from src.img_processing.augmentations import (
-    hue_saturation_transforms, non_rigid_transforms,
-    blur_transforms, random_crop, to_tensor, tta_transforms,
-    non_spatial_transforms, compose, no_transforms
-)
 
 
 class SegModel(pl.LightningModule):
@@ -32,15 +26,13 @@ class SegModel(pl.LightningModule):
                  dataset_args: DictConfig,
                  experiment_args: DictConfig,
                  training_args: DictConfig,
-                 **kwargs
-                ) -> None:
+                 **kwargs) -> None:
         """
         Pytorch Lightning abstraction for any pytorch segmentation model architecture used
         in this project.
         
         Args:
-            model (nn.Module): Pytorch model specification. Can be from smp, toolbelt, or a 
-                custom model. ttatch wrappers work also. Basically any model that inherits 
+            model (nn.Module): Pytorch model specification. Basically any model that inherits
                 nn.Module should work
             dataset_args (DictConfig): omegaconfig DictConfig specifying arguments related 
                 to the dataset that is being used. config.py for more info
@@ -52,7 +44,7 @@ class SegModel(pl.LightningModule):
         super(SegModel, self).__init__()
         
         # Hyperparams
-        self.model = tta.SegmentationTTAWrapper(model, tta_transforms()) if training_args["tta"] else model
+        self.model = model
         self.batch_size = training_args["batch_size"]
         self.input_size = training_args["model_input_size"]
         self.loss_name_inst = training_args["inst_branch_loss"]
@@ -74,7 +66,7 @@ class SegModel(pl.LightningModule):
             experiment_args
         )
         
-        self.criterion = self._criterion
+        self.criterion = self.prepare_criterion
         # torch.autograd.set_detect_anomaly(True)
         
     @classmethod
@@ -112,43 +104,35 @@ class SegModel(pl.LightningModule):
 
     @property
     def binary_class_weights(self):
-        num_class_pixels = self.fm.get_class_pixels_num(self.train_data.as_posix())
-        num_binary_pixels = np.sum(num_class_pixels, where=[False] + [True]*(len(num_class_pixels)-1))
-        class_pixels = np.array([num_class_pixels[0], num_binary_pixels])
-        return to_device(1-class_pixels/class_pixels.sum())
+        weights = None
+        if self.class_weights:
+            num_class_pixels = self.fm.get_class_pixels_num(self.train_data.as_posix())
+            num_binary_pixels = np.sum(num_class_pixels, where=[False] + [True]*(len(num_class_pixels)-1))
+            class_pixels = np.array([num_class_pixels[0], num_binary_pixels])
+            weights = to_device(1-class_pixels/class_pixels.sum())
+        return weights
 
     @property
     def type_class_weights(self):
-        class_pixels = self.fm.get_class_pixels_num(self.train_data.as_posix())
-        return to_device(1-class_pixels/class_pixels.sum())
+        weights = None
+        if self.class_weights:
+            class_pixels = self.fm.get_class_pixels_num(self.train_data.as_posix())
+            weights = to_device(1-class_pixels/class_pixels.sum())
+        return weights
 
     @property
-    def _criterion(self):
-        # TODO get rid off if else
-        # bw = if self.class_weights
-        if self.class_weights:
-            criterion = LossBuilder.set_loss(
-                loss_name_inst=self.loss_name_inst,
-                loss_name_type=self.loss_name_type,
-                loss_name_aux=self.loss_name_aux,
-                class_types=self.fm.class_types,
-                binary_weights=self.binary_class_weights,
-                type_weights=self.type_class_weights,
-                edge_weight=self.edge_weight,
-                aux_branch_name=self.fm.aux_branch
-            )
-        else:
-            criterion = LossBuilder.set_loss(
-                loss_name_inst=self.loss_name_inst,
-                loss_name_type=self.loss_name_type,
-                loss_name_aux=self.loss_name_aux,
-                class_types=self.fm.class_types,
-                edge_weight=self.edge_weight,
-                aux_branch_name=self.fm.aux_branch
-            )
-        return criterion
-            
-    
+    def prepare_criterion(self):
+        return LossBuilder.set_loss(
+            loss_name_inst=self.loss_name_inst,
+            loss_name_type=self.loss_name_type,
+            loss_name_aux=self.loss_name_aux,
+            class_types=self.fm.class_types,
+            binary_weights=self.binary_class_weights,
+            type_weights=self.type_class_weights,
+            edge_weight=self.edge_weight,
+            aux_branch_name=self.fm.aux_branch
+        )
+                
     # Lightning framework stuff:
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         return self.model(x)
@@ -300,17 +284,13 @@ class SegModel(pl.LightningModule):
         return return_dict
 
     def configure_optimizers(self):
-        layerwise_params = {
-            "encoder*": dict(lr=self.encoder_lr, weight_decay=self.encoder_weight_decay)
-        }
+        layerwise_params = {"encoder*": dict(lr=self.encoder_lr, weight_decay=self.encoder_weight_decay)}
 
         # Remove weight_decay for biases and apply layerwise_params for encoder
         model_params = utils.process_model_params(self.model, layerwise_params=layerwise_params)
         
         # Base Optimizer
-        base_optimizer = Ralamb(
-            model_params, lr=self.lr, weight_decay=self.weight_decay
-        )
+        base_optimizer = Ralamb(model_params, lr=self.lr, weight_decay=self.weight_decay)
         
         # Lookahead optimizer
         optimizer = [Lookahead(base_optimizer)]
@@ -328,34 +308,18 @@ class SegModel(pl.LightningModule):
         return optimizer, scheduler 
     
     def prepare_data(self):
-        # compose transforms
-        train_transforms = compose([
-            hue_saturation_transforms(),
-            # non_rigid_transforms(),
-            blur_transforms(),
-            non_spatial_transforms(),
-            random_crop(self.input_size),
-            to_tensor()
-        ])
-        
-        test_transforms = compose([no_transforms()])
-        
-        self.trainset = SegmentationDataset(
+        self.trainset = DatasetBuilder.set_train_dataset(
             fname=self.train_data.as_posix(), 
-            transforms=train_transforms,
-            aux_branch=self.fm.aux_branch
+            preproc_style=self.fm.preproc_style,
+            augs_list=self.fm.train_augs
         )
-        
-        self.validset = SegmentationDataset(
+        self.validset = DatasetBuilder.set_test_dataset(
             fname=self.valid_data.as_posix(), 
-            transforms=test_transforms,
-            aux_branch=self.fm.aux_branch
+            preproc_style=self.fm.preproc_style,
         )
-        
-        self.testset = SegmentationDataset(
+        self.testset = DatasetBuilder.set_test_dataset(
             fname=self.test_data.as_posix(), 
-            transforms=test_transforms,
-            aux_branch=self.fm.aux_branch
+            preproc_style=self.fm.preproc_style,
         )
     
     def train_dataloader(self):
