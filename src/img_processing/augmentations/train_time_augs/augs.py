@@ -13,7 +13,7 @@ def rigid_transforms(**kwargs) -> List[BasicTransform]:
     - flip (rotate 180 degrees)
     - transpose (flip x and y axis)
     - shift, scale and rotation
-    is applied with a probability of 0.5*0.5=0.25
+    is applied with a probability of 0.7*(0.5/(0.5+0.5+0.5))=0.233
 
     Returns:
         A List of possible data augmentations
@@ -23,7 +23,7 @@ def rigid_transforms(**kwargs) -> List[BasicTransform]:
             A.RandomRotate90(p=0.5),
             A.Flip(p=0.5),
             A.Transpose(p=0.5),
-        ], p=0.5)
+        ], p=0.7)
     ]
 
 
@@ -33,7 +33,7 @@ def non_rigid_transforms(**kwargs) -> List[BasicTransform]:
     - elastic transformation
     - grid distortion
     - optical distortion
-    is applied with a probability of 0.2*0.5=0.1
+    is applied with a probability of 0.7*(0.5/(0.5+0.5+0.5))=0.233
 
     Returns:
         A List of possible data augmentations
@@ -43,7 +43,7 @@ def non_rigid_transforms(**kwargs) -> List[BasicTransform]:
             A.ElasticTransform(alpha=120, sigma=120*0.05, alpha_affine=120*0.03, p=0.5),
             A.GridDistortion(p=0.5),
             A.OpticalDistortion(distort_limit=2, shift_limit=0.5, p=0.5)
-        ], p=0.2)
+        ], p=0.7)
     ]
 
 
@@ -51,12 +51,12 @@ def hue_saturation_transforms(**kwargs) -> List[BasicTransform]:
     """
     Wrapper for non hue saturation albumentations augmentations. For every patch, either:
     - hue saturation value shift
-    is applied with a probability of 0.5 
+    is applied with a probability of 0.5
 
     Returns:
         A List of possible data augmentations
     """
-    return [A.HueSaturationValue(hue_shift_limit=(0,15), sat_shift_limit=0, val_shift_limit=0, p=0.1)]
+    return [A.HueSaturationValue(hue_shift_limit=(0,15), sat_shift_limit=0, val_shift_limit=0, p=0.5)]
 
 
 def blur_transforms(**kwargs) -> List[BasicTransform]:
@@ -65,7 +65,7 @@ def blur_transforms(**kwargs) -> List[BasicTransform]:
     - motion blur
     - median blur
     - gaussian blur
-    is applied with a probability of 0.2*0.5=0.1
+    is applied with a probability of 0.7*(0.5/(0.5+0.5+0.5))=0.233
 
     Returns:
         A List of possible data augmentations
@@ -75,7 +75,7 @@ def blur_transforms(**kwargs) -> List[BasicTransform]:
             A.MotionBlur(p=0.5),
             A.MedianBlur(blur_limit=3, p=0.5),
             A.Blur(blur_limit=3, p=0.5),
-        ], p=0.2)
+        ], p=0.7)
     ]
 
 
@@ -85,7 +85,7 @@ def non_spatial_transforms(**kwargs) -> List[BasicTransform]:
     - CLAHE
     - brightness contrast
     - gaussian blur
-    is applied with a probability of 0.2*0.5=0.1
+    is applied with a probability of 0.7*(0.5/(0.5+0.5+0.5))=0.233
 
     Returns:
         A List of possible data augmentations
@@ -95,7 +95,7 @@ def non_spatial_transforms(**kwargs) -> List[BasicTransform]:
             A.CLAHE(p=0.5),
             A.RandomBrightnessContrast(p=0.5),    
             A.RandomGamma(p=0.5)
-        ], p=0.2)
+        ], p=0.7)
     ]
 
 

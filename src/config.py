@@ -36,13 +36,10 @@ CONFIG = OmegaConf.create(
             # Use either patches written to hdf5 db or .npy files. One of ("npy", "hdf5")
             "patches_dtype":"hdf5",
 
-            # Use auxilliary regression branch in the model. One of (None, "hover", TODO:"micro")
-            # Requires special GT masks
-            "aux_branch": "hover",
-
             # There are several ways data can be pre processed before inputting it to network
             # Supported ones are ("hover", "unet", "micro", "basic"). If "hover" or "micro" is 
-            # used, an auxilliary regression branch will be added to the model for 
+            # used, an auxilliary regression branch will be added to the model for regressing
+            # targets either horizontal and vertical maps or nuclei boundaries
             "pre_process":"hover",
 
             # List of augmentations used for input image patches. (from albumentations)
@@ -54,7 +51,10 @@ CONFIG = OmegaConf.create(
                 "non_rigid",
                 "blur",
                 "non_spatial",
-            ]
+            ],
+
+            "batch_size":6,
+            "model_input_size":256 # patches of shape 256x256
         },
               
         # Change these according to your needs. The more there are patches (trtaining data).
@@ -76,9 +76,6 @@ CONFIG = OmegaConf.create(
 
             # This needs to be same as in the patching args
             "model_input_size":256,
-
-            # use test time augmentation during training. Note: Training gets very slow
-            "tta": False,
 
             # continue training where you left off?  
             "resume_training":False, 

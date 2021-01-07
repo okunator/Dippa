@@ -6,7 +6,6 @@ import sklearn.feature_extraction.image
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import ttach as tta
 
 from pathlib import Path
 from omegaconf import DictConfig
@@ -43,19 +42,15 @@ class Inferer(Benchmarker, PatchExtractor):
         in this project (defined in lightning_model.py)
         
         Args: 
-            model (nn.Module) : Pytorch model specification. Can be from smp, toolbelt, or a 
-                                custom model. ttatch wrappers work also. Basically any model 
-                                that inherits nn.Module should work
+            model (nn.Module) : Pytorch model specification.
             dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                       related to the dataset that is being used.
-                                       config.py for more info
+                related to the dataset that is being used. config.py for more info
             experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                          that are used for creating result folders and
-                                          files. Check config.py for more info
+                that are used for creating result folders and files. Check config.py
+                for more info
             inference_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                         that are used for inference and post processing.
-                                         Check config.py for more info
-
+                that are used for inference and post processing. Check config.py for
+                more info
         """
     
         super(Inferer, self).__init__(dataset_args, experiment_args)
@@ -104,10 +99,6 @@ class Inferer(Benchmarker, PatchExtractor):
         return self.input_size//2
     
     @property
-    def tta_model(self) -> nn.Module:
-        return tta.SegmentationTTAWrapper(self.model, tta_transforms())
-    
-    @property
     def images(self) -> List[str]:
         assert self.fold in self.phases, f"fold param: {self.fold} was not in given phases: {self.phases}" 
         return self.data_folds[self.fold]["img"]
@@ -152,6 +143,7 @@ class Inferer(Benchmarker, PatchExtractor):
 
         Args:
             batch (np.ndarray): inut image batch array. Shape (B, H, W, 3)
+            
         Yields:
             a np.ndarray of shape (H, W, 3)
         """
@@ -167,7 +159,7 @@ class Inferer(Benchmarker, PatchExtractor):
         Args:
             prob_map (np.ndarray): soft mask of shape (H, W, 2) for instance map
             thresh (Uninon[float, str]): either a value between [0, 1] or "argmax".
-                                         If smoothen is used this is ignored.
+                If smoothen is used this is ignored.
 
         Returns:
             thresholded and labelled np.ndarray instance map of shape (H, W)
@@ -191,7 +183,7 @@ class Inferer(Benchmarker, PatchExtractor):
 
         Args:
             im (np.ndarray): image patch of shape (input_size, input_size, 3)
-                             or (B, input_size, input_size, 3)
+                or (B, input_size, input_size, 3)
 
         Returns:
             A dictionary {"instances":torch.Tensor, "types":Union[torch.Tensor, None]}

@@ -145,8 +145,10 @@ class ProjectFileManager(FileHandler):
 
     @property
     def aux_branch(self) -> str:
-        assert self.dsargs.aux_branch in (None, "hover", "micro")
-        return self.dsargs.aux_branch
+        aux_branch = None
+        if self.preproc_style in ("micro", "hover"):
+            aux_branch = self.preproc_style
+        return aux_branch
 
     @property
     def preproc_style(self) -> str:

@@ -208,6 +208,7 @@ def get_type_instances(inst_map: np.ndarray,
 def one_hot(type_map: np.ndarray, num_classes: int) -> np.ndarray:
     """
     Convert type map of shape (H, W) to one hot encoded types of shape (H, W, C)
+    
     Args:
         type_map (np.ndarray): type map of shape (H, W). Labels are indices.
         num_classes (int): number of classes in the dataset
