@@ -69,7 +69,7 @@ def to_inst_map(binary_mask: np.ndarray) -> np.ndarray:
         binary_mask = binary_mask[..., 1]
 
     mask = ndi.binary_fill_holes(binary_mask)
-    mask = morph.remove_small_objects(binary_mask.astype(bool), min_size=20)
+    mask = morph.remove_small_objects(binary_mask.astype(bool), min_size=10)
     inst_map = ndi.label(mask)[0]
 
     return inst_map

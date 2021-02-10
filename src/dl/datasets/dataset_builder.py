@@ -11,7 +11,8 @@ class DatasetBuilder:
         Class to initialize train and test dataset for the lightning model
 
         Args:
-            preproc_style (str): One of ("basic", "hover", "unet", "micro")
+            preproc_style (str): 
+                One of ("basic", "hover", "unet", "micro")
         """
         self.preproc_style = preproc_style
 
@@ -20,7 +21,8 @@ class DatasetBuilder:
         Compose the augmentations in config.py to a augmentation pipeline
 
         Args:
-            augs_list (List[str], optional): List of augmentations specified in config.py
+            augs_list (List[str], optional): 
+                List of augmentations specified in config.py
         """
         
         aug_list = [augs.__dict__[ds.AUGS_LOOKUP[aug_name]]() for aug_name in augs_list] if augs_list else []
@@ -37,9 +39,12 @@ class DatasetBuilder:
         Init the train dataset. Chooses the data pre-processing style and augmentations from config.py 
 
         Args:
-            fname (str): path to the hdf5 database file
-            preproc_style (str): One of ("basic", "hover", "unet", "micro")
-            augs_list (List[str], optional): List of augmentations specified in config.py
+            fname (str):
+                path to the hdf5 database file
+            preproc_style (str): 
+                One of ("basic", "hover", "unet", "micro")
+            augs_list (List[str], optional):    
+                List of augmentations specified in config.py
         """
         c = cls(preproc_style)
         aug = c.get_augs(augs_list)
@@ -55,8 +60,10 @@ class DatasetBuilder:
         is ignored.  
 
         Args:
-            fname (str): path to the hdf5 database file
-            preproc_style (str): One of ("basic", "hover", "unet", "micro")
+            fname (str): 
+                path to the hdf5 database file
+            preproc_style (str): 
+                One of ("basic", "hover", "unet", "micro")
         """
         c = cls(preproc_style)
         aug = c.get_augs()

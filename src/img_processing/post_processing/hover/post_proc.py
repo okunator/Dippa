@@ -6,29 +6,30 @@ import skimage.segmentation as segm
 import skimage.util as util
 import scipy.ndimage as ndi
 from src.img_processing.post_processing.utils import remove_debris
-from src.img_processing.process_utils import bounding_box, remap_label
+from src.img_processing.process_utils import bounding_box, remap_label, binarize
 
 
 # ported from: https: // github.com/vqdang/hover_net/blob/master/src/postproc/hover.py  # L69
-def post_proc_hover(prob_map: np.ndarray, aux_map: np.ndarray, **kwargs) -> np.ndarray:
+def post_proc_hover(inst_map: np.ndarray, aux_map: np.ndarray, **kwargs) -> np.ndarray:
     """
     Post processing pipeline to combine hover branch output and instance segmentation branch output.
 
     Args:
-        prob_map (np.ndarray):  Probability map. Shape: (H, W, 2)
+        inst_map (np.ndarray):  inst map. Shape: (H, W, 2)
         aux_map (np.ndarray): Shape: (H, W, 2). hover_maps[..., 0] = xmap, hover_maps[..., 1] = ymap
 
     Returns:
         np.ndarray that is processed in the same way as in github.com/vqdang/hover_net/blob/master/src/postproc/hover.py
     """
 
-    inst_map = np.copy(prob_map)
-    inst_map[inst_map >= 0.5] = 1
-    inst_map[inst_map < 0.5] = 0
+    # inst_map = np.copy(prob_map)
+    # inst_map[inst_map >= 0.5] = 1
+    # inst_map[inst_map < 0.5] = 0
 
-    inst_map = ndi.label(inst_map)[0]
-    inst_map = morph.remove_small_objects(inst_map, min_size=10)
-    inst_map[inst_map > 0] = 1  # back ground is 0 already
+    # inst_map = ndi.label(inst_map)[0]
+    # inst_map = morph.remove_small_objects(inst_map, min_size=10)
+    # inst_map[inst_map > 0] = 1  # back ground is 0 already
+    inst_map = binarize(inst_map)
 
     h_dir = cv2.normalize(aux_map[..., 0], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
     v_dir = cv2.normalize(aux_map[..., 1], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
@@ -70,7 +71,7 @@ def post_proc_hover2(aux_map: np.ndarray, inst_map: np.ndarray, sigma: float = 2
     Post processing pipeline to combine hover branch output and instance segmentation branch output.
 
     Args:
-        inst_map (np.ndarray):  inst map map. Shape: (H, W, 2)
+        inst_map (np.ndarray):  inst map. Shape: (H, W, 2)
         aux_map (np.ndarray): Shape: (H, W, 2). hover_maps[..., 0] = xmap, hover_maps[..., 1] = ymap
 
     Returns:

@@ -122,8 +122,7 @@ class PatchExtractor:
         # add extra padding to match an exact multiple of 32 patch size,
         extra_pad_row = int(np.ceil(io.shape[0] / input_size)*input_size - io.shape[0])
         extra_pad_col = int(np.ceil(io.shape[1] / input_size)*input_size - io.shape[1])
-        io = np.pad(io, [(0, extra_pad_row), (0, extra_pad_col),
-                        (0, 0)], mode="constant")
+        io = np.pad(io, [(0, extra_pad_row), (0, extra_pad_col), (0, 0)], mode="constant")
 
         # extract the patches from input images
         arr_out = sklearn.feature_extraction.image.extract_patches(
@@ -159,12 +158,9 @@ class PatchExtractor:
         io = np.pad(im, [(padx, padx), (pady, pady), (0, 0)], mode="reflect")
 
         # add extra padding to match an exact multiple of 32 (smp models) patch size,
-        extra_pad_row = int(
-            np.ceil(io.shape[0] / input_size)*input_size - io.shape[0])
-        extra_pad_col = int(
-            np.ceil(io.shape[1] / input_size)*input_size - io.shape[1])
-        io = np.pad(io, [(0, extra_pad_row),
-                         (0, extra_pad_col), (0, 0)], mode="constant")
+        extra_pad_row = int(np.ceil(io.shape[0] / input_size)*input_size - io.shape[0])
+        extra_pad_col = int(np.ceil(io.shape[1] / input_size)*input_size - io.shape[1])
+        io = np.pad(io, [(0, extra_pad_row), (0, extra_pad_col), (0, 0)], mode="constant")
 
         # extract the patches from input images
         arr_out = sklearn.feature_extraction.image.extract_patches(

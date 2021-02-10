@@ -15,7 +15,7 @@ def naive_thresh_prob(prob_map: np.ndarray, threshold: float = 0.5, **kwargs) ->
     """
     assert 0 <= threshold <= 1, f"thresh = {threshold}. given threshold not between [0,1]"
     seg = prob_map.copy()
-    seg = seg > threshold
+    seg = seg >= threshold
     inst_map = to_inst_map(seg)
     return inst_map
 

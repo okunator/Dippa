@@ -66,7 +66,7 @@ class Inferer(Benchmarker, PatchExtractor):
         self.post_proc = inference_args.post_processing
         self.post_proc_method = inference_args.post_proc_method
         
-        # init containers for resluts
+        # init containers for results
         self.soft_insts = OrderedDict()
         self.soft_types = OrderedDict()
         self.inst_maps = OrderedDict()

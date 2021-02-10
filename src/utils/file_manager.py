@@ -47,7 +47,7 @@ class FileHandler:
         return im_patch, inst_patch, type_patch
 
     @staticmethod
-    def get_class_pixels_num(path: str) -> np.ndarray:
+    def get_class_pixels(path: str) -> np.ndarray:
         with tables.open_file(path, "r") as db:
             weights = db.root.numpixels[:]
         class_weight = weights[1, ]
@@ -66,177 +66,188 @@ class FileHandler:
                 if rm:
                     f.unlink()
 
+    @staticmethod
+    def suffix(directory: Path) -> str:
+        assert all([f.suffix for f in directory.iterdir()]), "Image files should be in same format"
+        return [f.suffix for f in directory.iterdir()][0]
 
-# Lots of spadghetti b/c different datasets need different ad hoc processing to get stuff aligned
-class ProjectFileManager(FileHandler):
+    def get_files(self, directory: str) -> List[str]:
+        d = Path(directory)
+        assert d.exists(), f"Provided directory: {d.as_posix()} does not exist."
+        file_suffix = self.suffix(d)
+        return sorted([x.as_posix() for x in d.glob(f"*{file_suffix}")])
+
+
+class FileManager(FileHandler):
     def __init__(self,
-                 dataset_args: DictConfig,
-                 experiment_args: DictConfig,
-                 **kwargs) -> None:
+                experiment_args: DictConfig,
+                dataset_args: DictConfig) -> None:
         """
-        A class for managing the file and folder paths needed in this project.
-        
-            Args:
-                dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                           related to the dataset that is being used.
-                                           config.py for more info
-                experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                              that are used for creating result folders and
-                                              files. Check config.py for more info
+        File hadling and managing
+
+        Args:
+            experiment_args (DictConfig): 
+                Omegaconfig DictConfig specifying arguments that
+                are used for creating result folders and files. 
+            dataset_args (DictConfig): 
+                Omegaconfig DictConfig specifying arguments related 
+                to the dataset that is being used.
         """
-        super().__init__(**kwargs)
-        self.dsargs = dataset_args
-        self.exargs = experiment_args
-    
+        self.__ex_name: str = experiment_args.experiment_name
+        self.__other_path: str = dataset_args.other_path
+        self.__train_ds: str = dataset_args.train_dataset
+        self.__infer_ds: str = dataset_args.infer_dataset
+
     @classmethod
     def from_conf(cls, conf: DictConfig):
-        dataset_args = conf.dataset_args
-        experiment_args = conf.experiment_args
-        
+        exargs = conf.experiment_args
+        dsargs = conf.dataset_args
+
         return cls(
-            dataset_args,
-            experiment_args
+            exargs,
+            dsargs
         )
 
     @property
     def experiment_dir(self) -> Path:
-        ex_version = self.exargs.experiment_version
-        model_name = self.exargs.model_name
-        return RESULT_DIR.joinpath(f"{model_name}/version_{ex_version}")
-    
-    @property
-    def dataset(self) -> str:
-        assert self.dsargs.dataset in ("kumar","consep","pannuke","dsb2018", "monusac")
-        return self.dsargs.dataset
+        return RESULT_DIR.joinpath(f"/version_{self.__ex_name}")
 
     @property
-    def model_name(self) -> str:
-        models = (
-            "fpn", "deeplabv3", "deeplabv3+", "linknet", "unet", "pan", 
-            "pspnet", "unet3+", "unet3-", "unet3+-", "unet++", "hovernet"
-        )
-        assert self.exargs.model_name in models, (
-            f"model name: {self.exargs.model_name} not recognized. Available models: {models}"
-        )
-        return self.exargs.model_name
+    def train_dataset(self):
+        assert self.__train_ds in ("kumar","consep","pannuke","dsb2018", "monusac", "other")
+        
+        if self.__train_ds == "other":
+            pass
+
+        return self.__train_ds
 
     @property
-    def data_dirs(self) -> Dict:
-        assert Path(DATA_DIR / self.dataset).exists(), (
-            f"The folder {Path(DATA_DIR / self.dataset)} for the dataset {self.dataset} does not exist"
-        )
-        return {
-            "raw_data_dir":Path(DATA_DIR / self.dataset),
-            "train_im":Path(DATA_DIR / self.dataset / "train" / "images"),
-            "train_gt":Path(DATA_DIR / self.dataset / "train" / "labels"),
-            "test_im":Path(DATA_DIR / self.dataset / "test" / "images"),
-            "test_gt":Path(DATA_DIR / self.dataset / "test" / "labels"),
-        }
-    
-    @property
-    def database_dir(self) -> Path:
-        assert self.dsargs.patches_dtype in ("npy", "hdf5"), f"{self.dsargs.patches_dtype}"
-        return Path(PATCH_DIR / self.dsargs.patches_dtype / self.dataset)
-    
-    @property
-    def phases(self) -> List[str]:
-        assert self.dsargs.phases in (["train", "valid", "test"], ["train", "test"]), f"{self.dsargs.phases}"
-        return self.dsargs.phases
+    def infer_dataset(self):
+        assert self.__infer_ds in ("kumar","consep","pannuke","dsb2018", "monusac", "other")
+        
+        if self.__infer_ds == "other":
+            pass
+        
+        return self.__infer_ds
 
-    @property
-    def aux_branch(self) -> str:
-        aux_branch = None
-        if self.preproc_style in ("micro", "hover"):
-            aux_branch = self.preproc_style
-        return aux_branch
-
-    @property
-    def preproc_style(self) -> str:
-        assert self.dsargs.pre_process in ("hover", "micro", "basic", "unet")
-        return self.dsargs.aux_branch
-
-    @property
-    def train_augs(self) -> List[str]:
-        augs = ["rigid", "non_rigid", "affine", "hue_sat", "blur", "center_crop", "random_crop", "non_spatial"]
-        assert all([aug_name in augs for aug_name in self.dsargs.augmentations]), (
-            f"all augmentations need to be in {augs}, your augs {self.dsargs.augmentations}"
-        )
-        return self.dsargs.augmentations
-    
-    @property
-    def classes(self) -> Dict[str, int]:
-        assert self.dsargs.class_types in ("instance", "panoptic")
-        yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
-        data_conf = OmegaConf.load(yml_path)
-        if self.dataset == "consep":
-            key = data_conf.types_to_use
-        else:
-            key = self.dsargs.class_types
-        return data_conf.class_types[key]
-
-    @property
-    def img_types(self) -> Dict[str, str]:
-        yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
-        data_conf = OmegaConf.load(yml_path)
-        return data_conf.img_types
-
-    @property
-    def class_types(self):
-        assert self.dsargs.class_types in ("naive_instance", "instance", "panoptic")
-        return self.dsargs.class_types
-    
     @property
     def pannuke_folds(self) -> Dict[str, str]:
-        assert self.dataset == "pannuke", f"dataset: {self.dataset}. dataset not pannuke"
-        yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
+        yml_path = [f for f in Path(CONF_DIR).iterdir() if "pannuke" in f.name][0]
         data_conf = OmegaConf.load(yml_path)
         return data_conf.folds
         
     @property
     def pannuke_tissues(self) -> List[str]:
-        yml_path = [f for f in Path(CONF_DIR).iterdir() if self.dataset in f.name][0]
+        yml_path = [f for f in Path(CONF_DIR).iterdir() if "pannuke" in f.name][0]
         data_conf = OmegaConf.load(yml_path)
         return data_conf.tissues
-        
-    @property
-    def data_folds(self) -> Dict[str, Dict[str, str]]:
+    
+    def __split_training_set(self,
+                             dataset: str,
+                             train_imgs: List[str], 
+                             train_masks: List[str],
+                             seed: int = 42,
+                             size: float = 0.2) -> Dict[str, List[str]]:
         """
-        Get the 'train', 'valid', 'test' fold paths. This also splits training set to train and valid
-        if 'valid is in self.phases list'
+        Split training set into training and validation set. This might affect training 
+        accuracy if training set is small. Pannuke is split by the folds specified in the pannuke.yml
+        """
+
+        assert dataset in ("kumar","consep","pannuke","dsb2018", "monusac", "other")
+
+        def split_pannuke(paths):
+            phases = {}
+            for fold, phase in self.pannuke_folds.items():
+                phases[phase] = []
+                for item in paths:
+                    if fold in Path(item).name:
+                        phases[phase].append(item)
+            return phases
         
+        if dataset == "pannuke":
+            imgs = split_pannuke(train_imgs)
+            masks = split_pannuke(train_masks)
+            train_imgs = sorted(imgs["train"])
+            train_masks = sorted(masks["train"])
+            valid_imgs = sorted(imgs["valid"])
+            valid_masks = sorted(masks["valid"])
+        else:
+            ixs = np.arange(len(train_imgs))
+            train_ixs, valid_ixs = train_test_split(ixs, test_size=size, random_state=42, shuffle=True)
+            np_train_imgs = np.array(train_imgs)
+            np_train_masks = np.array(train_masks)
+            train_imgs = sorted(np_train_imgs[train_ixs].tolist())
+            train_masks = sorted(np_train_masks[train_ixs].tolist())
+            valid_imgs = sorted(np_train_imgs[valid_ixs].tolist())
+            valid_masks = sorted(np_train_masks[valid_ixs].tolist())
+        
+        return {
+            "train_imgs":train_imgs,
+            "train_masks":train_masks,
+            "valid_imgs":valid_imgs,
+            "valid_masks":valid_masks
+        }
+
+    def get_data_dirs(self, dataset: str) -> Dict[str, Path]:
+        """
+        Get the paths of data dirs for given dataset
+        """
+        assert dataset in ("kumar","consep","pannuke","dsb2018", "monusac", "other")
+        assert Path(DATA_DIR / dataset).exists(), "No train data found"
+
+        return {
+            "raw_data_dir":Path(DATA_DIR / dataset),
+            "train_im":Path(DATA_DIR / dataset / "train" / "images"),
+            "train_gt":Path(DATA_DIR / dataset / "train" / "labels"),
+            "test_im":Path(DATA_DIR / dataset / "test" / "images"),
+            "test_gt":Path(DATA_DIR / dataset / "test" / "labels"),
+        }
+
+    def get_data_folds(self, dataset: str, split_train: bool=False) -> Dict[str, Dict[str, str]]:
+        """
+        Get train data folds
+
+        Args:
+            dataset (str):
+                name of the dataset. One of ("kumar","consep","pannuke","dsb2018", "monusac", "other")
+            split_train (bool):
+                split training data into training and validation data
+
         Returns:
             Dict[str, Dict[str, str]]
             Dictionary where keys (train, test, valid) point to dictionaries with keys img and mask.
             The innermost dictionary values where the img and mask -keys point to are sorted lists 
             containing paths to the image and mask files. 
         """
-        assert all(Path(p).exists() for p in self.data_dirs.values()), (
-            "Data folders do not exists Convert the data first to right format. See step 1."
+
+        dirs = self.get_data_dirs(dataset)
+        assert all(Path(p).exists() for p in dirs.values()), (
+            "Data folders do not exists. Convert the data first to right format."
         )
-        
-        train_imgs = self.__get_files(self.data_dirs["train_im"])
-        train_masks = self.__get_files(self.data_dirs["train_gt"])
-        test_imgs = self.__get_files(self.data_dirs["test_im"])
-        test_masks = self.__get_files(self.data_dirs["test_gt"])
-        
-        if "valid" in self.phases:
+        assert dataset in ("kumar","consep","pannuke","dsb2018", "monusac", "other")
+
+        train_imgs = self.get_files(dirs["train_im"])
+        train_masks = self.get_files(dirs["train_gt"])
+        test_imgs = self.get_files(dirs["test_im"])
+        test_masks = self.get_files(dirs["test_gt"])
+        valid_imgs = None
+        valid_masks = None
+
+        if split_train:
             d = self.__split_training_set(train_imgs, train_masks)
             train_imgs = d["train_imgs"]
             train_masks = d["train_masks"]
             valid_imgs = d["valid_imgs"]
             valid_masks = d["valid_masks"]
-        else:
-            valid_imgs = None
-            valid_masks = None
-            
+
         return {
             "train":{"img":train_imgs, "mask":train_masks},
             "valid":{"img":valid_imgs, "mask":valid_masks},
             "test":{"img":test_imgs, "mask":test_masks},
         }
+
     
-    @property
-    def databases(self) -> Dict[str, Dict[int, str]]:
+    def get_databases(self, dataset: str) -> Dict[str, Dict[int, str]]:
         """
         Get the the databases that were written by the PatchWriter
         
@@ -255,26 +266,21 @@ class ProjectFileManager(FileHandler):
                 size = int("".join(filter(str.isdigit, fn)))
                 path_dict[size] = path
             return path_dict
-                    
-        assert self.database_dir.exists(), (
-            f"Database dir: {self.database_dir} not found, Create the dbs first. Check instructions."
+
+        db_dir = Path(PATCH_DIR / "hdf5" / dataset)         
+        assert db_dir.exists(), (
+            f"Database dir: {db_dir} not found, Create the dbs first. Check instructions."
         )
             
-        if "valid" in self.phases:
-            train_dbs = list(self.database_dir.glob("*_train_*"))
-            valid_dbs = list(self.database_dir.glob("*_valid_*"))
-            test_dbs = list(self.database_dir.glob("*_test_*"))
-        else:
-            train_dbs = list(self.database_dir.glob("*_train_*"))
-            valid_dbs = list(self.database_dir.glob("*_test_*")) # test set used for both valid and test
-            test_dbs = list(self.database_dir.glob("*_test_*")) # remember to not use the best model w this
-            
+        train_dbs = list(db_dir.glob("*_train_*"))
+        valid_dbs = list(db_dir.glob("*_valid_*"))
+        test_dbs = list(db_dir.glob("*_test_*"))
+        
+        if not valid_dbs:
+            valid_dbs = test_dbs
+
         assert train_dbs, (
             f"{train_dbs} HDF5 training db not found. Create the dbs first. Check instructions."
-        )
-        
-        assert valid_dbs, (
-            f"{valid_dbs} HDF5 validation db not found. Create the dbs first. Check instructions."
         )
         
         return {
@@ -283,13 +289,15 @@ class ProjectFileManager(FileHandler):
             "test":get_input_sizes(test_dbs)
         }
 
-    def model_checkpoint(self, which: str = "last") -> Path:
+    def get_model_checkpoint(self, which: str = "last") -> Path:
         """
         Get the best or last checkpoint of a trained network.
 
         Args:
-            which (str): one of ("best", "last"). Specifies whether to use last epoch model or best model on
-                         validation data.
+            which (str): 
+                One of ("best", "last"). Specifies whether to use 
+                last epoch model or best model on validation data.
+
         Returns:
             Path object to the pytorch checkpoint file.
         """
@@ -311,60 +319,3 @@ class ProjectFileManager(FileHandler):
         )
         return ckpt
 
-    def __get_img_suffix(self, directory: Path) -> str:
-        assert all([f.suffix for f in directory.iterdir()]), "All image files should be in same format"
-        return [f.suffix for f in directory.iterdir()][0]
-           
-    def __get_files(self, directory: str) -> List[str]:
-        d = Path(directory)
-        assert d.exists(), f"Provided directory: {d.as_posix()} does not exist."
-        file_suffix = self.__get_img_suffix(d)
-        return sorted([x.as_posix() for x in d.glob(f"*{file_suffix}")])
-           
-    def __split_training_set(self, 
-                             train_imgs: List, 
-                             train_masks: List,
-                             seed: int = 42,
-                             size: float = 0.2) -> Dict[str, List[str]]:
-        """
-        Split training set into training and validation set. This might affect training 
-        accuracy if training set is small. Pannuke is split by the folds specified in the pannuke.yml
-        """
-        def split_pannuke(paths):
-            phases = {}
-            for fold, phase in self.pannuke_folds.items():
-                phases[phase] = []
-                for item in paths:
-                    if fold in Path(item).name:
-                        phases[phase].append(item)
-            return phases
-        
-        if self.dataset == "pannuke":
-            imgs = split_pannuke(train_imgs)
-            masks = split_pannuke(train_masks)
-            train_imgs = sorted(imgs["train"])
-            train_masks = sorted(masks["train"])
-            valid_imgs = sorted(imgs["valid"])
-            valid_masks = sorted(masks["valid"])
-        else:
-            indices = np.arange(len(train_imgs))
-            train_indices, valid_indices = train_test_split(
-                indices, test_size=size, random_state=42, shuffle=True
-            )
-
-            np_train_imgs = np.array(train_imgs)
-            np_train_masks = np.array(train_masks)
-            train_imgs = sorted(np_train_imgs[train_indices].tolist())
-            train_masks = sorted(np_train_masks[train_indices].tolist())
-            valid_imgs = sorted(np_train_imgs[valid_indices].tolist())
-            valid_masks = sorted(np_train_masks[valid_indices].tolist())
-        
-        return {
-            "train_imgs":train_imgs,
-            "train_masks":train_masks,
-            "valid_imgs":valid_imgs,
-            "valid_masks":valid_masks
-        }
-
-
-    

@@ -33,7 +33,7 @@ class BasicDataset(BaseDataset):
         # binarize inst branch mask
         inst_patch = self.binary(inst_patch)
 
-        # augment
+        # augment (albumentations)
         augmented_data = self.transforms(image=im_patch, masks=[inst_patch, type_patch, weight_map])
         img = augmented_data["image"]
         masks = augmented_data["masks"]

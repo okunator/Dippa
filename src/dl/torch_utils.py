@@ -10,7 +10,8 @@ def ndarray_to_tensor(array: np.ndarray) -> torch.Tensor:
     Convert img or mask of shape (H, W)|(H, W, C)|(B, H, W, C) to tensor (B, C, H, W)
 
     Args:
-        array (np.ndarray) : numpy matrix of shape (H, W) or (H, W, C)
+        array (np.ndarray) : 
+            numpy matrix of shape (H, W) or (H, W, C)
     """
     assert isinstance(array, np.ndarray), f"Input type: {type(array)} is not np.ndarray"
     assert 1 < len(array.shape) <= 4, f"ndarray.shape {array.shape}, rank needs to be bw [2, 4]" 
@@ -34,10 +35,13 @@ def tensor_to_ndarray(tensor: torch.Tensor,
     of shape (B, H, W, C)|(B, H, W)|(H, W, C)|(H, W)
 
     Args:
-        tensor (torch.Tensor): tensor of size (B, C, H, W)
-        channel (Optional[int]): index of the channel dimension. If applied returns
-                                 an array of shape (H, W)|(B, H, W)
-        squeeze (Optional[bool]): if batch size == 1. Squeeze it out. 
+        tensor (torch.Tensor): 
+            tensor of size (B, C, H, W)
+        channel (int, optional, default=None): 
+            index of the channel dimension. If applied returns
+            an array of shape (H, W)|(B, H, W)
+        squeeze (bool, optional, default=False): 
+            if batch size == 1. Squeeze it out. 
     """
     assert isinstance(tensor, torch.Tensor), f"Input type: {type(tensor)} is not torch.Tensor"
     assert 3 <= tensor.dim() <= 4, f"tensor needs to have shape (B, H, W) or (B, C, H, W). Shape {tensor.shape}"
@@ -69,8 +73,11 @@ def argmax_and_flatten(yhat: torch.Tensor, activation: Optional[str] = None) -> 
     a class for a pixel.
 
     Args:
-        yhat (torch.Tensor): logits or softmaxed tensor of shape (B, C, H, W)
-        activation (Optional[str]): apply sigmoid or softmax activation before taking argmax
+        yhat (torch.Tensor): 
+            Logits or softmaxed tensor of shape (B, C, H, W)
+        activation (str, optional, default=None): 
+            Apply sigmoid or softmax activation before taking argmax
+
     Returns:
          a tensor that can be inputted to different classification metrics. Shape (H, W)
     """
@@ -89,7 +96,8 @@ def to_device(tensor: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
     Push torch.Tensor or np.ndarray to GPU if it is available.
 
     Args:
-        tensor (torch.Tensor or np.ndarray): multi dim array to be pushed to gpu
+        tensor (torch.Tensor or np.ndarray): 
+            multi dim array to be pushed to gpu
     """
     # TODO: implement other types too
     if isinstance(tensor, np.ndarray):
@@ -102,7 +110,6 @@ def to_device(tensor: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
     return tensor
 
 
-# Adapted from: https: // kornia.readthedocs.io/en/latest/_modules/kornia/utils/metrics/confusion_matrix.html
 def confusion_mat(yhat: torch.Tensor, 
                   target: torch.Tensor, 
                   activation: Optional[str] = None) -> torch.Tensor:
@@ -110,17 +117,19 @@ def confusion_mat(yhat: torch.Tensor,
     Computes confusion matrix from the soft mask and target tensor
 
     Args:
-        yhat (torch.Tensor): the soft mask from the network of shape (B, C, H, W)
-        target (torch.Tensor): the target matrix of shape (B, H, W)
-        activation (Optional[str]): apply sigmoid or softmax activation before taking argmax
+        yhat (torch.Tensor): 
+            the soft mask from the network of shape (B, C, H, W)
+        target (torch.Tensor): 
+            the target matrix of shape (B, H, W)
+        activation (str, optional, default=1): 
+            apply sigmoid or softmax activation before taking argmax
 
     Returns:
         torch.Tensor of shape (B, num_classes, num_classes)
     """
 
     if activation is not None:
-        assert activation in (
-            "sigmoid", "softmax"), f"activation: {activation} sigmoid and softmax allowed."
+        assert activation in ("sigmoid", "softmax"), f"activation: {activation} sigmoid and softmax allowed."
         if activation == "sigmoid":
             yhat_soft = torch.sigmoid(yhat)
         elif activation == "softmax":
@@ -145,15 +154,16 @@ def confusion_mat(yhat: torch.Tensor,
     return confusion_mat
 
 
-# from https://kornia.readthedocs.io/en/latest/_modules/kornia/utils/one_hot.html#one_hot
 def one_hot(type_map: torch.Tensor, n_classes: int) -> torch.Tensor:
     """
     Take in a type map of shape (B, H, W) with class indices as values and reshape it
     into a tensor of shape (B, C, H, W)
 
     Args:
-        type_map (torch.Tensor): type map
-        n_classes (int): number of classes in type_map
+        type_map (torch.Tensor): 
+            type map
+        n_classes (int): 
+            number of classes in type_map
 
     Returns:
         torch.Tensor onet hot tensor from the type map of shape (B, C, H, W)
@@ -163,29 +173,54 @@ def one_hot(type_map: torch.Tensor, n_classes: int) -> torch.Tensor:
     return one_hot.scatter_(dim=1, index=type_map.unsqueeze(1), value=1.0) + 1e-6
 
 
-# from: https://kornia.readthedocs.io/en/latest/_modules/kornia/utils/metrics/mean_iou.html#mean_iou
-def mean_iou(yhat: torch.Tensor, 
-             target: torch.Tensor,
-             activation: Optional[str] = None,
-             eps: Optional[float] = 1e-7) -> torch.Tensor:
+def iou(yhat: torch.Tensor, 
+        target: torch.Tensor,
+        activation: Optional[str] = None,
+        eps: Optional[float] = 1e-7) -> torch.Tensor:
     """
-    Compute the mean iou for each class in the segmented image
+    Compute the per class intersection over union for dense predictions
 
     Args:
-        yhat (torch.Tensor): the soft mask from the network of shape (B, C, H, W)
-        target (torch.Tensor): the target matrix of shape (B, H, W)
-        activation (Optional[str]): apply sigmoid or softmax activation before taking argmax
+        yhat (torch.Tensor): 
+            the soft mask from the network of shape (B, C, H, W)
+        target (torch.Tensor): 
+            the target matrix of shape (B, H, W)
+        activation (str, optional, default=None): 
+            apply sigmoid or softmax activation before taking argmax
+        eps (float, optional, default=1e-7)
+            small constant to avoid zero div error
 
     Returns:
         torch.Tensor of shape (B, num_classes, num_classes)
     """
     conf_mat = confusion_mat(yhat, target, activation)
-    sum_over_row = torch.sum(conf_mat, dim=1)
-    sum_over_col = torch.sum(conf_mat, dim=2)
-    conf_mat_diag = torch.diagonal(conf_mat, dim1=-2, dim2=-1)
-    denominator = sum_over_row + sum_over_col - conf_mat_diag
-
-    # NOTE: we add epsilon so that samples that are neither in the
-    # prediction or ground truth are taken into account.
-    ious = (conf_mat_diag + eps) / (denominator + eps)
+    rowsum = torch.sum(conf_mat, dim=1) # [(TP + FP), (FN + TN)]
+    colsum = torch.sum(conf_mat, dim=2) # [(TP + FN), (FP + TN)]
+    diag = torch.diagonal(conf_mat, dim1=-2, dim2=-1) # [TP, TN]
+    denom = rowsum + colsum - diag # [(TP + FN + FP), (TN + FN + FP)]
+    ious = (diag + eps) / (denom + eps) # [(TP/(TP + FN + FP)), (TN/(TN + FN + FP))]
     return ious
+
+
+def accuracy(yhat: torch.Tensor,
+             target: torch.Tensor,
+             activation: Optional[str] = None,
+             eps: float = 1e-7) -> torch.Tensor:
+    """
+    Compute the per class accuracy for dense predictions
+
+    Args:
+        yhat (torch.Tensor): 
+            the soft mask from the network of shape (B, C, H, W)
+        target (torch.Tensor): 
+            the target matrix of shape (B, H, W)
+        activation (str, optional, default=None): 
+            apply sigmoid or softmax activation before taking argmax
+    """
+    conf_mat = confusion_mat(yhat, target, activation)
+    diag = torch.diagonal(conf_mat, dim1=-2, dim2=-1) # batch diagonal
+    denom = conf_mat.sum()
+    accuracies = (eps + diag) / (eps + denom)
+    return accuracies
+
+
