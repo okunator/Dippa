@@ -7,10 +7,6 @@ import src.img_processing.post_processing as post_proc
 import src.img_processing.augmentations.test_time_augs as tta
 from typing import Dict
 
-# inheritance idea: projectfilemanager -> inferer
-# predictor -> post-processor
-# tilerStitcher
-# benchmarker
 
 class Predcictor:
     def __init__(self, model: nn.Module) -> None:
