@@ -61,16 +61,16 @@ class LossBuilder:
             loss_args (omegaconf.DictConfig):
                 Arguments related to the different loss functions
                 at different branches 
-            loss_weights (List[float], optional): 
+            loss_weights (List[float], optional, default=None): 
                 List of weights for loss functions of instance, 
                 semantic and auxilliary branches in this order.
-            binary_weights (torch.Tensor): 
+            binary_weights (torch.Tensor, default=None): 
                 Tensor of size (2, ). Weights for background
                  and foreground.
-            type_weights (torch.Tensor): 
+            type_weights (torch.Tensor, default=None): 
                 Tensor of size (C, ). Each slot indicates the 
                 weight to be applied for each class
-            edge_weight (float): 
+            edge_weight (float, optional, default=1.1): 
                 Weight given at the nuclei edges
         """
         c = cls(decoder_branches, loss_args)

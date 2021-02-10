@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.optim.optimizer import Optimizer
 from omegaconf import DictConfig
 
-import src.dl.optimizer as optim
+import src.dl.optimizers as optims
 
 
 class OptimizerBuilder:
@@ -73,17 +73,18 @@ class OptimizerBuilder:
                 pytorch model specification
         """
         c = cls(optimizer_args, model)
-        optims = list(optim.OPTIM_LOOKUP.keys())
-        assert c.optimizer_name in optim.OPTIM_LOOKUP.keys(), f"optimizer: {c.optimizer_name} not one of {optims}"
+        optimz = list(optims.OPTIM_LOOKUP.keys())
+        assert c.optimizer_name in optimz, f"optimizer: {c.optimizer_name} not one of {optimz}"
 
         kwargs = kwargs.copy()
         kwargs["lr"] = c.lr
         kwargs["weight_decay"] = c.weight_decay
         kwargs["params"] = c.adjust_optim_params()
 
-        optimizer = optim.__dict__[c.optimizer_name](**kwargs)
+        key = optims.OPTIM_LOOKUP[c.optimizer_name]
+        optimizer = optims.__dict__[key](**kwargs)
 
         if c.lookahead:
-            optimizer = optim.Lookahead(optimizer, k=5, alpha=0.5)
+            optimizer = optims.Lookahead(optimizer, k=5, alpha=0.5)
 
         return optimizer

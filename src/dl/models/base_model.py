@@ -4,8 +4,6 @@ from . import initialize_head
 
 
 # Adapted from https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/base/model.py
-
-
 class MultiTaskSegModel(nn.Module):
     """
     Base class for models instance seg models that have also cell type cls branch
