@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 
 import src.dl.activations as act
-from src.dl.modules import WSConv2d, EstBN, BCNorm
+from src.dl.modules import WSConv2d
+from src.dl.normalization import EstBN, BCNorm
 
 
 class BasicConvBlock(nn.Module):
