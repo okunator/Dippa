@@ -14,6 +14,7 @@ from catalyst.contrib.nn import Ralamb, RAdam, Lookahead
 
 from src.utils.file_manager import FileManager
 from src.dl.datasets.dataset_builder import DatasetBuilder
+from src.dl.optimizers.optim_builder import OptimizerBuilder
 from src.dl.losses.loss_builder import LossBuilder
 from src.dl.torch_utils import to_device, argmax_and_flatten, iou, accuracy
 
@@ -35,19 +36,19 @@ class SegModel(pl.LightningModule):
             model (nn.Module):
                 pytorch model specification.
             experiment_args (omegaconf.DictConfig): 
-                Omegaconfig DictConfig specifying arguments that
+                Omegaconf DictConfig specifying arguments that
                 are used for creating result folders and files. 
             dataset_args (omegaconf.DictConfig): 
-                Omegaconfig DictConfig specifying arguments related 
+                Omegaconf DictConfig specifying arguments related 
                 to the dataset that is being used.
             model_args (omegaconf.DictConfig): 
-                Omegaconfig DictConfig specifying arguments related 
+                Omegaconf DictConfig specifying arguments related 
                 to the model architecture that is being used.
             training_args (omegaconf.DictConfig): 
-                Omegaconfig DictConfig specifying arguments that are
+                Omegaconf DictConfig specifying arguments that are
                 used for training a network.
             runtime_args (omegaconf.DictConfig): 
-                Omegaconfig DictConfig specifying batch size and 
+                Omegaconf DictConfig specifying batch size and 
                 input image size for the model.
         """
         super(SegModel, self).__init__()
@@ -79,6 +80,7 @@ class SegModel(pl.LightningModule):
         self.scheduler_factor: float = training_args.optimizer_args.scheduler_factor
         self.schduler_patience: int = training_args.optimizer_args.schduler_patience
         self.lookahead: bool = training_args.optimizer_args.lookahead
+        self.bias_weight_decay: bool = training_args.optimizer_args.bias_weight_decay
         self.save_hyperparameters()
 
         # init file manager
@@ -93,6 +95,11 @@ class SegModel(pl.LightningModule):
             loss_args=training_args.loss_args,
             binary_weights=self.binary_class_weights,
             type_weights=self.type_branch_loss
+        )
+
+        # init optimizer
+        self.optimizer = OptimizerBuilder.set_optimizer(
+            training_args.optimizer_args, self.model
         )
 
     @classmethod
@@ -266,14 +273,8 @@ class SegModel(pl.LightningModule):
         return return_dict
 
     def configure_optimizers(self):
-        model_params = self.adjust_params()
+        optimizer = self.optimizer
 
-        # Base Optimizer
-        base_optimizer = Ralamb(model_params, lr=self.lr, weight_decay=self.weight_decay)
-        
-        # Lookahead optimizer
-        optimizer = [Lookahead(base_optimizer)]
-        
         # Scheduler
         scheduler = [{
             'scheduler': optim.lr_scheduler.ReduceLROnPlateau(

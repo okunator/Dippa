@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import List, Tuple
-from src.dl.models.modules import Mish
 
 # Implementation follows same class structure as in https://github.com/qubvel/segmentation_models.pytorch
 # so that the pre-trained encoders can be used
@@ -28,7 +27,7 @@ class Unet3pConvBlock(nn.Module):
         block = []
 
         block.append(nn.Conv2d(in_channels, out_channels,
-                               kernel_size=3, padding=int(padding)))
+                     kernel_size=3, padding=int(padding)))
 
         if batch_norm:
             block.append(nn.BatchNorm2d(out_channels))

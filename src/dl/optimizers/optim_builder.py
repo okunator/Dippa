@@ -26,6 +26,7 @@ class OptimizerBuilder:
         self.weight_decay: float = optimizer_args.weight_decay
         self.encoder_weight_decay: float = optimizer_args.encoder_weight_decay
         self.lookahead: bool = optimizer_args.lookahead
+        self.bias_weight_decay: bool = optimizer_args.bias_weight_decay
 
 
     def adjust_optim_params(self):
@@ -49,9 +50,10 @@ class OptimizerBuilder:
                 if key in name:
                     for k, i in key_opts.items():
                         opts[k] = i
-
-            if name.endswith("bias"):
-                opts["weight_decay"] = 0.0
+                        
+            if self.bias_weight_decay:
+                if name.endswith("bias"):
+                    opts["weight_decay"] = 0.0
             
             adjust_params.append({"params": parameters, **opts})
 

@@ -8,56 +8,55 @@ from src.utils.file_manager import ProjectFileManager
 from src.dl.activations.utils import convert_relu_to_mish, convert_relu_to_swish
 
 
-class ModelBuilder(ProjectFileManager):
+class ModelBuilder:
     def __init__(self,
                  dataset_args: DictConfig,
-                 experiment_args: DictConfig) -> None:
+                 model_args: DictConfig,
+                 **kwargs) -> None:
         """
-        Sets a pytorch model specification with an encoder branch and
-        a decoder branch. Then converts the model for panoptic segmentation task
-        if specified in the config.py file. If objective is to do only instance
-        segmentation then this just model = s a wrapper for the model without
-        semantic segmentation decoder branch. This can take in your own model specs,
-        smp models, toolbelt models or any models with distinct encoder and decoder
-        specifications
-
+        Class which builds the model from the architectural desing choices 
+        which are specified in experiment.yml
+        
         Args:
-            dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
-                related to the dataset that is being used. config.py for more info
-            experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
-                that are used for creating result folders and files. Check config.py
-                for more info
+            dataset_args (omegaconf.DictConfig): 
+                Omegaconf DictConfig specifying arguments related 
+                to the dataset that is being used.
+            model_args (omegaconf.DictConfig): 
+                Omegaconf DictConfig specifying arguments related 
+                to the model architecture that is being used. 
         """
-        super(ModelBuilder, self).__init__(dataset_args, experiment_args)
-
-    @property
-    def nclasses(self) -> int:
-        return len(self.classes)
+        self.activation: str = model_args.architecture_design.activation
+        self.normalization: str = model_args.architecture_design.normalization
+        self.weight_standardize: bool = model_args.architecture_design.weight_standardize
+        self.weight_init: str = model_args.architecture_design.weight_init
+        self.encoder_name: str = model_args.architecture_design.encoder
+        self.pretrained: bool = model_args.architecture_design.pretrain
+        self.short_skips: str = model_args.architecture_design.short_skips
+        self.long_skips: str = model_args.architecture_design.long_skips
+        self.merge_policy: str = model_args.architecture_design.merge_policy
+        self.upsampling: str = model_args.architecture_design.upsampling
 
     @classmethod
     def set_model(cls,
-                  conf: DictConfig,
-                  encoder_name: str = "resnext50_32x4d",
-                  encoder_weights: str = "imagenet",
-                  relu_to_mish: bool = False,
-                  relu_to_swish: bool = False,
+                  dataset_args: DictConfig,
+                  model_args: DictConfig,
+                  n_classes: int,
                   **kwargs) -> nn.Module:
         """
         Initializes smp or other pytorch model specifications
 
         Args:
-            conf (DictConfig): the config.py file
-            encoder_name (str): name of the encoder to be used. 
-            encoder_weights (str): One of ("imagenet", "instagram", None)
-            relu_to_mish: bool = converts ReLU units Mish units in the model
-            relu_to_swish: bool = converts ReLU units Swish units in the model
+            dataset_args (omegaconf.DictConfig): 
+                Omegaconf DictConfig specifying arguments related 
+                to the dataset that is being used.
+            model_args (omegaconf.DictConfig): 
+                Omegaconf DictConfig specifying arguments related 
+                to the model architecture that is being used.
+            n_classes (int):
+                Number of classses in the training dataset
 
         Returns:
             nn.Module initialized pytorch model specification
-
-        Example:
-            >>> from src.conf.config import CONFIG
-            >>> ModelBuilder.get_model(CONFIG)
         """
         dataset_args = conf.dataset_args
         experiment_args = conf.experiment_args
@@ -69,17 +68,14 @@ class ModelBuilder(ProjectFileManager):
         kwargs.setdefault("encoder_weights", encoder_weights)
         kwargs.setdefault("aux_branch_name", c.aux_branch)
 
-        if c.class_types == "instance":
-            mn = mdls.MODEL_NAIVE_LOOKUP[c.model_name]
-            model = mdls.__dict__[mn](**kwargs)
-        elif c.class_types == "panoptic":
-            mn = mdls.MODEL_LOOKUP[c.model_name]
-            model = mdls.__dict__[mn](**kwargs)
 
-        if relu_to_mish:
+        mn = mdls.MODEL_LOOKUP[c.model_name]
+        model = mdls.__dict__[mn](**kwargs)
+
+        if self.activation == "mish":
             convert_relu_to_mish(model)
 
-        if relu_to_swish:
+        if self.activation == "swish<":
             convert_relu_to_swish(model)
         
         return model

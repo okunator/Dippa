@@ -2,31 +2,33 @@ experiment_args:
   experiment_name: test1
 
 dataset_args:
-  train_dataset: consep # One of (consep, pannuke, kumar, monusac)
-  infer_dataset: consep # One of (consep, pannuke, kumar, monusac, other)
-  other_path: null      # Path to own dataset if infer_dataset=other
+  train_dataset: consep       # One of (consep, pannuke, kumar, monusac)
+  infer_dataset: consep       # One of (consep, pannuke, kumar, monusac, other)
+  other_path: null            # Path to own dataset if infer_dataset=other
 
 model_args:
   architecture_design:
-    activation: relu      # One of (relu, mish, swish)
-    normalization: bn     # One of (bn, bcn, ws+bn, ws+bcn)
-    weight_init: he       # One of (he, eoc, fixup)
-    encoder: resnext50    # One of smp encoders.
-    short_skips: residual # One of (residual, dense, null) (for decoder branch only)
-    long_skips: unet      # One of (unet, unet++, unet3+)
-    merge_policy: cat     # One of (sum, cat)
-    upsampling: interp    # One of (interp, segnet, transconv)
+    activation: relu          # One of (relu, mish, swish)
+    normalization: bn         # One of (bn, bcn, ws+bn, ws+bcn)
+    weight_standardize: False # Weight standardization
+    weight_init: he           # One of (he, eoc, fixup)
+    encoder: resnext50        # One of encoders https://github.com/qubvel/segmentation_models.pytorch
+    pretrain: True            # Use Imagenet pre-trained encoder
+    short_skips: residual     # One of (residual, dense, null) (for decoder branch only)
+    long_skips: unet          # One of (unet, unet++, unet3+, null)
+    merge_policy: cat         # One of (sum, cat)
+    upsampling: interp        # One of (interp, segnet, transconv)
 
   decoder_branches:
     type: True
     aux: True
-    aux_type: hover       # One of (hover, dist, contour) (ignored if aux=False)
+    aux_type: hover           # One of (hover, dist, contour) (ignored if aux=False)
 
 training_args:
   resume_training: False
   num_epochs: 3
   num_gpus: 1
-  weight_balancing: null  # One of (gradnorm, uncertainty, null)
+  weight_balancing: null      # One of (gradnorm, uncertainty, null)
   augmentations:
     - hue_sat
     - non_rigid
@@ -34,14 +36,15 @@ training_args:
     - non-spatial
 
   optimizer_args:
-    optimizer: adam       # One of https://github.com/jettify/pytorch-optimizer 
+    optimizer: adamw          # One of https://github.com/jettify/pytorch-optimizer 
     lr: 0.0005
     encoder_lr: 0.00005
     weight_decay: 0.0003
     encoder_weight_decay: 0.00003
+    lookahead: True
+    bias_weight_decay: False
     scheduler_factor: 0.25
     schduler_patience: 2
-    lookahead: False
 
   loss_args:
     inst_branch_loss: dice_focal
@@ -52,8 +55,8 @@ training_args:
 
 
 inference_args:
-  model_weights: last     # One of (last, best)
-  data_fold: test         # One of (train, test)
+  model_weights: last         # One of (last, best)
+  data_fold: test             # One of (train, test)
   tta: False
   verbose: True
 
