@@ -9,13 +9,13 @@ dataset_args:
 model_args:
   architecture_design:
     activation: relu          # One of (relu, mish, swish)
-    normalization: bn         # One of (bn, bcn, ws+bn, ws+bcn)
+    normalization: bn         # One of (bn, bcn, ws+bn, ws+bcn, nope)
     weight_standardize: False # Weight standardization
     weight_init: he           # One of (he, eoc, fixup)
     encoder: resnext50        # One of encoders https://github.com/qubvel/segmentation_models.pytorch
     pretrain: True            # Use Imagenet pre-trained encoder
-    short_skips: residual     # One of (residual, dense, null) (for decoder branch only)
-    long_skips: unet          # One of (unet, unet++, unet3+, null)
+    short_skips: residual     # One of (residual, dense, nope) (for decoder branch only)
+    long_skips: unet          # One of (unet, unet++, unet3+, nope)
     merge_policy: cat         # One of (sum, cat)
     upsampling: interp        # One of (interp, segnet, transconv)
 

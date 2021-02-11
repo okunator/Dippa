@@ -1,8 +1,33 @@
+"""
+MIT License
+
+Copyright (c) 2020 vqdang
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
 import cv2
 import numpy as np
 import skimage.morphology as morph
 import skimage.feature as feat
 import skimage.segmentation as segm
+import skimage.filters as filters
 import skimage.util as util
 import scipy.ndimage as ndi
 from src.img_processing.post_processing.utils import remove_debris
@@ -21,14 +46,6 @@ def post_proc_hover(inst_map: np.ndarray, aux_map: np.ndarray, **kwargs) -> np.n
     Returns:
         np.ndarray that is processed in the same way as in github.com/vqdang/hover_net/blob/master/src/postproc/hover.py
     """
-
-    # inst_map = np.copy(prob_map)
-    # inst_map[inst_map >= 0.5] = 1
-    # inst_map[inst_map < 0.5] = 0
-
-    # inst_map = ndi.label(inst_map)[0]
-    # inst_map = morph.remove_small_objects(inst_map, min_size=10)
-    # inst_map[inst_map > 0] = 1  # back ground is 0 already
     inst_map = binarize(inst_map)
 
     h_dir = cv2.normalize(aux_map[..., 0], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
@@ -66,6 +83,7 @@ def post_proc_hover(inst_map: np.ndarray, aux_map: np.ndarray, **kwargs) -> np.n
     return inst_map 
 
 
+# Treid to do some mods to the original. Not as quite good...
 def post_proc_hover2(aux_map: np.ndarray, inst_map: np.ndarray, sigma: float = 2.0, **kwargs):
     """
     Post processing pipeline to combine hover branch output and instance segmentation branch output.

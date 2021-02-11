@@ -8,9 +8,9 @@ class WSConv2d(nn.Conv2d):
     def __init__(self, 
                  in_channels: int, 
                  out_channels: int,
-                 kernel_size: int,
+                 kernel_size: int = 3,
                  stride: int = 1,
-                 padding: int = 0,
+                 padding: int = 1,
                  dilation: int = 1,
                  groups: int = 1,
                  bias: bool = True,
@@ -29,7 +29,7 @@ class WSConv2d(nn.Conv2d):
         )
         self.eps = eps
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
         weight = self.weight
         weight_mean = weight.mean(dim=1, keepdim=True).mean(dim=2, keepdim=True).mean(dim=3, keepdim=True)
         weight = weight - weight_mean
@@ -50,7 +50,7 @@ class EstBN(nn.Module):
         Args:
             num_features (int):
                 Number of input channels/features
-            eps (float):
+            eps (float, default=1e-7):
                 small constant for numerical stability
         """
         super(EstBN, self).__init__()
@@ -85,7 +85,7 @@ class EstBN(nn.Module):
 class BCNorm(nn.Module):
     def __init__(self,
                  num_features: int, 
-                 num_groups: int,
+                 num_groups: int = 32,
                  eps: float = 1e-7,
                  estimate: bool = False) -> None:
         """
@@ -97,11 +97,12 @@ class BCNorm(nn.Module):
         Args:
             num_features (int):
                 Number of input channels/features
-            num_groups (int):
-                Number of groups to group the channels
-            eps (float):
+            num_groups (int, default=32):
+                Number of groups to group the channels.
+                Typically n_features is a multiple of 32
+            eps (float, default=1e-7):
                 small constant for numerical stability
-            estimate (bool):
+            estimate (bool, default=False):
                 If True, Uses EstBN.
                 Refer to the article
         """
