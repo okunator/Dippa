@@ -8,6 +8,8 @@ class EstBN(nn.Module):
         """
         Estimate of the batch statistics
         From: https://github.com/joe-siyuan-qiao/Batch-Channel-Normalization
+
+        https://arxiv.org/abs/1911.09738
         
         Args:
             num_features (int):

@@ -170,7 +170,7 @@ def one_hot(type_map: torch.Tensor, n_classes: int) -> torch.Tensor:
     """
     assert type_map.dtype == torch.int64, f"Wrong type_map dtype: {type_map.dtype}. Should be torch.int64"
     one_hot = torch.zeros(type_map.shape[0], n_classes, *type_map.shape[1:], device=type_map.device, dtype=type_map.dtype)
-    return one_hot.scatter_(dim=1, index=type_map.unsqueeze(1), value=1.0) + 1e-6
+    return one_hot.scatter_(dim=1, index=type_map.unsqueeze(1), value=1.0) + 1e-7
 
 
 def iou(yhat: torch.Tensor, 

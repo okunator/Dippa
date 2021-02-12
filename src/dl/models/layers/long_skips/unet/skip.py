@@ -1,6 +1,7 @@
 
 import torch
 import torch.nn as nn
+from typing import Tuple
 
 
 class UnetSkipBlock(nn.Module):
@@ -16,9 +17,10 @@ class UnetSkipBlock(nn.Module):
         assert merge_policy in ("cat", "sum")
         self.merge_policy = merge_policy
 
-    def forward(x: torch.Tensor, skip: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, skip: Tuple[torch.Tensor]) -> torch.Tensor:
+        # TODO shape check
         if self.merge_policy == "cat":
-            x = torch.cat([x, skip], dim=1)
+            x = torch.cat([x, *skip], dim=1)
         elif self.merge_policy == "sum":
             x += skip
         return x

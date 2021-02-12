@@ -1,6 +1,5 @@
 import torch.nn as nn
-from . import initialize_decoder
-from . import initialize_head
+import src.dl.models.initialization as init
 
 
 # Adapted from https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/base/model.py
@@ -10,16 +9,16 @@ class MultiTaskSegModel(nn.Module):
     and an optional aux branch
     """
     def initialize(self):
-        initialize_decoder(self.inst_decoder)
-        initialize_head(self.inst_seg_head)
+        init.initialize_decoder(self.inst_decoder)
+        init.initialize_head(self.inst_seg_head)
 
         if self.type_branch:
-            initialize_decoder(self.type_decoder)
-            initialize_head(self.type_seg_head)
+            init.initialize_decoder(self.type_decoder)
+            init.initialize_head(self.type_seg_head)
 
         if self.aux_branch:
-            initialize_decoder(self.aux_decoder)
-            initialize_head(self.aux_seg_head)
+            init.initialize_decoder(self.aux_decoder)
+            init.initialize_head(self.aux_seg_head)
 
     def forward(self, x):
         features = self.encoder(x)

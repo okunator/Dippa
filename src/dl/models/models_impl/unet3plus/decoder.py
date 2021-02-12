@@ -17,11 +17,15 @@ class Unet3pConvBlock(nn.Module):
         Operations done for every unet block
 
         Args:
-            in_channels (int): number of channels in the input layer (feature map)
-            out_channels (int): number of channels in the output layer (feature map)
-            padding (bool): if True, perform padding to the input image such that the input
-                            shape is the same as the output.
-            batch_norm (bool): if True perform batch normalization after each activation
+            in_channels (int): 
+                number of channels in the input layer (feature map)
+            out_channels (int): 
+                number of channels in the output layer (feature map)
+            padding (bool): 
+                if True, perform padding to the input image such that the input
+                shape is the same as the output.
+            batch_norm (bool): 
+                if True perform batch normalization after each activation
         """
         super(Unet3pConvBlock, self).__init__()
         block = []

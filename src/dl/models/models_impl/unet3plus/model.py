@@ -2,10 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import List, Tuple, Optional, Union
+
 from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.base import SegmentationHead
+
 from src.dl.models.base_model import MultiTaskSegModel
-from src.dl.models.unet3plus.decoder import Unet3pDecoder
+from .decoder import Unet3pDecoder
 
 
 class Unet3pMulti(MultiTaskSegModel):

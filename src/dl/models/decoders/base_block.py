@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
 
-import src.dl.activations as act
-from src.dl.modules import WSConv2d
-from src.dl.normalization import EstBN, BCNorm
+import src.dl.models.layers.activations as act
+import src.dl.models.layers.normalization as norm
 
 
-class BasicConvBlock(nn.Module):
+class BaseConvBlock(nn.Module):
     def __init__(self,
                  in_channels: int,
                  out_channels: int,
@@ -15,7 +14,9 @@ class BasicConvBlock(nn.Module):
                  activation: str = "relu",
                  weight_standardize: bool = False) -> None:
         """
-        Basic conv block that can be used in decoders
+        Base conv block that is used in all decoder blocks
+        This uses moduledicts which let you choose the different methods
+        to use.
 
         Args:
             in_channels (int):
@@ -33,8 +34,8 @@ class BasicConvBlock(nn.Module):
             weight_standardize (bool):
                 If True, perform weight standardization
         """
-        super(BasicConvBlock, self).__init__()
-        assert batch_norm in ("bn", "bcn", None)
+        super(BaseConvBlock, self).__init__()
+        assert batch_norm in ("bn", "bcn", "nope")
         assert activation in ("relu", "mish", "swish")
         
         self.batch_norm = batch_norm
@@ -42,13 +43,13 @@ class BasicConvBlock(nn.Module):
         self.conv_choice = "wsconv" if weight_standardize else "conv"
         
         self.conv_choices = nn.ModuleDict({
-            "wsconv": WSConv2d(in_channels, out_channels, kernel_size=3, padding=int(same_padding)),
+            "wsconv": norm.WSConv2d(in_channels, out_channels, kernel_size=3, padding=int(same_padding)),
             "conv": nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=int(same_padding))
         })
 
         self.bn_choices = nn.ModuleDict({
             "bn": nn.BatchNorm2d(num_features=out_channels),
-            "bcn": BCNorm(num_features=out_channels, num_groups=32),
+            "bcn": norm.BCNorm(num_features=out_channels, num_groups=32),
             "nope": nn.Identity()
         })
 
@@ -57,9 +58,3 @@ class BasicConvBlock(nn.Module):
             "mish": act.Mish(),
             "swish": act.Swish()
         })
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.conv_choices[self.conv_choice](x)
-        x = self.bn_choices[self.batch_norm](x)
-        x = self.act_choices[self.activation](x)
-        return x

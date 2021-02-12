@@ -17,7 +17,7 @@ model_args:
     short_skips: residual     # One of (residual, dense, nope) (for decoder branch only)
     long_skips: unet          # One of (unet, unet++, unet3+, nope)
     merge_policy: cat         # One of (sum, cat)
-    upsampling: interp        # One of (interp, segnet, transconv)
+    upsampling: interp        # One of (interp, segnet, transconv, fixed_unpool)
 
   decoder_branches:
     type: True

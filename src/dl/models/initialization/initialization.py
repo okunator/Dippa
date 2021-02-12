@@ -1,7 +1,7 @@
 # ported from https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/base/initialization.py
 import torch.nn as nn
 
-def initialize_decoder(module):
+def initialize_decoder(module: nn.Module):
     for m in module.modules():
         if isinstance(m, nn.Conv2d):
             nn.init.kaiming_uniform_(
@@ -19,7 +19,7 @@ def initialize_decoder(module):
                 nn.init.constant_(m.bias, 0)
 
 
-def initialize_head(module):
+def initialize_head(module: nn.Module):
     for m in module.modules():
         if isinstance(m, (nn.Linear, nn.Conv2d)):
             nn.init.xavier_uniform_(m.weight)
