@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
-import src.dl.models.layers.activations as act
+
+from .mish import Mish
+from .swish import Swish
 
 
 def convert_relu_to_mish(model: nn.Module) -> None:
@@ -13,7 +15,7 @@ def convert_relu_to_mish(model: nn.Module) -> None:
     """
     for child_name, child in model.named_children():
         if isinstance(child, nn.ReLU):
-            setattr(model, child_name, act.Mish(inplace=False))
+            setattr(model, child_name, Mish(inplace=False))
         else:
             convert_relu_to_mish(child)
 
@@ -28,6 +30,6 @@ def convert_relu_to_swish(model: nn.Module) -> None:
     """
     for child_name, child in model.named_children():
         if isinstance(child, nn.ReLU):
-            setattr(model, child_name, act.Swish(inplace=False))
+            setattr(model, child_name, Swish(inplace=False))
         else:
             convert_relu_to_swish(child)

@@ -1,1 +1,1 @@
-from src.dl.models.layers.upsampling.fixed_unpool.up import FixedUnpool
+from src.dl.models.layers.upsampling.fixed_unpool import FixedUnpool

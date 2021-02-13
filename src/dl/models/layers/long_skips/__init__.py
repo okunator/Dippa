@@ -1,1 +1,1 @@
-from src.dl.models.layers.long_skips.unet.skip import UnetSkipBlock
+from src.dl.models.layers.long_skips.unet_skip import UnetSkipBlock
