@@ -1,14 +1,16 @@
 # Dippa
+Work in progress...
 Benchmarking framework for nuclei segmentation and cell type classification.
 Datasets contain only H&amp;E stained images for now
-Most of the models are just wrappers for models implemented in: [segmentation_models_pytorch](https://github.com/qubvel/segmentation_models.pytorch).
+Using encoders from: [segmentation_models_pytorch](https://github.com/qubvel/segmentation_models.pytorch).
+Also nulti-task segmentation model wrappers for smp models. 
 
 Also borrowing a lot of utilities from:
 
 - HoVer-Net [repository](https://github.com/vqdang/hover_net)
 - pytorch-toolbelt [repository](https://github.com/BloodAxe/pytorch-toolbelt) 
 
-## Supported datasets
+## Download scripts for datasets
 * [x] [Kumar](https://ieeexplore.ieee.org/document/7872382) (Kumar et al.)
 * [x] [CoNSep](https://arxiv.org/pdf/1812.06499) (Graham, Vu, et al.)
 * [x] [Pannuke](https://arxiv.org/abs/2003.10778) (Gamper et al.)
@@ -39,16 +41,80 @@ pip install -r requirements.txt
 **Note**: dl framework is PyTorch (torch==1.4.0) which expects cuda 10.1. If you want to use the repo with other version of torch and cuda, just follow the installation details at https://pytorch.org/. At least 1.6.0 with cuda 10.1 worked ok. 
 
 
-##  Instructions for running the experiments
-1. Download the data `src/download.py`.
-2. Run an experiment.
-    1. Modify the parameters in the config file. `src/conf/config.py`
-    2. Extract patches from the downloaded images and save them to hdf5 or numpy files. `src/patch.py`
-    3. Train a model with the extracted patches.  `src/train.py` (use notebook for now)
-    4. Infer, post process and benchmark.  `src/infer.py` (use notebook for now)
-    - Optionally you can just run the notebooks in `notebooks/` which do the exact same.
-    - **Note:** you don't have to repeat part **i** and **ii** if you've already done them and you want to run new experiments. If you want to patch the images differently (different stride or window size) for your experiments then modify the config and run part **ii** again.
+Intsuctions to run coming later...
 
+## experiment.yml
+
+```
+experiment_args:
+  experiment_name: test
+  experiment_version: something
+
+dataset_args:
+  train_dataset: consep       # One of (consep, pannuke, kumar, monusac)
+  infer_dataset: consep       # One of (consep, pannuke, kumar, monusac, other)
+  other_path: null            # Path to own dataset if infer_dataset=other
+
+model_args:
+  architecture_design:
+    activation: relu          # One of (relu, mish, swish)
+    normalization: bn         # One of (bn, bcn, ws+bn, ws+bcn, nope)
+    weight_standardize: False # Weight standardization
+    weight_init: he           # One of (he, eoc, fixup)
+    encoder: resnext50        # One of encoders https://github.com/qubvel/segmentation_models.pytorch
+    pretrain: True            # Use Imagenet pre-trained encoder
+    short_skips: residual     # One of (residual, dense, nope) (for decoder branch only)
+    long_skips: unet          # One of (unet, unet++, unet3+, nope)
+    merge_policy: cat         # One of (sum, cat)
+    upsampling: interp        # One of (interp, segnet, transconv, fixed_unpool)
+
+  decoder_branches:
+    type: True
+    aux: True
+    aux_type: hover           # One of (hover, dist, contour) (ignored if aux=False)
+
+training_args:
+  resume_training: False
+  num_epochs: 3
+  num_gpus: 1
+  weight_balancing: null      # One of (gradnorm, uncertainty, null)
+  augmentations:
+    - hue_sat
+    - non_rigid
+    - blur
+    - non-spatial
+
+  optimizer_args:
+    optimizer: adamw          # One of https://github.com/jettify/pytorch-optimizer 
+    lr: 0.0005
+    encoder_lr: 0.00005
+    weight_decay: 0.0003
+    encoder_weight_decay: 0.00003
+    lookahead: True
+    bias_weight_decay: False
+    scheduler_factor: 0.25
+    schduler_patience: 2
+
+  loss_args:
+    inst_branch_loss: dice_focal
+    type_branch_loss: tversky_focal
+    aux_branch_loss: mse
+    edge_weight: False
+    class_weights: False
+
+
+inference_args:
+  model_weights: last         # One of (last, best)
+  data_fold: test             # One of (train, test)
+  tta: False
+  verbose: True
+
+runtime_args:
+  batch_size: 6
+  model_input_size: 256 # Multiple of 32. Tuple(int, int) 
+
+
+```
 
 ## References
 
