@@ -45,7 +45,7 @@ Intsuctions to run coming later...
 
 ## experiment.yml
 
-```
+```yaml
 experiment_args:
   experiment_name: test
   experiment_version: something
