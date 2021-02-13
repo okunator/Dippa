@@ -1,20 +1,30 @@
-import src.img_processing.augmentations as augs
-import src.dl.datasets as ds
 from typing import List, Optional
 from torch.utils.data import Dataset
 from omegaconf import DictConfig
 
+import src.dl.datasets as ds
 
-class DatasetBuilder:
-    def __init__(self, preproc_style: str) -> None:
+
+class DataSetBuilder:
+    def __init__(self,
+                 model_args: DictConfig,
+                 training_args: DictConfig,
+                 **kwargs) -> None:
         """
-        Class to initialize train and test dataset for the lightning model
+        Initializes the train & test time datsets based on the experiment.yml
 
         Args:
-            preproc_style (str): 
-                One of ("basic", "hover", "unet", "micro")
+            model_args (omegaconf.DictConfig): 
+                Omegaconf DictConfig specifying arguments related 
+                to the model architecture that is being used.
+            training_args (omegaconf.DictConfig): 
+                Omegaconf DictConfig specifying arguments that are
+                used for training a network. Contains list of augmentations
         """
-        self.preproc_style = preproc_style
+        self.augs: List[str] = training_args.augmentations
+        self.aux_branch = model_args.decoder_branches.aux
+        self.ds_name = model_args.decoder_branches.aux_type if self.aux_branch else "basic"
+        assert self.ds_name in ("hover", "dist", "contour", "unet", "basic")
 
     def get_augs(self, augs_list: Optional[List[str]] = None):
         """
@@ -24,48 +34,53 @@ class DatasetBuilder:
             augs_list (List[str], optional): 
                 List of augmentations specified in config.py
         """
-        
-        aug_list = [augs.__dict__[ds.AUGS_LOOKUP[aug_name]]() for aug_name in augs_list] if augs_list else []
-        aug_list.append(augs.to_tensor()) 
-        return augs.compose(aug_list)
+        aug_list = [ds.__dict__[ds.AUGS_LOOKUP[aug_name]]() for aug_name in augs_list] if augs_list else []
+        aug_list.append(ds.to_tensor()) 
+        return ds.compose(aug_list)
 
     @classmethod
-    def set_train_dataset(cls, 
+    def set_train_dataset(cls,
+                          model_args: DictConfig,
+                          training_args: DictConfig,
                           fname: str,
-                          preproc_style: str = "basic", 
-                          augs_list: Optional[List[str]] = None,
-                          **kwargs) -> Dataset:
+                          augs_list: Optional[List[str]] = None) -> Dataset:
         """
-        Init the train dataset. Chooses the data pre-processing style and augmentations from config.py 
+        Init the train dataset.
 
         Args:
+            model_args (omegaconf.DictConfig): 
+                Omegaconf DictConfig specifying arguments related 
+                to the model architecture that is being used.
+            training_args (omegaconf.DictConfig): 
+                Omegaconf DictConfig specifying arguments that are
+                used for training a network. Contains list of augmentations
             fname (str):
                 path to the hdf5 database file
-            preproc_style (str): 
-                One of ("basic", "hover", "unet", "micro")
-            augs_list (List[str], optional):    
+            augs_list (List[str], optional, default=None):    
                 List of augmentations specified in config.py
         """
-        c = cls(preproc_style)
+        c = cls(model_args, training_args)
         aug = c.get_augs(augs_list)
-        return ds.__dict__[ds.DS_LOOKUP[preproc_style]](fname=fname, transforms=aug)
+        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug)
 
     @classmethod
-    def set_test_dataset(cls, 
-                         fname: str,
-                         preproc_style: str = "basic", 
-                         **kwargs) -> Dataset:
+    def set_test_dataset(cls,   
+                         model_args: DictConfig,
+                         training_args: DictConfig, 
+                         fname: str) -> Dataset:
         """
-        Init the test dataset. Chooses the data pre-processing style from config.py but data augmentation 
-        is ignored.  
+        Init the test dataset. 
 
         Args:
+            model_args (omegaconf.DictConfig): 
+                Omegaconf DictConfig specifying arguments related 
+                to the model architecture that is being used.
+            training_args (omegaconf.DictConfig): 
+                Omegaconf DictConfig specifying arguments that are
+                used for training a network. Contains list of augmentations
             fname (str): 
                 path to the hdf5 database file
-            preproc_style (str): 
-                One of ("basic", "hover", "unet", "micro")
         """
-        c = cls(preproc_style)
+        c = cls(model_args, training_args)
         aug = c.get_augs()
-        return ds.__dict__[ds.DS_LOOKUP[c.preproc_style]](fname=fname, transforms=aug)
-        
+        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug)

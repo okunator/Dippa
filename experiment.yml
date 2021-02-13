@@ -23,7 +23,7 @@ model_args:
   decoder_branches:
     type: True
     aux: True
-    aux_type: hover           # One of (hover, dist, contour) (ignored if aux=False)
+    aux_type: unet           # One of (hover, dist, contour, unet) (ignored if aux=False)
 
 training_args:
   resume_training: False

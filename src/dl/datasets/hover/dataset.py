@@ -1,7 +1,9 @@
 import torch
 import numpy as np
 from typing import List, Optional, Dict
-from src.dl.datasets.base_dataset import BaseDataset 
+
+from .pre_proc import gen_hv_maps
+from ..base_dataset import BaseDataset 
 
 
 class HoverDataset(BaseDataset):
@@ -33,7 +35,7 @@ class HoverDataset(BaseDataset):
         weight_map = self.generate_weight_map(self.remove_overlaps(inst_patch))
 
         # generate hv-maps
-        hvmaps = self.generate_hv_maps(inst_patch)
+        hvmaps = gen_hv_maps(inst_patch)
         xmap = hvmaps["xmap"]
         ymap = hvmaps["ymap"]
         

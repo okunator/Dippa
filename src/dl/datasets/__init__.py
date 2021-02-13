@@ -1,7 +1,7 @@
 from src.dl.datasets.basic.dataset import BasicDataset
 from src.dl.datasets.unet.dataset import UnetDataset
 from src.dl.datasets.hover.dataset import HoverDataset
-from src.dl.datasets.micro.dataset import MicroDataset
+from src.dl.datasets.augs import *
 
 AUGS_LOOKUP = {
     "rigid":"rigid_transforms",
