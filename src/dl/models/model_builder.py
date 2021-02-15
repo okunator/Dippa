@@ -58,25 +58,6 @@ class ModelBuilder:
         Returns:
             nn.Module initialized pytorch model specification
         """
-        dataset_args = conf.dataset_args
-        experiment_args = conf.experiment_args
-        c = cls(dataset_args, experiment_args)
-
-        kwargs = kwargs.copy()
-        kwargs.setdefault("classes", c.nclasses)
-        kwargs.setdefault("encoder_name", encoder_name)
-        kwargs.setdefault("encoder_weights", encoder_weights)
-        kwargs.setdefault("aux_branch_name", c.aux_branch)
-
-
-        mn = mdls.MODEL_LOOKUP[c.model_name]
-        model = mdls.__dict__[mn](**kwargs)
-
-        if self.activation == "mish":
-            convert_relu_to_mish(model)
-
-        if self.activation == "swish<":
-            convert_relu_to_swish(model)
+        c = cls(dataset_args, model_args)
         
-        return model
 

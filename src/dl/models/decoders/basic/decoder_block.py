@@ -17,7 +17,8 @@ class BasicDecoderBlock(nn.Module):
                  weight_standardize: bool = False,
                  n_blocks: int = 2,
                  up_sampling: str = "fixed_unpool",
-                 long_skip: str = "nope") -> None:
+                 long_skip: str = "unet",
+                 long_skip_merge_policy: str = "cat") -> None:
 
         """
         Basic decoder block. 
@@ -31,7 +32,8 @@ class BasicDecoderBlock(nn.Module):
             in_channels (int):
                 Number of input channels
             skip_channels (int):
-                Number of channels in the encoder skip tensor
+                Number of channels in the encoder skip tensor.
+                Ignored if long_skip == "nope".
             out_channels (int):
                 Number of output channels
             same_padding (bool, default=True):
@@ -48,33 +50,52 @@ class BasicDecoderBlock(nn.Module):
                 Number of basic convolution blocks in this Decoder block
             up_sampling (str, default="fixed_unpool"):
                 up sampling method to be used.
-                One of ("interp", "segnet", "transconv", "fixed_unpool")
+                One of ("interp", "max_unpool", "transconv", "fixed_unpool")
             long_skip (str, default="unet"):
                 long skip connection style to be used.
-                One of ("unet", "unet++", "unet3+", "nope")            
+                One of ("unet", "unet++", "unet3+", "nope")
+            long_skip_merge_policy (str, default: "cat):
+                whether long skip is summed or concatenated
+                One of ("sum", "cat")        
         """
         super(BasicDecoderBlock, self).__init__()
-        assert up_sampling in ("interp", "segnet", "transconv", "fixed_unpool")
-        assert long_skip in ("unet", "unet++", "unet3p", "nope")
-        
+        assert up_sampling in ("interp", "max_unpool", "transconv", "fixed_unpool")
+        assert long_skip in ("unet", "unet++", "unet3+", "nope")
+        assert long_skip_merge_policy in ("cat", "sum")
+
         self.up_sampling = up_sampling
-        self.long_skip = long_skip
-    
+        self.long_skip = None if long_skip == "nope" else long_skip
+        self.merge_pol = long_skip_merge_policy
+
+        # set upsampling choices
         self.up_choices = nn.ModuleDict({
             "fixed_unpool": layers.FixedUnpool(scale_factor=2),
             "interp": None,
             "transconv":None,
-            "segnet":None
+            "max_unpool":None
         })
         
-        self.skip_choices = nn.ModuleDict({
-            "unet": layers.UnetSkipBlock(),
-            "unet++": None,
-            "unet3+": None,
-        })
+        # Set skip connection block choices
+        self.skip_choices = None
+        if self.long_skip is not None:
 
-        self.conv = MultiBlockBasic(
-            in_channels=in_channels+skip_channels, 
+            # adjust input channel dim if "cat"
+            if self.merge_pol == "cat":
+                in_channels += skip_channels
+
+            self.skip_choices = nn.ModuleDict({
+                "unet": layers.UnetSkipBlock(
+                    merge_policy=self.merge_pol, 
+                    skip_channels=skip_channels, 
+                    in_channels=in_channels
+                ),
+                "unet++": None,
+                "unet3+": None,
+            })
+
+        # multi conv block
+        self.multiconv_block = MultiBlockBasic(
+            in_channels=in_channels, 
             out_channels=out_channels,
             n_blocks=n_blocks,
             batch_norm=batch_norm, 
@@ -82,10 +103,10 @@ class BasicDecoderBlock(nn.Module):
             weight_standardize=weight_standardize
         )
         
-    def forward(self, x: torch.Tensor, skips: Tuple[torch.Tensor]=None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, skips: Tuple[torch.Tensor], **kwargs) -> torch.Tensor:
         x = self.up_choices[self.up_sampling](x)
-        if skips is not None:
-            x = self.skip_choices[self.long_skip](x, skips)
-        x = self.conv(x)
+        if self.skip_choices is not None:
+            x = self.skip_choices[self.long_skip](x, skips, **kwargs)
+        x = self.multiconv_block(x)
 
         return x
