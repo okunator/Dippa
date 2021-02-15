@@ -40,3 +40,10 @@ class MultiTaskSegModel(nn.Module):
             "types": types,
             "aux": aux
         }
+
+    def freeze_encoder(self):
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+    
+    def preactivate_encoder(self):
+        pass

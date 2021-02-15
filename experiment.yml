@@ -3,33 +3,40 @@ experiment_args:
   experiment_version: something
 
 dataset_args:
-  train_dataset: consep       # One of (consep, pannuke, kumar, monusac)
-  infer_dataset: consep       # One of (consep, pannuke, kumar, monusac, other)
-  other_path: null            # Path to own dataset if infer_dataset=other
+  train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
+  infer_dataset: consep         # One of (consep, pannuke, kumar, monusac, other)
+  other_path: null              # Path to own dataset if infer_dataset=other
 
 model_args:
   architecture_design:
-    activation: relu          # One of (relu, mish, swish)
-    normalization: bn         # One of (bn, bcn, nope)
-    weight_standardize: False # Weight standardization
-    weight_init: he           # One of (he, eoc, fixup)
-    encoder: resnext50        # One of encoders https://github.com/qubvel/segmentation_models.pytorch
-    pretrain: True            # Use Imagenet pre-trained encoder
-    short_skips: residual     # One of (residual, dense, nope) (for decoder branch only)
-    long_skips: unet          # One of (unet, unet++, unet3+, nope)
-    merge_policy: cat         # One of (sum, cat)
-    upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
+    module_args:
+      activation: relu          # One of (relu, mish, swish)
+      normalization: bn         # One of (bn, bcn, nope)
+      weight_standardize: False # Weight standardization
+      weight_init: he           # One of (he, eoc, fixup) (only for decoder if pretrain)
+    encoder_args:
+      in_channels: 3            # RGB input images
+      encoder: resnet50         # https://github.com/qubvel/segmentation_models.pytorch
+      pretrain: True            # Use imagenet pre-trained encoder
+      encoder_depth: 5          # Number of layers in encoder
+    decoder_args:
+      n_blocks: 2               # Number of convolutions blocks in each decoder block
+      short_skips: nope         # One of (residual, dense, nope) (for decoder branch only)
+      long_skips: unet          # One of (unet, unet++, unet3+, nope)
+      merge_policy: sum         # One of (sum, cat) (for long skips)
+      upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
 
   decoder_branches:
     type: True
     aux: True
-    aux_type: unet           # One of (hover, dist, contour, unet) (ignored if aux=False)
+    aux_type: hover              # One of (hover, dist, contour) (ignored if aux=False)
 
 training_args:
   resume_training: False
   num_epochs: 3
   num_gpus: 1
-  weight_balancing: null      # One of (gradnorm, uncertainty, null)
+  freeze_encoder: False         # freeze the weights in the encoder (for fine tuning)
+  weight_balancing: null        # One of (gradnorm, uncertainty, null)
   augmentations:
     - hue_sat
     - non_rigid
@@ -37,7 +44,7 @@ training_args:
     - non-spatial
 
   optimizer_args:
-    optimizer: adamw          # One of https://github.com/jettify/pytorch-optimizer 
+    optimizer: adamw            # One of https://github.com/jettify/pytorch-optimizer 
     lr: 0.0005
     encoder_lr: 0.00005
     weight_decay: 0.0003
@@ -63,5 +70,5 @@ inference_args:
 
 runtime_args:
   batch_size: 6
-  model_input_size: 256 # Multiple of 32. Tuple(int, int) 
+  model_input_size: 256       # Multiple of 32. Tuple(int, int) 
 

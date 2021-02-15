@@ -29,6 +29,7 @@ from typing import List, Tuple, Optional, Union
 from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.base import SegmentationHead
 from segmentation_models_pytorch.unetplusplus.decoder import UnetPlusPlusDecoder
+
 from src.dl.models.base_model import MultiTaskSegModel
 
 
@@ -159,11 +160,10 @@ class UnetPlusPlusSmpMulti(MultiTaskSegModel):
 
             self.aux_seg_head = SegmentationHead(
                 in_channels=decoder_channels[-1],
-                out_channels=2,
+                out_channels=aux_out_channels,
                 activation=activation,
                 kernel_size=3,
             )
-
 
         self.name = "unetplusplus-multi-{}".format(encoder_name)
         self.initialize()

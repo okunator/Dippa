@@ -15,7 +15,7 @@ class BasicDecoder(nn.ModuleDict):
                  weight_standardize: bool = False,
                  n_blocks: int = 2,
                  up_sampling: str = "fixed_unpool",
-                 short_skip: str = "nope",
+                 short_skip: str = "basic",
                  long_skip: str = "unet",
                  long_skip_merge_policy: str ="cat",
                  **kwargs) -> None:
@@ -43,6 +43,7 @@ class BasicDecoder(nn.ModuleDict):
             up_sampling (str, default="fixed_unpool"):
                 up sampling method to be used.
                 One of ("interp", "max_unpool", "transconv", "fixed_unpool")
+            short_skip ()
             long_skip (str, default="unet"):
                 long skip connection style to be used.
                 One of ("unet", "unet++", "unet3+", "nope")
@@ -52,6 +53,8 @@ class BasicDecoder(nn.ModuleDict):
         """
         super(BasicDecoder, self).__init__()
         assert len(encoder_channels[1:]) == len(decoder_channels), "Encoder and decoder need to have same number of layers (symmetry)"
+        assert short_skip in ("residual", "dense", "nope")
+        self.decoder_type = short_skip
 
         # flip channels nums to start from the deepest channel
         # and remove the input channel num.
@@ -61,13 +64,12 @@ class BasicDecoder(nn.ModuleDict):
         head_channels = encoder_channels[0]
 
         # in_channels for all decoder layers
-        in_channels = decoder_channels
-        in_channels.insert(0, head_channels)
+        in_channels = [head_channels] + decoder_channels
+        # in_channels.insert(0, head_channels)
 
         # skip channels for every decoder layer
         # no skip connection at the last decoder layer
-        skip_channels = encoder_channels[1:]
-        skip_channels.append(0)
+        skip_channels = encoder_channels[1:] + [0]
 
         # set up kwargs
         kwargs = kwargs.copy()
@@ -81,7 +83,7 @@ class BasicDecoder(nn.ModuleDict):
         kwargs.setdefault("long_skip_merge_policy", long_skip_merge_policy)
 
         # Build decoder
-        for i, (in_ch, skip_ch, out_ch) in enumerate(zip(in_channels, skip_channels, decoder_channels[1:]), 1):
+        for i, (in_ch, skip_ch, out_ch) in enumerate(zip(in_channels, skip_channels, decoder_channels), 1):
             decoder_block = nn.ModuleDict({
                 "nope": BasicDecoderBlock(in_ch, skip_ch, out_ch, **kwargs),
                 "residual":None,
@@ -89,14 +91,14 @@ class BasicDecoder(nn.ModuleDict):
             })
             self.add_module(f"decoder_block{i}", decoder_block)
 
-    def forward(self, features: Tuple[torch.Tensor]):
+    def forward(self, *features: Tuple[torch.Tensor]):
         features = features[1:][::-1]
         head = features[0]
         skips = features[1:]
-
+        
         x = head
         for i, (key, block) in enumerate(self.items()):
             kwargs = {}
             kwargs["idx"] = i
-            x = block(x, skips, **kwargs)
+            x = block[self.decoder_type](x, skips, **kwargs)
         return x

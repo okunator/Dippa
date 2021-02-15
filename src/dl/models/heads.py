@@ -29,6 +29,6 @@ class SegHead(nn.Module):
                 in_channels, out_channels, kernel_size=1, padding=0, bias=False
             )
         
-    def forward(x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.conv2d(x)
         return x

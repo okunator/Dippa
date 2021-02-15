@@ -23,7 +23,7 @@ class DataSetBuilder:
         """
         self.augs: List[str] = training_args.augmentations
         self.aux_branch = model_args.decoder_branches.aux
-        self.ds_name = model_args.decoder_branches.aux_type if self.aux_branch else "basic"
+        self.ds_name = model_args.decoder_branches.aux_type if self.aux_branch else "unet"
         assert self.ds_name in ("hover", "dist", "contour", "unet", "basic")
 
     def get_augs(self, augs_list: Optional[List[str]] = None):

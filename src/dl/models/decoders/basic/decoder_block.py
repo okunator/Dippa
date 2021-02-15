@@ -108,5 +108,4 @@ class BasicDecoderBlock(nn.Module):
         if self.skip_choices is not None:
             x = self.skip_choices[self.long_skip](x, skips, **kwargs)
         x = self.multiconv_block(x)
-
         return x

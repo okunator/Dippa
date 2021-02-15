@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import List, Dict, Tuple
 from omegaconf import DictConfig, OmegaConf
 from sklearn.model_selection import train_test_split
+
 from src.img_processing.viz_utils import draw_contours
 from src.img_processing.process_utils import overlays
 from src.settings import DATA_DIR, CONF_DIR, PATCH_DIR, RESULT_DIR
@@ -80,8 +81,8 @@ class FileHandler:
 
 class FileManager(FileHandler):
     def __init__(self,
-                experiment_args: DictConfig,
-                dataset_args: DictConfig) -> None:
+                 experiment_args: DictConfig,
+                 dataset_args: DictConfig) -> None:
         """
         File hadling and managing
 
