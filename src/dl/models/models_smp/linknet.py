@@ -22,53 +22,53 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import List, Tuple, Optional, Union
 from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.base import SegmentationHead
-from segmentation_models_pytorch.pan.decoder import PANDecoder
-from src.dl.models.base_model import MultiTaskSegModel
+from segmentation_models_pytorch.linknet.decoder import LinknetDecoder
 
-# adapted from https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/pan/model.py
+from ..base_model import MultiTaskSegModel
 
-class PanSmpMulti(MultiTaskSegModel):
+
+class LinknetSmpMulti(MultiTaskSegModel):
     def __init__(self,
                  encoder_name: str = "resnet34",
-                 encoder_weights: str = "imagenet",
-                 encoder_dilation: bool = True,
-                 decoder_channels: int = 32,
+                 encoder_depth: int = 5,
+                 encoder_weights: Optional[str] = "imagenet",
+                 decoder_use_batchnorm: bool = True,
                  in_channels: int = 3,
-                 classes: int = 2,
+                 classes: int = 1,
                  activation: Optional[Union[str, callable]] = None,
-                 upsampling: int = 4,
                  type_branch: bool = True,
                  aux_branch: bool = True,
                  aux_out_channels: int = 1,
                  **kwargs) -> None:
-
-        """ 
-        Implementation of _PAN (Pyramid Attention Network).
-        Currently works with shape of input tensor >= [B x C x 128 x 128] for pytorch <= 1.1.0
-        and with shape of input tensor >= [B x C x 256 x 256] for pytorch == 1.3.1
+        """
+        Linknet_ is a fully convolution neural network for fast image semantic segmentation
+        Note:
+            This implementation by default has 4 skip connections (original - 3).
 
         This class uses https://github.com/qubvel/segmentation_models.pytorch/ implementation
-        of the model and adds a semantic segmentation branch for classifying cell types that
-        outputs type maps (B, C, H, W). Adds also an optional aux branch for regressing (B, 2, H, W) outputs
+        of the model and adds an optional aux branch for regressing (B, 2, H, W) outputs
 
         Args:
             encoder_name (str, default="resnet34"):
                 name of classification model (without last dense layers) used as feature
                 extractor to build segmentation model.
+            encoder_depth (int, default=5): 
+                number of stages used in decoder, larger depth - more features are generated.
+                e.g. for depth=3 encoder will generate list of features with following spatial shapes
+                [(H,W), (H/2, W/2), (H/4, W/4), (H/8, W/8)], so in general the deepest feature will have
+                spatial resolution (H/(2^depth), W/(2^depth)]
             encoder_weights (str, optional, default="imagenet"):
                 one of ``None`` (random initialization), ``imagenet`` (pre-training on ImageNet).
-            encoder_dilation (bool, default=True): 
-                Flag to use dilation in encoder last layer.
-                Doesn't work with [``*ception*``, ``vgg*``, ``densenet*``] backbones, default is True.
-            decoder_channels (int, default=32):
-                Number of ``Conv2D`` layer filters in decoder blocks
+            decoder_use_batchnorm (bool, default=True)
+                if ``True``, ``BatchNormalisation`` layer between ``Conv2D`` and ``Activation`` layers
+                is used. If 'inplace' InplaceABN will be used, allows to decrease memory consumption.
+                One of [True, False, 'inplace']
             in_channels (int, default=3): 
                 number of input channels for model, default is 3.
             classes (int, default=2): 
@@ -85,77 +85,64 @@ class PanSmpMulti(MultiTaskSegModel):
                 if True, auxiliary decoder branch is added to the network
             aux_out_channels (int, default=1):
                 number of output channels from the auxiliary branch
-            
-        Returns:
-            ``torch.nn.Module``: **PAN**
-        .. _PAN:
-            https://arxiv.org/abs/1805.10180
-        """
 
+        Returns:
+            ``torch.nn.Module``: **Linknet**
+        .. _Linknet:
+            https://arxiv.org/pdf/1707.03718.pdf
+        """
         super().__init__()
         self.type_branch = type_branch
         self.aux_branch = aux_branch
 
-        # encoder
         self.encoder = get_encoder(
             encoder_name,
             in_channels=in_channels,
-            depth=5,
+            depth=encoder_depth,
             weights=encoder_weights,
         )
 
-        if encoder_dilation:
-            self.encoder.make_dilated(
-                stage_list=[5],
-                dilation_list=[2]
-            )
-
-        #  inst decoder
-        self.inst_decoder = PANDecoder(
+        # inst decoder
+        self.inst_decoder = LinknetDecoder(
             encoder_channels=self.encoder.out_channels,
-            decoder_channels=decoder_channels,
+            n_blocks=encoder_depth,
+            prefinal_channels=32,
+            use_batchnorm=decoder_use_batchnorm,
         )
 
         self.inst_seg_head = SegmentationHead(
-            in_channels=decoder_channels,
-            out_channels=2,
-            activation=activation,
-            kernel_size=1,
-            upsampling=upsampling
+            in_channels=32, out_channels=2, activation=activation, kernel_size=1
         )
 
         # type decoder
         self.type_decoder = None
         self.type_seg_head = None
         if self.type_branch:
-            self.type_decoder = PANDecoder(
+            self.type_decoder = LinknetDecoder(
                 encoder_channels=self.encoder.out_channels,
-                decoder_channels=decoder_channels,
+                n_blocks=encoder_depth,
+                prefinal_channels=32,
+                use_batchnorm=decoder_use_batchnorm,
             )
 
             self.type_seg_head = SegmentationHead(
-                in_channels=decoder_channels,
-                out_channels=classes,
-                activation=activation,
-                kernel_size=1,
-                upsampling=upsampling
+                in_channels=32, out_channels=classes, activation=activation, kernel_size=1
             )
 
         # aux decoder
         self.aux_decoder = None
         self.aux_seg_head = None
         if self.aux_branch:
-            self.aux_decoder = PANDecoder(
+            self.aux_decoder = LinknetDecoder(
                 encoder_channels=self.encoder.out_channels,
-                decoder_channels=decoder_channels,
-            )
-            self.aux_seg_head = SegmentationHead(
-                in_channels=decoder_channels,
-                out_channels=aux_out_channels,
-                activation=activation,
-                kernel_size=1,
-                upsampling=upsampling
+                n_blocks=encoder_depth,
+                prefinal_channels=32,
+                use_batchnorm=decoder_use_batchnorm,
             )
 
-        self.name = "pan-multi-{}".format(encoder_name)
+            self.aux_seg_head = SegmentationHead(
+                in_channels=32, out_channels=aux_out_channels, activation=activation, kernel_size=1
+            )
+
+        self.name = "link-multi-{}".format(encoder_name)
         self.initialize()

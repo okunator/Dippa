@@ -191,7 +191,7 @@ class SegModel(pl.LightningModule):
 
         return {
             "loss":loss,
-            "accuracy":type_acc.mean(),
+            "accuracy":type_acc.mean(), # accuracy computation not working
             "mean_iou":type_iou.mean()
         }
 
@@ -275,8 +275,6 @@ class SegModel(pl.LightningModule):
         }
 
         return [optimizer], [scheduler]
-
-
 
     def configure_loss(self):
         # Compute binary weights tensor

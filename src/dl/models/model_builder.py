@@ -137,7 +137,13 @@ class Model(MultiTaskSegModel):
 
 
         self.name = "custom-multi-task-model-{}".format(self.encoder_name)
+        
+        # init decoder weights
         self.initialize()
+
+        # freeze encoder if specified
+        if self.freeze:
+            self.freeze_encoder()
 
     @classmethod
     def set_model(cls,

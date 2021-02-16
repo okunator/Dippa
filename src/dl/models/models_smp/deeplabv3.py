@@ -28,31 +28,32 @@ import torch.nn.functional as F
 from typing import List, Tuple, Optional, Union
 from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.base import SegmentationHead
-from segmentation_models_pytorch.linknet.decoder import LinknetDecoder
-from src.dl.models.base_model import MultiTaskSegModel
+from segmentation_models_pytorch.deeplabv3.decoder import DeepLabV3Decoder
+from ..base_model import MultiTaskSegModel
 
+# adapted from https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/deeplabv3/model.py
 
-class LinknetSmpMulti(MultiTaskSegModel):
+class DeepLabV3SmpMulti(MultiTaskSegModel):        
     def __init__(self,
                  encoder_name: str = "resnet34",
                  encoder_depth: int = 5,
                  encoder_weights: Optional[str] = "imagenet",
-                 decoder_use_batchnorm: bool = True,
+                 decoder_channels: int = 256,
                  in_channels: int = 3,
-                 classes: int = 1,
-                 activation: Optional[Union[str, callable]] = None,
+                 classes: int = 2,
+                 activation: Optional[str] = None,
+                 upsampling: int = 8,
                  type_branch: bool = True,
                  aux_branch: bool = True,
                  aux_out_channels: int = 1,
                  **kwargs) -> None:
         """
-        Linknet_ is a fully convolution neural network for fast image semantic segmentation
-        Note:
-            This implementation by default has 4 skip connections (original - 3).
+        DeepLabV3_ implemetation from "Rethinking Atrous Convolution for Semantic Image Segmentation"
 
         This class uses https://github.com/qubvel/segmentation_models.pytorch/ implementation
-        of the model and adds an optional aux branch for regressing (B, 2, H, W) outputs
-
+        of the model and adds a semantic segmentation branch for classifying cell types that
+        outputs type maps (B, C, H, W). Adds also an optional aux branch for regressing (B, 2, H, W) outputs
+        
         Args:
             encoder_name (str, default="resnet34"):
                 name of classification model (without last dense layers) used as feature
@@ -64,10 +65,10 @@ class LinknetSmpMulti(MultiTaskSegModel):
                 spatial resolution (H/(2^depth), W/(2^depth)]
             encoder_weights (str, optional, default="imagenet"):
                 one of ``None`` (random initialization), ``imagenet`` (pre-training on ImageNet).
-            decoder_use_batchnorm (bool, default=True)
-                if ``True``, ``BatchNormalisation`` layer between ``Conv2D`` and ``Activation`` layers
-                is used. If 'inplace' InplaceABN will be used, allows to decrease memory consumption.
-                One of [True, False, 'inplace']
+            decoder_channels (int, default=256):
+                a number of convolution filters in ASPP module (default 256).
+            decoder_atrous_rates (tuple, default=(12, 24, 36)): 
+                dilation rates for ASPP module (should be a tuple of 3 integer values)
             in_channels (int, default=3): 
                 number of input channels for model, default is 3.
             classes (int, default=2): 
@@ -86,62 +87,74 @@ class LinknetSmpMulti(MultiTaskSegModel):
                 number of output channels from the auxiliary branch
 
         Returns:
-            ``torch.nn.Module``: **Linknet**
-        .. _Linknet:
-            https://arxiv.org/pdf/1707.03718.pdf
+            ``torch.nn.Module``: **DeepLabV3**
+        .. _DeeplabV3:
+            https://arxiv.org/abs/1706.05587
         """
         super().__init__()
         self.type_branch = type_branch
         self.aux_branch = aux_branch
 
+        # encoder
         self.encoder = get_encoder(
             encoder_name,
             in_channels=in_channels,
             depth=encoder_depth,
             weights=encoder_weights,
         )
+        self.encoder.make_dilated(
+            stage_list=[4, 5],
+            dilation_list=[2, 4]
+        )
 
         # inst decoder
-        self.inst_decoder = LinknetDecoder(
-            encoder_channels=self.encoder.out_channels,
-            n_blocks=encoder_depth,
-            prefinal_channels=32,
-            use_batchnorm=decoder_use_batchnorm,
+        self.inst_decoder = DeepLabV3Decoder(
+            in_channels=self.encoder.out_channels[-1],
+            out_channels=decoder_channels,
         )
 
         self.inst_seg_head = SegmentationHead(
-            in_channels=32, out_channels=2, activation=activation, kernel_size=1
+            in_channels=self.inst_decoder.out_channels,
+            out_channels=2,
+            activation=activation,
+            kernel_size=1,
+            upsampling=upsampling,
         )
 
         # type decoder
         self.type_decoder = None
         self.type_seg_head = None
         if self.type_branch:
-            self.type_decoder = LinknetDecoder(
-                encoder_channels=self.encoder.out_channels,
-                n_blocks=encoder_depth,
-                prefinal_channels=32,
-                use_batchnorm=decoder_use_batchnorm,
+            self.type_decoder = DeepLabV3Decoder(
+                in_channels=self.encoder.out_channels[-1],
+                out_channels=decoder_channels,
             )
 
             self.type_seg_head = SegmentationHead(
-                in_channels=32, out_channels=classes, activation=activation, kernel_size=1
+                in_channels=self.inst_decoder.out_channels,
+                out_channels=classes,
+                activation=activation,
+                kernel_size=1,
+                upsampling=upsampling,
             )
 
         # aux decoder
         self.aux_decoder = None
         self.aux_seg_head = None
         if self.aux_branch:
-            self.aux_decoder = LinknetDecoder(
-                encoder_channels=self.encoder.out_channels,
-                n_blocks=encoder_depth,
-                prefinal_channels=32,
-                use_batchnorm=decoder_use_batchnorm,
+            self.aux_decoder = DeepLabV3Decoder(
+                in_channels=self.encoder.out_channels[-1],
+                out_channels=decoder_channels,
             )
 
             self.aux_seg_head = SegmentationHead(
-                in_channels=32, out_channels=aux_out_channels, activation=activation, kernel_size=1
+                in_channels=self.inst_decoder.out_channels,
+                out_channels=aux_out_channels,
+                activation=activation,
+                kernel_size=1,
+                upsampling=upsampling,
             )
 
-        self.name = "link-multi-{}".format(encoder_name)
+
+        self.name = "deeplabv3-multi-{}".format(encoder_name)
         self.initialize()

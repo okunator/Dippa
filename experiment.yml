@@ -32,8 +32,8 @@ model_args:
     aux_type: hover              # One of (hover, dist, contour) (ignored if aux=False)
 
 training_args:
-  resume_training: True
-  num_epochs: 2
+  resume_training: False
+  num_epochs: 10
   num_gpus: 1
   freeze_encoder: False         # freeze the weights in the encoder (for fine tuning)
   weight_balancing: null        # One of (gradnorm, uncertainty, null)

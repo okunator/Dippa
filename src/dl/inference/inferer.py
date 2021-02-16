@@ -11,14 +11,14 @@ from pathos.multiprocessing import ThreadPool as Pool
 from skimage.color import label2rgb
 
 import src.dl.torch_utils as torch_utils
-from src.utils.file_manager import ProjectFileManager
+from src.utils.file_manager import FileManager
 from src.dl.inference.postprocessor import PostProcessor
 from src.dl.inference.predictor import Predictor
 from src.img_processing.patching.tiler_stitcher import TilerStitcher
 from src.img_processing.viz_utils import draw_contours, KEY_COLORS
 
 
-class Inferer(ProjectFileManager):
+class Inferer(FileManager):
     def __init__(self,
                  model: nn.Module,
                  dataset_args: DictConfig,

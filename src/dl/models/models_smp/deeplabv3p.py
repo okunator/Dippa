@@ -29,7 +29,8 @@ from typing import List, Tuple, Optional, Union
 from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.base import SegmentationHead
 from segmentation_models_pytorch.deeplabv3.decoder import DeepLabV3PlusDecoder
-from src.dl.models.base_model import MultiTaskSegModel
+
+from ..base_model import MultiTaskSegModel
 
 
 class DeepLabV3PlusSmpMulti(MultiTaskSegModel):

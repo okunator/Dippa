@@ -29,8 +29,9 @@ from typing import List, Tuple, Optional, Union
 from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.base import SegmentationHead
 from segmentation_models_pytorch.pspnet.decoder import PSPDecoder
-from src.dl.models.base_model import MultiTaskSegModel
-# Adapted from https: // github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/pspnet/model.py
+
+from ..base_model import MultiTaskSegModel
+
 
 class PSPNetSmpMulti(MultiTaskSegModel):
     def __init__(self,

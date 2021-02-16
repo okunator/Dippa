@@ -65,7 +65,7 @@ class SegTrainer:
         self.epochs = training_args.num_epochs
         self.resume_training = training_args.resume_training
         self.last_ckpt = fm.get_model_checkpoint("last") if self.resume_training else None
-        
+    
         # set logging dir
         self.logging_dir = fm.experiment_dir / "tf"
 
@@ -83,7 +83,7 @@ class SegTrainer:
             training_args,
             extra_callbacks
         )
-        
+
         return pl.Trainer(
             max_epochs=c.epochs,
             gpus=c.gpus,
