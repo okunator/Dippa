@@ -65,7 +65,6 @@ class BasicDecoder(nn.ModuleDict):
 
         # in_channels for all decoder layers
         in_channels = [head_channels] + decoder_channels
-        # in_channels.insert(0, head_channels)
 
         # skip channels for every decoder layer
         # no skip connection at the last decoder layer

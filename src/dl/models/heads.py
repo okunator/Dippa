@@ -8,7 +8,8 @@ class SegHead(nn.Module):
                  out_channels: int,
                  kernel_size: int = 1) -> None:
         """
-        Reduce the number of channels to out_channels
+        Segmentation head at the end of decoder branches.
+        Reduces the number of channels to out_channels
 
         Args:
             in_channels (int):

@@ -2,26 +2,23 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-import pandas as pd
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 
-from pathlib import Path
 from typing import List, Dict
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from torch.utils.data import DataLoader
-from catalyst.contrib.nn import Ralamb, RAdam, Lookahead
 
 from src.utils.file_manager import FileManager
 from src.dl.datasets.dataset_builder import DatasetBuilder
 from src.dl.optimizers.optim_builder import OptimizerBuilder
 from src.dl.losses.loss_builder import LossBuilder
+from src.dl.models.model_builder import Model
 from src.dl.torch_utils import to_device, argmax_and_flatten, iou, accuracy
 
 
 class SegModel(pl.LightningModule):
     def __init__(self,
-                 model: nn.Module,
                  experiment_args: DictConfig,
                  dataset_args: DictConfig,
                  model_args: DictConfig,
@@ -33,8 +30,6 @@ class SegModel(pl.LightningModule):
         Uses the experiment.yml file.
 
         Args:
-            model (nn.Module):
-                pytorch model specification.
             experiment_args (omegaconf.DictConfig): 
                 Omegaconf DictConfig specifying arguments that
                 are used for creating result folders and files. 
@@ -52,14 +47,34 @@ class SegModel(pl.LightningModule):
                 input image size for the model.
         """
         super(SegModel, self).__init__()
-        self.model: nn.Module = model
 
-        # General args
-        self.augmentations: List[str] = training_args.augmentations
+        # Init all args for save_hyperparameters() (hypereparam logging)
+        # General runtime args and augs
+        self.augs: List[str] = training_args.augmentations
         self.batch_size: int = runtime_args.batch_size
         self.input_size: int = runtime_args.model_input_size
+        self.runtime: str = runtime_args.runtime
 
-        # model args
+        # Module args
+        self.activation: str = model_args.architecture_design.module_args.activation
+        self.normalization: str = model_args.architecture_design.module_args.normalization
+        self.weight_standardize: bool = model_args.architecture_design.module_args.weight_standardize
+        self.weight_init: str = model_args.architecture_design.module_args.weight_init
+
+        # Encoder args
+        self.in_channels: int = model_args.architecture_design.encoder_args.in_channels
+        self.encoder_name: str = model_args.architecture_design.encoder_args.encoder
+        self.pretrain: bool = model_args.architecture_design.encoder_args.pretrain
+        self.depth: int = model_args.architecture_design.encoder_args.encoder_depth
+
+        # Decoder_args
+        self.n_blocks: int = model_args.architecture_design.decoder_args.n_blocks
+        self.short_skips: str = model_args.architecture_design.decoder_args.short_skips
+        self.long_skips: str = model_args.architecture_design.decoder_args.long_skips
+        self.merge_policy: str = model_args.architecture_design.decoder_args.merge_policy
+        self.upsampling: str = model_args.architecture_design.decoder_args.upsampling
+
+        # Multi-tasking args
         self.type_branch: bool = model_args.decoder_branches.type
         self.aux_branch: bool = model_args.decoder_branches.aux
         self.aux_type: str = model_args.decoder_branches.aux_type
@@ -68,8 +83,8 @@ class SegModel(pl.LightningModule):
         self.inst_branch_loss: str = training_args.loss_args.inst_branch_loss
         self.type_branch_loss: str = training_args.loss_args.inst_branch_loss
         self.aux_branch_loss: str = training_args.loss_args.inst_branch_loss
-        self.edge_weight: str = training_args.loss_args.edge_weight
-        self.class_weights: str = training_args.loss_args.class_weights
+        self.edge_weight: bool = training_args.loss_args.edge_weight
+        self.class_weights: bool = training_args.loss_args.class_weights
 
         # Optimizer args
         self.optimizer_name: str = training_args.optimizer_args.optimizer
@@ -78,9 +93,11 @@ class SegModel(pl.LightningModule):
         self.weight_decay: float = training_args.optimizer_args.weight_decay 
         self.encoder_weight_decay: float = training_args.optimizer_args.encoder_weight_decay
         self.scheduler_factor: float = training_args.optimizer_args.scheduler_factor
-        self.schduler_patience: int = training_args.optimizer_args.schduler_patience
+        self.scheduler_patience: int = training_args.optimizer_args.scheduler_patience
         self.lookahead: bool = training_args.optimizer_args.lookahead
         self.bias_weight_decay: bool = training_args.optimizer_args.bias_weight_decay
+
+        # save args to a file
         self.save_hyperparameters()
 
         # init file manager
@@ -89,22 +106,30 @@ class SegModel(pl.LightningModule):
             dataset_args=dataset_args
         )
 
-        # init loss function
-        self.criterion = LossBuilder.set_loss(
-            decoder_branches=model_args.decoder_branches,
-            loss_args=training_args.loss_args,
-            binary_weights=self.binary_class_weights,
-            type_weights=self.type_branch_loss
-        )
+        # database paths
+        self.dataset = self.fm.train_dataset if self.runtime == "train" else self.fm.infer_dataset
+        self.db_dict = self.fm.get_databases(self.dataset)
+        self.train_data = self.db_dict['train'][self.input_size]
+        self.valid_data = self.db_dict['valid'][self.input_size]
+        self.test_data = self.db_dict['test'][self.input_size]
 
-        # init optimizer
-        self.optimizer = OptimizerBuilder.set_optimizer(
-            training_args.optimizer_args, self.model
-        )
+        # init model
+        self.nclasses = self.fm.nclasses_traindata if self.runtime == "train" else self.fm.nclasses_inferdata
+        if self.aux_branch:
+            self.aux_channels = 2 if self.aux_type == "hover" else 1
+
+        self.model = Model(model_args, n_classes=self.nclasses, aux_out_channels=self.aux_channels)
+
+        # Redundant but necessary for experiment logging..
+        self.optimizer_args = training_args.optimizer_args
+        self.decoder_branch_args = model_args.decoder_branches
+        self.loss_args = training_args.loss_args
+        
+        # init multi loss function
+        self.criterion = self.configure_loss()
 
     @classmethod
-    def from_conf(cls, conf: DictConfig, model: nn.Module):
-        model = model
+    def from_conf(cls, conf: DictConfig):
         dataset_args = conf.dataset_args
         experiment_args = conf.experiment_args
         model_args = conf.model_args
@@ -112,7 +137,6 @@ class SegModel(pl.LightningModule):
         runtime_args = conf.runtime_args
         
         return cls(
-            model,
             experiment_args,
             dataset_args,
             model_args,
@@ -120,51 +144,13 @@ class SegModel(pl.LightningModule):
             runtime_args
         )
 
-    @property
-    def train_data(self):
-        #TODO npy files
-        return self.fm.databases['train'][self.input_size]
-    
-    @property
-    def valid_data(self):
-        # TODO npy files
-        return self.fm.databases['valid'][self.input_size]
-    
-    @property
-    def test_data(self):
-        # TODO npy files
-        return self.fm.databases['test'][self.input_size]
-
-    @property
-    def binary_class_weights(self):
-        """
-        Compute weights for fg and bg from training data pixels
-        """
-        weights = None
-        if self.class_weights:
-            num_class_pixels = self.fm.get_class_pixels(self.train_data.as_posix())
-            num_binary_pixels = np.sum(num_class_pixels, where=[False] + [True]*(len(num_class_pixels)-1))
-            class_pixels = np.array([num_class_pixels[0], num_binary_pixels])
-            weights = to_device(1-class_pixels/class_pixels.sum())
-        return weights
-
-    @property
-    def type_class_weights(self):
-        """
-        Compute weights for type classes from training data pixels
-        """
-        weights = None
-        if self.class_weights:
-            class_pixels = self.fm.get_class_pixels(self.train_data.as_posix())
-            weights = to_device(1-class_pixels/class_pixels.sum())
-        return weights
-
     # Lightning framework stuff:
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         return self.model(x)
 
     def step(self, batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
         """
+        General training step
         """
         # Get data
         x = batch["image"].float()
@@ -273,33 +259,63 @@ class SegModel(pl.LightningModule):
         return return_dict
 
     def configure_optimizers(self):
-        optimizer = self.optimizer
+        # init optimizer
+        optimizer = OptimizerBuilder.set_optimizer(
+            self.optimizer_args, self.model
+        )
 
         # Scheduler
-        scheduler = [{
+        scheduler = {
             'scheduler': optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer[0], factor=self.factor, patience=self.patience
+                optimizer, factor=self.scheduler_factor, patience=self.scheduler_patience
             ),
             'monitor': 'avg_val_loss',
             'interval': 'epoch',
             'frequency': 1
-        }]
+        }
 
-        return optimizer, scheduler 
+        return [optimizer], [scheduler]
+
+
+
+    def configure_loss(self):
+        # Compute binary weights tensor
+        binary_weights = None
+        if self.class_weights:
+            num_class_pixels = self.fm.get_class_pixels(self.train_data.as_posix())
+            num_binary_pixels = np.sum(num_class_pixels, where=[False] + [True]*(len(num_class_pixels)-1))
+            class_pixels = np.array([num_class_pixels[0], num_binary_pixels])
+            binary_weights = to_device(1-class_pixels/class_pixels.sum())
+        
+        # compute type weight tensor
+        type_weights = None
+        if self.class_weights:
+            class_pixels = self.fm.get_class_pixels(self.train_data.as_posix())
+            type_weights = to_device(1-class_pixels/class_pixels.sum())
+        
+        # init loss function
+        loss = LossBuilder.set_loss(
+            decoder_branches_args=self.decoder_branch_args,
+            loss_args=self.loss_args,
+            binary_weights=binary_weights,
+            type_weights=type_weights,
+
+        )
+        return loss
 
     def prepare_data(self):
         self.trainset = DatasetBuilder.set_train_dataset(
+            decoder_branch_args=self.decoder_branch_args,
+            augmentations=self.augs,
             fname=self.train_data.as_posix(), 
-            preproc_style=self.fm.preproc_style,
-            augs_list=self.fm.train_augs
         )
         self.validset = DatasetBuilder.set_test_dataset(
+            decoder_branch_args=self.decoder_branch_args,
             fname=self.valid_data.as_posix(), 
-            preproc_style=self.fm.preproc_style,
         )
         self.testset = DatasetBuilder.set_test_dataset(
-            fname=self.test_data.as_posix(), 
-            preproc_style=self.fm.preproc_style,
+            decoder_branch_args=self.decoder_branch_args,
+            fname=self.test_data.as_posix()
         )
 
     def train_dataloader(self):

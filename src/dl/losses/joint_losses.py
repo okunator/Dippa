@@ -12,7 +12,7 @@ class JointLoss(nn.ModuleDict):
         in the list and at the end sums the outputs together as one joint loss.
 
         Args:
-            losses (List[nn.Module]): List of losses found in losses.py
+            losses (List[nn.Module]): List of nn.Module losses
             weights (List[float]): List of weights for each loss
 
         Returns:

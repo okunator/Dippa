@@ -95,6 +95,7 @@ class FileManager(FileHandler):
                 to the dataset that is being used.
         """
         self.__ex_name: str = experiment_args.experiment_name
+        self.__ex_version: str = experiment_args.experiment_version
         self.__other_path: str = dataset_args.other_path
         self.__train_ds: str = dataset_args.train_dataset
         self.__infer_ds: str = dataset_args.infer_dataset
@@ -110,8 +111,12 @@ class FileManager(FileHandler):
         )
 
     @property
+    def result_folder(self):
+        return RESULT_DIR
+
+    @property
     def experiment_dir(self) -> Path:
-        return RESULT_DIR.joinpath(f"/version_{self.__ex_name}")
+        return RESULT_DIR / f"{self.__ex_name}" / f"version_{self.__ex_version}"
 
     @property
     def train_dataset(self):
@@ -130,6 +135,20 @@ class FileManager(FileHandler):
             pass
         
         return self.__infer_ds
+
+    @property
+    def nclasses_traindata(self):
+        yml_path = [f for f in Path(CONF_DIR).iterdir() if self.train_dataset in f.name][0]
+        data_conf = OmegaConf.load(yml_path)
+        classes = data_conf.class_types.type
+        return len(classes)
+
+    @property
+    def nclasses_inferdata(self):
+        yml_path = [f for f in Path(CONF_DIR).iterdir() if self.infer_dataset in f.name][0]
+        data_conf = OmegaConf.load(yml_path)
+        classes = data_conf.class_types.type
+        return len(classes)
 
     @property
     def pannuke_folds(self) -> Dict[str, str]:
@@ -217,7 +236,7 @@ class FileManager(FileHandler):
         Returns:
             Dict[str, Dict[str, str]]
             Dictionary where keys (train, test, valid) point to dictionaries with keys img and mask.
-            The innermost dictionary values where the img and mask -keys point to are sorted lists 
+            The innermost dictionary values where the img and mask keys point to are sorted lists 
             containing paths to the image and mask files. 
         """
 
@@ -316,7 +335,8 @@ class FileManager(FileHandler):
                     ckpt = item
 
         assert ckpt is not None, (
-            f"ckpt: {ckpt}. Checkpoint is None. Make sure that a .ckpt file exists in experiment dir"
+            f"ckpt: {ckpt}. Checkpoint is None. Make sure that a .ckpt file exists in experiment dir",
+            "If you dont want to resume training, check that resume_training = False in experiment.yml"
         )
         return ckpt
 

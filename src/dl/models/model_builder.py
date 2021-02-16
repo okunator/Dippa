@@ -13,7 +13,7 @@ class Model(MultiTaskSegModel):
     def __init__(self,
                  model_args: DictConfig,
                  n_classes: int,
-                 aux_out_channels: int,
+                 aux_out_channels: int = None,
                  **kwargs) -> None:
         """
         Class which builds the model from the architectural desing choices 
@@ -26,7 +26,7 @@ class Model(MultiTaskSegModel):
             n_classes (int):
                 Number of classes in the dataset. Type decoder branch
                 is set to output this number of classes
-            aux_out_channels (int, default=1):
+            aux_out_channels (int, default=None):
                 Number of output channels from the auxiliary branch
         """
         super(Model, self).__init__()

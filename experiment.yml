@@ -32,8 +32,8 @@ model_args:
     aux_type: hover              # One of (hover, dist, contour) (ignored if aux=False)
 
 training_args:
-  resume_training: False
-  num_epochs: 3
+  resume_training: True
+  num_epochs: 2
   num_gpus: 1
   freeze_encoder: False         # freeze the weights in the encoder (for fine tuning)
   weight_balancing: null        # One of (gradnorm, uncertainty, null)
@@ -41,10 +41,10 @@ training_args:
     - hue_sat
     - non_rigid
     - blur
-    - non-spatial
+    - non_spatial
 
   optimizer_args:
-    optimizer: adamw            # One of https://github.com/jettify/pytorch-optimizer 
+    optimizer: adam            # One of https://github.com/jettify/pytorch-optimizer 
     lr: 0.0005
     encoder_lr: 0.00005
     weight_decay: 0.0003
@@ -52,14 +52,14 @@ training_args:
     lookahead: True
     bias_weight_decay: False
     scheduler_factor: 0.25
-    schduler_patience: 2
+    scheduler_patience: 2
 
   loss_args:
     inst_branch_loss: dice_focal
     type_branch_loss: tversky_focal
-    aux_branch_loss: mse
-    edge_weight: False
-    class_weights: False
+    aux_branch_loss: mse_ssim
+    edge_weight: False         # Give penalty to nuclei borders in cross-entropy based losses
+    class_weights: False       # Weight classes by the # of class pixels in the data
 
 
 inference_args:
@@ -69,6 +69,7 @@ inference_args:
   verbose: True
 
 runtime_args:
-  batch_size: 6
+  runtime: train              # One of (train, inference)
+  batch_size: 8
   model_input_size: 256       # Multiple of 32. Tuple(int, int) 
 

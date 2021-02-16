@@ -5,25 +5,26 @@ from omegaconf import DictConfig
 import src.dl.datasets as ds
 
 
-class DataSetBuilder:
+class DatasetBuilder:
     def __init__(self,
-                 model_args: DictConfig,
-                 training_args: DictConfig,
+                 decoder_branch_args: DictConfig,
+                 augmentations: List[str],
                  **kwargs) -> None:
         """
         Initializes the train & test time datsets based on the experiment.yml
 
         Args:
-            model_args (omegaconf.DictConfig): 
+            decoder_branch_args (omegaconf.DictConfig): 
                 Omegaconf DictConfig specifying arguments related 
-                to the model architecture that is being used.
-            training_args (omegaconf.DictConfig): 
-                Omegaconf DictConfig specifying arguments that are
-                used for training a network. Contains list of augmentations
+                to the what decoder branches are used
+            augmentations (List[str]): 
+                List of augmentations to be used for training
+                One of ("rigid", "non_rigid", "hue_sat", "blur", "non_spatial",
+                        "random_crop", "center_crop", "resize")
         """
-        self.augs: List[str] = training_args.augmentations
-        self.aux_branch = model_args.decoder_branches.aux
-        self.ds_name = model_args.decoder_branches.aux_type if self.aux_branch else "unet"
+        self.augs: List[str] = augmentations
+        self.aux_branch = decoder_branch_args.aux
+        self.ds_name = decoder_branch_args.aux_type if self.aux_branch else "unet"
         assert self.ds_name in ("hover", "dist", "contour", "unet", "basic")
 
     def get_augs(self, augs_list: Optional[List[str]] = None):
@@ -40,47 +41,47 @@ class DataSetBuilder:
 
     @classmethod
     def set_train_dataset(cls,
-                          model_args: DictConfig,
-                          training_args: DictConfig,
                           fname: str,
-                          augs_list: Optional[List[str]] = None) -> Dataset:
+                          decoder_branch_args: DictConfig,
+                          augmentations: List[str]=None) -> Dataset:
         """
         Init the train dataset.
 
         Args:
-            model_args (omegaconf.DictConfig): 
+            decoder_branch_args (omegaconf.DictConfig): 
                 Omegaconf DictConfig specifying arguments related 
-                to the model architecture that is being used.
-            training_args (omegaconf.DictConfig): 
-                Omegaconf DictConfig specifying arguments that are
-                used for training a network. Contains list of augmentations
+                to the what decoder branches are used
+            augmentations (List[str]): 
+                List of augmentations to be used for training
+                One of ("rigid", "non_rigid", "hue_sat", "blur", "non_spatial",
+                        "random_crop", "center_crop", "resize")
             fname (str):
                 path to the hdf5 database file
-            augs_list (List[str], optional, default=None):    
-                List of augmentations specified in config.py
+
         """
-        c = cls(model_args, training_args)
-        aug = c.get_augs(augs_list)
+        c = cls(decoder_branch_args, augmentations)
+        aug = c.get_augs(c.augs)
         return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug)
 
     @classmethod
-    def set_test_dataset(cls,   
-                         model_args: DictConfig,
-                         training_args: DictConfig, 
-                         fname: str) -> Dataset:
+    def set_test_dataset(cls,
+                         fname: str,
+                         decoder_branch_args: DictConfig,
+                         augmentations: List[str]=None) -> Dataset:
         """
         Init the test dataset. 
 
         Args:
-            model_args (omegaconf.DictConfig): 
+            decoder_branch_args (omegaconf.DictConfig): 
                 Omegaconf DictConfig specifying arguments related 
-                to the model architecture that is being used.
-            training_args (omegaconf.DictConfig): 
-                Omegaconf DictConfig specifying arguments that are
-                used for training a network. Contains list of augmentations
+                to the what decoder branches are used
+            augmentations (List[str]): 
+                List of augmentations to be used for training
+                One of ("rigid", "non_rigid", "hue_sat", "blur", "non_spatial",
+                        "random_crop", "center_crop", "resize")
             fname (str): 
                 path to the hdf5 database file
         """
-        c = cls(model_args, training_args)
+        c = cls(decoder_branch_args, augmentations)
         aug = c.get_augs()
         return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug)
