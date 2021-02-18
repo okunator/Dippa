@@ -17,8 +17,10 @@ class BaseDataset(Dataset, FileHandler):
         Base dataset class
 
         Args:
-            fname (str): path to the pytables database
-            transforms (albu.Compose): albumentations.Compose obj (a list of augmentations)
+            fname (str): 
+                path to the pytables database
+            transforms (albu.Compose): 
+                albumentations.Compose obj (a list of augmentations)
         """
         assert transforms is not None, "No augmentations given. Give at least epmty albu.Compose"
         self.fname = fname

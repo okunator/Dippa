@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import pytorch_lightning as pl
-import matplotlib.pyplot as plt
 
 from typing import List, Dict
 from omegaconf import DictConfig

@@ -15,8 +15,10 @@ class HoverDataset(BaseDataset):
         https://arxiv.org/abs/1812.06499
 
         Args:
-            fname (str): path to the pytables database
-            transforms (albu.Compose): albumentations.Compose obj (a list of augmentations)
+            fname (str): 
+                path to the pytables database
+            transforms (albu.Compose): 
+                albumentations.Compose obj (a list of augmentations)
         """
 
         super(HoverDataset, self).__init__(fname, transforms)

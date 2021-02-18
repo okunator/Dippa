@@ -14,7 +14,6 @@ class PostProcessor:
     Should be used for full sized images and not small patches.
     """
 
-    @staticmethod
     def threshold(self, 
                   prob_map: np.ndarray, 
                   method: str = "argmax", 
@@ -36,7 +35,6 @@ class PostProcessor:
         key = post_proc.THRESH_LOOKUP[method]
         return post_proc.__dict__[key](prob_map, thresh) 
 
-    @staticmethod
     def post_process(self, 
                      inst_map: np.ndarray,
                      prob_map: np.ndarray,
@@ -72,7 +70,6 @@ class PostProcessor:
         key = post_proc.POST_PROC_LOOKUP[method1][method2]
         return post_proc.__dict__[key](**kwargs)
 
-    @staticmethod
     def combine_inst_type(self, inst_map: np.ndarray, type_map: np.ndarray) -> np.ndarray:
         """
         Combines the nuclei types and instances 
