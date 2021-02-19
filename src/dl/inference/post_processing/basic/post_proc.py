@@ -6,9 +6,10 @@ import skimage.feature as feat
 import skimage.filters as filters
 import skimage.util as util
 import scipy.ndimage as ndi
-from src.img_processing.post_processing.thresholding import niblack_thresh
-from src.img_processing.post_processing.utils import remove_debris, cv2_opening
-from src.img_processing.process_utils import bounding_box, binarize, remap_label
+
+from src.utils.process_utils import bounding_box, remap_label
+from .utils import remove_debris, cv2_opening, binarize
+from .thresholding import niblack_thresh
 
 
 

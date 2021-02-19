@@ -5,7 +5,17 @@ import numpy as np
 import skimage.morphology as morph
 import skimage.filters as filters
 import scipy.ndimage as ndi
-import src.img_processing.process_utils as util
+
+
+def binarize(inst_map: np.ndarray) -> np.ndarray:
+    """
+    Binarize a labelled instance map
+
+    Args:
+        inst_map (np.ndarray): instance map to be binarized
+    """
+    inst_map[inst_map > 0] = 1
+    return inst_map.astype("uint8")
 
 
 def activation(prob_map: np.ndarray, method: str = 'sigmoid') -> np.ndarray:
@@ -84,7 +94,7 @@ def cv2_opening(mask: np.ndarray, iterations: int = 2) -> np.ndarray:
         mask (np.ndarray): instance map to be opened. Shape (H, W)
         iterations: int: number of iterations for the operation
     """
-    mask = util.binarize(mask)
+    mask = binarize(mask)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5))
     new_mask = (mask*255).astype(np.uint8)
     new_mask = cv2.morphologyEx(new_mask, cv2.MORPH_OPEN, kernel, iterations=iterations)
@@ -100,7 +110,7 @@ def cv2_closing(mask: np.ndarray, iterations: int = 2) -> np.ndarray:
         mask (np.ndarray): instance map to be opened. Shape (H, W)
         iterations: int: number of iterations for the operation
     """
-    mask = util.binarize(mask)
+    mask = binarize(mask)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5))
     new_mask = (mask*255).astype(np.uint8)
     new_mask = cv2.morphologyEx(new_mask, cv2.MORPH_CLOSE, kernel, iterations=iterations)

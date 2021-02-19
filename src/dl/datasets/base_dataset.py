@@ -4,9 +4,8 @@ import numpy as np
 from torch.utils.data import Dataset
 from typing import List, Dict, Optional
 
-from src.img_processing.process_utils import binarize
 from src.utils.file_manager import FileHandler
-from .pre_proc_utils import get_weight_map, remove_1px_boundary, fix_mirror_padding
+from .pre_proc_utils import get_weight_map, remove_1px_boundary, fix_mirror_padding, binarize
 
 
 class BaseDataset(Dataset, FileHandler):

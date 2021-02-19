@@ -11,7 +11,7 @@ import src.dl.torch_utils as util
 class Predictor:
     def __init__(self, model: nn.Module) -> None:
         """
-        class to create predictions at inference time
+        Helper class for predicting soft masks at inference time
 
         Args;
             model (nn.Module): nn.Module pytorch model

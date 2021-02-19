@@ -30,8 +30,9 @@ import skimage.segmentation as segm
 import skimage.filters as filters
 import skimage.util as util
 import scipy.ndimage as ndi
-from src.img_processing.post_processing.utils import remove_debris
-from src.img_processing.process_utils import bounding_box, remap_label, binarize
+
+from src.utils.process_utils import bounding_box, remap_label
+from .utils import remove_debris, binarize
 
 
 # ported from: https: // github.com/vqdang/hover_net/blob/master/src/postproc/hover.py  # L69

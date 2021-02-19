@@ -22,11 +22,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-
 import numpy as np
 import pandas as pd
 from scipy.spatial import distance_matrix
-from src.img_processing.process_utils import get_inst_centroid, bounding_box
+
+from src.utils.process_utils import get_inst_centroid, bounding_box
 
 
 # Adapted from https://github.com/vqdang/hover_net/blob/master/src/process.py

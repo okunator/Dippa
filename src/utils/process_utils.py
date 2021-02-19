@@ -1,37 +1,38 @@
+"""
+Utility functions mainly ported from HoVer-Net repo
+"""
+
 import cv2
 import numpy as np
+import scipy.ndimage as ndi
+
 from typing import List, Tuple
-from skimage.morphology import opening 
-from scipy import ndimage as ndi
-import skimage.morphology as morph
-from scipy.optimize import linear_sum_assignment
 
 
-# ported from https://github.com/vqdang/hover_net/blob/master/src/misc/utils.py
-def cropping_center(x: np.ndarray,
-                    crop_shape: Tuple[int] = (256, 256),
-                    batch: bool = False) -> np.ndarray:
+def center_crop(img: np.ndarray, ch: int, cw: int) -> np.ndarray:
     """
-    Crop an input image from the center
+    Center crop an input image
 
     Args:
-        x (np.ndarray): input img
-        crop_shape (Tuple[int]): the shape of the crop
-        batch: (bool): batch dim is included in input img
+        img (np.ndarray): 
+            Input img. Shape (H, W).
+        ch (int):
+            Crop height
+        cw (int):
+            crop width
     """
-    orig_shape = x.shape
-    if not batch:
-        h0 = int((orig_shape[0] - crop_shape[0]) * 0.5)
-        w0 = int((orig_shape[1] - crop_shape[1]) * 0.5)
-        x = x[h0:h0 + crop_shape[0], w0:w0 + crop_shape[1]]
+    if len(img.shape) == 3:
+        H, W, _ = img.shape
     else:
-        h0 = int((orig_shape[1] - crop_shape[0]) * 0.5)
-        w0 = int((orig_shape[2] - crop_shape[1]) * 0.5)
-        x = x[:,h0:h0 + crop_shape[0], w0:w0 + crop_shape[1]]        
-    return x
+        H, W = img.shape
 
+    x = W // 2 - (cw // 2)
+    y = H // 2 - (ch // 2)    
+    img = img[y:y + ch, x:x + cw, :] if len(img.shape) == 3 else img[y:y + ch, x:x + cw]
+    return img
+    
 
-# ported from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
+# Ported from https://github.com/vqdang/hover_net/blob/master/src/misc/utils.py
 def bounding_box(inst_map: np.ndarray) -> List[int]:
     """
     Bounding box coordinates for nuclei instance
@@ -117,7 +118,6 @@ def get_inst_centroid(inst_map: np.ndarray) -> np.ndarray:
     return np.array(inst_centroid_list)
 
 
-# Adapted from Hover-net repo
 def get_inst_types(inst_map: np.ndarray, type_map: np.ndarray) -> np.ndarray:
     """
     Get the types of every single instance in an instance map
@@ -148,7 +148,6 @@ def get_inst_types(inst_map: np.ndarray, type_map: np.ndarray) -> np.ndarray:
     return inst_types
 
 
-# Adapted from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
 def instance_contours(inst_map: np.ndarray, thickness: int = 2):
     """
     Find a contour for each nuclei instance in a mask
@@ -159,8 +158,7 @@ def instance_contours(inst_map: np.ndarray, thickness: int = 2):
     """
 
     # Padding first to avoid contouring the image borders
-    inst_map2 = np.pad(
-        inst_map.copy(), ((thickness, thickness), (thickness, thickness)), 'edge')
+    inst_map2 = np.pad(inst_map.copy(), ((thickness, thickness), (thickness, thickness)), 'edge')
     bg = np.zeros(inst_map2.shape, dtype=np.uint8)
     for j, nuc_id in enumerate(np.unique(inst_map)):
         inst_map = np.array(inst_map2 == nuc_id, np.uint8)
@@ -183,7 +181,7 @@ def instance_contours(inst_map: np.ndarray, thickness: int = 2):
         bg[y1:y2, x1:x2] = inst_bg_crop
 
     bg = bg[thickness:-thickness, thickness:-thickness]
-    return bg
+    return bg, contours
 
 
 def get_type_instances(inst_map: np.ndarray,
@@ -241,14 +239,3 @@ def type_map_flatten(type_map: np.ndarray) -> np.ndarray:
         type_tmp = type_map == t
         type_out += (type_tmp * t)
     return type_out
-
-
-def binarize(inst_map: np.ndarray) -> np.ndarray:
-    """
-    Binarize a labelled instance map
-
-    Args:
-        inst_map (np.ndarray): instance map to be binarized
-    """
-    inst_map[inst_map > 0] = 1
-    return inst_map.astype("uint8")

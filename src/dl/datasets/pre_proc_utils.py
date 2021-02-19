@@ -116,3 +116,15 @@ def get_weight_map(inst_map: np.ndarray, sigma: float = 5.0, w0: float = 10.0):
     pen_map = w0 * np.exp(- pen_map**2 / 2)
     pen_map[inst_map > 0] = 0 # inner instances zero
     return pen_map
+
+
+def binarize(inst_map: np.ndarray) -> np.ndarray:
+    """
+    Binarize a labelled instance map
+
+    Args:
+        inst_map (np.ndarray): instance map to be binarized
+    """
+    inst_map[inst_map > 0] = 1
+    return inst_map.astype("uint8")
+
