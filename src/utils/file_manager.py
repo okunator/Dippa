@@ -96,9 +96,7 @@ class FileManager(FileHandler):
         """
         self.__ex_name: str = experiment_args.experiment_name
         self.__ex_version: str = experiment_args.experiment_version
-        self.__other_path: str = dataset_args.other_path
         self.__train_ds: str = dataset_args.train_dataset
-        self.__infer_ds: str = dataset_args.infer_dataset
 
     @classmethod
     def from_conf(cls, conf: DictConfig):
@@ -120,21 +118,12 @@ class FileManager(FileHandler):
 
     @property
     def train_dataset(self):
-        assert self.__train_ds in ("kumar","consep","pannuke","dsb2018", "monusac", "other")
+        assert self.__train_ds in ("kumar","consep","pannuke","dsb2018", "monusac", None)
         
         if self.__train_ds == "other":
             pass
 
         return self.__train_ds
-
-    @property
-    def infer_dataset(self):
-        assert self.__infer_ds in ("kumar","consep","pannuke","dsb2018", "monusac", "other")
-        
-        if self.__infer_ds == "other":
-            pass
-        
-        return self.__infer_ds
 
     @property
     def n_classes(self):

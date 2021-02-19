@@ -52,8 +52,6 @@ experiment_args:
 
 dataset_args:
   train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
-  infer_dataset: consep         # One of (consep, pannuke, kumar, monusac, other)
-  other_path: null              # Path to own dataset if infer_dataset=other
 
 model_args:
   architecture_design:
