@@ -64,7 +64,7 @@ model_args:
       weight_init: he           # One of (he, eoc, fixup) (only for decoder if pretrain)
     encoder_args:
       in_channels: 3            # RGB input images
-      encoder: resnext50        # https://github.com/qubvel/segmentation_models.pytorch
+      encoder: resnet50         # https://github.com/qubvel/segmentation_models.pytorch
       pretrain: True            # Use imagenet pre-trained encoder
       encoder_depth: 5          # Number of layers in encoder
     decoder_args:
@@ -108,16 +108,10 @@ training_args:
     edge_weight: False
     class_weights: False
 
-
-inference_args:
-  model_weights: last         # One of (last, best)
-  data_fold: test             # One of (train, test)
-  tta: False
-  verbose: True
-
 runtime_args:
   batch_size: 6
-  model_input_size: 256       # Multiple of 32. Tuple(int, int) 
+  model_input_size: 256       # Multiple of 32. Tuple(int, int)
+  num_workers: 8              # number workers for data loeader
 
 ```
 

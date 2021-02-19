@@ -61,15 +61,9 @@ training_args:
     edge_weight: False         # Give penalty to nuclei borders in cross-entropy based losses
     class_weights: False       # Weight classes by the # of class pixels in the data
 
-
-inference_args:
-  model_weights: last         # One of (last, best)
-  data_fold: test             # One of (train, test)
-  tta: False
-  verbose: True
-
 runtime_args:
-  runtime: train              # One of (train, inference)
   batch_size: 8
   model_input_size: 256       # Multiple of 32. Tuple(int, int) 
+  num_workers: 8              # number workers for data loeader
+
 

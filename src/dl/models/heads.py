@@ -20,6 +20,7 @@ class SegHead(nn.Module):
 
         """
         super(SegHead, self).__init__()
+        self.n_classes = out_channels
 
         if kernel_size != 1:
             self.conv2d = nn.Conv2d(

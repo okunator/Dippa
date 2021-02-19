@@ -29,6 +29,7 @@ results/tests/*
 results/*
 src/tests/
 src/old/
+src/deprecated/
 notebooks/tests/
 .ipynb_checkpoints
 .DS_Store

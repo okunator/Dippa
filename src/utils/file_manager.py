@@ -137,15 +137,8 @@ class FileManager(FileHandler):
         return self.__infer_ds
 
     @property
-    def nclasses_traindata(self):
+    def n_classes(self):
         yml_path = [f for f in Path(CONF_DIR).iterdir() if self.train_dataset in f.name][0]
-        data_conf = OmegaConf.load(yml_path)
-        classes = data_conf.class_types.type
-        return len(classes)
-
-    @property
-    def nclasses_inferdata(self):
-        yml_path = [f for f in Path(CONF_DIR).iterdir() if self.infer_dataset in f.name][0]
         data_conf = OmegaConf.load(yml_path)
         classes = data_conf.class_types.type
         return len(classes)

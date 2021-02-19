@@ -13,7 +13,7 @@ from src.dl.datasets.dataset_builder import DatasetBuilder
 from src.dl.optimizers.optim_builder import OptimizerBuilder
 from src.dl.losses.loss_builder import LossBuilder
 from src.dl.models.model_builder import Model
-from src.dl.torch_utils import to_device, argmax_and_flatten, iou, accuracy
+from src.dl.torch_utils import to_device, iou, accuracy
 
 
 class SegModel(pl.LightningModule):
@@ -52,7 +52,7 @@ class SegModel(pl.LightningModule):
         self.augs: List[str] = training_args.augmentations
         self.batch_size: int = runtime_args.batch_size
         self.input_size: int = runtime_args.model_input_size
-        self.runtime: str = runtime_args.runtime
+        self.num_workers: int = runtime_args.num_workers
 
         # Module args
         self.activation: str = model_args.architecture_design.module_args.activation
@@ -106,18 +106,16 @@ class SegModel(pl.LightningModule):
         )
 
         # database paths
-        self.dataset = self.fm.train_dataset if self.runtime == "train" else self.fm.infer_dataset
-        self.db_dict = self.fm.get_databases(self.dataset)
+        self.db_dict = self.fm.get_databases(self.fm.train_dataset)
         self.train_data = self.db_dict['train'][self.input_size]
         self.valid_data = self.db_dict['valid'][self.input_size]
         self.test_data = self.db_dict['test'][self.input_size]
 
         # init model
-        self.nclasses = self.fm.nclasses_traindata if self.runtime == "train" else self.fm.nclasses_inferdata
         if self.aux_branch:
             self.aux_channels = 2 if self.aux_type == "hover" else 1
 
-        self.model = Model(model_args, n_classes=self.nclasses, aux_out_channels=self.aux_channels)
+        self.model = Model(model_args, n_classes=self.fm.n_classes, aux_out_channels=self.aux_channels)
 
         # Redundant but necessary for experiment logging..
         self.optimizer_args = training_args.optimizer_args
@@ -317,15 +315,27 @@ class SegModel(pl.LightningModule):
 
     def train_dataloader(self):
         return DataLoader(
-            self.trainset, batch_size=self.batch_size, shuffle=True, pin_memory=True, num_workers=8
+            self.trainset, 
+            batch_size=self.batch_size, 
+            shuffle=True, 
+            pin_memory=True, 
+            num_workers=self.num_workers
         )
 
     def val_dataloader(self):
         return DataLoader(
-            self.validset, batch_size=self.batch_size, shuffle=False, pin_memory=True, num_workers=8
+            self.validset, 
+            batch_size=self.batch_size,
+            shuffle=False,
+            pin_memory=True, 
+            num_workers=self.num_workers
         )
     
     def test_dataloader(self):
         return DataLoader(
-            self.testset, batch_size=self.batch_size, shuffle=False, pin_memory=True, num_workers=8
+            self.testset,
+            batch_size=self.batch_size, 
+            shuffle=False, 
+            pin_memory=True, 
+            num_workers=self.num_workers
         )
