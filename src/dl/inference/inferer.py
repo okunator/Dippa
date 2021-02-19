@@ -1,11 +1,10 @@
 import torch
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, Dataset
-from collections import OrderedDict
 from typing import Tuple, List, Union, Optional
+from collections import OrderedDict
 from pathlib import Path
 from tqdm import tqdm
-
 
 from src.utils.file_manager import FileHandler
 from src.dl.inference.predictor import Predictor
@@ -13,12 +12,15 @@ from src.patching import TilerStitcherTorch
 from src.dl.torch_utils import tensor_to_ndarray
 
 
+SUFFIXES = (".jpeg", ".jpg", "tif", ".tiff", ".png")
+
+
 class FolderDataset(Dataset, FileHandler):
     def __init__(self, folder_path: Union[str, Path], pattern: str="*"):
         """
         Simple pytorch folder dataset. Assumes that
         folder_path contains only image files which are readable
-        by cv2. No error checking so use with care.
+        by cv2.
 
         Args:
             folder_path (Union[str, Path]):
@@ -27,7 +29,13 @@ class FolderDataset(Dataset, FileHandler):
                 file pattern for getting only files that contain the pattern.
         """
         super(FolderDataset, self).__init__()
-        self.fnames = sorted(Path(folder_path).glob(pattern))
+        folder_path = Path(folder_path)
+        assert folder_path.exists(), f"folder: {folder_path} does not exist"
+        assert folder_path.is_dir(), f"given path: {folder_path} is not a folder"
+        assert all([f.suffix in SUFFIXES for f in folder_path.iterdir()]) ,(
+            f"files formats in given folder need to be in {SUFFIXES}"
+        )
+        self.fnames = sorted(folder_path.glob(pattern))
 
     def __len__(self) -> int:
         return len(self.fnames)
