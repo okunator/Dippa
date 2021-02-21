@@ -34,7 +34,7 @@ def combine_inst_semantic(inst_map: np.ndarray,
                           type_map: np.ndarray) -> np.ndarray:
     """
     Takes in the outputs of the different segmentation heads and combines them into
-    one panoptic segmentation result
+    one instance segmentation result
 
     Args:
         inst_map (np.ndarray): output from the instance segmentation head of a panoptic

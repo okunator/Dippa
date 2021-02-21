@@ -8,8 +8,8 @@ import skimage.util as util
 import scipy.ndimage as ndi
 
 from src.utils.process_utils import bounding_box, remap_label
-from .utils import remove_debris, cv2_opening, binarize
-from .thresholding import niblack_thresh
+from ..thresholding import niblack_thresh
+from ..utils import remove_debris, cv2_opening, binarize
 
 
 

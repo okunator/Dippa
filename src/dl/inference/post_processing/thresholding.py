@@ -11,8 +11,10 @@ def naive_thresh_prob(prob_map: np.ndarray, threshold: float = 0.5, **kwargs) ->
     Threshold an activated soft mask with probability values [0, 1].
 
     Args:
-        prob_map (np.ndarray): soft mask to be thresholded. Shape (H, W)
-        threshold (float): thresholding cutoff between [0, 1]
+        prob_map (np.ndarray): 
+            Soft mask to be thresholded. Shape (H, W)
+        threshold (float, default=0.5): 
+            Thresholding cutoff between [0, 1]
     """
     assert 0 <= threshold <= 1, f"thresh = {threshold}. given threshold not between [0,1]"
     seg = prob_map.copy()
@@ -26,8 +28,10 @@ def naive_thresh(prob_map: np.ndarray, threshold: int = 2, **kwargs) -> np.ndarr
     Threshold a soft mask. Values can be logits or probabilites
 
     Args:
-        prob_map (np.ndarray): soft mask to be thresholded. Shape (H, W)
-        threshold (int): value used to divide the max value of the mask
+        prob_map (np.ndarray): 
+            Soft mask to be thresholded. Shape (H, W)
+        threshold (int, default=2): 
+            Value used to divide the max value of the mask
     """
     seg = prob_map.copy()
     seg[seg < np.amax(prob_map)/threshold] = 0
@@ -42,8 +46,10 @@ def niblack_thresh(prob_map: np.ndarray, win_size: int = 13, **kwargs) -> np.nda
     https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_niblack_sauvola.html
     
     Args:
-        prob_map (np.ndarray): soft mask to be thresholded. Shape (H, W)
-        win_size (int): size of the window used in the thresholding algorithm
+        prob_map (np.ndarray): 
+            Soft mask to be thresholded. Shape (H, W)
+        win_size (int, default=13): 
+            Size of the window used in the thresholding algorithm
     """
     thresh = filters.threshold_niblack(prob_map, window_size=win_size)
     mask = prob_map > thresh
@@ -52,14 +58,16 @@ def niblack_thresh(prob_map: np.ndarray, win_size: int = 13, **kwargs) -> np.nda
     return inst_map
     
 
-def sauvola_thresh(prob_map, win_size=33, **kwargs):
+def sauvola_thresh(prob_map: np.ndarray, win_size: int=33, **kwargs) -> np.ndarray:
     """
     Wrapper for skimage sauvola thresholding method
     https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_niblack_sauvola.html
 
     Args:
-        prob_map (np.ndarray): soft mask to be thresholded. Shape (H, W)
-        win_size (int): size of the window used in the thresholding algorithm
+        prob_map (np.ndarray): 
+            Soft mask to be thresholded. Shape (H, W)
+        win_size (int, default=33):
+            Size of the window used in the thresholding algorithm
     """
     thresh = filters.threshold_sauvola(prob_map, window_size=win_size)
     mask = prob_map > thresh
@@ -74,7 +82,8 @@ def morph_chan_vese_thresh(prob_map: np.ndarray, **kwargs) -> np.ndarray:
     https://scikit-image.org/docs/dev/api/skimage.segmentation.html#skimage.segmentation.morphological_chan_vese
 
     Args: 
-        prob_map (np.ndarray): soft mask to be thresholded. Shape (H, W)
+        prob_map (np.ndarray): 
+            soft mask to be thresholded. Shape (H, W)
     """
     init_ls = segm.checkerboard_level_set(prob_map.shape, 2)
     ls = segm.morphological_chan_vese(prob_map, 35, smoothing=1, init_level_set=init_ls)
@@ -92,7 +101,8 @@ def argmax(prob_map: np.ndarray, **kwargs) -> np.ndarray:
     Wrapper to take argmax of a one_hot logits or prob map
 
     Args:
-        prob_map (np.ndarray) : the probability map of shape (H, W, C)
+        prob_map (np.ndarray): 
+            The probability map of shape (H, W, C)
 
     Returns:
         a mask of indices shaped (H, W)
@@ -108,8 +118,11 @@ def smoothed_thresh(prob_map: np.ndarray, eps: float = 0.01, **kwargs) -> np.nda
     value for threshold.
 
     Args:
-        prob_map (np.ndarray): soft mask to be thresholded. Shape (H, W)
-        eps (int): increase the threshold a little with this
+        prob_map (np.ndarray): 
+            Soft mask to be thresholded. Shape (H, W)
+        eps (int): 
+            Small increase the threshold, since the hist center
+            often not optimal
     """
     # Find the steepest drop in the histogram
     hist, hist_centers = histogram(prob_map)

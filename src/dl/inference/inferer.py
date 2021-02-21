@@ -12,6 +12,7 @@ from src.patching import TilerStitcherTorch
 from src.dl.torch_utils import tensor_to_ndarray
 
 
+
 SUFFIXES = (".jpeg", ".jpg", "tif", ".tiff", ".png")
 
 
@@ -64,6 +65,8 @@ class Inferer:
                  num_workers: int=8,
                  batch_size: int=8,
                  stride_size: int=128,
+                 thresh_method: int="naive",
+                 thresh: float=0.5,
                  **kwargs) -> None:
         """
         Class to perform inference and post-processing
@@ -106,6 +109,11 @@ class Inferer:
                 stitched back to the input image size. On the other hand small stride_size means more
                 patches and larger number of patches -> slower inference time and larger memory 
                 consumption. stride_size needs to be less or equal than the input image size.
+            thresh_method (str, default="naive"):
+                Thresholding method for the soft masks from the insntance branch.
+                One of ("naive", "argmax", "sauvola", "niblack")).
+            thresh (float, default = 0.5): 
+                threshold probability value. Only used if method == "naive"
         """
         assert isinstance(model, pl.LightningModule), "Input model needs to be a lightning model"
         assert dataset in ("kumar", "consep", "pannuke", "dsb2018", "monusac", None)
@@ -127,7 +135,6 @@ class Inferer:
         checkpoint = torch.load(ckpt_path, map_location = lambda storage, loc : storage)
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
-
         # Set input data folder
         self.in_data_dir = in_data_dir
         if self.in_data_dir is None:
@@ -145,6 +152,11 @@ class Inferer:
 
         # Some helper classes 
         self.predictor = Predictor(self.model)
+
+        # Get post-processing method (clumsy but...)
+        # key = self.model.aux_type if self.model.aux_branch is not None else "basic"
+        # processor_name = post_proc.POST_PROC_LOOKUP[key]
+        # self.post_processor = post_proc.__dict__[processor_name](thresh_method, thresh)
 
     def _get_batch(self, patches: torch.Tensor, batch_size: int) -> torch.Tensor:
         """

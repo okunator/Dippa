@@ -29,9 +29,8 @@ from scipy import ndimage as ndi
 from typing import Tuple
 from skimage import morphology as morph
 
-from src.img_processing.process_utils import (
-    bounding_box, cropping_center
-)
+from src.utils.process_utils import bounding_box, center_crop
+
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/loader/augs.py
 def gen_hv_maps(inst_map: np.ndarray, crop_shape: Tuple[int] = (256, 256)) -> np.ndarray:
@@ -52,7 +51,7 @@ def gen_hv_maps(inst_map: np.ndarray, crop_shape: Tuple[int] = (256, 256)) -> np
         crop_shape (Tuple[int]): crop shape if network output smaller dims than the input
     """
 
-    crop_inst_map = cropping_center(inst_map, crop_shape)
+    crop_inst_map = center_crop(inst_map, crop_shape)
     crop_inst_map = morph.remove_small_objects(crop_inst_map, min_size=30)
 
     x_map = np.zeros(inst_map.shape[:2], dtype=np.float32)

@@ -6,6 +6,8 @@ import skimage.morphology as morph
 import skimage.filters as filters
 import scipy.ndimage as ndi
 
+from src.utils.process_utils import bounding_box
+
 
 def binarize(inst_map: np.ndarray) -> np.ndarray:
     """

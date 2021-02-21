@@ -32,7 +32,7 @@ import skimage.util as util
 import scipy.ndimage as ndi
 
 from src.utils.process_utils import bounding_box, remap_label
-from .utils import remove_debris, binarize
+from ..utils import remove_debris, binarize
 
 
 # ported from: https: // github.com/vqdang/hover_net/blob/master/src/postproc/hover.py  # L69
@@ -41,8 +41,10 @@ def post_proc_hover(inst_map: np.ndarray, aux_map: np.ndarray, **kwargs) -> np.n
     Post processing pipeline to combine hover branch output and instance segmentation branch output.
 
     Args:
-        inst_map (np.ndarray):  inst map. Shape: (H, W, 2)
-        aux_map (np.ndarray): Shape: (H, W, 2). hover_maps[..., 0] = xmap, hover_maps[..., 1] = ymap
+        inst_map (np.ndarray): 
+            Soft inst map. Shape: (H, W, 2)
+        aux_map (np.ndarray): 
+            Shape: (H, W, 2). aux_map[..., 0] = xmap, aux_map[..., 1] = ymap
 
     Returns:
         np.ndarray that is processed in the same way as in github.com/vqdang/hover_net/blob/master/src/postproc/hover.py

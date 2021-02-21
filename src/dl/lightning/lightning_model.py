@@ -141,6 +141,10 @@ class SegModel(pl.LightningModule):
             runtime_args
         )
 
+    @classmethod
+    def from_experiment_name(cls, name: str, version: str):
+        pass
+
     # Lightning framework stuff:
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         return self.model(x)

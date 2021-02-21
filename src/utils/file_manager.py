@@ -3,14 +3,11 @@ import zipfile
 import cv2
 import scipy.io
 import numpy as np
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import List, Dict, Tuple
 from omegaconf import DictConfig, OmegaConf
 from sklearn.model_selection import train_test_split
 
-from src.img_processing.viz_utils import draw_contours
-from src.img_processing.process_utils import overlays
 from src.settings import DATA_DIR, CONF_DIR, PATCH_DIR, RESULT_DIR
 
 
@@ -118,11 +115,7 @@ class FileManager(FileHandler):
 
     @property
     def train_dataset(self):
-        assert self.__train_ds in ("kumar","consep","pannuke","dsb2018", "monusac", None)
-        
-        if self.__train_ds == "other":
-            pass
-
+        assert self.__train_ds in ("kumar","consep","pannuke","dsb2018", "monusac", "other")
         return self.__train_ds
 
     @property
