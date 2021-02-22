@@ -1,41 +1,74 @@
-# import argparse
-# import torch
-# import segmentation_models_pytorch as smp
-# from torch import nn
-# from src.conf.config import CONFIG
-# from src.dl.inferer import Inferer
-# from src.dl.lightning_model import SegModel
+import argparse
 
-# config = CONFIG
+import src.dl.lightning as lightning
+from src.dl.inference.inferer import Inferer
+from src.config import CONFIG
 
-# def main(conf, params):
-#     model = smp.Unet(
-#         encoder_name="resnext50_32x4d", 
-#         classes=2
-#     )
 
-#     lightning_model = SegModel.from_conf(model, conf)
-#     ckpt = lightning_model.fm.model_checkpoint(conf.inference_args.model_weights)
-#     checkpoint = torch.load(ckpt, map_location = lambda storage, loc : storage)
-#     lightning_model.load_state_dict(checkpoint['state_dict'], strict=False)
+def main(conf, params):
+    data_dir = params.data_dir
+    dataset = params.dataset
+    data_fold = params.data_fold
+    stride_size = params.stride_size
+    pattern_list = params.pattern_list
+    fn_pattern = params.fn_pattern
+
+    lightning_model = lightning.SegModel.from_conf(CONFIG)
+
+    inferer = Inferer(
+        model=lightning_model,
+        data_dir=data_dir,
+        dataset=dataset,
+        data_fold=data_fold,
+        stride_size=stride_size,
+        fn_pattern=fn_pattern
+    )
+
+    print("Running predictions")
+    inferer.run_inference()
     
-#     inf = Inferer.from_conf(lightning_model, conf)
-#     infobj = inf.run()
+    print("Running post-processing")
+    inferer.post_process()
     
-#     print("Running post-processing")
-#     inf.post_process()
+    print("Running instance benchmarks")
+    inferer.benchmark_insts(pattern_list=pattern_list)
     
-#     print("Running benchmarks")
-#     score_df = inf.benchmark(save=True)
-#     inf.plot_overlays(ixs=[12], save=True)
+    print("Running type benchmarks")
+    scores = inferer.benchmark_types(pattern_list=pattern_list)
     
 
-# if __name__ == '__main__':
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument('--model', help="specify the model you want to use", default=0)
-#     parser.add_argument('--tensorboard', help="Use tensorboard", default=True)
-#     parser.add_argument('--auto_bs', help="Find a batch size that fits to mem automagically", default=False)
-#     parser.add_argument('--plots', help="Save the metrics plots from training", default=True)
-#     parser.add_argument('--test', help="Run model on test set and report training metrics", default=True)
-#     args = parser.parse_args()
-#     main(config, args)
+if __name__ == '__main__':
+    # TODO add rest of the inferrer args
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--data_dir',
+        help="One of ('consep', 'pannuke', 'kumar'). Defaults to None. If not Used, then dataset arg is used.",
+        default=None
+    )
+    parser.add_argument(
+        '--dataset',
+        help="One of ('consep', 'pannuke', 'kumar'). Defaults to None. Used if data_dir is None. If both data_dir, and dataset are None, training data is used",
+        default=None
+    )
+    parser.add_argument(
+        '--data_fold',
+        help="One of ('train', 'test'). Defaults to 'test'",
+        default="test"
+    )
+    parser.add_argument(
+        '--stride_size',
+        help="Stride size for the sliding window if input images need to be patched for the network",
+        default=100
+    )
+    parser.add_argument(
+        '--fn_pattern',
+        help="A regex pattern that the file names can contain. Only files containing the pattern are used.",
+        default="*"
+    )
+    parser.add_argument(
+        '--pattern_list', 
+        help="List of regex patterns that the file names can contain. Averages of metrics are computed for files containing these patterns", 
+        default=None
+    )
+    args = parser.parse_args()
+    main(CONFIG, args)
