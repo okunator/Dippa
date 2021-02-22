@@ -1,14 +1,8 @@
 # Dippa
 Work in progress...
-Benchmarking framework for nuclei segmentation and cell type classification.
-Datasets contain only H&amp;E stained images for now
+Benchmarking framework for simultaneous nuclei segmentation and cell type classification.
 Using encoders from: [segmentation_models_pytorch](https://github.com/qubvel/segmentation_models.pytorch).
-Also nulti-task segmentation model wrappers for smp models. 
-
-Also borrowing a lot of utilities from:
-
-- HoVer-Net [repository](https://github.com/vqdang/hover_net)
-- pytorch-toolbelt [repository](https://github.com/BloodAxe/pytorch-toolbelt) 
+Also multi-task segmentation model wrappers for smp models. 
 
 ## Download scripts for datasets
 * [x] [Kumar](https://ieeexplore.ieee.org/document/7872382) (Kumar et al.)
@@ -112,6 +106,11 @@ runtime_args:
   num_workers: 8              # number workers for data loeader
 
 ```
+
+Borrowing functions and utilities from:
+
+- HoVer-Net [repository](https://github.com/vqdang/hover_net)
+
 
 ## References
 

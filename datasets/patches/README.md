@@ -1,3 +1,3 @@
 ### Location of the extracted patches
 
-These patches are fed to the networks at training time.
+Location for databases where patched images will be written.
