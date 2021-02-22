@@ -1,16 +1,10 @@
 import src.dl.lightning as lightning
 from src.config import CONFIG
 
-config = CONFIG
-
-
 def main(conf):
-    # get the experiment.yml config file
-    config = CONFIG
 
-    # Insert the model to pytorch lightning framework. (Simplifies the training and other stuff)
-    lightning_model = lightning.SegModel.from_conf(config)
-    trainer = lightning.SegTrainer.from_conf(config)
+    lightning_model = lightning.SegModel.from_conf(CONFIG)
+    trainer = lightning.SegTrainer.from_conf(CONFIG)
 
     trainer.fit(lightning_model)
 
@@ -21,7 +15,7 @@ def main(conf):
 
 
 if __name__ == '__main__':
-    main(config)
+    main(CONFIG)
     
     
     
