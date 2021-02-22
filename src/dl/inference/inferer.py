@@ -14,7 +14,6 @@ from .post_processing.processor_builder import PostProcBuilder
 from .predictor import Predictor
 
 
-
 SUFFIXES = (".jpeg", ".jpg", "tif", ".tiff", ".png")
 
 
