@@ -27,10 +27,9 @@ import cv2
 import numpy as np
 from scipy import ndimage as ndi
 from typing import Tuple
-from skimage import morphology as morph
 
 from src.utils.process_utils import bounding_box, center_crop
-
+from ..pre_proc_utils import remove_small_objects
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/loader/augs.py
 def gen_hv_maps(inst_map: np.ndarray, crop_shape: Tuple[int] = (256, 256)) -> np.ndarray:
@@ -52,7 +51,7 @@ def gen_hv_maps(inst_map: np.ndarray, crop_shape: Tuple[int] = (256, 256)) -> np
     """
 
     crop_inst_map = center_crop(inst_map, crop_shape[0], crop_shape[1])
-    crop_inst_map = morph.remove_small_objects(crop_inst_map, min_size=30)
+    remove_small_objects(crop_inst_map, min_size=30, out=crop_inst_map)
 
     x_map = np.zeros(inst_map.shape[:2], dtype=np.float32)
     y_map = np.zeros(inst_map.shape[:2], dtype=np.float32)
