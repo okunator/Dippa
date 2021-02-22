@@ -8,7 +8,7 @@ from .utils import to_inst_map, cv2_opening
 
 def naive_thresh_prob(prob_map: np.ndarray, threshold: float = 0.5, **kwargs) -> np.ndarray:
     """
-    Threshold an activated soft mask with probability values [0, 1].
+    Threshold a sigmoid/softmax activated soft mask.
 
     Args:
         prob_map (np.ndarray): 

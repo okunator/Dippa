@@ -1,4 +1,3 @@
-
 import numpy as np
 from typing import Dict, Optional, Tuple, List
 from pathos.multiprocessing import ThreadPool as Pool
@@ -6,6 +5,7 @@ from tqdm import tqdm
 
 from .post_proc import post_proc_hover
 from ..base_processor import PostProcessor
+
 
 class HoverNetPostProcessor(PostProcessor):
     def __init__(self,
@@ -52,7 +52,7 @@ class HoverNetPostProcessor(PostProcessor):
             types = np.argmax(type_map, axis=2)
             combined = self.combine_inst_type(inst_map, types)
 
-        return name, inst_map, types, combined
+        return name, inst_map, combined
 
     def run_post_processing(self,
                             inst_maps: Dict[str, np.ndarray],

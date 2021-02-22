@@ -1,7 +1,15 @@
 from abc import ABC, abstractmethod 
 import numpy as np
 
-import src.dl.inference.post_processing as post_proc
+from .thresholding import argmax, sauvola_thresh, niblack_thresh, naive_thresh_prob
+from .combine_type_inst import combine_inst_semantic
+
+THRESH_LOOKUP = {
+    "argmax":"argmax",
+    "sauvola":"sauvola_thresh",
+    "niblack":"niblack_thresh",
+    "naive":"naive_thresh_prob"
+}
 
 
 class PostProcessor(ABC):
@@ -12,13 +20,13 @@ class PostProcessor(ABC):
         Args:
             thresh_method (str, default="naive"):
                 Thresholding method for the soft masks from the insntance branch.
-                One of ("naive", "argmax", "sauvola", "niblack")).
+                One of ("naive", "argmax", "sauvola", "niblack").
             thresh (float, default = 0.5): 
                 threshold probability value. Only used if method == "naive"
         """
-        assert thresh_method in post_proc.THRESH_LOOKUP.keys(), (
-            f"method not one of {list(post_proc.THRESH_LOOKUP.keys())}"
-        )
+        methods = ("naive", "argmax", "sauvola", "niblack")
+        assert thresh_method in methods, f"method: {thresh_method} not one of {methods}"
+        
         self.method = thresh_method
         self.thresh = thresh
 
@@ -37,8 +45,17 @@ class PostProcessor(ABC):
         kwargs = {}
         kwargs["prob_map"] = prob_map
         kwargs["thresh"] = self.thresh
-        key = post_proc.THRESH_LOOKUP[self.method]
-        return post_proc.__dict__[key](**kwargs) 
+
+        if self.method == "argmax":
+            result = argmax(**kwargs)
+        elif self.method == "naive":
+            result = naive_thresh_prob(**kwargs)
+        elif self.method == "sauvola":
+            result = sauvola_thresh(**kwargs)
+        elif self.method == "niblack":
+            result = niblack_thresh(**kwargs)
+
+        return result
 
     def combine_inst_type(self, inst_map: np.ndarray, type_map: np.ndarray) -> np.ndarray:
         """
@@ -53,7 +70,7 @@ class PostProcessor(ABC):
         Returns:
             The final combined prediction.
         """
-        return post_proc.combine_inst_semantic(inst_map, type_map)
+        return combine_inst_semantic(inst_map, type_map)
 
     @abstractmethod
     def post_proc_pipeline(self):

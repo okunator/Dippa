@@ -7,9 +7,11 @@ from pathlib import Path
 from tqdm import tqdm
 
 from src.utils.file_manager import FileHandler
-from src.dl.inference.predictor import Predictor
 from src.patching import TilerStitcherTorch
 from src.dl.torch_utils import tensor_to_ndarray
+
+from .post_processing.processor_builder import PostProcBuilder
+from .predictor import Predictor
 
 
 
@@ -110,7 +112,7 @@ class Inferer:
                 patches and larger number of patches -> slower inference time and larger memory 
                 consumption. stride_size needs to be less or equal than the input image size.
             thresh_method (str, default="naive"):
-                Thresholding method for the soft masks from the insntance branch.
+                Thresholding method for the soft masks from the instance branch.
                 One of ("naive", "argmax", "sauvola", "niblack")).
             thresh (float, default = 0.5): 
                 threshold probability value. Only used if method == "naive"
@@ -152,11 +154,12 @@ class Inferer:
 
         # Some helper classes 
         self.predictor = Predictor(self.model)
-
-        # Get post-processing method (clumsy but...)
-        # key = self.model.aux_type if self.model.aux_branch is not None else "basic"
-        # processor_name = post_proc.POST_PROC_LOOKUP[key]
-        # self.post_processor = post_proc.__dict__[processor_name](thresh_method, thresh)
+        self.post_processor = PostProcBuilder.set_postprocessor(
+            aux_branch=self.model.aux_branch, 
+            aux_type=self.model.aux_type,
+            thresh_method=thresh_method,
+            thresh=thresh
+        )
 
     def _get_batch(self, patches: torch.Tensor, batch_size: int) -> torch.Tensor:
         """
@@ -299,7 +302,27 @@ class Inferer:
                     soft_types.append((fnames, tilertorch.stitch_batched_patches(batch_types)))
                     aux_maps.append((fnames, tilertorch.stitch_batched_patches(batch_aux)))
 
-        self.res_aux = OrderedDict(unpack(aux_maps))
-        self.res_insts = OrderedDict(unpack(soft_instances))
-        self.res_types = OrderedDict(unpack(soft_types))
+        self.aux_maps = OrderedDict(unpack(aux_maps))
+        self.soft_insts = OrderedDict(unpack(soft_instances))
+        self.soft_types = OrderedDict(unpack(soft_types))
+
+
+    def post_process(self):
+        """
+        Run post processing pipeline
+        """
+        assert "soft_insts" in self.__dict__.keys(), "No predictions found, run inference first."
+        maps = self.post_processor.run_post_processing(self.soft_insts, self.aux_maps, self.soft_types)
+
+        # save to containers
+        self.inst_maps = OrderedDict()
+        self.type_maps = OrderedDict()
+        for res in maps:
+            name = res[0]
+            self.inst_maps[name] = res[1]
+            self.type_maps[name] = res[2]
+
+
+    def plot_results(self):
+        pass
 

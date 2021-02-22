@@ -1,46 +1,41 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+
 from pathlib import Path
-from typing import Dict, List, Union
-from omegaconf import DictConfig
+from typing import Dict, Union
 from collections import OrderedDict
 from pathos.multiprocessing import ThreadPool as Pool
-from src.utils.file_manager import ProjectFileManager
-from src.img_processing.process_utils import remap_label, get_type_instances
-from src.metrics.metrics import (
-    PQ, AJI, AJI_plus, DICE2, split_and_merge
-)
+from tqdm import tqdm
+
+from src.utils.process_utils import remap_label, get_type_instances
+from .metrics import PQ, AJI, AJI_plus, DICE2, split_and_merge
 
 
-class Benchmarker(ProjectFileManager):
-    def __init__(self,
-                 dataset_args: DictConfig,
-                 experiment_args: DictConfig) -> None:
+class Benchmarker:
+    def __init__(self) -> None:
         """
         A classs for benchmarking segmentations against their ground truth annotations
 
-        Args:
-            dataset_args (DictConfig): omegaconfig DictConfig specifying arguments
-                            related to the dataset that is being used.
-                            config.py for more info
-            experiment_args (DictConfig): omegaconfig DictConfig specifying arguments
-                                          that are used for creating result folders and
-                                          files. Check config.py for more info
         """
-        super(Benchmarker, self).__init__(dataset_args, experiment_args)
         self.inst_metrics = OrderedDict()
         self.type_metrics = OrderedDict()
 
-    def compute_metrics(self, true: np.ndarray, pred: np.ndarray) -> Dict[str, float]:
+    def compute_metrics(self, true_pred: List[np.ndarray]) -> Dict[str, float]:
         """
         Computes metrics for one (inst_map, gt_mask) pair.
+
         Args:
-            true (np.ndarray): ground truth annotations
-            pred (np.ndarray): instance map
+            true_pred (List[np.ndarray]): 
+                Ground truth annotations in true_pred[0] and corresponding 
+                predicted instance map in true_pred[1]
+
         Returns:
             A Dict[str, float] of the metrics
         """
+
+        name = true_pred[0]
+        true = true_pred[1]
+        pred = true_pred[2]
         if len(np.unique(true)) > 1:
             pq = PQ(remap_label(true), remap_label(pred))
             aji = AJI(remap_label(true), remap_label(pred))
@@ -48,32 +43,41 @@ class Benchmarker(ProjectFileManager):
             dice2 = DICE2(remap_label(true), remap_label(pred))
             splits, merges = split_and_merge(remap_label(true), remap_label(pred))
 
-            return {
+            result = {
                 "AJI": aji,
                 "AJI_plus": aji_p,
                 "DICE2": dice2,
-                "PQ": pq["pq"],  # panoptic quality
-                "SQ": pq["sq"],  # segmentation quality
-                "DQ": pq["dq"],  # Detection quality i.e. F1-score
+                "PQ": pq["pq"],
+                "SQ": pq["sq"],
+                "DQ": pq["dq"],
                 "inst_recall": pq["recall"],
                 "inst_precision": pq["precision"],
                 "splits": splits,
                 "merges": merges
             }
 
-    def benchmark_instmaps(self,
-                           inst_maps: Dict[str, np.ndarray],
-                           gt_masks: Dict[str, np.ndarray],
-                           save: bool = False) -> pd.DataFrame:
+            return name, result
+
+    def benchmark_insts(self,
+                        inst_maps: Dict[str, np.ndarray],
+                        gt_masks: Dict[str, np.ndarray],
+                        save: bool = False,
+                        save_dir: Union[str, Path]=None) -> pd.DataFrame:
         """
         Run benchmarking metrics for instance maps for all of the files in the dataset.
         Note that the inst_maps and gt_masks need to be sorted so they align
         when computing metrics.
         
         Args:
-            inst_maps (Dict[str, np.ndarray]): a dict of file_name:inst_map key vals in order
-            gt_masks (Dict[str, np.ndarray]): a dict of file_name:gt_inst_map key vals in order
-            save (bool): save the result table to .csv file
+            inst_maps (OrderedDict[str, np.ndarray]): 
+                A dict of file_name:inst_map key vals in order
+            gt_masks (OrderedDict[str, np.ndarray]): 
+                A dict of file_name:gt_inst_map key vals in order
+            save (bool): 
+                Save the result table to .csv file
+            save_dir (str or Path):
+                directory where to save the result .csv
+
         Returns:
             a pandas dataframe of the metrics. Samples are rows and metrics are columns:
             _____________________
@@ -85,11 +89,15 @@ class Benchmarker(ProjectFileManager):
         assert isinstance(inst_maps, dict), f"inst_maps: {type(inst_maps)} is not a dict of inst_maps"
         assert isinstance(gt_masks, dict), f"inst_maps: {type(gt_masks)} is not a dict of inst_maps"
 
-        params_list = list(zip(gt_masks.values(), inst_maps.values()))
+        masks = list(zip(inst_maps.keys(), gt_masks.values(), inst_maps.values()))
 
+        metrics = []
         with Pool() as pool:
-            metrics = pool.starmap(self.compute_metrics, params_list)
+            for x in tqdm(pool.imap_unordered(self.post_proc_pipeline, masks), total=len(masks)):
+                metrics.append(x)
 
+
+        # TODO FIX FROM HERE
         for i, fn in enumerate(gt_masks.keys()):
             self.inst_metrics[f"{fn}_metrics"] = metrics[i]
 
@@ -106,31 +114,38 @@ class Benchmarker(ProjectFileManager):
         if save:
             result_dir = Path(self.experiment_dir / "benchmark_results")
             self.create_dir(result_dir)
-            score_df.to_csv(
-                Path(result_dir / f"{self.exargs.experiment_version}_benchmark_result.csv")
-            )
+            score_df.to_csv(Path(result_dir / f"{self.exargs.experiment_version}_benchmark_result.csv"))
 
         return score_df
 
-    def benchmark_panoptic_maps(self,
-                                inst_maps: Dict[str, np.ndarray],
-                                panoptic_maps: Dict[str, np.ndarray],
-                                gt_mask_insts: Dict[str, np.ndarray],
-                                gt_mask_types: Dict[str, np.ndarray],
-                                classes: Dict[str, int],
-                                save: bool = False) -> pd.DataFrame:
+    def benchmark_per_type(self,
+                           inst_maps: Dict[str, np.ndarray],
+                           type_maps: Dict[str, np.ndarray],
+                           gt_mask_insts: Dict[str, np.ndarray],
+                           gt_mask_types: Dict[str, np.ndarray],
+                           classes: Dict[str, int],
+                           save: bool = False) -> pd.DataFrame:
         """
         Run benchmarking metrics per class type for all of the files in the dataset.
         Note that the inst_maps and gt_masks need to be sorted so they align
         when computing metrics.
 
         Args:
-            inst_maps (Dict[str, np.ndarray]): dict of file_name:inst_map key vals in order
-            panoptic_maps (Dict[str, np.ndarray]): dict of file_name:panoptic_map key vals in order
-            gt_masks_insts (Dict[str, np.ndarray]): dict of file_name:gt_inst_map key vals in order
-            gt_masks_types (Dict[str, np.ndarray]): dict of file_name:gt_panoptic_map key vals in order
-            classes (Dict[str, int]): class dict e.g. {bg: 0, immune: 1, epithel: 2} background must be 0 class
-            save (bool): save the result table to .csv file
+            inst_maps (Dict[str, np.ndarray]): 
+                A dict of file_name:inst_map key vals in order
+            type_maps (Dict[str, np.ndarray]): 
+                A dict of file_name:panoptic_map key vals in order
+            gt_masks_insts (Dict[str, np.ndarray]): 
+                A dict of file_name:gt_inst_map key vals in order
+            gt_masks_types (Dict[str, np.ndarray]): 
+                A dict of file_name:gt_panoptic_map key vals in order
+            classes (Dict[str, int]): 
+                The class dict e.g. {bg: 0, immune: 1, epithel: 2} background must be 0 class
+            save (bool): 
+                Save the result table to .csv file
+            save_dir (str or Path):
+                directory where to save the result .csv
+
         Returns:
             a pandas dataframe of the metrics. Samples are rows and metrics are columns:
             __________________________
@@ -143,7 +158,7 @@ class Benchmarker(ProjectFileManager):
         """
         # assert self.dataset_args.class_types == "panoptic", "You can only use this when doing panoptic segmentation"
         assert isinstance(inst_maps, dict), f"inst_maps: {type(inst_maps)} is not a dict of inst_maps"
-        assert isinstance(panoptic_maps, dict), f"inst_maps: {type(panoptic_maps)} is not a dict of panoptic_maps"
+        assert isinstance(type_maps, dict), f"inst_maps: {type(type_maps)} is not a dict of panoptic_maps"
         assert isinstance(gt_mask_insts, dict), f"inst_maps: {type(gt_mask_insts)} is not a dict of inst_maps"
         assert isinstance(gt_mask_types, dict), f"inst_maps: {type(gt_mask_types)} is not a dict of inst_maps"
 
