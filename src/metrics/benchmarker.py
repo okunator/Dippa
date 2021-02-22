@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from pathlib import Path
-from typing import Dict, Union
+from typing import Dict, List, Union
 from collections import OrderedDict
 from pathos.multiprocessing import ThreadPool as Pool
 from tqdm import tqdm
@@ -12,14 +12,6 @@ from .metrics import PQ, AJI, AJI_plus, DICE2, split_and_merge
 
 
 class Benchmarker:
-    def __init__(self) -> None:
-        """
-        A classs for benchmarking segmentations against their ground truth annotations
-
-        """
-        self.inst_metrics = OrderedDict()
-        self.type_metrics = OrderedDict()
-
     def compute_metrics(self, true_pred: List[np.ndarray]) -> Dict[str, float]:
         """
         Computes metrics for one (inst_map, gt_mask) pair.
@@ -44,6 +36,7 @@ class Benchmarker:
             splits, merges = split_and_merge(remap_label(true), remap_label(pred))
 
             result = {
+                "name":name,
                 "AJI": aji,
                 "AJI_plus": aji_p,
                 "DICE2": dice2,
@@ -56,25 +49,27 @@ class Benchmarker:
                 "merges": merges
             }
 
-            return name, result
+            return result
 
     def benchmark_insts(self,
                         inst_maps: Dict[str, np.ndarray],
                         gt_masks: Dict[str, np.ndarray],
-                        save: bool = False,
+                        pattern_list: List[str]=None,
                         save_dir: Union[str, Path]=None) -> pd.DataFrame:
         """
         Run benchmarking metrics for instance maps for all of the files in the dataset.
-        Note that the inst_maps and gt_masks need to be sorted so they align
-        when computing metrics.
+        Note that the inst_maps and gt_masks need to share exact same keys and be sorted
+        so that they align when computing metrics.
         
         Args:
             inst_maps (OrderedDict[str, np.ndarray]): 
                 A dict of file_name:inst_map key vals in order
             gt_masks (OrderedDict[str, np.ndarray]): 
                 A dict of file_name:gt_inst_map key vals in order
-            save (bool): 
-                Save the result table to .csv file
+            pattern_list (List[str], default=None):
+                A list of patterns contained in the gt_mask and inst_map names.
+                Averages for the masks containing these patterns will be added
+                to the result df.
             save_dir (str or Path):
                 directory where to save the result .csv
 
@@ -89,32 +84,32 @@ class Benchmarker:
         assert isinstance(inst_maps, dict), f"inst_maps: {type(inst_maps)} is not a dict of inst_maps"
         assert isinstance(gt_masks, dict), f"inst_maps: {type(gt_masks)} is not a dict of inst_maps"
 
-        masks = list(zip(inst_maps.keys(), gt_masks.values(), inst_maps.values()))
+        # Sort by file name
+        inst_maps = OrderedDict(sorted(inst_maps.items()))
+        gt_masks = OrderedDict(sorted(gt_masks.items()))
+        assert inst_maps.keys() == gt_masks.keys(), (
+            f"inst_maps have different names as gt masks. insts: {inst_maps.keys()}. gt's: {gt_masks.keys()}"
+        )
 
+        masks = list(zip(inst_maps.keys(), gt_masks.values(), inst_maps.values()))
+        
         metrics = []
         with Pool() as pool:
-            for x in tqdm(pool.imap_unordered(self.post_proc_pipeline, masks), total=len(masks)):
+            for x in tqdm(pool.imap_unordered(self.compute_metrics, masks), total=len(masks)):
                 metrics.append(x)
-
-
-        # TODO FIX FROM HERE
-        for i, fn in enumerate(gt_masks.keys()):
-            self.inst_metrics[f"{fn}_metrics"] = metrics[i]
-
-        # score_df = pd.DataFrame.from_records([self.inst_metrics]).transpose()
-        score_df = pd.DataFrame(self.inst_metrics).transpose()
+        
+        score_df = pd.DataFrame.from_records(metrics).set_index("name").sort_index()
         score_df.loc["averages_for_the_set"] = score_df.mean(axis=0)
 
-        if self.dataset == "pannuke":
-            df = score_df.rename_axis("fn").reset_index()
-            td = {f"{tissue}_avg": df[df.fn.str.contains(f"{tissue}")].mean(axis=0) 
-                  for tissue in self.pannuke_tissues}
-            score_df = pd.concat([score_df, pd.DataFrame(td).transpose()])
+        # Add averages to the df of files which contain patterns in the pattern list
+        if pattern_list is not None:
+            pattern_avgs = {f"{p}_avg": score_df[score_df.index.str.contains(f"{p}")].mean(axis=0) for p in pattern_list}
+            score_df = pd.concat([score_df, pd.DataFrame(pattern_avgs).transpose()])
 
-        if save:
-            result_dir = Path(self.experiment_dir / "benchmark_results")
-            self.create_dir(result_dir)
-            score_df.to_csv(Path(result_dir / f"{self.exargs.experiment_version}_benchmark_result.csv"))
+        # Save results to .csv
+        if save_dir is not None:
+            save_dir = Path(save_dir)
+            score_df.to_csv(Path(save_dir / "inst_benchmark.csv"))
 
         return score_df
 
@@ -124,11 +119,12 @@ class Benchmarker:
                            gt_mask_insts: Dict[str, np.ndarray],
                            gt_mask_types: Dict[str, np.ndarray],
                            classes: Dict[str, int],
-                           save: bool = False) -> pd.DataFrame:
+                           pattern_list: List[str]=None,
+                           save_dir: Union[str, Path]=None) -> pd.DataFrame:
         """
         Run benchmarking metrics per class type for all of the files in the dataset.
-        Note that the inst_maps and gt_masks need to be sorted so they align
-        when computing metrics.
+        Note that the inst_maps and gt_masks need to share exact same keys and be sorted
+        so that they align when computing metrics.
 
         Args:
             inst_maps (Dict[str, np.ndarray]): 
@@ -141,8 +137,10 @@ class Benchmarker:
                 A dict of file_name:gt_panoptic_map key vals in order
             classes (Dict[str, int]): 
                 The class dict e.g. {bg: 0, immune: 1, epithel: 2} background must be 0 class
-            save (bool): 
-                Save the result table to .csv file
+            pattern_list (List[str], default=None):
+                A list of patterns contained in the gt_mask and inst_map names.
+                Averages for the masks containing these patterns will be added
+                to the result df.
             save_dir (str or Path):
                 directory where to save the result .csv
 
@@ -162,40 +160,44 @@ class Benchmarker:
         assert isinstance(gt_mask_insts, dict), f"inst_maps: {type(gt_mask_insts)} is not a dict of inst_maps"
         assert isinstance(gt_mask_types, dict), f"inst_maps: {type(gt_mask_types)} is not a dict of inst_maps"
 
+        # sort by name
+        inst_maps = OrderedDict(sorted(inst_maps.items()))
+        type_maps = OrderedDict(sorted(type_maps.items()))
+        gt_mask_insts = OrderedDict(sorted(gt_mask_insts.items()))
+        gt_mask_types = OrderedDict(sorted(gt_mask_types.items()))
+        assert inst_maps.keys() == gt_mask_insts.keys(), (
+            f"inst_maps have different names as gt masks. insts: {inst_maps.keys()}. gt's: {gt_mask_insts.keys()}"
+        )
+
+        # Loop masks per class
         df_total = pd.DataFrame()
         for c, ix in list(classes.items())[1:]: # skip bg
-            gts_per_class = [get_type_instances(i, t, ix) 
-                                for i, t in zip(gt_mask_insts.values(), gt_mask_types.values())]
+            gts_per_class = [get_type_instances(i, t, ix) for i, t in zip(gt_mask_insts.values(), gt_mask_types.values())]
+            insts_per_class = [get_type_instances(i, t, ix) for i, t in zip(inst_maps.values(), type_maps.values())]
 
-            insts_per_class = [get_type_instances(i, t, ix) 
-                                for i, t in zip(inst_maps.values(), panoptic_maps.values())]
+            masks = list(zip(inst_maps.keys(), gts_per_class, insts_per_class))
 
-            params_list = list(zip(gts_per_class, insts_per_class))
-
+            metrics = []
             with Pool() as pool:
-                metrics = pool.starmap(self.compute_metrics, params_list)
-
-            for i, fn in enumerate(gt_mask_insts.keys()): 
-                self.type_metrics[f"{fn}_{c}_metrics"] = metrics[i]
-
-            score_df = pd.DataFrame(self.type_metrics).transpose()
+                for x in tqdm(pool.imap_unordered(self.compute_metrics, masks), total=len(masks)):
+                    metrics.append(x)
+            
+            # drop Nones if no classes are found in an image
+            metrics = [metric for metric in metrics if metric] 
+            score_df = pd.DataFrame.from_records(metrics).set_index("name").sort_index()
             score_df.loc[f"{c}_avg_for_the_set"] = score_df.mean(axis=0)
 
-            if self.dataset == "pannuke":
-                df = score_df.rename_axis("fn").reset_index()
-                td = {f"{tissue}_avg": df[df.fn.str.contains(f"{tissue}")].mean(axis=0) 
-                    for tissue in self.pannuke_tissues}
-                score_df = pd.concat([score_df, pd.DataFrame(td).transpose()])
+            # Add averages to the df of files which contain patterns in the pattern list
+            if pattern_list is not None:
+                pattern_avgs = {f"{c}_{p}_avg": score_df[score_df.index.str.contains(f"{p}")].mean(axis=0) for p in pattern_list}
+                score_df = pd.concat([score_df, pd.DataFrame(pattern_avgs).transpose()])
 
             df_total = pd.concat([df_total, score_df])
 
-        if save:
-            result_dir = Path(self.experiment_dir / "benchmark_results")
-            self.create_dir(result_dir)
-            df_total.to_csv(
-                Path(result_dir / f"{self.exargs.experiment_version}_benchmark_per_class_result.csv")
-            )
+        # Save results to .csv
+        if save_dir is not None:
+            save_dir = Path(save_dir)
+            df_total.to_csv(Path(save_dir / "type_benchmark.csv"))
+
         return df_total
-
-
     

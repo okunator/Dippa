@@ -115,7 +115,7 @@ class SegModel(pl.LightningModule):
         if self.aux_branch:
             self.aux_channels = 2 if self.aux_type == "hover" else 1
 
-        self.model = Model(model_args, n_classes=self.fm.n_classes, aux_out_channels=self.aux_channels)
+        self.model = Model(model_args, n_classes=len(self.fm.classes), aux_out_channels=self.aux_channels)
 
         # Redundant but necessary for experiment logging..
         self.optimizer_args = training_args.optimizer_args

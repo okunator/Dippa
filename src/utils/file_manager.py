@@ -4,7 +4,7 @@ import cv2
 import scipy.io
 import numpy as np
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Union
 from omegaconf import DictConfig, OmegaConf
 from sklearn.model_selection import train_test_split
 
@@ -16,17 +16,19 @@ class FileHandler:
     Class for handling different file formats that are needed in the project.
     """
     @staticmethod
-    def read_img(path: str) -> np.ndarray:
-        return cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
+    def read_img(path: Union[str, Path]) -> np.ndarray:
+        path = Path(path)
+        return cv2.cvtColor(cv2.imread(path.as_posix()), cv2.COLOR_BGR2RGB)
 
     @staticmethod
-    def read_mask(path: str, key: str = "inst_map") -> np.ndarray:
+    def read_mask(path: Union[str, Path], key: str = "inst_map") -> np.ndarray:
         assert key in ("inst_map", "type_map", "inst_centroid", "inst_type")
         dtypes = {"inst_map":"int32", "type_map":"int32", "inst_centroid":"float64", "inst_type":"int32"}
-        return scipy.io.loadmat(path)[key].astype(dtypes[key])
+        path = Path(path)
+        return scipy.io.loadmat(path.as_posix())[key].astype(dtypes[key])
     
     @staticmethod
-    def remove_existing_files(directory: str) -> None:
+    def remove_existing_files(directory: Union[str, Path]) -> None:
         assert Path(directory).exists(), f"{directory} does not exist"
         for item in Path(directory).iterdir():
             # Do not touch the folders inside the directory
@@ -34,8 +36,9 @@ class FileHandler:
                 item.unlink()
 
     @staticmethod
-    def read_hdf5_patch(path: str, index: int) -> Tuple[np.ndarray]:
-        with tables.open_file(path, "r") as db:
+    def read_hdf5_patch(path: Union[str, Path], index: int) -> Tuple[np.ndarray]:
+        path = Path(path)
+        with tables.open_file(path.as_posix(), "r") as db:
             img = db.root.img
             inst_map = db.root.inst_map
             type_map = db.root.type_map
@@ -45,35 +48,37 @@ class FileHandler:
         return im_patch, inst_patch, type_patch
 
     @staticmethod
-    def get_class_pixels(path: str) -> np.ndarray:
-        with tables.open_file(path, "r") as db:
+    def get_class_pixels(path: Union[str, Path]) -> np.ndarray:
+        path = Path(path)
+        with tables.open_file(path.as_posix(), "r") as db:
             weights = db.root.numpixels[:]
         class_weight = weights[1, ]
         return class_weight
 
     @staticmethod
-    def create_dir(path: str) -> None:
+    def create_dir(path: Union[str, Path]) -> None:
         Path(path).mkdir(parents=True, exist_ok=True)
 
     @staticmethod
-    def extract_zips(folder: str, rm: bool = False) -> None:
-        for f in Path(folder).iterdir():
+    def extract_zips(path: Union[str, Path], rm: bool = False) -> None:
+        for f in Path(path).iterdir():
             if f.is_file() and f.suffix == ".zip":
                 with zipfile.ZipFile(f, 'r') as z:
-                    z.extractall(folder)
+                    z.extractall(path)
                 if rm:
                     f.unlink()
 
     @staticmethod
-    def suffix(directory: Path) -> str:
-        assert all([f.suffix for f in directory.iterdir()]), "Image files should be in same format"
-        return [f.suffix for f in directory.iterdir()][0]
+    def suffix(path: Union[str, Path]) -> str:
+        path = Path(path)
+        assert all([f.suffix for f in path.iterdir()]), "Image files should be in same format"
+        return [f.suffix for f in path.iterdir()][0]
 
-    def get_files(self, directory: str) -> List[str]:
-        d = Path(directory)
-        assert d.exists(), f"Provided directory: {d.as_posix()} does not exist."
+    def get_files(self, path: Union[str, Path]) -> List[str]:
+        path = Path(path)
+        assert path.exists(), f"Provided directory: {path.as_posix()} does not exist."
         file_suffix = self.suffix(d)
-        return sorted([x.as_posix() for x in d.glob(f"*{file_suffix}")])
+        return sorted([x.as_posix() for x in path.glob(f"*{file_suffix}")])
 
 
 class FileManager(FileHandler):
@@ -119,11 +124,11 @@ class FileManager(FileHandler):
         return self.__train_ds
 
     @property
-    def n_classes(self):
+    def classes(self):
         yml_path = [f for f in Path(CONF_DIR).iterdir() if self.train_dataset in f.name][0]
         data_conf = OmegaConf.load(yml_path)
         classes = data_conf.class_types.type
-        return len(classes)
+        return classes
 
     @property
     def pannuke_folds(self) -> Dict[str, str]:

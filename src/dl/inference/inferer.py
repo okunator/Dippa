@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from src.utils.file_manager import FileHandler
 from src.patching import TilerStitcherTorch
+from src.metrics.benchmarker import Benchmarker
 from src.dl.torch_utils import tensor_to_ndarray
 
 from .post_processing.processor_builder import PostProcBuilder
@@ -136,16 +137,22 @@ class Inferer:
         checkpoint = torch.load(ckpt_path, map_location = lambda storage, loc : storage)
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
-        # Set input data folder
+        # Set input data folder and gt mask folder if there are gt masks
+        self.dataset = dataset
+        self.gt_mask_dir = None
         self.in_data_dir = in_data_dir
         if self.in_data_dir is None:
-            if dataset is not None:
-                dirs = self.model.fm.get_data_dirs(dataset)
+            if self.dataset is not None:
+                dirs = self.model.fm.get_data_dirs(self.dataset)
                 self.in_data_dir = dirs[f"{data_fold}_im"]
+                self.gt_mask_dir = dirs[f"{data_fold}_gt"]
             else:
-                dataset = self.model.fm.train_dataset
-                dirs = self.model.fm.get_data_dirs(dataset)
+                self.dataset = self.model.fm.train_dataset
+                dirs = self.model.fm.get_data_dirs(self.dataset)
                 self.in_data_dir = dirs[f"{data_fold}_im"]
+                self.gt_mask_dir = dirs[f"{data_fold}_gt"]
+
+            self.gt_mask_paths = sorted(self.gt_mask_dir.glob(fn_pattern))
             
         # Set dataset dataloader
         self.folderset = FolderDataset(self.in_data_dir, pattern=fn_pattern)
@@ -318,10 +325,63 @@ class Inferer:
         self.type_maps = OrderedDict()
         for res in maps:
             name = res[0]
-            self.inst_maps[name] = res[1]
-            self.type_maps[name] = res[2]
+            self.inst_maps[name] = res[1].astype("int32")
+            self.type_maps[name] = res[2].astype("int32")
 
 
     def plot_results(self):
         pass
 
+    def benchmark_insts(self, pattern_list: List[str]=None):
+        """
+        Run benchmarikng metrics for only instance maps 
+        """
+        assert "inst_maps" in self.__dict__.keys(), "No instance maps found, run inference and post proc first."
+        assert self.gt_mask_dir is not None, f"gt mask dir is None. Benchmarking only with consep, kumar, pannuke"
+
+        gt_masks = OrderedDict(
+            [(f.name[:-4], FileHandler.read_mask(f, "inst_map")) for f in self.gt_mask_paths]
+        )
+
+        bm = Benchmarker()
+        scores = bm.benchmark_insts(
+            inst_maps=self.inst_maps,
+            gt_masks=gt_masks,
+            pattern_list=pattern_list,
+            save_dir=self.model.fm.experiment_dir
+        )
+        return scores
+
+
+    def benchmark_types(self, pattern_list: List[str]=None):
+        """
+        Run benchmarking for type maps
+        """
+        assert "inst_maps" in self.__dict__.keys(), "No instance maps found, run inference and post proc first."
+        assert "type_maps" in self.__dict__.keys(), "No type maps found, run inference and post proc first."
+        assert self.gt_mask_dir is not None, f"gt mask dir is None. Benchmarking only with consep, kumar, pannuke"
+        assert self.model.type_branch, "the netowork model does not contain type branch"
+        assert self.dataset == self.model.fm.train_dataset, (
+            "benchmarking per type can be done only for the same data set as the model training set",
+            f"Given dataset for the inferer is not the training set: {self.dataset} != {self.model.fm.train_dataset}"
+        )
+
+        gt_mask_insts = OrderedDict(
+            [(f.name[:-4], FileHandler.read_mask(f, "inst_map")) for f in self.gt_mask_paths]
+        )
+        gt_mask_types = OrderedDict(
+            [(f.name[:-4], FileHandler.read_mask(f, "type_map")) for f in self.gt_mask_paths]
+        )
+
+        bm = Benchmarker()
+        scores = bm.benchmark_per_type(
+            inst_maps=self.inst_maps, 
+            type_maps=self.type_maps, 
+            gt_mask_insts=gt_mask_insts, 
+            gt_mask_types=gt_mask_types,
+            pattern_list=pattern_list,
+            classes=self.model.fm.classes, 
+            save_dir=self.model.fm.experiment_dir
+        )
+
+        return scores
