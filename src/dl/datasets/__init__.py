@@ -2,7 +2,7 @@ from src.dl.datasets.basic.dataset import BasicDataset
 from src.dl.datasets.unet.dataset import UnetDataset
 from src.dl.datasets.hover.dataset import HoverDataset
 from src.dl.datasets.dist.dataset import DistDataset
-# from src.dl.datasets.contour.dataset import ContourDataset
+from src.dl.datasets.contour.dataset import ContourDataset
 from src.dl.datasets.augs import *
 
 

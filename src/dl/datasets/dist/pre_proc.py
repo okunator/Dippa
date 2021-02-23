@@ -44,7 +44,9 @@ def gen_dist_maps(inst_map: np.ndarray, crop_shape: Tuple[int]=(256, 256), norm:
         np.ndarray: distance maps of nuclei
     """
 
-    crop_ann = center_crop(inst_map, crop_shape[0], crop_shape[1])
+    if inst_map.shape[0] > crop_shape[0]: 
+        inst_map = center_crop(inst_map, crop_shape[0], crop_shape[1])
+
     dist = np.zeros_like(inst_map, dtype=np.float32)
 
     inst_list = list(np.unique(inst_map))

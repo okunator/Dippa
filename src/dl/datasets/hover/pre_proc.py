@@ -23,7 +23,6 @@ SOFTWARE.
 """
 
 
-import cv2
 import numpy as np
 from scipy import ndimage as ndi
 from typing import Tuple
@@ -53,16 +52,18 @@ def gen_hv_maps(inst_map: np.ndarray, crop_shape: Tuple[int] = (256, 256)) -> np
             crop shape if network output smaller dims than the input
     """
 
-    crop_inst_map = center_crop(inst_map, crop_shape[0], crop_shape[1])
-    remove_small_objects(crop_inst_map, min_size=30, out=crop_inst_map)
+    if inst_map.shape[0] > crop_shape[0]: 
+        inst_map = center_crop(inst_map, crop_shape[0], crop_shape[1])
+
+    remove_small_objects(inst_map, min_size=30, out=inst_map)
 
     x_map = np.zeros_like(inst_map, dtype=np.float32)
     y_map = np.zeros_like(inst_map, dtype=np.float32)
 
-    inst_list = list(np.unique(crop_inst_map))
+    inst_list = list(np.unique(inst_map))
     inst_list.remove(0)  # 0 is background
     for inst_id in inst_list:
-        inst = np.array(crop_inst_map == inst_id, np.int32)
+        inst = np.array(inst_map == inst_id, np.int32)
         y1, y2, x1, x2 = bounding_box(inst)
         y1 = y1 - 2 if y1 - 2 >= 0 else y1
         x1 = x1 - 2 if x1 - 2 >= 0 else x1
