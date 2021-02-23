@@ -65,6 +65,7 @@ class SegModel(pl.LightningModule):
         self.encoder_name: str = model_args.architecture_design.encoder_args.encoder
         self.pretrain: bool = model_args.architecture_design.encoder_args.pretrain
         self.depth: int = model_args.architecture_design.encoder_args.encoder_depth
+        self.freeze: bool = training_args.freeze_encoder
 
         # Decoder_args
         self.n_blocks: int = model_args.architecture_design.decoder_args.n_blocks
@@ -115,7 +116,12 @@ class SegModel(pl.LightningModule):
         if self.aux_branch:
             self.aux_channels = 2 if self.aux_type == "hover" else 1
 
-        self.model = Model(model_args, n_classes=len(self.fm.classes), aux_out_channels=self.aux_channels)
+        self.model = Model(
+            model_args=model_args,
+            n_classes=len(self.fm.classes),
+            freeze_encoder=self.freeze, 
+            aux_out_channels=self.aux_channels
+        )
 
         # Redundant but necessary for experiment logging..
         self.optimizer_args = training_args.optimizer_args
@@ -168,7 +174,10 @@ class SegModel(pl.LightningModule):
                 xmap = batch["xmap"].float()
                 ymap = batch["ymap"].float()
                 aux_target = torch.stack([xmap, ymap], dim=1)
-            # TODO: other aux branches
+            elif self.aux_type == "dist":
+                aux_target = batch["dist_map"].float()
+            elif self.aux_type == "contour":
+                pass
 
         # Forward pass
         soft_mask = self.forward(x)
@@ -206,11 +215,12 @@ class SegModel(pl.LightningModule):
             f"{phase}_mean_iou": z["mean_iou"]
         }
 
+        self.log_dict(logs, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+
         return {
             "loss": z["loss"],
             "accuracy": z["accuracy"],
-            "mean_iou": z["mean_iou"],
-            "log": logs
+            "mean_iou": z["mean_iou"]
         }
 
     def epoch_end(self, outputs: torch.Tensor, phase: str) -> Dict[str, torch.Tensor]:
@@ -227,10 +237,9 @@ class SegModel(pl.LightningModule):
             f"avg_{phase}_iou": iou,
         }
 
-        return {
-            "loss": loss,
-            "log": logs,
-        }
+        self.log_dict(logs, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+
+        return {f"avg_{phase}_loss": loss}
     
     def training_step(self, train_batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
         z = self.step(train_batch, batch_idx)
@@ -247,17 +256,14 @@ class SegModel(pl.LightningModule):
         return_dict = self.step_return_dict(z, "test")
         return return_dict
     
-    def training_epoch_end(self, outputs: torch.Tensor) -> Dict[str, torch.Tensor]:
-        return_dict = self.epoch_end(outputs, "train")
-        return return_dict
+    def training_epoch_end(self, outputs: torch.Tensor) -> None:
+        self.epoch_end(outputs, "train")
+        
+    def validation_epoch_end(self, outputs: torch.Tensor) -> None:
+        self.epoch_end(outputs, "val")
 
-    def validation_epoch_end(self, outputs: torch.Tensor) -> Dict[str, torch.Tensor]:
-        return_dict = self.epoch_end(outputs, "val")
-        return return_dict
-
-    def test_epoch_end(self, outputs: torch.Tensor) -> Dict[str, torch.Tensor]:
-        return_dict = self.epoch_end(outputs, "test")
-        return return_dict
+    def test_epoch_end(self, outputs: torch.Tensor) -> None:
+        self.epoch_end(outputs, "test")
 
     def configure_optimizers(self):
         # init optimizer

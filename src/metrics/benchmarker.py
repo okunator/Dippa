@@ -18,8 +18,8 @@ class Benchmarker:
 
         Args:
             true_pred (List[np.ndarray]): 
-                Ground truth annotations in true_pred[0] and corresponding 
-                predicted instance map in true_pred[1]
+                Ground truth annotations in true_pred[1] and corresponding 
+                predicted instance map in true_pred[2]
 
         Returns:
             A Dict[str, float] of the metrics

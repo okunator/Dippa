@@ -11,7 +11,7 @@ class SegTrainer:
     def __init__(self,
                  experiment_args: DictConfig,
                  dataset_args: DictConfig,
-                 training_args: DictConfig,
+                 runtime_args: DictConfig,
                  extra_callbacks: List[pl.Callback] = None) -> None:
         """
         Initializes lightning trainer based on the experiment.yml
@@ -23,9 +23,9 @@ class SegTrainer:
             dataset_args (omegaconf.DictConfig): 
                 Omegaconf DictConfig specifying arguments related 
                 to the dataset that is being used.
-            training_args (omegaconf.DictConfig): 
-                Omegaconf DictConfig specifying arguments that are
-                used for training a network.
+            runtime_args (omegaconf.DictConfig): 
+                Omegaconf DictConfig specifying batch size and 
+                input image size for the model.
             extra_callbacks (List[pl.CallBack], default=None):
                 List of extra callbacks to add to the Trainer
         """
@@ -46,7 +46,7 @@ class SegTrainer:
 
         # set checkpoint callback
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
-            filepath = self.ckpt_dir.as_posix(),
+            filepath = self.ckpt_dir,
             save_top_k = 1,
             save_last = True,
             verbose = True, 
@@ -56,31 +56,29 @@ class SegTrainer:
         )
 
         # set gpu monitoring callback
-        gpu_callback = pl.callbacks.GPUStatsMonitor()
+        # gpu_callback = pl.callbacks.GPUStatsMonitor()
 
         # set attributes
-        self.callbacks = [checkpoint_callback, gpu_callback]
+        self.callbacks = [checkpoint_callback] #, gpu_callback]
         self.callbacks += extra_callbacks if extra_callbacks is not None else []
-        self.gpus = training_args.num_gpus
-        self.epochs = training_args.num_epochs
-        self.resume_training = training_args.resume_training
+        self.gpus = runtime_args.num_gpus
+        self.epochs = runtime_args.num_epochs
+        self.resume_training = runtime_args.resume_training
         self.last_ckpt = fm.get_model_checkpoint("last") if self.resume_training else None
     
         # set logging dir
         self.logging_dir = fm.experiment_dir / "tf"
 
- 
-
     @classmethod
     def from_conf(cls, conf: DictConfig, extra_callbacks: List[pl.Callback] = None):
         dataset_args = conf.dataset_args
         experiment_args = conf.experiment_args
-        training_args = conf.training_args
+        runtime_args = conf.runtime_args
 
         c = cls(
             experiment_args,
             dataset_args,
-            training_args,
+            runtime_args,
             extra_callbacks
         )
 

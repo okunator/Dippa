@@ -31,7 +31,8 @@ from typing import Tuple
 from src.utils.process_utils import bounding_box, center_crop
 from ..pre_proc_utils import remove_small_objects
 
-# ported from https://github.com/vqdang/hover_net/blob/master/src/loader/augs.py
+
+# ported from https://github.com/vqdang/hover_net/blob/195ed9b6cc67b12f908285492796fb5c6c15a000/src/loader/augs.py#L21
 def gen_hv_maps(inst_map: np.ndarray, crop_shape: Tuple[int] = (256, 256)) -> np.ndarray:
     """
     Generates horizontal and vertical maps from instance labels
@@ -46,15 +47,17 @@ def gen_hv_maps(inst_map: np.ndarray, crop_shape: Tuple[int] = (256, 256)) -> np
     nuclear instance.
 
     Args:
-        inst_map (np.ndarray): inst map
-        crop_shape (Tuple[int]): crop shape if network output smaller dims than the input
+        inst_map (np.ndarray): 
+            inst map
+        crop_shape (Tuple[int]): 
+            crop shape if network output smaller dims than the input
     """
 
     crop_inst_map = center_crop(inst_map, crop_shape[0], crop_shape[1])
     remove_small_objects(crop_inst_map, min_size=30, out=crop_inst_map)
 
-    x_map = np.zeros(inst_map.shape[:2], dtype=np.float32)
-    y_map = np.zeros(inst_map.shape[:2], dtype=np.float32)
+    x_map = np.zeros_like(inst_map, dtype=np.float32)
+    y_map = np.zeros_like(inst_map, dtype=np.float32)
 
     inst_list = list(np.unique(crop_inst_map))
     inst_list.remove(0)  # 0 is background

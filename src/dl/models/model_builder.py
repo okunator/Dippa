@@ -13,7 +13,8 @@ class Model(MultiTaskSegModel):
     def __init__(self,
                  model_args: DictConfig,
                  n_classes: int,
-                 aux_out_channels: int = None,
+                 freeze_encoder: bool=False,
+                 aux_out_channels: int=None,
                  **kwargs) -> None:
         """
         Class which builds the model from the architectural desing choices 
@@ -26,6 +27,8 @@ class Model(MultiTaskSegModel):
             n_classes (int):
                 Number of classes in the dataset. Type decoder branch
                 is set to output this number of classes
+            freeze_encoder (bool, default=False):
+                freeze the encoder for training
             aux_out_channels (int, default=None):
                 Number of output channels from the auxiliary branch
         """
@@ -42,8 +45,8 @@ class Model(MultiTaskSegModel):
         self.encoder_name: str = model_args.architecture_design.encoder_args.encoder
         self.pretrained: bool = model_args.architecture_design.encoder_args.pretrain
         self.depth: int = model_args.architecture_design.encoder_args.encoder_depth
-        self.weights = "imagenet" if self.pretrained else None
-        self.freeze = model_args.architecture_design.encoder_args.encoder_depth
+        self.weights: str = "imagenet" if self.pretrained else None
+        self.freeze: bool = freeze_encoder
 
         # Decoder args
         self.n_blocks: int = model_args.architecture_design.decoder_args.n_blocks

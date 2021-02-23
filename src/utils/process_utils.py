@@ -63,9 +63,14 @@ def remap_label(pred: np.ndarray, by_size: bool = False) -> np.ndarray:
     so that bigger nucler has smaller ID
 
     Args:
-        pred    : the 2d array contain instances where each instances is marked
-                  by non-zero integer
-        by_size : renaming with larger nuclei has smaller id (on-top)
+        pred (np.ndarray):
+            the 2d array contain instances where each instances is marked
+            by non-zero integer
+        by_size (bool, default=False): 
+            renaming with larger nuclei has smaller id (on-top)
+    
+    Returns:
+        np.ndarray inst map with remapped contiguous labels
     """
     pred_id = list(np.unique(pred))
     pred_id.remove(0)
@@ -228,9 +233,9 @@ def overlays(im: np.ndarray, mask:np.ndarray) -> np.ndarray:
 
 def type_map_flatten(type_map: np.ndarray) -> np.ndarray:
     """
-    Convert a type map of shape (H, W, C) to a single channel map of shape (H, W)
-    where the class types are indexes of the new map
-
+    Convert a one hot type map of shape (H, W, C) to a single channel
+    indice map of shape (H, W)
+    
     Args:
         type_map (np.ndarray): type_map to be flattened
     """

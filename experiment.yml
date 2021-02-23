@@ -1,6 +1,6 @@
 experiment_args:
-  experiment_name: test
-  experiment_version: something
+  experiment_name: consep_quick_test_2
+  experiment_version: hover_unet_skip_sum_unfreeze
 
 dataset_args:
   train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
@@ -30,11 +30,8 @@ model_args:
     aux_type: hover              # One of (hover, dist, contour) (ignored if aux=False)
 
 training_args:
-  resume_training: False
-  num_epochs: 10
-  num_gpus: 1
-  freeze_encoder: False         # freeze the weights in the encoder (for fine tuning)
-  weight_balancing: null        # One of (gradnorm, uncertainty, null)
+  freeze_encoder: False          # freeze the weights in the encoder (for fine tuning)
+  weight_balancing: null         # One of (gradnorm, uncertainty, null)
   augmentations:
     - hue_sat
     - non_rigid
@@ -53,13 +50,16 @@ training_args:
     scheduler_patience: 2
 
   loss_args:
-    inst_branch_loss: dice_focal
-    type_branch_loss: tversky_focal
+    inst_branch_loss: dice_ce
+    type_branch_loss: dice_ce
     aux_branch_loss: mse_ssim
     edge_weight: False         # Give penalty to nuclei borders in cross-entropy based losses
     class_weights: False       # Weight classes by the # of class pixels in the data
 
 runtime_args:
+  resume_training: True
+  num_epochs: 14
+  num_gpus: 1
   batch_size: 8
   model_input_size: 256       # Multiple of 32. Tuple(int, int) 
   num_workers: 8              # number workers for data loeader

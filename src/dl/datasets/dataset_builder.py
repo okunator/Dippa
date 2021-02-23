@@ -23,8 +23,8 @@ class DatasetBuilder:
                         "random_crop", "center_crop", "resize")
         """
         self.augs: List[str] = augmentations
-        self.aux_branch = decoder_branch_args.aux
-        self.ds_name = decoder_branch_args.aux_type if self.aux_branch else "unet"
+        self.aux_branch: bool = decoder_branch_args.aux
+        self.ds_name: str = decoder_branch_args.aux_type if self.aux_branch else "unet"
         assert self.ds_name in ("hover", "dist", "contour", "unet", "basic")
 
     def get_augs(self, augs_list: Optional[List[str]] = None):
