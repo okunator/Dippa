@@ -31,14 +31,24 @@ from src.utils.process_utils import center_crop, bounding_box
 
 # Ported from https://github.com/vqdang/hover_net/blob/195ed9b6cc67b12f908285492796fb5c6c15a000/src/loader/augs.py#L21
 def gen_dist_maps(inst_map: np.ndarray, crop_shape: Tuple[int]=(256, 256), norm: bool=True) -> np.ndarray:
+    """
+    Compute distance transforms for every distinct nuclear object
 
-    # re-cropping with fixed instance id map
+    Args:
+        inst_map (np.ndarray): 
+            inst map
+        crop_shape (Tuple[int]): 
+            crop shape if network output smaller dims than the input
+
+    Returns:
+        np.ndarray: distance maps of nuclei
+    """
+
     crop_ann = center_crop(inst_map, crop_shape[0], crop_shape[1])
     dist = np.zeros_like(inst_map, dtype=np.float32)
 
     inst_list = list(np.unique(inst_map))
-    inst_list.remove(0) # 0 is background
-    for inst_id in inst_list:
+    for inst_id in inst_list[1:]:
         inst = np.array(inst_map == inst_id, np.uint8)
 
         y1, y2, x1, x2 = bounding_box(inst)
@@ -60,10 +70,9 @@ def gen_dist_maps(inst_map: np.ndarray, crop_shape: Tuple[int]=(256, 256), norm:
         if norm:
             max_value = np.amax(inst_dist)
             if max_value <= 0: 
-                continue # HACK: temporay patch for divide 0 i.e no nuclei (how?)
+                continue
             inst_dist = (inst_dist / np.amax(inst_dist)) 
 
-        ####
         dist_map_box = dist[y1:y2, x1:x2]
         dist_map_box[inst > 0] = inst_dist[inst > 0]
 
