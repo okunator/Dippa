@@ -6,7 +6,6 @@ from skimage import morphology as morph
 from scipy.ndimage.morphology import distance_transform_edt
 
 
-
 def binarize(inst_map: np.ndarray) -> np.ndarray:
     """
     Binarize a labelled instance map

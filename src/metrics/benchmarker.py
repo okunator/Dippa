@@ -161,7 +161,6 @@ class Benchmarker:
             |img2_type2  |.5|.4|.6|.6 |
 
         """
-        # assert self.dataset_args.class_types == "panoptic", "You can only use this when doing panoptic segmentation"
         assert isinstance(inst_maps, dict), f"inst_maps: {type(inst_maps)} is not a dict of inst_maps"
         assert isinstance(type_maps, dict), f"inst_maps: {type(type_maps)} is not a dict of panoptic_maps"
         assert isinstance(gt_mask_insts, dict), f"inst_maps: {type(gt_mask_insts)} is not a dict of inst_maps"

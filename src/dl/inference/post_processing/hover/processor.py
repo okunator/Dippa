@@ -68,7 +68,7 @@ class HoverNetPostProcessor(PostProcessor):
             inst_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, soft instance map) pairs
                 inst_map shapes are (H, W, 2) 
-            aux_maps (OrderedDict[str, np.ndarray]):
+            hover_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, hover map) pairs.
                 hover_map[..., 0] = horizontal map
                 hover_map[..., 1] = vertical map

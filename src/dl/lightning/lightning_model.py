@@ -177,8 +177,10 @@ class SegModel(pl.LightningModule):
                 aux_target = torch.stack([xmap, ymap], dim=1)
             elif self.aux_type == "dist":
                 aux_target = batch["dist_map"].float()
+                aux_target = aux_target.unsqueeze(dim=1)
             elif self.aux_type == "contour":
-                pass
+                aux_target = batch["dist_map"].float()
+                aux_target = aux_target.unsqueeze(dim=1)
 
         # Forward pass
         soft_mask = self.forward(x)

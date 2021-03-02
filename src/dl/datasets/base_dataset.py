@@ -16,7 +16,6 @@ from src.utils.mask_utils import (
 )
 
 
-
 class BaseDataset(Dataset, FileHandler):
     def __init__(self,
                  fname: str) -> None:

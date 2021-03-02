@@ -1,6 +1,6 @@
 experiment_args:
-  experiment_name: baseline_consep_lol
-  experiment_version: hover
+  experiment_name: baseline_consep
+  experiment_version: dist
 
 dataset_args:
   train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
@@ -27,7 +27,7 @@ model_args:
   decoder_branches:
     type: True
     aux: True
-    aux_type: hover              # One of (hover, dist, contour) (ignored if aux=False)
+    aux_type: dist              # One of (hover, dist, contour) (ignored if aux=False)
 
 training_args:
   normalize_input: False         # 1-99 percentile normalize input images after augs (get nans?)
@@ -59,8 +59,8 @@ training_args:
     class_weights: False       # Weight classes by the # of class pixels in the data
 
 runtime_args:
-  resume_training: True
-  num_epochs: 50
+  resume_training: False
+  num_epochs: 10
   num_gpus: 1
   batch_size: 8
   model_input_size: 256       # Multiple of 32. Tuple(int, int) 

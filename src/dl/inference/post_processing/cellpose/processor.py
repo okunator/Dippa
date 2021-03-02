@@ -56,7 +56,7 @@ class CellposePostProcessor(PostProcessor):
 
         inst_map = self.clean_up(cellpose_dict["inst_map"])
 
-        # save the flows here to avoid complicating the inferer code 
+        # save the flows here to avoid complicating the inferer code
         self.flows[name] = cellpose_dict["flows"]["flow"]
 
         return name, inst_map, combined

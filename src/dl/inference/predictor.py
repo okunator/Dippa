@@ -52,7 +52,6 @@ def compute_pyramid_patch_weight_loss(width: int, height: int) -> np.ndarray:
     alpha = (width * height) / np.sum(np.divide(De, np.add(Dc, De)))
     W = alpha * np.divide(De, np.add(Dc, De))
     return W
- 
 
 
 class Predictor:
@@ -96,7 +95,6 @@ class Predictor:
                  patch: torch.Tensor, 
                  act: Union[str, None]="softmax", 
                  apply_weights: bool=False,
-                 squeeze: bool=False,
                  return_type: str="torch") -> np.ndarray:
         """
         Take in a patch or a batch of patches of logits produced by the model and
@@ -113,10 +111,7 @@ class Predictor:
                 apply a weight matrix that assigns bigger weight on pixels
                 in center and less weight to pixels on image boundary. helps dealing with
                 prediction artifacts on tile boundaries.
-            squeeze (bool): 
-                whether to squeeze the output batch dim if B (batch dim) = 1
-                (B, C, input_size, input_size) -> (C, input_size, input_size) if B == 1
-            return_type:
+            return_type (str, default="torch"):
                 One of ("torch", "numpy")
 
         Returns:
@@ -142,7 +137,7 @@ class Predictor:
 
         # from gpu to cpu
         if return_type == "numpy":
-            pred = util.tensor_to_ndarray(pred, squeeze=squeeze)
+            pred = util.tensor_to_ndarray(pred)
         else:
             pred = pred.detach()
             if pred.is_cuda:

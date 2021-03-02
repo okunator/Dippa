@@ -176,7 +176,7 @@ class Inferer:
         self.predictor = Predictor(self.model)
 
         # set the post-processing pipeline. Defaults to 
-        # model.aux_type if model has ans auxiliary branch
+        # model.aux_type if model has an auxiliary branch
         self.post_proc_method = post_proc_method
         if self.post_proc_method is None:
             self.post_proc_method = self.model.aux_type if self.model.aux_branch else "basic"
@@ -229,7 +229,7 @@ class Inferer:
         """
         # TODO: tta
         pred = self.predictor.forward_pass(batch)
-        insts = self.predictor.classify(pred["instances"], act="sigmoid") # goes to cpu
+        insts = self.predictor.classify(pred["instances"], act="softmax") # goes to cpu
         types = self.predictor.classify(pred["types"], act="softmax") if pred["types"] is not None else None
         aux = self.predictor.classify(pred["aux"], act=None, apply_weights=self.apply_weights) if pred["aux"] is not None else None
         return insts, types, aux

@@ -44,7 +44,6 @@ def enhance_hover(hover: np.ndarray, order: str="XY", channels: str="HWC") -> np
     like in CellPose. Assumes that the hovermaps are stacked in "YX" order. And that the shape
     is (H, W, 2). If not, then reshapes the np.ndarray.
 
-    dP is 2 x Y x X 
     This is ported from the CellPose repo and slightly modified.
 
     Args:
