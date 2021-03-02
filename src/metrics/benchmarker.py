@@ -7,7 +7,7 @@ from collections import OrderedDict
 from pathos.multiprocessing import ThreadPool as Pool
 from tqdm import tqdm
 
-from src.utils.process_utils import remap_label, get_type_instances
+from src.utils.mask_utils import remap_label, get_type_instances
 from .metrics import PQ, AJI, AJI_plus, DICE2, split_and_merge
 
 
@@ -55,7 +55,8 @@ class Benchmarker:
                         inst_maps: Dict[str, np.ndarray],
                         gt_masks: Dict[str, np.ndarray],
                         pattern_list: List[str]=None,
-                        save_dir: Union[str, Path]=None) -> pd.DataFrame:
+                        save_dir: Union[str, Path]=None,
+                        prefix: str="") -> pd.DataFrame:
         """
         Run benchmarking metrics for instance maps for all of the files in the dataset.
         Note that the inst_maps and gt_masks need to share exact same keys and be sorted
@@ -72,6 +73,9 @@ class Benchmarker:
                 to the result df.
             save_dir (str or Path):
                 directory where to save the result .csv
+            prefix (str, default=""):
+                adds a prefix to the .csv file name
+
 
         Returns:
             a pandas dataframe of the metrics. Samples are rows and metrics are columns:
@@ -109,7 +113,7 @@ class Benchmarker:
         # Save results to .csv
         if save_dir is not None:
             save_dir = Path(save_dir)
-            score_df.to_csv(Path(save_dir / "inst_benchmark.csv"))
+            score_df.to_csv(Path(save_dir / f"{prefix}_inst_benchmark.csv"))
 
         return score_df
 
@@ -120,7 +124,8 @@ class Benchmarker:
                            gt_mask_types: Dict[str, np.ndarray],
                            classes: Dict[str, int],
                            pattern_list: List[str]=None,
-                           save_dir: Union[str, Path]=None) -> pd.DataFrame:
+                           save_dir: Union[str, Path]=None,
+                           prefix: str="") -> pd.DataFrame:
         """
         Run benchmarking metrics per class type for all of the files in the dataset.
         Note that the inst_maps and gt_masks need to share exact same keys and be sorted
@@ -143,6 +148,8 @@ class Benchmarker:
                 to the result df.
             save_dir (str or Path):
                 directory where to save the result .csv
+            prefix (str, default=""):
+                adds a prefix to the .csv file name
 
         Returns:
             a pandas dataframe of the metrics. Samples are rows and metrics are columns:
@@ -197,7 +204,7 @@ class Benchmarker:
         # Save results to .csv
         if save_dir is not None:
             save_dir = Path(save_dir)
-            df_total.to_csv(Path(save_dir / "type_benchmark.csv"))
+            df_total.to_csv(Path(save_dir / f"{prefix}_type_benchmark.csv"))
 
         return df_total
     

@@ -3,27 +3,31 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 from typing import List, Dict, Optional
+from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
 from src.utils.file_manager import FileHandler
-from .pre_proc_utils import get_weight_map, remove_1px_boundary, fix_mirror_padding, binarize
+from ..torch_utils import percentile_normalize_torch
+
+from src.utils.mask_utils import (
+    get_weight_map, 
+    remove_1px_boundary, 
+    fix_mirror_padding,
+    binarize
+)
+
 
 
 class BaseDataset(Dataset, FileHandler):
     def __init__(self,
-                 fname: str,
-                 transforms: List) -> None:
+                 fname: str) -> None:
         """
         Base dataset class
 
         Args:
             fname (str): 
                 path to the pytables database
-            transforms (albu.Compose): 
-                albumentations.Compose obj (a list of augmentations)
         """
-        assert transforms is not None, "No augmentations given. Give at least epmty albu.Compose"
         self.fname = fname
-        self.transforms = transforms
         self.tables = tables.open_file(self.fname)
         self.numpixels = self.tables.root.numpixels[:]
         self.n_items = self.tables.root.img.shape[0]
@@ -45,3 +49,6 @@ class BaseDataset(Dataset, FileHandler):
         
     def binary(self, inst_map:np.ndarray) -> np.ndarray:
         return binarize(inst_map)
+
+    def normalize(self, img: torch.Tensor) -> torch.Tensor:
+        return percentile_normalize_torch(img)

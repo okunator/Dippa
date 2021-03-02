@@ -9,7 +9,7 @@ from ..base_processor import PostProcessor
 
 class HoverNetPostProcessor(PostProcessor):
     def __init__(self,
-                 thresh_method: str,
+                 thresh_method: str="naive",
                  thresh: float=0.5,
                  **kwargs) -> None:
         """
@@ -51,6 +51,9 @@ class HoverNetPostProcessor(PostProcessor):
         if type_map is not None:
             types = np.argmax(type_map, axis=2)
             combined = self.combine_inst_type(inst_map, types)
+        
+        # Clean up the result
+        inst_map = self.clean_up(inst_map)
 
         return name, inst_map, combined
 
@@ -63,14 +66,15 @@ class HoverNetPostProcessor(PostProcessor):
 
         Args:
             inst_maps (OrderedDict[str, np.ndarray]):
-                Ordered dict of (file name, soft instance map) pairs 
+                Ordered dict of (file name, soft instance map) pairs
+                inst_map shapes are (H, W, 2) 
             aux_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, hover map) pairs.
                 hover_map[..., 0] = horizontal map
                 hover_map[..., 1] = vertical map
             type_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, type map) pairs.
-                type maps are in one hot format.
+                type maps are in one hot format (H, W, n_classes).
         """
         # Set arguments for threading pool
         maps = list(zip(inst_maps.keys(), inst_maps.values(), hover_maps.values(), type_maps.values()))

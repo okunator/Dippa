@@ -6,17 +6,71 @@ from typing import Dict, Union
 
 import src.dl.torch_utils as util
 # import src.dl.inference.tta as tta
+
+
+def compute_pyramid_patch_weight_loss(width: int, height: int) -> np.ndarray:
+    """
+    Compute a weight matrix that assigns bigger weight on pixels in center and
+    less weight to pixels on image boundary. This weight matrix is used for merging
+    individual tile predictions and helps dealing with prediction artifacts on tile
+    boundaries.
+
+    Ported from:
+    https://github.com/BloodAxe/pytorch-toolbelt/blob/develop/pytorch_toolbelt/inference/tiles.py
+
+    Args:
+        width (int):
+            Tile width
+        height (int): 
+            Tile height
+
+    Returns:
+        np.ndarray since-channel image. Shape (H, W)
+    """
+    xc = width * 0.5
+    yc = height * 0.5
+    xl = 0
+    xr = width
+    yb = 0
+    yt = height
+    Dc = np.zeros((width, height))
+    De = np.zeros((width, height))
+
+    Dcx = np.square(np.arange(width) - xc + 0.5)
+    Dcy = np.square(np.arange(height) - yc + 0.5)
+    Dc = np.sqrt(Dcx[np.newaxis].transpose() + Dcy)
+
+    De_l = np.square(np.arange(width) - xl + 0.5) + np.square(0.5)
+    De_r = np.square(np.arange(width) - xr + 0.5) + np.square(0.5)
+    De_b = np.square(0.5) + np.square(np.arange(height) - yb + 0.5)
+    De_t = np.square(0.5) + np.square(np.arange(height) - yt + 0.5)
+
+    De_x = np.sqrt(np.minimum(De_l, De_r))
+    De_y = np.sqrt(np.minimum(De_b, De_t))
+    De = np.minimum(De_x[np.newaxis].transpose(), De_y)
+
+    alpha = (width * height) / np.sum(np.divide(De, np.add(Dc, De)))
+    W = alpha * np.divide(De, np.add(Dc, De))
+    return W
  
+
 
 class Predictor:
     def __init__(self, model: nn.Module) -> None:
         """
         Helper class for predicting soft masks at inference time
+        
+        Contains a weight matrix that can assign bigger weight on pixels
+        in center and less weight to pixels on image boundary. helps dealing with
+        prediction artifacts on tile boundaries.
 
         Args;
-            model (nn.Module): nn.Module pytorch model
+            model (nn.Module):
+                nn.Module pytorch model
         """
         self.model = model
+        weight_mat = compute_pyramid_patch_weight_loss(self.model.input_size, self.model.input_size)
+        self.weight_mat = torch.from_numpy(weight_mat).float().to(self.model.device).unsqueeze(0).unsqueeze(0)
 
 
     def forward_pass(self, patch: Union[np.ndarray, torch.Tensor]) -> Dict[str, torch.Tensor]:
@@ -41,8 +95,9 @@ class Predictor:
     def classify(self, 
                  patch: torch.Tensor, 
                  act: Union[str, None]="softmax", 
+                 apply_weights: bool=False,
                  squeeze: bool=False,
-                 return_type: str="numpy") -> np.ndarray:
+                 return_type: str="torch") -> np.ndarray:
         """
         Take in a patch or a batch of patches of logits produced by the model and
         use sigmoid activation for instance logits and softmax for semantic logits
@@ -54,17 +109,23 @@ class Predictor:
                 Shape: (B, C, input_size, input_size)
             act (str or None, default="softmax"):
                 activation to be used. One of ("sigmoid", "softmax", None)
+            apply_weights (bool, default=True):
+                apply a weight matrix that assigns bigger weight on pixels
+                in center and less weight to pixels on image boundary. helps dealing with
+                prediction artifacts on tile boundaries.
             squeeze (bool): 
                 whether to squeeze the output batch dim if B (batch dim) = 1
                 (B, C, input_size, input_size) -> (C, input_size, input_size) if B == 1
             return_type:
                 One of ("torch", "numpy")
+
         Returns:
             np.ndarray of the prediction
         """
         assert act in ("sigmoid", "softmax", None)
         assert return_type in ("torch", "numpy")
         
+        # apply classification activation
         if act == "sigmoid":
             pred = torch.sigmoid(patch)
         elif act == "softmax":
@@ -72,10 +133,17 @@ class Predictor:
         else:
             pred = patch
 
+        # Add weights to pred matrix 
+        if apply_weights:
+            # work out the tensor shape first for the weight mat
+            B, C = pred.shape[:2]
+            W = torch.repeat_interleave(self.weight_mat, repeats=C, dim=1).repeat_interleave(repeats=B, dim=0)
+            pred *= W
+
+        # from gpu to cpu
         if return_type == "numpy":
             pred = util.tensor_to_ndarray(pred, squeeze=squeeze)
         else:
-            # from gpu to cpu
             pred = pred.detach()
             if pred.is_cuda:
                 pred = pred.cpu()

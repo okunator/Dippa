@@ -14,7 +14,8 @@ AUGS_LOOKUP = {
     "non_spatial":"non_spatial_transforms",
     "random_crop":"random_crop",
     "center_crop":"center_crop",
-    "resize":"resize"
+    "resize":"resize",
+    "normalize":"normalize"
 }
 
 DS_LOOKUP = {

@@ -43,7 +43,8 @@ class DatasetBuilder:
     def set_train_dataset(cls,
                           fname: str,
                           decoder_branch_args: DictConfig,
-                          augmentations: List[str]=None) -> Dataset:
+                          augmentations: List[str]=None,
+                          norm: bool=True) -> Dataset:
         """
         Init the train dataset.
 
@@ -61,15 +62,16 @@ class DatasetBuilder:
         """
         c = cls(decoder_branch_args, augmentations)
         aug = c.get_augs(c.augs)
-        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug)
+        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug, norm=norm)
 
     @classmethod
     def set_test_dataset(cls,
                          fname: str,
                          decoder_branch_args: DictConfig,
-                         augmentations: List[str]=None) -> Dataset:
+                         augmentations: List[str]=None,
+                         norm: bool=True) -> Dataset:
         """
-        Init the test dataset. 
+        Init the test dataset. No augmentations used. Only ndarray to tensor conversion.
 
         Args:
             decoder_branch_args (omegaconf.DictConfig): 
@@ -84,4 +86,4 @@ class DatasetBuilder:
         """
         c = cls(decoder_branch_args, augmentations)
         aug = c.get_augs()
-        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug)
+        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug, norm=norm)

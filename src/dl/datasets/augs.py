@@ -20,6 +20,7 @@ def rigid_transforms(**kwargs) -> List[BasicTransform]:
     """
     return [
         A.OneOf([
+            # A.Rotate(p=0.5),
             A.RandomRotate90(p=0.5),
             A.Flip(p=0.5),
             A.Transpose(p=0.5),
@@ -33,7 +34,7 @@ def non_rigid_transforms(**kwargs) -> List[BasicTransform]:
     - elastic transformation
     - grid distortion
     - optical distortion
-    is applied with a probability of 0.7*(0.5/(0.5+0.5+0.5))=0.233
+    is applied with a probability of 0.3*(0.5/(0.5+0.5+0.5))=0.1
 
     Returns:
         A List of possible data augmentations
@@ -43,7 +44,7 @@ def non_rigid_transforms(**kwargs) -> List[BasicTransform]:
             A.ElasticTransform(alpha=120, sigma=120*0.05, alpha_affine=120*0.03, p=0.5),
             A.GridDistortion(p=0.5),
             A.OpticalDistortion(distort_limit=2, shift_limit=0.5, p=0.5)
-        ], p=0.7)
+        ], p=0.3)
     ]
 
 
@@ -56,7 +57,7 @@ def hue_saturation_transforms(**kwargs) -> List[BasicTransform]:
     Returns:
         A List of possible data augmentations
     """
-    return [A.HueSaturationValue(hue_shift_limit=(0,15), sat_shift_limit=0, val_shift_limit=0, p=0.5)]
+    return [A.HueSaturationValue(hue_shift_limit=(0,15), sat_shift_limit=0, val_shift_limit=0, p=0.25)]
 
 
 def blur_transforms(**kwargs) -> List[BasicTransform]:
@@ -84,7 +85,7 @@ def non_spatial_transforms(**kwargs) -> List[BasicTransform]:
     Wrapper for non spatial albumentations augmentations. For every patch, either:
     - CLAHE
     - brightness contrast
-    - gaussian blur
+    - random gamma
     is applied with a probability of 0.7*(0.5/(0.5+0.5+0.5))=0.233
 
     Returns:
@@ -141,6 +142,10 @@ def resize(height: int, width: int, **kwargs) -> List[BasicTransform]:
         A resize transform
     """
     return  [A.Resize(height=height, width=width, p=1)]
+
+
+def normalize(**kwargs):
+    return [A.Normalize()]
 
 
 def to_tensor(**kwargs) -> List[BasicTransform]:

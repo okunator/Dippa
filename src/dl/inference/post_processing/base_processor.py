@@ -3,6 +3,8 @@ import numpy as np
 
 from .thresholding import argmax, sauvola_thresh, niblack_thresh, naive_thresh_prob
 from .combine_type_inst import combine_inst_semantic
+from src.utils.mask_utils import remove_debris
+
 
 THRESH_LOOKUP = {
     "argmax":"argmax",
@@ -72,6 +74,13 @@ class PostProcessor(ABC):
         """
         return combine_inst_semantic(inst_map, type_map)
 
+    def clean_up(self, inst_map: np.ndarray, min_size: int=10) -> np.ndarray:
+        """
+        Remove small objects. Sometimes ndimage and skimage does not work. This does
+        """
+        return remove_debris(inst_map, min_size)
+
+
     @abstractmethod
     def post_proc_pipeline(self):
         raise NotImplementedError
@@ -79,6 +88,12 @@ class PostProcessor(ABC):
     @abstractmethod
     def run_post_processing(self):
         raise NotImplementedError
+
+    # @abstractmethod
+    # def viz_contents(self):
+    #     raise NotImplementedError
+
+
         
 
 

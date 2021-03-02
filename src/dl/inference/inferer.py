@@ -69,6 +69,8 @@ class Inferer:
                  stride_size: int=128,
                  thresh_method: int="naive",
                  thresh: float=0.5,
+                 apply_weights: bool=False,
+                 post_proc_method: str=None,
                  **kwargs) -> None:
         """
         Class to perform inference and post-processing
@@ -82,12 +84,12 @@ class Inferer:
                 This argument overrides all other dataset related argument.
             dataset (str, optional, default=None):
                 One of ("kumar","consep","pannuke","dsb2018", "monusac", None)
-                If data_dir == None images from this dataset will be used for inference. 
+                If data_dir == None, images from this dataset will be used for inference. 
                 If both dataset == None & data_dir == None. The inference is performed
                 on the same dataset that the input model was trained with.
             data_fold (str, default="test"):
-                Which fold of data to run inference. One of ("train", "test"). If data_dir is set
-                this arg will be ignored.
+                Which fold of data to run inference. One of ("train", "test"). 
+                If data_dir is set this arg will be ignored.
             tta (bool, default=False):
                 If True, performs test time augmentation. Inference time goes up
                 with often marginal performance improvements.
@@ -116,6 +118,17 @@ class Inferer:
                 One of ("naive", "argmax", "sauvola", "niblack")).
             thresh (float, default = 0.5): 
                 threshold probability value. Only used if method == "naive"
+            apply_weights (bool, default=True):
+                After a prediction, apply a weight matrix that assigns bigger weight on pixels
+                in center and less weight to pixels on prediction boundaries. helps dealing with
+                prediction artifacts on tile/patch boundaries. NOTE: This is only applied at the
+                auxiliary branch prediction since there tiling effect has the most impact.
+                (Especially, in HoVer-maps)
+            post_proc_method (str, default=None):
+                Defines the post-processing pipeline. If this is None, then the post-processing
+                pipeline is defined by the aux_type of the model. If the aux_type of the model
+                is None, then the basic watershed post-processing pipeline is used. If the
+                aux_type == "hover", then the HoVer-Net and CellPose pipelines can be used.
         """
         assert isinstance(model, pl.LightningModule), "Input model needs to be a lightning model"
         assert dataset in ("kumar", "consep", "pannuke", "dsb2018", "monusac", None)
@@ -158,11 +171,29 @@ class Inferer:
         self.folderset = FolderDataset(self.in_data_dir, pattern=fn_pattern)
         self.dataloader = DataLoader(self.folderset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=num_workers)
 
-        # Some helper classes 
+        # set apply weights flag for aux branch and prdeictor helper class
+        self.apply_weights = apply_weights
         self.predictor = Predictor(self.model)
+
+        # set the post-processing pipeline. Defaults to 
+        # model.aux_type if model has ans auxiliary branch
+        self.post_proc_method = post_proc_method
+        if self.post_proc_method is None:
+            self.post_proc_method = self.model.aux_type if self.model.aux_branch else "basic"
+
+        # Quick checks that a valid post-proc-method is used
+        msg = f"post_proc_method set to: {self.post_proc_method}, while model.aux_type: {self.model.aux_type}"
+        if self.model.aux_branch:
+            if self.model.aux_type == "hover":
+                assert self.post_proc_method in ("hover", "cellpose", "basic"), msg
+            elif self.model.aux_type == "dist":
+                assert self.post_proc_method in ("dist", "basic"), msg
+            elif self.model.aux_type == "contour":
+                assert self.post_proc_method in ("contour", "basic"), msg
+        
+        # init the post-processor
         self.post_processor = PostProcBuilder.set_postprocessor(
-            aux_branch=self.model.aux_branch, 
-            aux_type=self.model.aux_type,
+            post_proc_method=self.post_proc_method,
             thresh_method=thresh_method,
             thresh=thresh
         )
@@ -198,9 +229,9 @@ class Inferer:
         """
         # TODO: tta
         pred = self.predictor.forward_pass(batch)
-        insts = self.predictor.classify(pred["instances"], act="sigmoid", return_type="torch") # goes to cpu
-        types = self.predictor.classify(pred["types"], act="softmax", return_type="torch") if pred["types"] is not None else None
-        aux = self.predictor.classify(pred["aux"], act=None, return_type="torch") if pred["aux"] is not None else None
+        insts = self.predictor.classify(pred["instances"], act="sigmoid") # goes to cpu
+        types = self.predictor.classify(pred["types"], act="softmax") if pred["types"] is not None else None
+        aux = self.predictor.classify(pred["aux"], act=None, apply_weights=self.apply_weights) if pred["aux"] is not None else None
         return insts, types, aux
 
     def run_inference(self) -> None:
@@ -329,15 +360,12 @@ class Inferer:
             self.type_maps[name] = res[2].astype("int32")
 
 
-    def plot_results(self):
-        pass
-
-    def benchmark_insts(self, pattern_list: List[str]=None):
+    def benchmark_insts(self, pattern_list: List[str]=None, file_prefix:str=""):
         """
         Run benchmarikng metrics for only instance maps 
         """
         assert "inst_maps" in self.__dict__.keys(), "No instance maps found, run inference and post proc first."
-        assert self.gt_mask_dir is not None, f"gt mask dir is None. Benchmarking only with consep, kumar, pannuke"
+        assert self.gt_mask_dir is not None, f"gt_mask_dir is None. Benchmarking only with consep, kumar, pannuke"
 
         gt_masks = OrderedDict(
             [(f.name[:-4], FileHandler.read_mask(f, "inst_map")) for f in self.gt_mask_paths]
@@ -348,18 +376,19 @@ class Inferer:
             inst_maps=self.inst_maps,
             gt_masks=gt_masks,
             pattern_list=pattern_list,
-            save_dir=self.model.fm.experiment_dir
+            save_dir=self.model.fm.experiment_dir,
+            prefix=file_prefix
         )
         return scores
 
 
-    def benchmark_types(self, pattern_list: List[str]=None):
+    def benchmark_types(self, pattern_list: List[str]=None, file_prefix:str=""):
         """
         Run benchmarking for type maps
         """
         assert "inst_maps" in self.__dict__.keys(), "No instance maps found, run inference and post proc first."
         assert "type_maps" in self.__dict__.keys(), "No type maps found, run inference and post proc first."
-        assert self.gt_mask_dir is not None, f"gt mask dir is None. Benchmarking only with consep, kumar, pannuke"
+        assert self.gt_mask_dir is not None, f"gt_mask_dir is None. Benchmarking only with consep, kumar, pannuke"
         assert self.model.type_branch, "the netowork model does not contain type branch"
         assert self.dataset == self.model.fm.train_dataset, (
             "benchmarking per type can be done only for the same data set as the model training set",
@@ -381,7 +410,8 @@ class Inferer:
             gt_mask_types=gt_mask_types,
             pattern_list=pattern_list,
             classes=self.model.fm.classes, 
-            save_dir=self.model.fm.experiment_dir
+            save_dir=self.model.fm.experiment_dir,
+            prefix=file_prefix
         )
 
         return scores

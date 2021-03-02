@@ -6,7 +6,7 @@ from typing import List
 from src.utils.file_manager import FileManager
 
 
-# Inheriting Trainer does not work
+# Inheriting Trainer does not work so init w/ class method only
 class SegTrainer:
     def __init__(self,
                  experiment_args: DictConfig,

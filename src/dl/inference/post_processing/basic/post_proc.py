@@ -7,10 +7,15 @@ import skimage.filters as filters
 import skimage.util as util
 import scipy.ndimage as ndi
 
-from src.utils.process_utils import bounding_box, remap_label
 from ..thresholding import niblack_thresh
-from ..utils import remove_debris, cv2_opening, binarize
 
+from src.utils.mask_utils import (
+    bounding_box, 
+    remap_label,
+    remove_debris, 
+    cv2_opening, 
+    binarize
+)
 
 
 def shape_index_watershed2(prob_map: np.ndarray,

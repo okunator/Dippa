@@ -31,12 +31,22 @@ import skimage.filters as filters
 import skimage.util as util
 import scipy.ndimage as ndi
 
-from src.utils.process_utils import bounding_box, remap_label
-from ..utils import remove_debris, binarize
+from ..cellpose.post_proc import enhance_hover
+
+from src.utils.mask_utils import (
+    bounding_box, 
+    remap_label,
+    remove_debris, 
+    binarize
+)
 
 
-# ported from: https: // github.com/vqdang/hover_net/blob/master/src/postproc/hover.py  # L69
-def post_proc_hover(inst_map: np.ndarray, aux_map: np.ndarray, **kwargs) -> np.ndarray:
+# ported from: https: // github.com/vqdang/hover_net/blob/master/src/postproc/hover.py 
+# Very slightly modified 
+def post_proc_hover(inst_map: np.ndarray, 
+                    aux_map: np.ndarray,
+                    enhance: bool=True,
+                    **kwargs) -> np.ndarray:
     """
     Post processing pipeline to combine hover branch output and instance segmentation branch output.
 
@@ -45,14 +55,22 @@ def post_proc_hover(inst_map: np.ndarray, aux_map: np.ndarray, **kwargs) -> np.n
             Soft inst map. Shape: (H, W, 2)
         aux_map (np.ndarray): 
             Shape: (H, W, 2). aux_map[..., 0] = xmap, aux_map[..., 1] = ymap
+        enhance (bool, default=True):
+            Normalizes hover-maps to the 0-99 percentiles and clamps the values
+            to min=-1 and max=1. like in CellPose. Results in clearer signals.
 
     Returns:
-        np.ndarray that is processed in the same way as in github.com/vqdang/hover_net/blob/master/src/postproc/hover.py
+        np.ndarray that is processed in the same way as in 
     """
-    inst_map = binarize(inst_map)
 
+    inst_map = binarize(inst_map)
     h_dir = cv2.normalize(aux_map[..., 0], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
     v_dir = cv2.normalize(aux_map[..., 1], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+    if enhance:
+        enhanced_hover = enhance_hover(aux_map)
+        h_dir = enhanced_hover[..., 0]
+        v_dir = enhanced_hover[..., 1]
 
     sobelh = cv2.Sobel(h_dir, cv2.CV_64F, 1, 0, ksize=21)
     sobelv = cv2.Sobel(v_dir, cv2.CV_64F, 0, 1, ksize=21)

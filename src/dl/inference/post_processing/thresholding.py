@@ -3,7 +3,7 @@ import skimage.segmentation as segm
 import skimage.filters as filters
 from skimage.exposure import histogram
 
-from .utils import to_inst_map, cv2_opening
+from src.utils.mask_utils import to_inst_map, cv2_opening
 
 
 def naive_thresh_prob(prob_map: np.ndarray, threshold: float = 0.5, **kwargs) -> np.ndarray:

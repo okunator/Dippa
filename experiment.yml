@@ -1,6 +1,6 @@
 experiment_args:
-  experiment_name: consep_quick_test_2
-  experiment_version: hover_unet_skip_sum_unfreeze
+  experiment_name: baseline_consep_lol
+  experiment_version: hover
 
 dataset_args:
   train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
@@ -30,24 +30,26 @@ model_args:
     aux_type: hover              # One of (hover, dist, contour) (ignored if aux=False)
 
 training_args:
+  normalize_input: False         # 1-99 percentile normalize input images after augs (get nans?)
   freeze_encoder: False          # freeze the weights in the encoder (for fine tuning)
   weight_balancing: null         # One of (gradnorm, uncertainty, null)
   augmentations:
+    # - rigid
     - hue_sat
     - non_rigid
     - blur
     - non_spatial
 
   optimizer_args:
-    optimizer: adam            # One of https://github.com/jettify/pytorch-optimizer 
+    optimizer: adam              # One of https://github.com/jettify/pytorch-optimizer 
     lr: 0.0005
     encoder_lr: 0.00005
     weight_decay: 0.0003
     encoder_weight_decay: 0.00003
-    lookahead: True
-    bias_weight_decay: False
+    lookahead: False
+    bias_weight_decay: True
     scheduler_factor: 0.25
-    scheduler_patience: 2
+    scheduler_patience: 3
 
   loss_args:
     inst_branch_loss: dice_ce
@@ -58,7 +60,7 @@ training_args:
 
 runtime_args:
   resume_training: True
-  num_epochs: 14
+  num_epochs: 50
   num_gpus: 1
   batch_size: 8
   model_input_size: 256       # Multiple of 32. Tuple(int, int) 

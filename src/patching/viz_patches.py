@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Tuple
+from skimage.color import label2rgb
 
 
 def viz_patches(patches: np.ndarray) -> Tuple[int]:
@@ -28,7 +29,16 @@ def viz_patches(patches: np.ndarray) -> Tuple[int]:
     for idx in range(high - low):
         spl = plt.subplot(dims, dims, idx + 1)
         ax = plt.axis("off")
-        imm = plt.imshow(patches[idx].astype("uint8"))
+
+        if len(patches[idx].shape) == 2:
+            patch=label2rgb(patches[idx], bg_label=0)
+        else:
+            patch = patches[idx]
+            if patch.dtype == np.dtype("float64"):
+                patch = (patch * 255)
+            patch = patch.astype(np.uint8)
+            
+        im = plt.imshow(patch)
         cl = plt.clim(pmin, pmax)
     plt.show()
     return patches.shape

@@ -50,6 +50,7 @@ class SegModel(pl.LightningModule):
         # Init all args for save_hyperparameters() (hypereparam logging)
         # General runtime args and augs
         self.augs: List[str] = training_args.augmentations
+        self.norm: bool = training_args.normalize_input
         self.batch_size: int = runtime_args.batch_size
         self.input_size: int = runtime_args.model_input_size
         self.num_workers: int = runtime_args.num_workers
@@ -237,7 +238,7 @@ class SegModel(pl.LightningModule):
             f"avg_{phase}_iou": iou,
         }
 
-        self.log_dict(logs, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(logs, on_step=False, on_epoch=True, prog_bar=False, logger=True)
 
         return {f"avg_{phase}_loss": loss}
     
@@ -312,15 +313,18 @@ class SegModel(pl.LightningModule):
         self.trainset = DatasetBuilder.set_train_dataset(
             decoder_branch_args=self.decoder_branch_args,
             augmentations=self.augs,
-            fname=self.train_data.as_posix(), 
+            fname=self.train_data.as_posix(),
+            norm=self.norm
         )
         self.validset = DatasetBuilder.set_test_dataset(
             decoder_branch_args=self.decoder_branch_args,
-            fname=self.valid_data.as_posix(), 
+            fname=self.valid_data.as_posix(),
+            norm=self.norm
         )
         self.testset = DatasetBuilder.set_test_dataset(
             decoder_branch_args=self.decoder_branch_args,
-            fname=self.test_data.as_posix()
+            fname=self.test_data.as_posix(),
+            norm=self.norm
         )
 
     def train_dataloader(self):

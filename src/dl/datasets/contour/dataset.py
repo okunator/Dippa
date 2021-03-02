@@ -9,16 +9,23 @@ from .pre_proc import contours
 class ContourDataset(BaseDataset):
     def __init__(self,
                  fname: str,
-                 transforms: List) -> None:
+                 transforms: List,
+                 norm: bool=False) -> None:
         """
         Dataset where masks are pre-processed similarly to the Micro-Net paper
 
         Args:
-            fname (str): path to the pytables database
-            transforms (albu.Compose): albumentations.Compose obj (a list of augmentations)
+            fname (str): 
+                Path to the pytables database
+            transforms (albu.Compose): 
+                Albumentations.Compose obj (a list of augmentations)
+            norm (bool, default=False):
+                apply percentile normalization to inmut images after transforms
         """
-
-        super(ContourDataset, self).__init__(fname, transforms)
+        assert transforms is not None, "No augmentations given. Give at least epmty albu.Compose"
+        super(ContourDataset, self).__init__(fname)
+        self.transforms = transforms
+        self.norm = norm
 
     def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
         """
@@ -44,6 +51,9 @@ class ContourDataset(BaseDataset):
         augmented_data = self.transforms(image=im_patch, masks=[inst_patch, type_patch, weight_map, contour])
         img = augmented_data["image"]
         masks = augmented_data["masks"]
+
+        if self.norm:
+            img = self.normalize(img)
 
         result = {
             "image": img,
