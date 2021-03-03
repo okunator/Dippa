@@ -13,11 +13,11 @@ class DistPostProcessor(PostProcessor):
                  thresh: float=0.5,
                  **kwargs) -> None:
         """
-        Wrapper class to run the HoVer-Net post processing pipeline for networks
-        outputting instance maps, Optional[type maps], and horizontal & vertical maps.
+        Wrapper class to run the DRFNS post processing pipeline for networks
+        outputting instance maps, Optional[type maps], and distance transforms
 
-        HoVer-Net:
-        https://www.sciencedirect.com/science/article/pii/S1361841519301045?via%3Dihub
+        DRFNS:
+        https://ieeexplore.ieee.org/document/8438559
 
         Args:
             thresh_method (str, default="naive"):
@@ -68,7 +68,7 @@ class DistPostProcessor(PostProcessor):
             inst_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, soft instance map) pairs
                 inst_map shapes are (H, W, 2) 
-            hover_maps (OrderedDict[str, np.ndarray]):
+            dist_map (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, dist map) pairs.
                 The regressed distance trasnform from auxiliary branch. Shape (H, W, 1)
             type_maps (OrderedDict[str, np.ndarray]):

@@ -29,9 +29,15 @@ def shape_index_watershed2(prob_map: np.ndarray,
     operations remove a lot small cells.
 
     Args:
-        prob_map (np.ndarray): the soft mask outputted from the network. Shape (H, W)
-        inst_map (np.ndarray): The instance map to be segmented. Shape (H, W)
-        sigma (float): std for gaussian kernel before computing shape index
+        prob_map (np.ndarray): 
+            The soft mask outputted from the network. Shape (H, W)
+        inst_map (np.ndarray): 
+            The instance map to be segmented. Shape (H, W)
+        sigma (float, default=3.0): 
+            Std for gaussian kernel before computing shape index
+
+    Returns:
+        np.ndarray: post-processed labelled inst_map
     """
     s = feat.shape_index(prob_map, sigma=sigma)
     s[s > 0] = 1
@@ -131,6 +137,7 @@ def shape_index_watershed2(prob_map: np.ndarray,
     return inst_map
 
 
+# Explorative
 def shape_index_watershed(prob_map: np.ndarray,
                           inst_map: np.ndarray,
                           win_size: int = 13,
@@ -142,10 +149,16 @@ def shape_index_watershed(prob_map: np.ndarray,
     distance maps are computed using niblack thresholding on the distance map.
 
     Args:
-        prob_map (np.ndarray): the soft mask outputted from the network. Shape (H, W)
-        inst_map (np.ndarray): The instance map to be segmented. Shape (H, W)
-        win_size (int): window size used in niblack thresholding the distance maps to
-                        find markers for watershed
+        prob_map (np.ndarray): 
+            The soft mask outputted from the network. Shape (H, W)
+        inst_map (np.ndarray): 
+            The instance map to be segmented. Shape (H, W)
+        win_size (int, default=13): 
+            window size used in niblack thresholding the distance maps to
+            find markers for watershed
+
+    Returns:
+        np.ndarray: post-processed labelled inst_map
     """
     shape = inst_map.shape[:2]
     nuc_list = list(np.unique(inst_map))
@@ -202,10 +215,16 @@ def sobel_watershed(prob_map: np.ndarray,
     using niblack thresholding on the distance map.
 
     Args:
-        prob_map (np.ndarray): the soft mask outputted from the network
-        inst_map (np.ndarray): The instance map to be segmented. Shape (H, W)
-        win_size (int): window size used in niblack thresholding the distance maps to
-                        find markers for watershed
+        prob_map (np.ndarray): 
+            The soft mask outputted from the network
+        inst_map (np.ndarray): 
+            The instance map to be segmented. Shape (H, W)
+        win_size (int, default=13): 
+            window size used in niblack thresholding the distance maps to
+            find markers for watershed
+
+    Returns:
+        np.ndarray: post-processed labelled inst_map
     """
 
     seg = np.copy(inst_map)
@@ -254,9 +273,14 @@ def inv_dist_watershed(inst_map: np.ndarray, win_size: int = 13, **kwargs) -> np
     niblack thresholding on the distance map.
 
     Args:
-        inst_map (np.ndarray): The instance map to be segmented
-        win_size (int): window size used in niblack thresholding the 
-                        distance maps to find markers for watershed
+        inst_map (np.ndarray): 
+            The instance map to be segmented
+        win_size (int, default=13): 
+            window size used in niblack thresholding the 
+            distance maps to find markers for watershed
+
+    Returns:
+        np.ndarray: post-processed labelled inst_map
     """
     
     seg = np.copy(inst_map)

@@ -25,7 +25,7 @@ def enhance_dist(dist: np.ndarray, channels: str="HWC") -> np.ndarray:
     assert channels in ("HWC", "CHW")
 
     if channels == "CHW":
-        hover = hover.transpose(1, 2, 0) # HWC
+        dist = dist.transpose(1, 2, 0) # HWC
 
     percentile99 = np.percentile(dist, q=99, axis=(0, 1))
     percentile1 = np.percentile(dist, q=1, axis=(0, 1))
@@ -132,10 +132,11 @@ def post_proc_dist(dist_map: np.ndarray, inst_map: np.ndarray, thresh: float=0.5
     Uses regressed distance transform from an auxiliary branch to separate clumped nuclei. 
 
     Args:
-        prob_map (np.ndarray):
-            The probabilities from binary segmentation branch. Shape (H, W)
         dist_map (np.ndarray):
             Regressed distance transform from the auxiliary branch. Shape (H, W, 1)
+        inst_map (np.ndarray):
+            The segmentation mask from the binary seg branch of thenetwork. Shape (H, W)
+            If inst_map is labelled it will be binarized.
         thresh (float, default=0.5):
             threshold value for markers and binary mask 
     """
