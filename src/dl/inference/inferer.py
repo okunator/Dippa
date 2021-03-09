@@ -71,11 +71,13 @@ class Inferer:
                  thresh: float=0.5,
                  apply_weights: bool=False,
                  post_proc_method: str=None,
+                 normalize_input: bool=False,
                  **kwargs) -> None:
         """
         Class to perform inference and post-processing
 
         Args:
+        -----------
             model (pl.LightningModule):
                 Input SegModel (lightning model) specified in lightning_model.py.
             data_dir (str, optional, default=None):
@@ -129,6 +131,9 @@ class Inferer:
                 pipeline is defined by the aux_type of the model. If the aux_type of the model
                 is None, then the basic watershed post-processing pipeline is used. If the
                 aux_type == "hover", then the HoVer-Net and CellPose pipelines can be used.
+            normalize_input (bool, default=True):
+                Normalize the input in the same way as in training. Check the experiment.yml
+                whether inputs were normalized.
         """
         assert isinstance(model, pl.LightningModule), "Input model needs to be a lightning model"
         assert dataset in ("kumar", "consep", "pannuke", "dsb2018", "monusac", None)
@@ -198,17 +203,22 @@ class Inferer:
             thresh=thresh
         )
 
+        # input scaling flag
+        self.norm = normalize_input
+
     def _get_batch(self, patches: torch.Tensor, batch_size: int) -> torch.Tensor:
         """
         Divide a set of patches into batches of patches
 
         Args:
+        ---------
             patches (torch.Tensor): 
                 Batch of patches in. Shape (C, num_patches, pH, pW)
             batch_size (int): 
                 size of the batch
             
         Yields:
+        ---------
             torch.Tensor of shape (batch_size, C, H, W)
         """
         for i in range(0, patches.shape[1], batch_size):
@@ -220,15 +230,17 @@ class Inferer:
         Forward pass + classify. Handles missing branches in the model.
 
         Args:
+        ---------
             batch (torch.Tensor):
                 A batch of patches. Shape (B, C, patch_size, patch_size)
 
         Returns:
+        ---------
             A tuple of tensors containing the predictions. If network does not
             contain aux or type branch the predictions are None
         """
         # TODO: tta
-        pred = self.predictor.forward_pass(batch)
+        pred = self.predictor.forward_pass(batch, norm=self.norm)
         insts = self.predictor.classify(pred["instances"], act="softmax") # goes to cpu
         types = self.predictor.classify(pred["types"], act="softmax") if pred["types"] is not None else None
         aux = self.predictor.classify(pred["aux"], act=None, apply_weights=self.apply_weights) if pred["aux"] is not None else None
@@ -239,9 +251,9 @@ class Inferer:
         Run inference on the images in the input folder. 
         Results will be saved in OrderedDicts:
 
-        self.res_insts: instance branch predicitons
-        self.res_types: type branch predictions
-        self.res_aux: aux branch predictions
+        - self.res_insts: instance branch predicitons
+        - self.res_types: type branch predictions
+        - self.res_aux: aux branch predictions
         """
 
         def unpack(l: List[Tuple[str, int]]):

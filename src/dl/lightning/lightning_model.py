@@ -6,14 +6,16 @@ import pytorch_lightning as pl
 
 from typing import List, Dict
 from omegaconf import DictConfig
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, RandomSampler
+
 
 from src.utils.file_manager import FileManager
 from src.dl.datasets.dataset_builder import DatasetBuilder
 from src.dl.optimizers.optim_builder import OptimizerBuilder
 from src.dl.losses.loss_builder import LossBuilder
 from src.dl.models.model_builder import Model
-from src.dl.torch_utils import to_device, iou, accuracy
+from src.dl.torch_utils import to_device
+from .metrics.functional import iou, accuracy
 
 
 class SegModel(pl.LightningModule):
@@ -29,6 +31,7 @@ class SegModel(pl.LightningModule):
         Uses the experiment.yml file.
 
         Args:
+        ------------
             experiment_args (omegaconf.DictConfig): 
                 Omegaconf DictConfig specifying arguments that
                 are used for creating result folders and files. 
@@ -335,7 +338,7 @@ class SegModel(pl.LightningModule):
             batch_size=self.batch_size, 
             shuffle=True, 
             pin_memory=True, 
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
         )
 
     def val_dataloader(self):

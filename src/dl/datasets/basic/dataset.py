@@ -50,9 +50,9 @@ class BasicDataset(BaseDataset):
 
         result = {
             "image": img,
-            "binary_map": masks[0],
-            "type_map": masks[1],
-            "weight_map": masks[2],
+            "binary_map": torch.from_numpy(masks[0]),
+            "type_map": torch.from_numpy(masks[1]),
+            "weight_map": torch.from_numpy(masks[2]),
             "filename": self.fname
         }
         return result

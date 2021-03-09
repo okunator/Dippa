@@ -10,6 +10,7 @@ def ndarray_to_tensor(array: np.ndarray) -> torch.Tensor:
     Convert img or mask of shape (H, W)|(H, W, C)|(B, H, W, C) to tensor (B, C, H, W)
 
     Args:
+    -----------
         array (np.ndarray) : 
             numpy matrix of shape (H, W) or (H, W, C)
     """
@@ -35,6 +36,7 @@ def tensor_to_ndarray(tensor: torch.Tensor,
     of shape (B, H, W, C)|(B, H, W)|(H, W, C)|(H, W)
 
     Args:
+    ------------
         tensor (torch.Tensor): 
             tensor of size (B, C, H, W)
         channel (int, optional, default=None): 
@@ -73,12 +75,14 @@ def argmax_and_flatten(yhat: torch.Tensor, activation: Optional[str] = None) -> 
     a class for a pixel.
 
     Args:
+    -----------
         yhat (torch.Tensor): 
             Logits or softmaxed tensor of shape (B, C, H, W)
         activation (str, optional, default=None): 
             Apply sigmoid or softmax activation before taking argmax
 
     Returns:
+    -----------
          a tensor that can be inputted to different classification metrics. Shape (H, W)
     """
     if activation is not None:
@@ -96,6 +100,7 @@ def to_device(tensor: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
     Push torch.Tensor or np.ndarray to GPU if it is available.
 
     Args:
+    -----------
         tensor (torch.Tensor or np.ndarray): 
             multi dim array to be pushed to gpu
     """
@@ -110,162 +115,23 @@ def to_device(tensor: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
     return tensor
 
 
-# Ported from: https://gist.github.com/spezold/42a451682422beb42bc43ad0c0967a30
-def percentile(t: torch.tensor, q: float) -> Union[int, float]:
-    """
-    Return the ``q``-th percentile of the flattened input tensor's data.
-    
-    CAUTION:
-     * Needs PyTorch >= 1.1.0, as ``torch.kthvalue()`` is used.
-     * Values are not interpolated, which corresponds to
-       ``numpy.percentile(..., interpolation="nearest")``.
-       
-    :param t: Input tensor.
-    :param q: Percentile to compute, which must be between 0 and 100 inclusive.
-    :return: Resulting value (scalar).
-    """
-    # Note that ``kthvalue()`` works one-based, i.e. the first sorted value
-    # indeed corresponds to k=1, not k=0! Use float(q) instead of q directly,
-    # so that ``round()`` returns an integer, even if q is a np.float32.
-    k = 1 + round(.01 * float(q) * (t.numel() - 1))
-    result = t.view(-1).kthvalue(k).values.item()
-    return result
-
-
-def percentile_normalize_torch(img: torch.Tensor) -> torch.Tensor:
-    """ 
-    1-99 percentile normalization per image channel. Numpy version
-
-    Args:
-        img (torch.Tensor):
-            Input image to be normalized. Shape (C, H, W)
-    
-    Returns:
-        torch.Tensor=Normalized image
-    """
-    C, _, _ = img.shape
-    img = img.float()
-    percentile1 = torch.zeros(C, dtype=img.dtype, device=img.device)
-    percentile99 = torch.zeros(C, dtype=img.dtype, device=img.device)
-    for channel in range(C):
-        percentile1[channel] = percentile(img[channel, ...], q=1)
-        percentile99[channel] = percentile(img[channel, ...], q=99)
-
-    img.sub_(percentile1.view(-1, 1, 1)).div_((percentile99 - percentile1).view(-1, 1, 1))
-    return img
-
-
-def confusion_mat(yhat: torch.Tensor, 
-                  target: torch.Tensor, 
-                  activation: Optional[str] = None) -> torch.Tensor:
-    """
-    Computes confusion matrix from the soft mask and target tensor
-
-    Args:
-        yhat (torch.Tensor): 
-            the soft mask from the network of shape (B, C, H, W)
-        target (torch.Tensor): 
-            the target matrix of shape (B, H, W)
-        activation (str, optional, default=1): 
-            apply sigmoid or softmax activation before taking argmax
-
-    Returns:
-        torch.Tensor of shape (B, num_classes, num_classes)
-    """
-
-    if activation is not None:
-        assert activation in ("sigmoid", "softmax"), f"activation: {activation} sigmoid and softmax allowed."
-        if activation == "sigmoid":
-            yhat_soft = torch.sigmoid(yhat)
-        elif activation == "softmax":
-            yhat_soft = F.softmax(yhat, dim=1)
-        else:
-            yhat_soft = yhat
-    
-    n_classes = yhat_soft.shape[1]
-    batch_size = yhat_soft.shape[0]
-    bins = target + torch.argmax(yhat_soft, dim=1)*n_classes
-    bins_vec = bins.view(batch_size, -1)
-
-    confusion_list = []
-    for iter_id in range(batch_size):
-        pb = bins_vec[iter_id]
-        bin_count = torch.bincount(pb, minlength=n_classes**2)
-        confusion_list.append(bin_count)
-
-    confusion_vec = torch.stack(confusion_list)
-    confusion_mat = confusion_vec.view(batch_size, n_classes, n_classes).to(torch.float32)
-
-    return confusion_mat
-
-
 def one_hot(type_map: torch.Tensor, n_classes: int) -> torch.Tensor:
     """
     Take in a type map of shape (B, H, W) with class indices as values and reshape it
     into a tensor of shape (B, C, H, W)
 
     Args:
+    -----------
         type_map (torch.Tensor): 
             type map
         n_classes (int): 
             number of classes in type_map
 
     Returns:
+    -----------
         torch.Tensor onet hot tensor from the type map of shape (B, C, H, W)
     """
     assert type_map.dtype == torch.int64, f"Wrong type_map dtype: {type_map.dtype}. Should be torch.int64"
     one_hot = torch.zeros(type_map.shape[0], n_classes, *type_map.shape[1:], device=type_map.device, dtype=type_map.dtype)
     return one_hot.scatter_(dim=1, index=type_map.unsqueeze(1), value=1.0) + 1e-7
-
-
-def iou(yhat: torch.Tensor, 
-        target: torch.Tensor,
-        activation: Optional[str] = None,
-        eps: Optional[float] = 1e-7) -> torch.Tensor:
-    """
-    Compute the per class intersection over union for dense predictions
-
-    Args:
-        yhat (torch.Tensor): 
-            the soft mask from the network of shape (B, C, H, W)
-        target (torch.Tensor): 
-            the target matrix of shape (B, H, W)
-        activation (str, optional, default=None): 
-            apply sigmoid or softmax activation before taking argmax
-        eps (float, optional, default=1e-7)
-            small constant to avoid zero div error
-
-    Returns:
-        torch.Tensor of shape (B, num_classes, num_classes)
-    """
-    conf_mat = confusion_mat(yhat, target, activation)
-    rowsum = torch.sum(conf_mat, dim=1) # [(TP + FP), (FN + TN)]
-    colsum = torch.sum(conf_mat, dim=2) # [(TP + FN), (FP + TN)]
-    diag = torch.diagonal(conf_mat, dim1=-2, dim2=-1) # [TP, TN]
-    denom = rowsum + colsum - diag # [(TP + FN + FP), (TN + FN + FP)]
-    ious = (diag + eps) / (denom + eps) # [(TP/(TP + FN + FP)), (TN/(TN + FN + FP))]
-    return ious
-
-
-def accuracy(yhat: torch.Tensor,
-             target: torch.Tensor,
-             activation: Optional[str] = None,
-             eps: float = 1e-7) -> torch.Tensor:
-    """
-    Compute the per class accuracy for dense predictions
-
-    Args:
-        yhat (torch.Tensor): 
-            the soft mask from the network of shape (B, C, H, W)
-        target (torch.Tensor): 
-            the target matrix of shape (B, H, W)
-        activation (str, optional, default=None): 
-            apply sigmoid or softmax activation before taking argmax
-    """
-    conf_mat = confusion_mat(yhat, target, activation)
-    diag = torch.diagonal(conf_mat, dim1=-2, dim2=-1) # batch diagonal
-    denom = conf_mat.sum()
-    accuracies = (eps + diag) / (eps + denom)
-    return accuracies
-
 

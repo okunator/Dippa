@@ -35,7 +35,8 @@ class DatasetBuilder:
             augs_list (List[str], optional): 
                 List of augmentations specified in config.py
         """
-        aug_list = [ds.__dict__[ds.AUGS_LOOKUP[aug_name]]() for aug_name in augs_list] if augs_list else []
+        kwargs={"height":256, "width":256}
+        aug_list = [ds.__dict__[ds.AUGS_LOOKUP[aug_name]](**kwargs) for aug_name in augs_list] if augs_list else []
         aug_list.append(ds.to_tensor()) 
         return ds.compose(aug_list)
 

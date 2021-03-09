@@ -88,5 +88,6 @@ class SegTrainer:
             logger=c.tt_logger,
             callbacks=c.callbacks,
             resume_from_checkpoint=c.last_ckpt,
-            profiler=True
+            profiler=True #pl.profiler.AdvancedProfiler(),
+            # fast_dev_run=False
         )

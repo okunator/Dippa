@@ -1,5 +1,7 @@
 import torch
+import zarr
 import numpy as np
+import tables as tb
 from typing import List, Optional, Dict
 
 from .pre_proc import gen_hv_maps
@@ -16,6 +18,7 @@ class HoverDataset(BaseDataset):
         https://arxiv.org/abs/1812.06499
 
         Args:
+        ------------
             fname (str): 
                 path to the pytables database
             transforms (albu.Compose): 
@@ -28,16 +31,17 @@ class HoverDataset(BaseDataset):
         self.transforms = transforms
         self.norm = norm
 
-    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
+    def __getitem__(self, ix: int) -> Dict[str, torch.Tensor]:
         """
-        1. read data from hdf5 file
+        1. read data from zarr file
         2. fix duplicated instances due to mirror padding
         3. remove overlaps in occluded nuclei and generate the weight map for the borders of overlapping nuclei
         4. create horizontal and vertical maps as in https://arxiv.org/abs/1812.06499
         5. binarize input for the branch predicting foreground vs. background
         6. augment
         """
-        im_patch, inst_patch, type_patch = self.read_hdf5_patch(self.fname, index)
+        im_patch, inst_patch, type_patch = self.read_patch(self.fname, ix)
+
         inst_patch = self.fix_mirror_pad(inst_patch)
         weight_map = self.generate_weight_map(self.remove_overlaps(inst_patch))
 
@@ -59,11 +63,11 @@ class HoverDataset(BaseDataset):
 
         result = {
             "image": img,
-            "binary_map": masks[0],
-            "type_map": masks[1],
-            "weight_map": masks[2],
-            "xmap": masks[3],
-            "ymap": masks[4],
+            "binary_map": torch.from_numpy(masks[0]),
+            "type_map": torch.from_numpy(masks[1]),
+            "weight_map": torch.from_numpy(masks[2]),
+            "xmap": torch.from_numpy(masks[3]),
+            "ymap": torch.from_numpy(masks[4]),
             "filename": self.fname
         }
         return result

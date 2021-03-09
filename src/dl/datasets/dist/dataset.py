@@ -37,7 +37,7 @@ class DistDataset(BaseDataset):
         5. binarize input for the branch predicting foreground vs. background
         6. augment
         """
-        im_patch, inst_patch, type_patch = self.read_hdf5_patch(self.fname, index)
+        im_patch, inst_patch, type_patch = self.read_patch(self.fname, index)
         inst_patch = self.fix_mirror_pad(inst_patch)
         weight_map = self.generate_weight_map(self.remove_overlaps(inst_patch))
 
@@ -57,10 +57,10 @@ class DistDataset(BaseDataset):
 
         result = {
             "image": img,
-            "binary_map": masks[0],
-            "type_map": masks[1],
-            "weight_map": masks[2],
-            "dist_map": masks[3],
+            "binary_map": torch.from_numpy(masks[0]),
+            "type_map": torch.from_numpy(masks[1]),
+            "weight_map": torch.from_numpy(masks[2]),
+            "dist_map": torch.from_numpy(masks[3]),
             "filename": self.fname
         }
         return result

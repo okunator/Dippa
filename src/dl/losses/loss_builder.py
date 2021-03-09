@@ -19,6 +19,7 @@ class LossBuilder:
         Makes use of the experiment.yml
 
         Args:
+        ------------
             decoder_branches_args (omegaconf.DictConfig):
                 Arguments related to multi-task architecture:
                 specifically how to set up model deocder branches

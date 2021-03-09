@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: baseline_consep
-  experiment_version: dist
+  experiment_version: hover_zarr_minmax
 
 dataset_args:
   train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
@@ -27,14 +27,13 @@ model_args:
   decoder_branches:
     type: True
     aux: True
-    aux_type: dist              # One of (hover, dist, contour) (ignored if aux=False)
+    aux_type: hover              # One of (hover, dist, contour) (ignored if aux=False)
 
 training_args:
-  normalize_input: False         # 1-99 percentile normalize input images after augs (get nans?)
+  normalize_input: False          # minmax normalize input images after augs (nans??)
   freeze_encoder: False          # freeze the weights in the encoder (for fine tuning)
   weight_balancing: null         # One of (gradnorm, uncertainty, null)
   augmentations:
-    # - rigid
     - hue_sat
     - non_rigid
     - blur
@@ -60,7 +59,7 @@ training_args:
 
 runtime_args:
   resume_training: False
-  num_epochs: 10
+  num_epochs: 5
   num_gpus: 1
   batch_size: 8
   model_input_size: 256       # Multiple of 32. Tuple(int, int) 

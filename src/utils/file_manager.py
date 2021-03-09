@@ -1,8 +1,9 @@
-import tables
 import zipfile
+import zarr
 import cv2
 import scipy.io
 import numpy as np
+import tables as tb
 from pathlib import Path
 from typing import List, Dict, Tuple, Union
 from omegaconf import DictConfig, OmegaConf
@@ -36,12 +37,17 @@ class FileHandler:
                 item.unlink()
 
     @staticmethod
-    def read_hdf5_patch(path: Union[str, Path], index: int) -> Tuple[np.ndarray]:
-        path = Path(path)
-        with tables.open_file(path.as_posix(), "r") as db:
-            img = db.root.img
-            inst_map = db.root.inst_map
-            type_map = db.root.type_map
+    def read_zarr_patch(path: str, index: int):
+        d = zarr.open(path, mode="r")
+        im_patch, inst_patch, type_patch = d["imgs"][index, ...], d["insts"][index, ...], d["types"][index, ...]
+        return im_patch, inst_patch, type_patch 
+
+    @staticmethod
+    def read_h5_patch(path: str, index: int):
+        with tb.open_file(path, "r") as h5:
+            img = h5.root.imgs
+            inst_map = h5.root.insts
+            type_map = h5.root.types
             im_patch = img[index, ...]
             inst_patch = inst_map[index, ...]
             type_patch = type_map[index, ...]
@@ -50,7 +56,7 @@ class FileHandler:
     @staticmethod
     def get_class_pixels(path: Union[str, Path]) -> np.ndarray:
         path = Path(path)
-        with tables.open_file(path.as_posix(), "r") as db:
+        with tb.open_file(path.as_posix(), "r") as db:
             weights = db.root.numpixels[:]
         class_weight = weights[1, ]
         return class_weight
@@ -71,14 +77,20 @@ class FileHandler:
     @staticmethod
     def suffix(path: Union[str, Path]) -> str:
         path = Path(path)
-        assert all([f.suffix for f in path.iterdir()]), "Image files should be in same format"
+        assert all([f.suffix for f in path.iterdir()]), "All files should be in same format"
         return [f.suffix for f in path.iterdir()][0]
 
     def get_files(self, path: Union[str, Path]) -> List[str]:
         path = Path(path)
         assert path.exists(), f"Provided directory: {path.as_posix()} does not exist."
-        file_suffix = self.suffix(d)
+        file_suffix = self.suffix(path)
         return sorted([x.as_posix() for x in path.glob(f"*{file_suffix}")])
+
+    def get_dataset_classes(self, dataset:str) -> Dict[str, int]:
+        yml_path = [f for f in Path(CONF_DIR).iterdir() if dataset in f.name][0]
+        data_conf = OmegaConf.load(yml_path)
+        classes = data_conf.class_types.type
+        return classes
 
 
 class FileManager(FileHandler):
@@ -89,10 +101,11 @@ class FileManager(FileHandler):
         File hadling and managing
 
         Args:
-            experiment_args (DictConfig): 
+        ------------
+            `experiment_args` (DictConfig): 
                 Omegaconfig DictConfig specifying arguments that
                 are used for creating result folders and files. 
-            dataset_args (DictConfig): 
+            `dataset_args` (DictConfig): 
                 Omegaconfig DictConfig specifying arguments related 
                 to the dataset that is being used.
         """
@@ -193,7 +206,7 @@ class FileManager(FileHandler):
         Get the paths of data dirs for given dataset
         """
         assert dataset in ("kumar","consep","pannuke","dsb2018", "monusac", "other")
-        assert Path(DATA_DIR / dataset).exists(), "No train data found"
+        assert Path(DATA_DIR / dataset).exists(), f"No data found for dataset {dataset}"
 
         return {
             "raw_data_dir":Path(DATA_DIR / dataset),
@@ -208,12 +221,14 @@ class FileManager(FileHandler):
         Get train data folds
 
         Args:
+        ------------
             dataset (str):
                 name of the dataset. One of ("kumar","consep","pannuke","dsb2018", "monusac", "other")
             split_train (bool):
                 split training data into training and validation data
 
         Returns:
+        ------------
             Dict[str, Dict[str, str]]
             Dictionary where keys (train, test, valid) point to dictionaries with keys img and mask.
             The innermost dictionary values where the img and mask keys point to are sorted lists 
@@ -252,6 +267,7 @@ class FileManager(FileHandler):
         Get the the databases that were written by the PatchWriter
         
         Returns:
+        -------------
             Dict[str, Dict[int, str]]
             A dictionary where the keys (train, test, valid) are pointing to dictionaries with
             values are the paths to the hdf5 databases and keys are the size of the square 
@@ -294,11 +310,13 @@ class FileManager(FileHandler):
         Get the best or last checkpoint of a trained network.
 
         Args:
+        ------------
             which (str): 
                 One of ("best", "last"). Specifies whether to use 
                 last epoch model or best model on validation data.
 
         Returns:
+        ------------
             Path object to the pytorch checkpoint file.
         """
         assert which in ("best", "last"), f"param which: {which} not one of ('best', 'last')"

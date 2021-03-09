@@ -10,6 +10,8 @@ datasets/patches/npy/consep/*
 datasets/patches/npy/pannuke/*
 datasets/patches/npy/dsb2018/*
 datasets/patches/npy/cpm/*
+datasets/patches/zarr/*
+datasets/patches/tests/*
 datasets/data/kumar/test/*
 datasets/data/kumar/train/*
 datasets/data/kumar/orig/*

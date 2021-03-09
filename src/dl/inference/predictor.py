@@ -5,6 +5,7 @@ import numpy as np
 from typing import Dict, Union
 
 import src.dl.torch_utils as util
+from src.dl.torch_img_utils import minmax_normalize_torch
 # import src.dl.inference.tta as tta
 
 
@@ -63,7 +64,8 @@ class Predictor:
         in center and less weight to pixels on image boundary. helps dealing with
         prediction artifacts on tile boundaries.
 
-        Args;
+        Args:
+        ------------
             model (nn.Module):
                 nn.Module pytorch model
         """
@@ -72,21 +74,28 @@ class Predictor:
         self.weight_mat = torch.from_numpy(weight_mat).float().to(self.model.device).unsqueeze(0).unsqueeze(0)
 
 
-    def forward_pass(self, patch: Union[np.ndarray, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def forward_pass(self, patch: Union[np.ndarray, torch.Tensor], norm: bool=False) -> Dict[str, torch.Tensor]:
         """
         Input an image patch or batch of patches to the network and return logits.
         patch input_size likely to be 256x256 depending how the images were patched
 
         Args:
+        -----------
             patch (np.ndarray or torch.Tensor): 
                 Image patch of shape (input_size, input_size, 3)
                 or (B, input_size, input_size, 3)
 
         Returns:
+        -----------
             A dictionary {"instances":Tensor, "types":Union[Tensor, None], "aux":Union[Tensor, None]}
         """
         if isinstance(patch, np.ndarray):
             patch = util.ndarray_to_tensor(patch)  # (B, 3, H, W) | (1, 3, H, W)
+
+        if norm:
+            for i in range(patch.shape[0]):
+                patch[i] = minmax_normalize_torch(patch[i])
+            
 
         input_tensor = util.to_device(patch) # to cpu|gpu
         return self.model(input_tensor)  # Dict[(B, 2, H, W), (B, C, H, W)]
@@ -102,6 +111,7 @@ class Predictor:
         and convert the output to numpy nd.array.
 
         Args:
+        -----------
             patch (torch.Tensor): 
                 a tensor of logits produced by the network.
                 Shape: (B, C, input_size, input_size)
@@ -115,6 +125,7 @@ class Predictor:
                 One of ("torch", "numpy")
 
         Returns:
+        -----------
             np.ndarray of the prediction
         """
         assert act in ("sigmoid", "softmax", None)
@@ -151,6 +162,7 @@ class Predictor:
         Tta ensemble prediction pipeline.
     
         Args:
+        -----------
             patch (np.ndarray): 
                 The img patch used for ensemble prediction. 
                 shape (input_size, input_size, 3)
@@ -158,6 +170,7 @@ class Predictor:
                 Specifies which output branch
 
         Returns:
+        ------------
             A dictionary {"instances":Tensor, "types":Union[Tensor, None], "aux":Union[Tensor, None]}
         
         Following instructions of 'beneficial augmentations' from:

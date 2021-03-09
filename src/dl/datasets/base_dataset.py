@@ -1,12 +1,14 @@
-import tables
 import torch
 import numpy as np
+import zarr
+import tables as tb
+from pathlib import Path
 from torch.utils.data import Dataset
 from typing import List, Dict, Optional
 from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
 from src.utils.file_manager import FileHandler
-from ..torch_utils import percentile_normalize_torch
+from ..torch_img_utils import minmax_normalize_torch
 
 from src.utils.mask_utils import (
     get_weight_map, 
@@ -17,23 +19,35 @@ from src.utils.mask_utils import (
 
 
 class BaseDataset(Dataset, FileHandler):
-    def __init__(self,
-                 fname: str) -> None:
+
+    def __init__(self, fname:str) -> None:
         """
         Base dataset class
 
         Args:
+        ----------
             fname (str): 
                 path to the pytables database
         """
         self.fname = fname
-        self.tables = tables.open_file(self.fname)
-        self.numpixels = self.tables.root.numpixels[:]
-        self.n_items = self.tables.root.img.shape[0]
-        self.tables.close()
+        self.suffix = Path(self.fname).suffix 
+
+        # Get the numeber of patches in dataset
+        if self.suffix == ".zarr":
+            z = zarr.open(self.fname, mode="r")
+            self.n_items = z.attrs["n_items"]
+        elif self.suffix == ".h5":
+            with tb.open_file(self.fname) as h5:
+                self.n_items = h5.root._v_attrs["n_items"]
+
 
     def __len__(self): 
         return self.n_items
+
+    @property
+    def read_patch(self):
+        read_func = self.read_h5_patch if self.suffix == ".h5" else self.read_zarr_patch
+        return read_func
 
     def generate_weight_map(self, inst_map: np.ndarray) -> np.ndarray: 
         wmap = get_weight_map(inst_map)
@@ -50,4 +64,4 @@ class BaseDataset(Dataset, FileHandler):
         return binarize(inst_map)
 
     def normalize(self, img: torch.Tensor) -> torch.Tensor:
-        return percentile_normalize_torch(img)
+        return minmax_normalize_torch(img)

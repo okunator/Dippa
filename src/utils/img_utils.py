@@ -7,12 +7,14 @@ def percentile_normalize(img: np.ndarray, channels: str="HWC") -> np.ndarray:
     1-99 percentile normalization per image channel. Numpy version
 
     Args:
+    -----------
         img (np.ndarray):
             Input image to be normalized. Shape (H, W, C)|(C, H, W)
         channels (str, default="HWC"):
             The order of image dimensions
 
     Returns:
+    -----------
         np.ndarray = Normalized image. Same shape as input
     """
     assert channels in ("HW", "HWC", "CHW")
@@ -39,6 +41,7 @@ def normalize(img: np.ndarray, channels: str="HWC", standardize: bool=True) -> n
     Mean center or standardize per image channel
 
     Args:
+    -----------
         img (np.ndarray):
             Input image to be normalized. Shape (H, W, C)|(C, H, W)
         channels (str, default="HWC"):
@@ -47,6 +50,7 @@ def normalize(img: np.ndarray, channels: str="HWC", standardize: bool=True) -> n
             If True, divide with standard deviation after mean centering
 
     Returns:
+    -----------
         np.ndarray = Normalized image. Same shape as input
     """
     im = img.copy()
@@ -72,12 +76,14 @@ def minmax_normalize(img: np.ndarray, channels: str="HWC") -> np.ndarray:
     Min-max normalization per image channel
 
     Args:
+    -----------
         img (np.ndarray):
             Input image to be normalized. Shape (H, W, C)|(C, H, W)
         channels (str, default="HWC"):
             The order of image dimensions
 
     Returns:
+    -----------
         np.ndarray = Min-max normalized image. Same shape as input
     """
     im = img.copy()
@@ -98,8 +104,10 @@ def minmax_normalize(img: np.ndarray, channels: str="HWC") -> np.ndarray:
 def float2ubyte(mat: np.ndarray, channels: str="HWC", normalize: bool=False) -> np.ndarray:
     """
     Convert float64 to uint8. float matrix values need to be in [-1, 1] for img_as_ubyte
+    So the image is normalized or clamped before conversion.
 
     Args:
+    ------------
         mat (np.ndarray):
             float64 matrix. Shape (H, W, C)|(C, H, W)
         channels (str, default="HWC"):
@@ -109,6 +117,7 @@ def float2ubyte(mat: np.ndarray, channels: str="HWC", normalize: bool=False) -> 
             clips values between [-1, 1].
 
     Returns:
+    ------------
         np.ndarray = uint8 matrix. Shape (H, W, C)
     """
     m = mat.copy()
@@ -117,7 +126,7 @@ def float2ubyte(mat: np.ndarray, channels: str="HWC", normalize: bool=False) -> 
         m = m.transpose(1, 2, 0)
     
     if normalize:
-        m=minmax_normalize(m)
+        m = minmax_normalize(m)
     else:
         m = np.clip(m, a_min=-1, a_max=1)
     
@@ -130,6 +139,7 @@ def overlays(im: np.ndarray, mask:np.ndarray) -> np.ndarray:
     mask is assumed to have shape (HxW)
 
     Args:
+    ------------
         im (np.ndarray): 
             Original image of shape (H, W, C)
         mask (np.ndarray): 
