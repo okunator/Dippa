@@ -262,10 +262,18 @@ class FileManager(FileHandler):
         }
 
     
-    def get_databases(self, dataset: str) -> Dict[str, Dict[int, str]]:
+    def get_databases(self, dataset: str, db_type: str="zarr") -> Dict[str, Dict[int, str]]:
         """
         Get the the databases that were written by the PatchWriter
         
+        Args:
+        -------------
+        dataset (str):
+            Name of the dataset. One of ("consep", "kumar", "pannuke")
+        db_type (str):
+            One of ("zarr", "hdf5"). Depends on what db's have been written
+            by the datawriters.
+
         Returns:
         -------------
             Dict[str, Dict[int, str]]
@@ -273,37 +281,27 @@ class FileManager(FileHandler):
             values are the paths to the hdf5 databases and keys are the size of the square 
             patches saved in the databass
         """
-        def get_input_sizes(paths):
-            # Paths to dbs are named as 'patchsize_dataset'. e.g. 'patch256_kumar.pytable' 
-            # This will parse the name and use patchsize as key for a dict
-            path_dict = {}
-            for path in paths:
-                fn = path.as_posix().split("/")[-1]
-                size = int("".join(filter(str.isdigit, fn)))
-                path_dict[size] = path
-            return path_dict
 
-        db_dir = Path(PATCH_DIR / "hdf5" / dataset)         
-        assert db_dir.exists(), (
-            f"Database dir: {db_dir} not found, Create the dbs first. Check instructions."
-        )
+        db_dir = Path(PATCH_DIR / db_type / dataset)       
+        assert db_dir.exists(), (f"Database dir: {db_dir} not found, Create the dbs first. Check instructions.")
             
-        train_dbs = list(db_dir.glob("*_train_*"))
-        valid_dbs = list(db_dir.glob("*_valid_*"))
-        test_dbs = list(db_dir.glob("*_test_*"))
+        train_dbs = list(db_dir.glob(f"*train_{dataset}*"))
+        valid_dbs = list(db_dir.glob(f"valid_{dataset}*"))
+        test_dbs = list(db_dir.glob(f"test_{dataset}*"))
+
+        assert train_dbs, (f"{train_dbs} HDF5 training db not found. Create the dbs first. Check instructions.")
+        assert test_dbs, (f"{test_dbs} HDF5 test db not found. Create the dbs first. Check instructions.")
         
         if not valid_dbs:
             valid_dbs = test_dbs
 
-        assert train_dbs, (
-            f"{train_dbs} HDF5 training db not found. Create the dbs first. Check instructions."
-        )
-        
-        return {
-            "train":get_input_sizes(train_dbs),
-            "valid":get_input_sizes(valid_dbs),
-            "test":get_input_sizes(test_dbs)
+        dbs = {
+            "train":train_dbs[0],
+            "valid":valid_dbs[0],
+            "test":test_dbs[0]
         }
+
+        return dbs
         
 
     def get_model_checkpoint(self, which: str = "last") -> Path:

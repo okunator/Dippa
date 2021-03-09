@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: baseline_consep
-  experiment_version: hover_zarr_minmax
+  experiment_version: hover_zarr_minmax_try2
 
 dataset_args:
   train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
@@ -37,7 +37,7 @@ training_args:
     - hue_sat
     - non_rigid
     - blur
-    - non_spatial
+    # - non_spatial
 
   optimizer_args:
     optimizer: adam              # One of https://github.com/jettify/pytorch-optimizer 

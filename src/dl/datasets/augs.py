@@ -99,7 +99,7 @@ def non_spatial_transforms(**kwargs) -> List[BasicTransform]:
     return [
         A.OneOf([
             # A.CLAHE(p=0.5),
-            A.RandomBrightnessContrast(p=0.5),    
+            A.RandomBrightnessContrast(p=0.5),
             A.RandomGamma(p=0.5)
         ], p=0.7)
     ]
