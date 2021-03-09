@@ -111,10 +111,10 @@ class SegModel(pl.LightningModule):
         )
 
         # database paths
-        self.db_dict = self.fm.get_databases(self.fm.train_dataset)
-        self.train_data = self.db_dict['train'][self.input_size]
-        self.valid_data = self.db_dict['valid'][self.input_size]
-        self.test_data = self.db_dict['test'][self.input_size]
+        # self.db_dict = self.fm.get_databases(self.fm.train_dataset)
+        self.train_data = None# self.db_dict['train'][self.input_size]
+        self.valid_data = None# self.db_dict['valid'][self.input_size]
+        self.test_data = None# self.db_dict['test'][self.input_size]
 
         # init model
         if self.aux_branch:
