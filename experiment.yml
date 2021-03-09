@@ -30,7 +30,7 @@ model_args:
     aux_type: hover              # One of (hover, dist, contour) (ignored if aux=False)
 
 training_args:
-  normalize_input: False          # minmax normalize input images after augs (nans??)
+  normalize_input: True          # minmax normalize input images after augs (nans??)
   freeze_encoder: False          # freeze the weights in the encoder (for fine tuning)
   weight_balancing: null         # One of (gradnorm, uncertainty, null)
   augmentations:

@@ -84,6 +84,9 @@ class Predictor:
             patch (np.ndarray or torch.Tensor): 
                 Image patch of shape (input_size, input_size, 3)
                 or (B, input_size, input_size, 3)
+            norm (bool, default=False):
+                Normalize input data. Set to True only if input data was
+                normalized in the training phase.
 
         Returns:
         -----------

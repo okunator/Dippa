@@ -2,7 +2,7 @@ import torch
 from typing import Union
 
 
-# Channel-wise normalizations per image. Normalizations per data not yet implemented.
+# Channel-wise normalizations per image. Normalizations per full training data not yet implemented.
 
 # Ported from: https://gist.github.com/spezold/42a451682422beb42bc43ad0c0967a30
 def percentile(t: torch.tensor, q: float) -> Union[int, float]:
