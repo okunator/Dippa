@@ -30,14 +30,13 @@ model_args:
     aux_type: hover              # One of (hover, dist, contour) (ignored if aux=False)
 
 training_args:
-  normalize_input: True          # minmax normalize input images after augs (nans??)
+  normalize_input: True          # minmax normalize input images after augs
   freeze_encoder: False          # freeze the weights in the encoder (for fine tuning)
   weight_balancing: null         # One of (gradnorm, uncertainty, null)
   augmentations:
     - hue_sat
     - non_rigid
     - blur
-    # - non_spatial
 
   optimizer_args:
     optimizer: adam              # One of https://github.com/jettify/pytorch-optimizer 
@@ -62,7 +61,7 @@ runtime_args:
   num_epochs: 5
   num_gpus: 1
   batch_size: 8
-  model_input_size: 256       # Multiple of 32. Tuple(int, int) 
-  num_workers: 8              # number workers for data loeader
+  num_workers: 8              # number workers for data loader
+  db_type: "zarr"             # The type of the input data db. One of (hdf5, zarr). 
 
 

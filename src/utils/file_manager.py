@@ -276,10 +276,8 @@ class FileManager(FileHandler):
 
         Returns:
         -------------
-            Dict[str, Dict[int, str]]
-            A dictionary where the keys (train, test, valid) are pointing to dictionaries with
-            values are the paths to the hdf5 databases and keys are the size of the square 
-            patches saved in the databass
+            Dict[str, Path]
+            A dictionary where the keys (train, test, valid) are pointing to Path objs of dbs.
         """
 
         db_dir = Path(PATCH_DIR / db_type / dataset)       

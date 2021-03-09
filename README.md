@@ -41,8 +41,8 @@ Intsuctions to run coming later...
 
 ```yaml
 experiment_args:
-  experiment_name: test
-  experiment_version: something
+  experiment_name: my_tests
+  experiment_version: activation_relu
 
 dataset_args:
   train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
@@ -61,50 +61,50 @@ model_args:
       encoder_depth: 5          # Number of layers in encoder
     decoder_args:
       n_blocks: 2               # Number of convolutions blocks in each decoder block
-      short_skips: residual     # One of (residual, dense, nope) (for decoder branch only)
+      short_skips: nope         # One of (residual, dense, nope) (for decoder branch only)
       long_skips: unet          # One of (unet, unet++, unet3+, nope)
-      merge_policy: cat         # One of (sum, cat) (for long skips)
+      merge_policy: sum         # One of (sum, cat) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
 
   decoder_branches:
     type: True
     aux: True
-    aux_type: unet              # One of (hover, dist, contour, unet) (ignored if aux=False)
+    aux_type: hover              # One of (hover, dist, contour) (ignored if aux=False)
 
 training_args:
-  resume_training: False
-  num_epochs: 3
-  num_gpus: 1
-  weight_balancing: null        # One of (gradnorm, uncertainty, null)
+  normalize_input: True          # minmax normalize input images after augs
+  freeze_encoder: False          # freeze the weights in the encoder (for fine tuning)
+  weight_balancing: null         # One of (gradnorm, uncertainty, null)
   augmentations:
     - hue_sat
     - non_rigid
     - blur
-    - non-spatial
 
   optimizer_args:
-    optimizer: adamw            # One of https://github.com/jettify/pytorch-optimizer 
+    optimizer: adam              # One of https://github.com/jettify/pytorch-optimizer 
     lr: 0.0005
     encoder_lr: 0.00005
     weight_decay: 0.0003
     encoder_weight_decay: 0.00003
-    lookahead: True
-    bias_weight_decay: False
+    lookahead: False
+    bias_weight_decay: True
     scheduler_factor: 0.25
-    schduler_patience: 2
+    scheduler_patience: 3
 
   loss_args:
-    inst_branch_loss: dice_focal
-    type_branch_loss: tversky_focal
-    aux_branch_loss: mse
-    edge_weight: False
-    class_weights: False
+    inst_branch_loss: dice_ce
+    type_branch_loss: dice_ce
+    aux_branch_loss: mse_ssim
+    edge_weight: False         # Give penalty to nuclei borders in cross-entropy based losses
+    class_weights: False       # Weight classes by the # of class pixels in the data
 
 runtime_args:
-  batch_size: 6
-  model_input_size: 256       # Multiple of 32. Tuple(int, int)
-  num_workers: 8              # number workers for data loeader
-
+  resume_training: False
+  num_epochs: 5
+  num_gpus: 1
+  batch_size: 8
+  num_workers: 8              # number workers for data loader
+  db_type: "zarr"             # The type of the input data db. One of (hdf5, zarr). 
 ```
 
 Borrowing functions and utilities from:

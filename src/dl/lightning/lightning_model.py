@@ -55,8 +55,8 @@ class SegModel(pl.LightningModule):
         self.augs: List[str] = training_args.augmentations
         self.norm: bool = training_args.normalize_input
         self.batch_size: int = runtime_args.batch_size
-        self.input_size: int = runtime_args.model_input_size
         self.num_workers: int = runtime_args.num_workers
+        self.db_type: str = runtime_args.db_type
 
         # Module args
         self.activation: str = model_args.architecture_design.module_args.activation
@@ -111,7 +111,7 @@ class SegModel(pl.LightningModule):
         )
 
         # database paths
-        self.db_dict = self.fm.get_databases(self.fm.train_dataset, db_type="zarr")
+        self.db_dict = self.fm.get_databases(self.fm.train_dataset, db_type=self.db_type)
         self.train_data = self.db_dict['train']
         self.valid_data = self.db_dict['valid']
         self.test_data = self.db_dict['test']
@@ -221,7 +221,7 @@ class SegModel(pl.LightningModule):
             f"{phase}_mean_iou": z["mean_iou"]
         }
 
-        self.log_dict(logs, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(logs, on_step=True, on_epoch=True, prog_bar=False, logger=True)
 
         return {
             "loss": z["loss"],
