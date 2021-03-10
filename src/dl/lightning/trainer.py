@@ -17,6 +17,7 @@ class SegTrainer:
         Initializes lightning trainer based on the experiment.yml
 
         Args:
+        -----------
             experiment_args (omegaconf.DictConfig):
                 Omegaconf DictConfig specifying arguments that
                 are used for creating result folders and files.
@@ -46,7 +47,7 @@ class SegTrainer:
 
         # set checkpoint callback
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
-            filepath = self.ckpt_dir,
+            dirpath = self.ckpt_dir,
             save_top_k = 1,
             save_last = True,
             verbose = True, 
@@ -88,6 +89,7 @@ class SegTrainer:
             logger=c.tt_logger,
             callbacks=c.callbacks,
             resume_from_checkpoint=c.last_ckpt,
+            log_gpu_memory=True,
             profiler=True #pl.profiler.AdvancedProfiler(),
             # fast_dev_run=False
         )

@@ -56,6 +56,7 @@ class SegModel(pl.LightningModule):
         self.norm: bool = training_args.normalize_input
         self.batch_size: int = runtime_args.batch_size
         self.num_workers: int = runtime_args.num_workers
+        self.input_size: int = runtime_args.model_input_size
         self.db_type: str = runtime_args.db_type
 
         # Module args

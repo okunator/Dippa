@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: baseline_consep
-  experiment_version: hover_zarr_minmax_try2
+  experiment_version: hover_zarr_tryddd
 
 dataset_args:
   train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
@@ -62,6 +62,7 @@ runtime_args:
   num_gpus: 1
   batch_size: 8
   num_workers: 8              # number workers for data loader
+  model_input_size: 256       # size of the model input (input_size, input_size)
   db_type: "zarr"             # The type of the input data db. One of (hdf5, zarr). 
 
 
