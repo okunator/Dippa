@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: baseline_consep
-  experiment_version: hover_zarr_tryddd
+  experiment_version: hovermaps
 
 dataset_args:
   train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
@@ -57,8 +57,8 @@ training_args:
     class_weights: False       # Weight classes by the # of class pixels in the data
 
 runtime_args:
-  resume_training: False
-  num_epochs: 5
+  resume_training: True
+  num_epochs: 50
   num_gpus: 1
   batch_size: 8
   num_workers: 8              # number workers for data loader

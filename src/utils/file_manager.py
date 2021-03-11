@@ -75,6 +75,18 @@ class FileHandler:
                     f.unlink()
 
     @staticmethod
+    def get_pannuke_folds() -> Dict[str, str]:
+        yml_path = [f for f in Path(CONF_DIR).iterdir() if "pannuke" in f.name][0]
+        data_conf = OmegaConf.load(yml_path)
+        return data_conf.folds
+        
+    @staticmethod
+    def get_pannuke_tissues() -> List[str]:
+        yml_path = [f for f in Path(CONF_DIR).iterdir() if "pannuke" in f.name][0]
+        data_conf = OmegaConf.load(yml_path)
+        return data_conf.tissues
+
+    @staticmethod
     def suffix(path: Union[str, Path]) -> str:
         path = Path(path)
         assert all([f.suffix for f in path.iterdir()]), "All files should be in same format"
@@ -142,18 +154,6 @@ class FileManager(FileHandler):
         data_conf = OmegaConf.load(yml_path)
         classes = data_conf.class_types.type
         return classes
-
-    @property
-    def pannuke_folds(self) -> Dict[str, str]:
-        yml_path = [f for f in Path(CONF_DIR).iterdir() if "pannuke" in f.name][0]
-        data_conf = OmegaConf.load(yml_path)
-        return data_conf.folds
-        
-    @property
-    def pannuke_tissues(self) -> List[str]:
-        yml_path = [f for f in Path(CONF_DIR).iterdir() if "pannuke" in f.name][0]
-        data_conf = OmegaConf.load(yml_path)
-        return data_conf.tissues
     
     def __split_training_set(self,
                              dataset: str,

@@ -17,13 +17,15 @@ class HDF5Writer(BaseWriter, FileHandler):
                  file_name: str,
                  classes: Dict[str, int],
                  patch_shape: Tuple[int]=(512, 512),
+                 stride_size: int=80,
+                 n_copies: int=None,
                  rigid_augs_and_crop: bool = True,
                  crop_shape: Tuple[int]=(256, 256),
-                 stride_size: int=80,
                  chunk_size: int=1) -> None:
         """
-        Iterates image and mask folders, patches them, and appends the patches to a hdf5 dataset.
-        The dataset does not contain any threading locks, so the datset class should handle that 
+        Iterates image and mask folders, patches them (if specified), and appends the patches to
+        a hdf5 dataset. This h5-file does not support thread locks, so the torch dataset class 
+        should handle that.
         
         Args:
         ------------
@@ -36,22 +38,29 @@ class HDF5Writer(BaseWriter, FileHandler):
                 (Suffix of the mask file name can be different). Masks need to be stored in .mat files
                 that contain at least the key: "inst_map". Also the "type_map".
             save_dir (str, Path):
-                The directory, where the zarr array is written/saved.
+                The directory, where the h5 array is written/saved.
             file_name (str):
-                name of the zarr array
+                name of the h5 array
             classes (Dist[str, int]):
                 Dictionary of class integer key-value pairs
                 e.g. {"background":0, "inflammatory":1, "epithel":2}
             patch_shape (Tuple[int], default=(512, 512)):
-                specifies the height and width of the patches that are stored in zarr-arrays.
-            rigid_augs_and_crop (bool, default=True):
-                If True, rotations, flips etc are applied to the patches which is followed by a
-                center cropping to smaller patch. 
-            crop_shape (Tuple[int], default=(256, 256)):
-                If rigid_augs_and_crop is True, this is the crop shape for the center crop. 
+                Specifies the height and width of the patches. If this is None, 
+                no patching is applied. 
             stride_size (int, default=80):
                 Stride size for the sliding window patcher. Needs to be <= patch_shape.
-                If < patch_shape, patches are created with overlap.
+                If < patch_shape, patches are created with overlap. Ignored if patch_shape
+                is None.
+            n_copies (int, default=None):
+                Number of copies created per one input image & corresponding mask.
+                Used for already patched data such as Pannuke data. If patch_shape
+                and n_copies are None, no additional data is created but transforms 
+                may still be applied to the patches.
+            rigid_augs_and_crop (bool, default=True):
+                If True, rotations, flips etc are applied to the patches which is followed by a
+                center cropping. 
+            crop_shape (Tuple[int], default=(256, 256)):
+                If rigid_augs_and_crop is True, this is the crop shape for the center crop. 
             chunk_size (int, default=1):
                 The chunk size of the zarr array. i.e. How many patches are included in
                 one read of the array.
@@ -61,6 +70,7 @@ class HDF5Writer(BaseWriter, FileHandler):
         self.save_dir = Path(save_dir)
         self.patch_shape = patch_shape
         self.stride_size = stride_size
+        self.n_copies = n_copies
         self.file_name = file_name
         self.chunk_size = chunk_size
         self.classes = classes
@@ -70,7 +80,9 @@ class HDF5Writer(BaseWriter, FileHandler):
         assert self.img_dir.exists(), f"img_dir: {img_dir} does not exist."
         assert self.mask_dir.exists(), f"mask_dir: {mask_dir} does not exist."
         assert self.save_dir.exists(), f"write_dir: {save_dir} does not exist."
-        assert self.stride_size <= self.patch_shape[0]
+        
+        if self.patch_shape is not None:
+            assert self.stride_size <= self.patch_shape[0]
 
 
     def write2hdf5(self) -> None:
@@ -128,26 +140,33 @@ class HDF5Writer(BaseWriter, FileHandler):
         
         with tqdm(total=len(img_files), unit="file") as pbar:
             for i, (img_path, mask_path) in enumerate(zip(img_files, mask_files), 1):
+                # get data
                 im = self.read_img(img_path)
                 inst_map = self.read_mask(mask_path, key="inst_map")
                 type_map = self.read_mask(mask_path, key="type_map")
                 npixels[:] += self._pixels_per_classes(type_map)
-
                 full_data = np.concatenate((im, inst_map[..., None], type_map[..., None]), axis=-1)
-                H, W, C = full_data.shape
-                tiler = TilerStitcher((H, W, C), self.patch_shape, self.stride_size)
-                patches = tiler.extract_patches_quick(full_data)
+                
+                # Do patching or create copies of input images 
+                if self.patch_shape is not None:
+                    H, W, C = full_data.shape
+                    tiler = TilerStitcher((H, W, C), self.patch_shape, self.stride_size)
+                    patches = tiler.extract_patches_quick(full_data)
+                elif self.n_copies is not None:
+                    patches = np.stack([full_data]*self.n_copies)
+                else:
+                    patches = full_data[None, ...]
 
                 if self.rac:
-                    im_p, inst_p, type_p = self._augment_patches(
+                    patches = self._augment_patches(
                         patches_im=patches[..., :3], 
                         patches_mask=patches[..., 3:],
                         crop_shape=self.crop_shape
                     )
-                else:
-                    im_p = patches[..., :3].astype("uint8")
-                    inst_p = patches[..., 3].astype("int32")
-                    type_p = patches[..., 4].astype("int32")
+                
+                im_p = patches[..., :3].astype("uint8")
+                inst_p = patches[..., 3].astype("int32")
+                type_p = patches[..., 4].astype("int32")
 
                 imgs.append(im_p)
                 insts.append(inst_p)

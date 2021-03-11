@@ -21,7 +21,7 @@ def rigid_transforms(**kwargs) -> List[BasicTransform]:
     """
     return [
         A.OneOf([
-            A.Rotate(p=0.5),
+            A.Rotate(p=0.8),
             A.RandomRotate90(p=0.5),
             A.Flip(p=0.5),
             A.Transpose(p=0.5),

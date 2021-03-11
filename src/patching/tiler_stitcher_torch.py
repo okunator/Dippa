@@ -21,6 +21,7 @@ class TilerStitcherTorch:
         https://discuss.pytorch.org/t/how-to-split-tensors-with-overlap-and-then-reconstruct-the-original-tensor/70261/12
 
         Args:
+        ------------
             batch_shape (Tuple[int]):
                 input image shape (B, C, H, W)
             patch_shape (Tuple[int]):
@@ -41,6 +42,7 @@ class TilerStitcherTorch:
     def margins(self) -> Tuple[int]:
         """
         Returns:
+        -------------
             Tuple[int]. Length of margins needed in the input image. Multiple of patch_shape
         """
         extra_pad = 200
@@ -54,10 +56,12 @@ class TilerStitcherTorch:
         Use unfold to patch a batched tensor image.
 
         Args:
+        -------------
             batch_im (torch.Tensor):
                 Batched input image. Shape (B, C, H, W)
 
         Returns:
+        -------------
             patched image of shape (B, C, n_patches, patch_height, patch_width)
         """
         if self.padding:
@@ -79,12 +83,14 @@ class TilerStitcherTorch:
         extract_patches_from_batched() method
 
         Args:
+        -------------
             patches (torch.Tensor):
                 input image in patches of shape (B, n_patches C, H, W).
             n_channels (int, default=3):
                 Number of channels in the output. 
 
         Returns:
+        -------------
              torch.Tensor (image) of shape (B, C, H, W) 
         """
         _, C, _, ph, pw = patches.shape
@@ -111,6 +117,7 @@ class TilerStitcherTorch:
         if you dont want this to crash
 
         Conversion example:
+        -------------------
             patches = (patches[1, ...].permute(0, 2, 3, 1).numpy().astype("uint8")
 
         """

@@ -14,6 +14,7 @@ class DatasetBuilder:
         Initializes the train & test time datsets based on the experiment.yml
 
         Args:
+        -----------
             decoder_branch_args (omegaconf.DictConfig): 
                 Omegaconf DictConfig specifying arguments related 
                 to the what decoder branches are used
@@ -32,6 +33,7 @@ class DatasetBuilder:
         Compose the augmentations in config.py to a augmentation pipeline
 
         Args:
+        -----------
             augs_list (List[str], optional): 
                 List of augmentations specified in config.py
         """
@@ -50,6 +52,7 @@ class DatasetBuilder:
         Init the train dataset.
 
         Args:
+        ------------
             decoder_branch_args (omegaconf.DictConfig): 
                 Omegaconf DictConfig specifying arguments related 
                 to the what decoder branches are used
@@ -75,6 +78,7 @@ class DatasetBuilder:
         Init the test dataset. No augmentations used. Only ndarray to tensor conversion.
 
         Args:
+        ------------
             decoder_branch_args (omegaconf.DictConfig): 
                 Omegaconf DictConfig specifying arguments related 
                 to the what decoder branches are used

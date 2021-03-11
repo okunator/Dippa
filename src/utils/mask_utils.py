@@ -11,6 +11,7 @@ def binarize(inst_map: np.ndarray) -> np.ndarray:
     Binarize a labelled instance map
 
     Args:
+    ----------
         inst_map (np.ndarray): 
             Instance map to be binarized
     """
@@ -19,12 +20,13 @@ def binarize(inst_map: np.ndarray) -> np.ndarray:
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/loader/augs.py
-def fix_mirror_padding(inst_map: np.ndarray) -> np.ndarray:
+def fix_duplicates(inst_map: np.ndarray) -> np.ndarray:
     """
-    Deal with duplicated instances due to mirroring in interpolation
-    during shape augmentation (scale, rotation etc.)
+    Deal with duplicated instances in an inst map. For example, duplicated instances
+    due to mirror padding. 
 
     Args:
+    -----------
         inst_map (np.ndarray): Inst map
     """
     current_max_id = np.amax(inst_map)
@@ -46,6 +48,7 @@ def remove_1px_boundary(inst_map: np.ndarray) -> np.ndarray:
     Removes 1px around each instance, removing overlaps of cells in an inst map
 
     Args: 
+    ----------
         inst_map (np.ndarray): inst map
     """
     new_inst_map = np.zeros(inst_map.shape[:2], np.int32)
@@ -66,6 +69,7 @@ def get_weight_map(inst_map: np.ndarray, sigma: float = 5.0, w0: float = 10.0):
     Generate a weight map like in U-Net paper
 
     Args: 
+    -----------
         inst_map (np.ndarray): 
             Instance map
         sigma (float): 
@@ -115,6 +119,7 @@ def remove_small_objects(ar, min_size=64, connectivity=1, in_place=False, *, out
     smaller than min_size. If `ar` is bool, the image is first labeled.
     This leads to potentially different behavior for bool and 0-and-1
     arrays.
+
     Parameters
     ----------
     ar : ndarray (arbitrary shape, int or bool type)
@@ -200,6 +205,7 @@ def center_crop(img: np.ndarray, ch: int, cw: int) -> np.ndarray:
     Center crop an input image
 
     Args:
+    ----------
         img (np.ndarray): 
             Input img. Shape (H, W).
         ch (int):
@@ -226,6 +232,7 @@ def bounding_box(inst_map: np.ndarray) -> List[int]:
     has only one instance in it.
 
     Args:
+    ----------
         inst_map (np.ndarray): 
             Instance labels
     """
@@ -242,7 +249,7 @@ def bounding_box(inst_map: np.ndarray) -> List[int]:
 
 
 # ported from https://github.com/vqdang/hover_net/tree/master/src/metrics/sample
-def remap_label(pred: np.ndarray, by_size: bool = False) -> np.ndarray:
+def remap_label(pred: np.ndarray) -> np.ndarray:
     """
     Rename all instance id so that the id is contiguous i.e [0, 1, 2, 3] 
     not [0, 2, 4, 6]. The ordering of instances (which one comes first) 
@@ -250,28 +257,19 @@ def remap_label(pred: np.ndarray, by_size: bool = False) -> np.ndarray:
     so that bigger nucler has smaller ID
 
     Args:
+    -----------
         pred (np.ndarray):
             The 2d array contain instances where each instances is marked
             by non-zero integer
-        by_size (bool, default=False): 
-            Renaming with larger nuclei has smaller id (on-top)
     
     Returns:
+    -----------
         np.ndarray inst map with remapped contiguous labels
     """
     pred_id = list(np.unique(pred))
     pred_id.remove(0)
     if len(pred_id) == 0:
         return pred # no label
-    if by_size:
-        pred_size = []
-        for inst_id in pred_id:
-            size = (pred == inst_id).sum()
-            pred_size.append(size)
-        # sort the id by size in descending order
-        pair_list = zip(pred_id, pred_size)
-        pair_list = sorted(pair_list, key=lambda x: x[1], reverse=True)
-        pred_id, pred_size = zip(*pair_list)
 
     new_pred = np.zeros(pred.shape, np.int32)
     for idx, inst_id in enumerate(pred_id):
@@ -285,10 +283,12 @@ def get_inst_centroid(inst_map: np.ndarray) -> np.ndarray:
     Get centroid x, y coordinates from each unique nuclei instance
 
     Args:
+    ----------
         inst_map (np.ndarray): 
             Nuclei instance map
 
     Returns:
+    ----------
         an np.ndarray of shape (num_instances, 2)
 
         Example:
@@ -317,12 +317,14 @@ def get_inst_types(inst_map: np.ndarray, type_map: np.ndarray) -> np.ndarray:
     and write them to a 1D-Array
     
     Args:
+    ----------
         inst_map (np.ndarray): 
             Instance map of shape (H, W)
         type_map (np.ndarray): 
             Type map of shape (H, W). Labels are indices.
 
     Returns:
+    ----------
         an np.ndarray of shape (num_instances, 1)
 
         Example:
@@ -350,6 +352,7 @@ def get_type_instances(inst_map: np.ndarray, type_map: np.ndarray, class_num: in
     non-zero pixels.
     
     Args:
+    ----------
         inst_map (np.ndarray): 
             Instance map of shape (H, W)
         type_map (np.ndarray): 
@@ -368,6 +371,7 @@ def one_hot(type_map: np.ndarray, num_classes: int) -> np.ndarray:
     Convert type map of shape (H, W) to one hot encoded types of shape (H, W, C)
     
     Args:
+    -----------
         type_map (np.ndarray): 
             Type map of shape (H, W). Labels are indices.
         num_classes (int): 
@@ -382,6 +386,7 @@ def type_map_flatten(type_map: np.ndarray) -> np.ndarray:
     indice map of shape (H, W)
     
     Args:
+    -----------
         type_map (np.ndarray): 
             Type map to be flattened
     """
@@ -399,6 +404,7 @@ def to_inst_map(binary_mask: np.ndarray) -> np.ndarray:
     binary_mask[..., 1] the foreground.
 
     Args:
+    -----------
         binary_mask (np.ndarray): 
             A binary mask to be labelled. Shape (H, W) or (H, W, C)
     
@@ -421,6 +427,7 @@ def cv2_opening(inst_map: np.ndarray, iterations: int = 2) -> np.ndarray:
     Seems to increase segmentation metrics
 
     Args:
+    -----------
         inst_map (np.ndarray): 
             Instance map to be opened. Shape (H, W)
         iterations (int, default=2):
@@ -439,6 +446,7 @@ def cv2_closing(inst_map: np.ndarray, iterations: int = 2) -> np.ndarray:
     Takes in an inst_map -> binarize -> apply morphological closing (2 iterations) -> label
     
     Args:
+    -----------
         inst_map (np.ndarray): 
             Instance map to be opened. Shape (H, W)
         iterations (int, default=2): 
@@ -457,6 +465,7 @@ def remove_debris(inst_map: np.ndarray, min_size: int = 10):
     Remove small objects from an inst map
 
     Args:
+    ------------
         inst_map (np.ndarray): 
             Instance map
         min_size (int, default=10): 

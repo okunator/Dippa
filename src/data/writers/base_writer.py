@@ -24,9 +24,12 @@ class BaseWriter:
                 Image patches. Shape (n_patches, pH, pW, 3)
             patches_mask (np.ndarray):
                 Patches of the masks. Shape (n_patches, pH, pW, n_masks).
-                inst_maps in patches_mask[..., 0], type_maps in patches_mask[..., 1]
+                inst_maps in patches_mask[0], type_maps in patches_mask[1]
             crop_shape (Tuple[int], default=(256, 256)):
-                Shape of the center crop. 
+                Shape of the center crop.
+
+        Returns:
+            A tuple of nd.arrays of the transformed patches.
         """
         
         imgs, inst_maps, type_maps, overlays = [], [], [], []
@@ -42,7 +45,10 @@ class BaseWriter:
             inst_maps.append(cropped_patches["masks"][0][..., 0])
             type_maps.append(cropped_patches["masks"][0][..., 1])
 
-        return np.array(imgs).astype("uint8"), np.array(inst_maps).astype("int32"), np.array(type_maps).astype("int32")
+        imgs, insts, types = np.array(imgs), np.array(inst_maps), np.array(type_maps)
+        full_data = np.concatenate((imgs, insts[..., None], types[..., None]), axis=-1)
+        return full_data
+        
 
     def _pixels_per_classes(self, type_map: np.ndarray) -> np.ndarray:
         """
@@ -52,6 +58,10 @@ class BaseWriter:
         ---------
         type_map (np.ndarray):
             Type map of shape (H, W).
+        
+        Returns:
+        ---------
+            np.ndarray of shape (C, ). indices are classes, values teh number of pixels per cls
         """
         totals = np.zeros(len(self.classes))
         for j, val in enumerate(self.classes.values()):

@@ -18,6 +18,7 @@ class ZarrWriter(BaseWriter, FileHandler):
                  classes: Dict[str, int],
                  patch_shape: Tuple[int]=(512, 512),
                  stride_size: int=80,
+                 n_copies: int=None,
                  rigid_augs_and_crop: bool = True,
                  crop_shape: Tuple[int]=(256, 256),
                  chunk_size: int=1,
@@ -47,6 +48,11 @@ class ZarrWriter(BaseWriter, FileHandler):
             stride_size (int, default=80):
                 Stride size for the sliding window patcher. Needs to be <= patch_shape.
                 If < patch_shape, patches are created with overlap.
+            n_copies (int, default=None):
+                Number of copies created per one input image & corresponding mask.
+                Used for already patched data such as Pannuke data. If patch_shape
+                and n_copies are None, no additional data is created but transforms 
+                may still be applied to the patches.
             rigid_augs_and_crop (bool, default=True):
                 If True, rotations, flips etc are applied to the patches which is followed by a
                 center cropping to smaller patch. (rigid_augs_and_crop)
@@ -63,6 +69,7 @@ class ZarrWriter(BaseWriter, FileHandler):
         self.save_dir = Path(save_dir)
         self.patch_shape = patch_shape
         self.stride_size = stride_size
+        self.n_copies = n_copies
         self.file_name = file_name
         self.chunk_sync = chunk_synchronization
         self.chunk_size = chunk_size
@@ -73,7 +80,9 @@ class ZarrWriter(BaseWriter, FileHandler):
         assert self.img_dir.exists(), f"img_dir: {img_dir} does not exist."
         assert self.mask_dir.exists(), f"mask_dir: {mask_dir} does not exist."
         assert self.save_dir.exists(), f"write_dir: {save_dir} does not exist."
-        assert self.stride_size <= self.patch_shape[0]
+        
+        if self.patch_shape is not None:
+            assert self.stride_size <= self.patch_shape[0]
 
     def write2zarr(self) -> None:
         """
@@ -137,20 +146,27 @@ class ZarrWriter(BaseWriter, FileHandler):
                 npixels[:] += self._pixels_per_classes(type_map)
 
                 full_data = np.concatenate((im, inst_map[..., None], type_map[..., None]), axis=-1)
-                H, W, C = full_data.shape
-                tiler = TilerStitcher((H, W, C), self.patch_shape, self.stride_size)
-                patches = tiler.extract_patches_quick(full_data)
+                
+                # Do patching or create copies of input images 
+                if self.patch_shape is not None:
+                    H, W, C = full_data.shape
+                    tiler = TilerStitcher((H, W, C), self.patch_shape, self.stride_size)
+                    patches = tiler.extract_patches_quick(full_data)
+                elif self.n_copies is not None:
+                    patches = np.stack([full_data]*self.n_copies)
+                else:
+                    patches = full_data[None, ...]
 
                 if self.rac:
-                    im_p, inst_p, type_p = self._augment_patches(
+                    patches = self._augment_patches(
                         patches_im=patches[..., :3], 
                         patches_mask=patches[..., 3:],
                         crop_shape=self.crop_shape
                     )
-                else:
-                    im_p = patches[..., :3].astype("uint8")
-                    inst_p = patches[..., 3].astype("int32")
-                    type_p = patches[..., 4].astype("int32")
+                
+                im_p = patches[..., :3].astype("uint8")
+                inst_p = patches[..., 3].astype("int32")
+                type_p = patches[..., 4].astype("int32")
 
                 imgs.append(im_p, axis=0)
                 imaps.append(inst_p, axis=0)

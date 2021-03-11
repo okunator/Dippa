@@ -10,10 +10,10 @@ from segmentation_models_pytorch.encoders import get_preprocessing_fn
 from src.utils.file_manager import FileHandler
 from ..torch_img_utils import minmax_normalize_torch
 
-from src.utils.mask_utils import (
+from src.utils import (
     get_weight_map, 
     remove_1px_boundary, 
-    fix_mirror_padding,
+    fix_duplicates,
     binarize
 )
 
@@ -58,7 +58,7 @@ class BaseDataset(Dataset, FileHandler):
         return remove_1px_boundary(inst_map)
 
     def fix_mirror_pad(self, inst_map: np.ndarray) -> np.ndarray:
-        return fix_mirror_padding(inst_map)
+        return fix_duplicates(inst_map)
         
     def binary(self, inst_map:np.ndarray) -> np.ndarray:
         return binarize(inst_map)

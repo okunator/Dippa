@@ -16,6 +16,7 @@ class TilerStitcher:
         Operates on numpy arrays
 
         Args:
+        -------------
             im_shape (Tuple[int]):
                 input image shape (H, W, C)
             patch_shape (Tuple[int]):
@@ -38,6 +39,7 @@ class TilerStitcher:
     def margins(self) -> Tuple[int]:
         """
         Returns:
+        ------------
             Tuple[int]. Length of margins needed in the input image. Multiple of patch_shape
         """
         extra_pad = 200
@@ -50,10 +52,12 @@ class TilerStitcher:
         Use numpy stride tricks via skimage to patch the image quickly.
 
         Args:
+        -------------
             im (np.ndarray):
                 Input image. Shape (H, W, C) | (H, W)
 
         Returns:
+        -------------
             patched image of shape (n_patches, patch_height, patch_width, C)
         """
         if len(im.shape) == 2:
@@ -78,10 +82,12 @@ class TilerStitcher:
         extract_patches_quick() method
 
         Args:
+        ------------
             patches (np.ndarray):
                 input image in patches of shape (n_patches, H, W, C).
 
         Returns:
+        ------------
             np.ndarray (image) of shape (H, W, C) 
         """
         assert self.ntile_x != None, (

@@ -11,11 +11,13 @@ def viz_patches(patches: np.ndarray) -> Tuple[int]:
     or everything willl crash.
 
     Args:
+    ----------
         patches (np.ndarray): 
             numpy array of stacked image patches.
             Shape: (n_patches, H, W, n_channels)
 
     Returns:
+    ----------
         Shape of the patches array
     """
     fignum = 200
