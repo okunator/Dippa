@@ -34,7 +34,7 @@ from skimage.color import hsv2rgb
 from scipy.ndimage import find_objects, binary_fill_holes
 from scipy.ndimage.filters import maximum_filter1d
 
-from src.utils.img_utils import percentile_normalize
+from src.utils.img_utils import percentile_normalize, percentile_normalize_and_clamp
 from src.utils.mask_utils import binarize
 
 
@@ -47,6 +47,7 @@ def enhance_hover(hover: np.ndarray, order: str="XY", channels: str="HWC") -> np
     This is ported from the CellPose repo and slightly modified.
 
     Args:
+    -----------
         hover (np.ndarray):
             Regressed Horizontal and Vertical gradient maps. Shape (2, H, W)|(H, W, 2)
         order (str, default="XY"):
@@ -56,6 +57,7 @@ def enhance_hover(hover: np.ndarray, order: str="XY", channels: str="HWC") -> np
             The order of image dimensions. One of ("HW", "HWC", "CHW")
     
     Returns:
+    -----------
         Enhanced hover-maps (np.ndarray) with channel order "YX" and shape (H, W, 2)
     """
     assert order in ("XY", "YX")
@@ -67,12 +69,7 @@ def enhance_hover(hover: np.ndarray, order: str="XY", channels: str="HWC") -> np
     if order == "YX":
         hover = hover[..., (1, 0)] #YX
 
-    percentile99 = np.percentile(hover, q=99, axis=(0, 1))
-    percentile1 = np.percentile(hover, q=1, axis=(0, 1))
-    percentiles = np.stack([percentile99, percentile1])
-    colmax = np.max(percentiles, axis=0)
-    enhanced = np.clip((hover / colmax), a_min=-1, a_max=1)
-
+    enhanced = percentile_normalize_and_clamp(hover, a_min=-1, a_max=1)
     return enhanced
 
 
@@ -82,6 +79,7 @@ def flows_from_hover(hover: np.ndarray, order: str="XY", channels: str="HWC") ->
     This is ported from the CellPose repo and slightly modified.
 
     Args:
+    ----------
         hover (np.ndarray):
             Regressed Horizontal and Vertical gradient maps. Shape (H, W, 2).
             order is "XY". i.e. Horizontal map in hover[..., 0] and vertical
@@ -93,6 +91,7 @@ def flows_from_hover(hover: np.ndarray, order: str="XY", channels: str="HWC") ->
             The order of image dimensions. One of ("HW", "HWC", "CHW")
 
     Returns:
+    ----------
         np.ndarray, the optical flow representation. Shape (H, W, 3)
     """
     enhanced = enhance_hover(hover, order=order, channels=channels)
@@ -114,6 +113,7 @@ def steps2D_interp_torch(p: np.ndarray, dP: np.ndarray, niter: int=200) -> np.nd
     We use finite differences with a step size of one."
 
     Args:
+    ----------
         p: float32, 3D array
             final locations of each pixel after dynamics,
             size [axis x Ly x Lx].
@@ -357,6 +357,7 @@ def post_proc_cellpose(hover_map:np.ndarray, inst_map: np.ndarray) -> Dict[str, 
     Does not discard bad flows which are removed in the paper..
 
     Args:
+    -----------
         hover_map (np.ndarray):
             The horizontal and vertical maps from the auxiliary
             branch of the network. Shape (H, W, 2). 
@@ -367,6 +368,7 @@ def post_proc_cellpose(hover_map:np.ndarray, inst_map: np.ndarray) -> Dict[str, 
             branch of the network. Shape (H, W)
 
     Returns:
+    -----------
         Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]. Dictionary where key "flows"
         returns a dict of the components needed in flow computations. Key "inst_map"
         returns the instance map.

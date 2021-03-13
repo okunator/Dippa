@@ -82,7 +82,9 @@ def handle_pannuke(orig_dir: Path,
     """
     Pannuke fold patches are saved in a numpy .npy file. This converts them to the same
     .mat (consep) format and saves each fold to a specific directory in the parent dir
-    of the 'orig_dir' directory. 
+    of the 'orig_dir' directory. Two folds are saved to train dir and to test dir.
+    If valid fold is needed the train folder can be split afterwards. Each filename 
+    include the tissue type and fold which can be used for splitting
 
     Args:
     ----------
@@ -99,9 +101,10 @@ def handle_pannuke(orig_dir: Path,
         fold_num (int): 
             the fold number
         fold_phase (str):
-            One of ("train", "valid", "test")
+            One of ("train", "test")
     """
-    
+    assert fold_phase in ("train", "test")
+
     # Create directories for the files
     FileHandler.create_dir(anns_train_dir)
     FileHandler.create_dir(imgs_train_dir)
@@ -116,13 +119,9 @@ def handle_pannuke(orig_dir: Path,
         for file in dir3.iterdir() if file.is_file() and file.suffix == ".npy"
     }
     
-    # Dict["phase/fold", Dict["img/mask", Path("path/to/dir")]]
+    # # Dict["phase/fold", Dict["img/mask", Path("path/to/dir")]]
     fold_phases = {
         "train":{
-            "img":imgs_train_dir,
-            "mask":anns_train_dir
-        },
-        "valid":{
             "img":imgs_train_dir,
             "mask":anns_train_dir
         },

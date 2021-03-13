@@ -36,7 +36,7 @@ class ContourDataset(BaseDataset):
         5. binarize input for the branch predicting foreground vs. background
         6. augment
         """
-        im_patch, inst_patch, type_patch = self.read_hdf5_patch(self.fname, index)
+        im_patch, inst_patch, type_patch = self.read_patch(self.fname, index)
         inst_patch = self.fix_mirror_pad(inst_patch)
         inst_patch = self.remove_overlaps(inst_patch)
         weight_map = self.generate_weight_map(inst_patch)

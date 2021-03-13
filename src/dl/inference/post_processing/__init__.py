@@ -1,14 +1,17 @@
 from .hover.processor import HoverNetPostProcessor
 from .cellpose.processor import CellposePostProcessor
-from .dist.processor import DistPostProcessor
-# from .contour.processor import ContourPostProcessor
+from .drfns.processor import DRFNSPostProcessor
+from .dcan.processor import DcanPostProcessor
 # from .basic.processor import BasicPostProcessor
+
+from .thresholding import *
+from .combine_type_inst import *
 
 
 POST_PROC_LOOKUP = {
     "hover":"HoverNetPostProcessor",
     "cellpose":"CellposePostProcessor",
-    "dist":"DistPostProcessor",
+    "dist":"DRFNSPostProcessor",
     "contour":"ContourPostProcessor",
     "basic":"BasicPostProcessor",
 }

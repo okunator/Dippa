@@ -5,8 +5,3 @@ class_types:
     type:
         background: 0
         nuclei: 1
-
-img_types:
-    - img
-    - inst_map
-    - type_map

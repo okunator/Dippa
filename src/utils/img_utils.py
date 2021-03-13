@@ -36,6 +36,32 @@ def percentile_normalize(img: np.ndarray, channels: str="HWC") -> np.ndarray:
     return im
 
 
+def percentile_normalize_and_clamp(im: np.ndarray, a_min: float=-1, a_max: float=1) -> np.ndarray:
+    """
+    1-99-percentile normalization + clamping to [a_min, a_max].
+    Assumes that input image is "HWC" or "HW". Does not handle
+    different channel orderings
+
+    Args:
+    ----------
+        im (np.ndarray):
+            Input image to be normalized. Shape (H, W, C)|(H, W)
+        a_min (float):
+            clamp min value
+        a_max (float):
+            clamp max value
+    
+    Returns:
+        np.ndarray normed input image of same shape as input.
+    """
+    percentile99 = np.percentile(im, q=99, axis=(0, 1))
+    percentile1 = np.percentile(im, q=1, axis=(0, 1))
+    percentiles = np.stack([percentile99, percentile1])
+    colmax = np.max(percentiles, axis=0)
+    normed = np.clip((im / colmax), a_min=a_min, a_max=a_max)
+    return normed
+
+
 def normalize(img: np.ndarray, channels: str="HWC", standardize: bool=True) -> np.ndarray:
     """
     Mean center or standardize per image channel

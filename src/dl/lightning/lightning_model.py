@@ -6,8 +6,7 @@ import pytorch_lightning as pl
 
 from typing import List, Dict
 from omegaconf import DictConfig
-from torch.utils.data import DataLoader, RandomSampler
-
+from torch.utils.data import DataLoader
 
 from src.utils.file_manager import FileManager
 from src.dl.datasets.dataset_builder import DatasetBuilder
@@ -49,6 +48,10 @@ class SegModel(pl.LightningModule):
                 input image size for the model.
         """
         super(SegModel, self).__init__()
+        self.experiment_name: str = experiment_args.experiment_name
+        self.experiment_version: str = experiment_args.experiment_version
+        self.train_dataset: str = dataset_args.train_dataset
+        assert self.train_dataset in ("consep", "pannuke", "kumar")
 
         # Init all args for save_hyperparameters() (hypereparam logging)
         # General runtime args and augs
@@ -78,16 +81,17 @@ class SegModel(pl.LightningModule):
         self.long_skips: str = model_args.architecture_design.decoder_args.long_skips
         self.merge_policy: str = model_args.architecture_design.decoder_args.merge_policy
         self.upsampling: str = model_args.architecture_design.decoder_args.upsampling
+        self.decoder_channels: List[int] = model_args.architecture_design.decoder_args.decoder_channels
 
         # Multi-tasking args
-        self.type_branch: bool = model_args.decoder_branches.type
-        self.aux_branch: bool = model_args.decoder_branches.aux
-        self.aux_type: str = model_args.decoder_branches.aux_type
+        self.type_branch: bool = model_args.decoder_branches.type_branch
+        self.aux_branch: str = model_args.decoder_branches.aux_branch
+        assert self.aux_branch in ("hover", "dist", "contour", None)
 
         # Loss args
         self.inst_branch_loss: str = training_args.loss_args.inst_branch_loss
-        self.type_branch_loss: str = training_args.loss_args.inst_branch_loss
-        self.aux_branch_loss: str = training_args.loss_args.inst_branch_loss
+        self.type_branch_loss: str = training_args.loss_args.type_branch_loss
+        self.aux_branch_loss: str = training_args.loss_args.aux_branch_loss
         self.edge_weight: bool = training_args.loss_args.edge_weight
         self.class_weights: bool = training_args.loss_args.class_weights
 
@@ -107,32 +111,38 @@ class SegModel(pl.LightningModule):
 
         # init file manager
         self.fm = FileManager(
-            experiment_args=experiment_args,
-            dataset_args=dataset_args
+            experiment_name=self.experiment_name,
+            experiment_version=self.experiment_version
         )
 
         # database paths
-        self.db_dict = self.fm.get_databases(self.fm.train_dataset, db_type=self.db_type)
+        self.db_dict = self.fm.get_databases(self.train_dataset, db_type=self.db_type)
         self.train_data = self.db_dict['train']
         self.valid_data = self.db_dict['valid']
         self.test_data = self.db_dict['test']
 
         # init model
-        if self.aux_branch:
-            self.aux_channels = 2 if self.aux_type == "hover" else 1
-
         self.model = Model(
-            model_args=model_args,
-            n_classes=len(self.fm.classes),
-            freeze_encoder=self.freeze, 
-            aux_out_channels=self.aux_channels
+            encoder_name=self.encoder_name,
+            in_channels=self.in_channels,
+            pretrain=self.pretrain,
+            encoder_depth=self.depth,
+            freeze_encoder=self.freeze,
+            activation=self.activation,
+            normalization=self.normalization,
+            weight_standardize=self.weight_standardize,
+            weight_init=self.weight_init,
+            decoder_n_blocks=self.n_blocks,
+            decoder_short_skips=self.short_skips,
+            long_skips=self.long_skips,
+            long_skip_merge_policy=self.merge_policy,
+            upsampling=self.upsampling,
+            type_branch=self.type_branch,
+            n_classes=len(self.fm.get_classes(self.train_dataset)),
+            aux_branch=self.aux_branch,
+            decoder_channels=self.decoder_channels
         )
 
-        # Redundant but necessary for experiment logging..
-        self.optimizer_args = training_args.optimizer_args
-        self.decoder_branch_args = model_args.decoder_branches
-        self.loss_args = training_args.loss_args
-        
         # init multi loss function
         self.criterion = self.configure_loss()
 
@@ -174,16 +184,16 @@ class SegModel(pl.LightningModule):
             type_target = batch["type_map"].long()
 
         aux_target = None
-        if self.aux_branch:
-            if self.aux_type == "hover":
+        if self.aux_branch is not None:
+            if self.aux_branch == "hover":
                 xmap = batch["xmap"].float()
                 ymap = batch["ymap"].float()
                 aux_target = torch.stack([xmap, ymap], dim=1)
-            elif self.aux_type == "dist":
+            elif self.aux_branch == "dist":
                 aux_target = batch["dist_map"].float()
                 aux_target = aux_target.unsqueeze(dim=1)
-            elif self.aux_type == "contour":
-                aux_target = batch["dist_map"].float()
+            elif self.aux_branch == "contour":
+                aux_target = batch["contour"].float()
                 aux_target = aux_target.unsqueeze(dim=1)
 
         # Forward pass
@@ -275,7 +285,14 @@ class SegModel(pl.LightningModule):
     def configure_optimizers(self):
         # init optimizer
         optimizer = OptimizerBuilder.set_optimizer(
-            self.optimizer_args, self.model
+            optimizer_name=self.optimizer_name,
+            lookahead=self.lookahead,
+            model=self.model,
+            learning_rate=self.lr,
+            encoder_learning_rate=self.encoder_lr,
+            weight_decay=self.weight_decay,
+            encoder_weight_decay=self.encoder_weight_decay,
+            bias_weight_decay=self.bias_weight_decay
         )
 
         # Scheduler
@@ -307,29 +324,31 @@ class SegModel(pl.LightningModule):
         
         # init loss function
         loss = LossBuilder.set_loss(
-            decoder_branches_args=self.decoder_branch_args,
-            loss_args=self.loss_args,
+            type_branch=self.type_branch,
+            aux_branch=self.aux_branch,
+            inst_branch_loss=self.inst_branch_loss,
+            type_branch_loss=self.type_branch_loss,
+            aux_branch_loss=self.aux_branch_loss,
             binary_weights=binary_weights,
             type_weights=type_weights,
-
         )
         return loss
 
     def prepare_data(self):
         self.trainset = DatasetBuilder.set_train_dataset(
-            decoder_branch_args=self.decoder_branch_args,
-            augmentations=self.augs,
             fname=self.train_data.as_posix(),
+            augmentations=self.augs,
+            aux_branch=self.aux_branch,
             norm=self.norm
         )
         self.validset = DatasetBuilder.set_test_dataset(
-            decoder_branch_args=self.decoder_branch_args,
             fname=self.valid_data.as_posix(),
+            aux_branch=self.aux_branch,
             norm=self.norm
         )
         self.testset = DatasetBuilder.set_test_dataset(
-            decoder_branch_args=self.decoder_branch_args,
             fname=self.test_data.as_posix(),
+            aux_branch=self.aux_branch,
             norm=self.norm
         )
 

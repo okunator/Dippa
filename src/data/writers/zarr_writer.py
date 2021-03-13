@@ -4,12 +4,11 @@ from tqdm import tqdm
 from pathlib import Path
 from typing import Tuple, Union, Optional, Dict
 
-from src.utils import FileHandler
 from src.patching import TilerStitcher
 from .base_writer import BaseWriter
 
 
-class ZarrWriter(BaseWriter, FileHandler):
+class ZarrWriter(BaseWriter):
     def __init__(self,
                  img_dir: Union[str, Path],
                  mask_dir: Union[str, Path],
@@ -22,9 +21,10 @@ class ZarrWriter(BaseWriter, FileHandler):
                  rigid_augs_and_crop: bool = True,
                  crop_shape: Tuple[int]=(256, 256),
                  chunk_size: int=1,
-                 chunk_synchronization: bool=False) -> None:
+                 chunk_synchronization: bool=True) -> None:
         """
-        Iterates image and mask folders, patches them, and appends the patches to a zarr dataset. 
+        Iterates image and mask folders, patches them, and appends the patches to a zarr dataset.
+        Thread locking can be applied by specifying chunk_synchronization = True.  
         
         Args:
         ------------
@@ -61,9 +61,10 @@ class ZarrWriter(BaseWriter, FileHandler):
             chunk_size (int, default=1):
                 The chunk size of the zarr array. i.e. How many patches are included in
                 one read of the array.
-            chunk_synchronization (bool: default=False):
+            chunk_synchronization (bool: default=True):
                 Make chunks thread safe. No concurrent writes and reads to the same chunk.
         """
+        super(ZarrWriter, self).__init__()
         self.img_dir = Path(img_dir)
         self.mask_dir = Path(mask_dir)
         self.save_dir = Path(save_dir)
@@ -84,100 +85,111 @@ class ZarrWriter(BaseWriter, FileHandler):
         if self.patch_shape is not None:
             assert self.stride_size <= self.patch_shape[0]
 
-    def write2zarr(self) -> None:
+    def write2db(self, skip: bool=False) -> Path:
         """
-        Write the the images and masks to zarr group. Mimics HDF5 file
+        Write the the images and masks to zarr groups. 
+        Mimics HDF5 filesystem inside a file
+
+        Args:
+        ---------
+            skip (bool, default=False):
+                If True, skips the db writing and just returns the filename of the db
         """
-        # Open zarr group
-        root = zarr.open(Path(self.save_dir / f"{self.file_name}.zarr").as_posix(), mode="w")
+        fname = Path(self.save_dir / f"{self.file_name}.zarr")
 
-        # save some params as metadata
-        root.attrs["stride_size"] = self.stride_size
-        root.attrs["img_dir"] = self.img_dir.as_posix()
-        root.attrs["mask_dir"] = self.mask_dir.as_posix()
-        root.attrs["classes"] = self.classes
+        if not skip:
+            # Open zarr group
+            root = zarr.open(fname.as_posix(), mode="w")
 
-        # init zarrays for data
-        ph, pw = self.patch_shape if not self.rac else self.crop_shape
-        imgs = root.zeros(
-            "imgs", 
-            mode="w", 
-            shape=(0, ph, pw, 3), 
-            chunks=(self.chunk_size, None, None, None), 
-            dtype="u1",
-            synchronizer=zarr.ThreadSynchronizer() if self.chunk_sync else None
-        )
+            # save some params as metadata
+            root.attrs["stride_size"] = self.stride_size
+            root.attrs["img_dir"] = self.img_dir.as_posix()
+            root.attrs["mask_dir"] = self.mask_dir.as_posix()
+            root.attrs["classes"] = self.classes
 
-        imaps = root.zeros(
-            "insts", 
-            mode="w", 
-            shape=(0, ph, pw), 
-            chunks=(self.chunk_size, None, None), 
-            dtype="i4",
-            synchronizer=zarr.ThreadSynchronizer() if self.chunk_sync else None
-        )
+            # init zarrays for data
+            ph, pw = self.patch_shape if not self.rac else self.crop_shape
+            imgs = root.zeros(
+                "imgs", 
+                mode="w", 
+                shape=(0, ph, pw, 3), 
+                chunks=(self.chunk_size, None, None, None), 
+                dtype="u1",
+                synchronizer=zarr.ThreadSynchronizer() if self.chunk_sync else None
+            )
 
-        tmaps = root.zeros(
-            "types", 
-            mode="w", 
-            shape=(0, ph, pw), 
-            chunks=(self.chunk_size, None, None), 
-            dtype="i4",
-            synchronizer=zarr.ThreadSynchronizer() if self.chunk_sync else None
-        )
+            imaps = root.zeros(
+                "insts", 
+                mode="w", 
+                shape=(0, ph, pw), 
+                chunks=(self.chunk_size, None, None), 
+                dtype="i4",
+                synchronizer=zarr.ThreadSynchronizer() if self.chunk_sync else None
+            )
 
-        npixels = root.zeros(
-            "npixels", 
-            mode="w", 
-            shape=(1, len(self.classes)), 
-            chunks=False,
-            dtype="i4"
-        )
+            tmaps = root.zeros(
+                "types", 
+                mode="w", 
+                shape=(0, ph, pw), 
+                chunks=(self.chunk_size, None, None), 
+                dtype="i4",
+                synchronizer=zarr.ThreadSynchronizer() if self.chunk_sync else None
+            )
 
-        # Iterate imgs and masks -> patch -> save to zarr
-        img_files = self.get_files(self.img_dir)
-        mask_files = self.get_files(self.mask_dir)
-        
-        with tqdm(total=len(img_files), unit="file") as pbar:
-            for i, (img_path, mask_path) in enumerate(zip(img_files, mask_files), 1):
-                im = self.read_img(img_path)
-                inst_map = self.read_mask(mask_path, key="inst_map")
-                type_map = self.read_mask(mask_path, key="type_map")
-                npixels[:] += self._pixels_per_classes(type_map)
+            npixels = root.zeros(
+                "npixels", 
+                mode="w", 
+                shape=(1, len(self.classes)), 
+                chunks=False,
+                dtype="i4"
+            )
 
-                full_data = np.concatenate((im, inst_map[..., None], type_map[..., None]), axis=-1)
-                
-                # Do patching or create copies of input images 
-                if self.patch_shape is not None:
-                    H, W, C = full_data.shape
-                    tiler = TilerStitcher((H, W, C), self.patch_shape, self.stride_size)
-                    patches = tiler.extract_patches_quick(full_data)
-                elif self.n_copies is not None:
-                    patches = np.stack([full_data]*self.n_copies)
-                else:
-                    patches = full_data[None, ...]
+            # Iterate imgs and masks -> patch -> save to zarr
+            img_files = self.get_files(self.img_dir)
+            mask_files = self.get_files(self.mask_dir)
+            
+            with tqdm(total=len(img_files), unit="file") as pbar:
+                for i, (img_path, mask_path) in enumerate(zip(img_files, mask_files), 1):
+                    im = self.read_img(img_path)
+                    inst_map = self.read_mask(mask_path, key="inst_map")
+                    type_map = self.read_mask(mask_path, key="type_map")
+                    npixels[:] += self._pixels_per_classes(type_map)
 
-                if self.rac:
-                    patches = self._augment_patches(
-                        patches_im=patches[..., :3], 
-                        patches_mask=patches[..., 3:],
-                        crop_shape=self.crop_shape
+                    full_data = np.concatenate((im, inst_map[..., None], type_map[..., None]), axis=-1)
+                    
+                    # Do patching or create copies of input images 
+                    if self.patch_shape is not None:
+                        H, W, C = full_data.shape
+                        tiler = TilerStitcher((H, W, C), self.patch_shape, self.stride_size)
+                        patches = tiler.extract_patches_quick(full_data)
+                    elif self.n_copies is not None:
+                        patches = np.stack([full_data]*self.n_copies)
+                    else:
+                        patches = full_data[None, ...]
+
+                    if self.rac:
+                        patches = self._augment_patches(
+                            patches_im=patches[..., :3], 
+                            patches_mask=patches[..., 3:],
+                            crop_shape=self.crop_shape
+                        )
+                    
+                    im_p = patches[..., :3].astype("uint8")
+                    inst_p = patches[..., 3].astype("int32")
+                    type_p = patches[..., 4].astype("int32")
+
+                    imgs.append(im_p, axis=0)
+                    imaps.append(inst_p, axis=0)
+                    tmaps.append(type_p, axis=0)
+
+                    # Update tqdm pbar
+                    npatch = im_p.shape[0] + inst_p.shape[0] + type_p.shape[0]
+                    pbar.set_postfix(
+                        info=f"Writing {npatch} mask and image patches from file: {Path(img_path).name} to zarr array"
                     )
-                
-                im_p = patches[..., :3].astype("uint8")
-                inst_p = patches[..., 3].astype("int32")
-                type_p = patches[..., 4].astype("int32")
+                    pbar.update(1)
 
-                imgs.append(im_p, axis=0)
-                imaps.append(inst_p, axis=0)
-                tmaps.append(type_p, axis=0)
+            # Add # of patches to attrs
+            root.attrs["n_items"] = len(imgs)
 
-                # Update tqdm pbar
-                npatch = im_p.shape[0] + inst_p.shape[0] + type_p.shape[0]
-                pbar.set_postfix(
-                    info=f"Writing {npatch} mask and image patches from file: {Path(img_path).name} to zarr array"
-                )
-                pbar.update(1)
-
-        # Add # of patches to attrs
-        root.attrs["n_items"] = len(imgs)
+        return fname

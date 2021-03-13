@@ -1,13 +1,13 @@
 import numpy as np
+from tqdm import tqdm
 from typing import Dict, Optional, Tuple, List
 from pathos.multiprocessing import ThreadPool as Pool
-from tqdm import tqdm
 
-from .post_proc import post_proc_dist
+from .post_proc import post_proc_drfns
 from ..base_processor import PostProcessor
 
 
-class DistPostProcessor(PostProcessor):
+class DRFNSPostProcessor(PostProcessor):
     def __init__(self,
                  thresh_method: str="naive",
                  thresh: float=0.5,
@@ -20,13 +20,14 @@ class DistPostProcessor(PostProcessor):
         https://ieeexplore.ieee.org/document/8438559
 
         Args:
+        ----------
             thresh_method (str, default="naive"):
                 Thresholding method for the soft masks from the insntance branch.
                 One of ("naive", "argmax", "sauvola", "niblack")).
             thresh (float, default = 0.5): 
                 threshold probability value. Only used if method == "naive"
         """
-        super(DistPostProcessor, self).__init__(thresh_method, thresh)
+        super(DRFNSPostProcessor, self).__init__(thresh_method, thresh)
 
     def post_proc_pipeline(self, maps: List[np.ndarray]) -> Tuple[np.ndarray]:
         """
@@ -35,8 +36,9 @@ class DistPostProcessor(PostProcessor):
         3. Combine type map and instance map
 
         Args:
+        -----------
             maps (List[np.ndarray]):
-                A list of the name of the file, soft masks, and hover maps from the network
+                A list of the name of the file, soft mask, and dist map from the network
         """
         name = maps[0]
         prob_map = maps[1]
@@ -44,13 +46,12 @@ class DistPostProcessor(PostProcessor):
         type_map = maps[3]
 
         inst_map = self.threshold(prob_map)
-        inst_map = post_proc_dist(dist_map, inst_map)
+        inst_map = post_proc_drfns(dist_map.squeeze(), inst_map)
 
         types = None
         combined = None
         if type_map is not None:
-            types = np.argmax(type_map, axis=2)
-            combined = self.combine_inst_type(inst_map, types)
+            combined = self.combine_inst_type(inst_map, type_map)
         
         # Clean up the result
         inst_map = self.clean_up(inst_map)
@@ -65,6 +66,7 @@ class DistPostProcessor(PostProcessor):
         Run post processing for all predictions
 
         Args:
+        ----------
             inst_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, soft instance map) pairs
                 inst_map shapes are (H, W, 2) 

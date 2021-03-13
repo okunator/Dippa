@@ -21,6 +21,7 @@ class CellposePostProcessor(PostProcessor):
         https://www.nature.com/articles/s41592-020-01018-x
 
         Args:
+        -----------
             thresh_method (str, default="naive"):
                 Thresholding method for the soft masks from the insntance branch.
                 One of ("naive", "argmax", "sauvola", "niblack")).
@@ -37,6 +38,7 @@ class CellposePostProcessor(PostProcessor):
         3. Combine type map and instance map
 
         Args:
+        -----------
             maps (List[np.ndarray]):
                 A list of the name of the file, soft masks, and hover maps from the network
         """
@@ -46,13 +48,13 @@ class CellposePostProcessor(PostProcessor):
         type_map = maps[3]
 
         inst_map = self.threshold(prob_map)
+        hover_map = 5
         cellpose_dict = post_proc_cellpose(hover_map, inst_map)
 
         types = None
         combined = None
         if type_map is not None:
-            types = np.argmax(type_map, axis=2)
-            combined = self.combine_inst_type(cellpose_dict["inst_map"], types)
+            combined = self.combine_inst_type(cellpose_dict["inst_map"], type_map)
 
         inst_map = self.clean_up(cellpose_dict["inst_map"])
 
@@ -69,6 +71,7 @@ class CellposePostProcessor(PostProcessor):
         Run post processing for all predictions
 
         Args:
+        ------------
             inst_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, soft instance map) pairs
                 inst_map shapes are (H, W, 2) 

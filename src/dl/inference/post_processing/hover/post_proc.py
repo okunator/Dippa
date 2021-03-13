@@ -51,6 +51,7 @@ def post_proc_hover(inst_map: np.ndarray,
     Post processing pipeline to combine hover branch output and instance segmentation branch output.
 
     Args:
+    ----------
         inst_map (np.ndarray): 
             Soft inst map. Shape: (H, W, 2)
         aux_map (np.ndarray): 
@@ -60,6 +61,7 @@ def post_proc_hover(inst_map: np.ndarray,
             to min=-1 and max=1. like in CellPose. Results in clearer signals.
 
     Returns:
+    -----------
         np.ndarray that is processed in the same way as in 
     """
 
@@ -110,10 +112,14 @@ def post_proc_hover2(aux_map: np.ndarray, inst_map: np.ndarray, sigma: float = 2
     Post processing pipeline to combine hover branch output and instance segmentation branch output.
 
     Args:
-        inst_map (np.ndarray):  inst map. Shape: (H, W, 2)
-        aux_map (np.ndarray): Shape: (H, W, 2). hover_maps[..., 0] = xmap, hover_maps[..., 1] = ymap
+    ----------
+        inst_map (np.ndarray): 
+            Inst map. Shape: (H, W, 2)
+        aux_map (np.ndarray): 
+            Shape: (H, W, 2). hover_maps[..., 0] = xmap, hover_maps[..., 1] = ymap
 
     Returns:
+    ----------
         np.ndarray that is processed similarly as in github.com/vqdang/hover_net/blob/master/src/postproc/hover.py
         and then a little further
     """

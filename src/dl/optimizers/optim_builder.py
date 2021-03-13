@@ -1,32 +1,45 @@
 
 import torch.nn as nn
 from torch.optim.optimizer import Optimizer
-from omegaconf import DictConfig
 
 import src.dl.optimizers as optims
 
 
 class OptimizerBuilder:
-    def __init__(self, optimizer_args: DictConfig, model: nn.Module) -> None:
+    def __init__(self, 
+                 model: nn.Module,
+                 learning_rate: float,
+                 encoder_learning_rate: float,
+                 weight_decay: float,
+                 encoder_weight_decay: float,
+                 bias_weight_decay: bool) -> None:
         """
-        Initializes the optimizer from the experiment.yml. 
+        Class used to initialize the optimizer from the given args
         Any optimizer from torch.optim or https://github.com/jettify/pytorch-optimizer
-        are allowed. 
+        are allowed.
 
         Args:
-            optimizer_args (omegaconf.DictConfig):
-                Arguments related to the optimzer
+        -----------
             model (nn.Module):
                 pytorch model specification
+            optimizer_name (str):
+                Name of the optimize. In-built torch optims and torch_optimizer lib 
+                optimizers can be used.
+            learning_rate (float):
+                Decoder learning rate.
+            weight_decay (float):
+                decoder weight decay
+            encoder_weight_decay (float):
+                encoder weight decay
+            bias_weight_decay (bool):
+                Flag whether to apply weight decay for biases.
         """
         self.model: nn.Module = model
-        self.optimizer_name: str = optimizer_args.optimizer
-        self.lr: float = optimizer_args.lr
-        self.encoder_lr: float = optimizer_args.encoder_lr
-        self.weight_decay: float = optimizer_args.weight_decay
-        self.encoder_weight_decay: float = optimizer_args.encoder_weight_decay
-        self.lookahead: bool = optimizer_args.lookahead
-        self.bias_weight_decay: bool = optimizer_args.bias_weight_decay
+        self.lr = learning_rate
+        self.encoder_lr = encoder_learning_rate
+        self.weight_decay = weight_decay
+        self.encoder_weight_decay = encoder_weight_decay
+        self.bias_weight_decay = bias_weight_decay
 
 
     def adjust_optim_params(self):
@@ -40,6 +53,7 @@ class OptimizerBuilder:
         "Bag of Tricks for Image Classification with Convolutional Neural Networks"
         https://arxiv.org/pdf/1812.01187
         """
+        
         params = list(self.model.named_parameters())
         encoder_params = {"encoder": dict(lr=self.encoder_lr, weight_decay=self.encoder_weight_decay)}
 
@@ -62,31 +76,57 @@ class OptimizerBuilder:
 
     @classmethod
     def set_optimizer(cls,
-                      optimizer_args: DictConfig,
+                      optimizer_name: str,
+                      lookahead: bool,
                       model: nn.Module,
+                      learning_rate: float,
+                      encoder_learning_rate: float,
+                      weight_decay: float,
+                      encoder_weight_decay: float,
+                      bias_weight_decay: bool,
                       **kwargs) -> Optimizer:
         """
         Initialize the optimizer
 
         Args:
-            optimizer_args (omegaconf.DictConfig):
-                Arguments related to the optimzer
+        ----------
+            optimizer_name (str):
+                Name of the optimize. In-built torch optims and torch_optimizer lib 
+                optimizers can be used.
+            lookahead (bool):
+                Flag whether the optimizer uses lookahead.
             model (nn.Module):
                 pytorch model specification
+            learning_rate (float):
+                Decoder learning rate.
+            weight_decay (float):
+                decoder weight decay
+            encoder_weight_decay (float):
+                encoder weight decay
+            bias_weight_decay (bool):
+                Flag whether to apply weight decay for biases.
         """
-        c = cls(optimizer_args, model)
+        c = cls(
+            model=model,
+            learning_rate=learning_rate,
+            encoder_learning_rate=encoder_learning_rate,
+            weight_decay=weight_decay,
+            encoder_weight_decay=encoder_weight_decay,
+            bias_weight_decay=bias_weight_decay
+        )
+
         optimz = list(optims.OPTIM_LOOKUP.keys())
-        assert c.optimizer_name in optimz, f"optimizer: {c.optimizer_name} not one of {optimz}"
+        assert optimizer_name in optimz, f"optimizer: {optimizer_name} not one of {optimz}"
 
         kwargs = kwargs.copy()
-        kwargs["lr"] = c.lr
-        kwargs["weight_decay"] = c.weight_decay
+        kwargs["lr"] = learning_rate
+        kwargs["weight_decay"] = weight_decay
         kwargs["params"] = c.adjust_optim_params()
 
-        key = optims.OPTIM_LOOKUP[c.optimizer_name]
+        key = optims.OPTIM_LOOKUP[optimizer_name]
         optimizer = optims.__dict__[key](**kwargs)
 
-        if c.lookahead:
+        if lookahead:
             optimizer = optims.Lookahead(optimizer, k=5, alpha=0.5)
 
         return optimizer

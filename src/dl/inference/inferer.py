@@ -187,13 +187,13 @@ class Inferer:
             self.post_proc_method = self.model.aux_type if self.model.aux_branch else "basic"
 
         # Quick checks that a valid post-proc-method is used
-        msg = f"post_proc_method set to: {self.post_proc_method}, while model.aux_type: {self.model.aux_type}"
+        msg = f"post_proc_method set to: {self.post_proc_method}, while model.aux_branch: {self.model.aux_branch}"
         if self.model.aux_branch:
-            if self.model.aux_type == "hover":
+            if self.model.aux_branch == "hover":
                 assert self.post_proc_method in ("hover", "cellpose", "basic"), msg
-            elif self.model.aux_type == "dist":
+            elif self.model.aux_branch == "dist":
                 assert self.post_proc_method in ("dist", "basic"), msg
-            elif self.model.aux_type == "contour":
+            elif self.model.aux_branch == "contour":
                 assert self.post_proc_method in ("contour", "basic"), msg
         
         # init the post-processor

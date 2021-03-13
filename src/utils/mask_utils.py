@@ -409,6 +409,7 @@ def to_inst_map(binary_mask: np.ndarray) -> np.ndarray:
             A binary mask to be labelled. Shape (H, W) or (H, W, C)
     
     Returns:
+    -----------
         labelled instances np.ndarray of shape (H, W)
     """
     if len(binary_mask.shape) == 3:

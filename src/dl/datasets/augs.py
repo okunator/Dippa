@@ -144,6 +144,7 @@ def resize(height: int, width: int, **kwargs) -> List[BasicTransform]:
     Wrapper for albumentations resize transform. 
 
     Args:
+    ----------
         height (int): height of the output image
         width (int): width of the input image
 

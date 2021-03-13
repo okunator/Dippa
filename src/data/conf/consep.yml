@@ -17,10 +17,3 @@ class_types:
         fibroblast: 5
         muscle: 6
         endothelial: 7
-
-img_types:
-    - img
-    - inst_map
-    - type_map
-
-types_to_use: type

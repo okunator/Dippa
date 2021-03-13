@@ -20,6 +20,7 @@ class PostProcessor(ABC):
         Base class for post processors
 
         Args:
+        ----------
             thresh_method (str, default="naive"):
                 Thresholding method for the soft masks from the insntance branch.
                 One of ("naive", "argmax", "sauvola", "niblack").
@@ -32,16 +33,26 @@ class PostProcessor(ABC):
         self.method = thresh_method
         self.thresh = thresh
 
+    @abstractmethod
+    def post_proc_pipeline(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def run_post_processing(self):
+            raise NotImplementedError
+
     def threshold(self, prob_map: np.ndarray) -> np.ndarray:
         """
         Thresholds the probability map from the network. 
         Available methods in .thresholding.py
 
         Args:
+        ----------
             prob_map (np.ndarray, np.float64): 
                 probability map from the inst branch of the network. Shape (H, W, 2).
             
         Returns:
+        ----------
             Thresholded integer valued mask (np.ndarray)
         """
         kwargs = {}
@@ -64,34 +75,35 @@ class PostProcessor(ABC):
         Combines the nuclei types and instances 
 
         Args:
+        -----------
             inst_map (np.ndarray, np.uint32):
                 The instance map. (Output from post-processing). Shape (H, W)
             type_map (np.ndarray, np.uint32):
-                The type map. (Argmaxed output from type cls branch of the network). Shape (H, W)
+                The type map. (Probabilities from type cls branch of the network). Shape (H, W, C)
 
         Returns:
+        -----------
             The final combined prediction.
         """
-        return combine_inst_semantic(inst_map, type_map)
+        types = np.argmax(type_map, axis=2)
+        return combine_inst_semantic(inst_map, types)
 
     def clean_up(self, inst_map: np.ndarray, min_size: int=10) -> np.ndarray:
         """
-        Remove small objects. Sometimes ndimage and skimage does not work. This does
+        Remove small objects. Sometimes ndimage and skimage does not work properly.
+
+        Args:
+        ---------
+            inst_map (np.ndarray):
+                The input inst map. Shape (H, W)
+            min_size (int):
+                min size for image objects (number of pixels)
+
+        Returns:
+        ---------
+            np.ndarray cleaned up inst map. Same shape as input
         """
         return remove_debris(inst_map, min_size)
-
-
-    @abstractmethod
-    def post_proc_pipeline(self):
-        raise NotImplementedError
-
-    @abstractmethod
-    def run_post_processing(self):
-        raise NotImplementedError
-
-    # @abstractmethod
-    # def viz_contents(self):
-    #     raise NotImplementedError
 
 
         

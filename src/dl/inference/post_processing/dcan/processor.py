@@ -1,85 +1,82 @@
 import numpy as np
+from tqdm import tqdm
 from typing import Dict, Optional, Tuple, List
 from pathos.multiprocessing import ThreadPool as Pool
-from tqdm import tqdm
 
-from .post_proc import post_proc_hover
 from ..base_processor import PostProcessor
+from .post_proc import post_proc_dcan
 
 
-class HoverNetPostProcessor(PostProcessor):
+class DcanPostProcessor(PostProcessor):
     def __init__(self,
                  thresh_method: str="naive",
                  thresh: float=0.5,
                  **kwargs) -> None:
         """
-        Wrapper class to run the HoVer-Net post processing pipeline for networks
-        outputting instance maps, Optional[type maps], and horizontal & vertical maps.
+        Wrapper class for the DCAN post-processing pipeline for networks outputting
+        contour maps. 
 
-        HoVer-Net:
-        https://www.sciencedirect.com/science/article/pii/S1361841519301045?via%3Dihub
+        https://arxiv.org/abs/1604.02677
 
-        Args:
-        ---------
+         Args:
+        ----------
             thresh_method (str, default="naive"):
                 Thresholding method for the soft masks from the insntance branch.
                 One of ("naive", "argmax", "sauvola", "niblack")).
             thresh (float, default = 0.5): 
                 threshold probability value. Only used if method == "naive"
         """
-        super(HoverNetPostProcessor, self).__init__(thresh_method, thresh)
+        super(DcanPostProcessor, self).__init__(thresh_method, thresh)
 
     def post_proc_pipeline(self, maps: List[np.ndarray]) -> Tuple[np.ndarray]:
         """
-        1. Threshold
-        2. Post process instance map
-        3. Combine type map and instance map
+        1. Run the dcan post-proc.
+        2. Combine type map and instance map
 
         Args:
         -----------
             maps (List[np.ndarray]):
-                A list of the name of the file, soft masks, and hover maps from the network
+                A list of the name of the file, soft mask, and contour map from the network
         """
         name = maps[0]
         prob_map = maps[1]
-        hover_map = maps[2]
+        contour_map = maps[2]
         type_map = maps[3]
 
-        inst_map = self.threshold(prob_map)
-        inst_map = post_proc_hover(inst_map, hover_map)
+        inst_map = post_proc_dcan(prob_map[..., 1], contour_map.squeeze())
 
         types = None
         combined = None
         if type_map is not None:
-            combined = self.combine_inst_type(inst_map, type_map)
+            combined = self.combine_inst_type(inst_map, types)
         
         # Clean up the result
         inst_map = self.clean_up(inst_map)
 
         return name, inst_map, combined
 
+
     def run_post_processing(self,
                             inst_maps: Dict[str, np.ndarray],
-                            hover_maps: Dict[str, np.ndarray],
+                            dist_map: Dict[str, np.ndarray],
                             type_maps: Dict[str, np.ndarray]):
         """
         Run post processing for all predictions
 
         Args:
-        ---------
+        ----------
             inst_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, soft instance map) pairs
                 inst_map shapes are (H, W, 2) 
-            hover_maps (OrderedDict[str, np.ndarray]):
-                Ordered dict of (file name, hover map) pairs.
-                hover_map[..., 0] = horizontal map
-                hover_map[..., 1] = vertical map
+            dist_map (OrderedDict[str, np.ndarray]):
+                Ordered dict of (file name, dist map) pairs.
+                The regressed distance trasnform from auxiliary branch. Shape (H, W, 1)
             type_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, type map) pairs.
                 type maps are in one hot format (H, W, n_classes).
         """
         # Set arguments for threading pool
-        maps = list(zip(inst_maps.keys(), inst_maps.values(), hover_maps.values(), type_maps.values()))
+        maps = list(zip(inst_maps.keys(), inst_maps.values(), dist_map.values(), type_maps.values()))
 
         # Run post processing
         seg_results = []

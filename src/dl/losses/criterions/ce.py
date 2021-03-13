@@ -14,8 +14,11 @@ class WeightedCELoss(WeightedBaseLoss):
         This class adds nuclei border weights to the final computed loss
 
         Args:
-            edge_weight (float, optional): weight to be added to nuclei borders like in Unet paper
-            class_weights (torch.Tensor, optional): Optional tensor of size (n_classes,) for class weights
+        ---------
+            edge_weight (float, optional, default=none): 
+                Weight to be added to nuclei borders like in Unet paper
+            class_weights (torch.Tensor, optional, default=None): 
+                Optional tensor of size (n_classes,) for class weights
         """
         super().__init__(class_weights, edge_weight)
         self.loss = nn.CrossEntropyLoss(
@@ -32,14 +35,19 @@ class WeightedCELoss(WeightedBaseLoss):
         Computes the cross entropy loss
 
         Args:
-            yhat (torch.Tensor): The feature map generated from the forward() of the model
-            target (torch.Tensor): the ground truth annotations of the input patch
-            target_weight (torch.Tensor): The weight map that points the pixels in clumped nuclei
-                                          that are overlapping.
-            edge_weight (float): weights applied to the nuclei edges: edge_weight^target_weight
+        ----------
+            yhat (torch.Tensor): 
+                The feature map generated from the forward() of the model
+            target (torch.Tensor): 
+                the ground truth annotations of the input patch
+            target_weight (torch.Tensor, default=None): 
+                The weight map that points the pixels in clumped nuclei
+                That are overlapping.
 
         Returns:
-            torch.Tensor: computed CE loss (scalar)
+        ----------
+            torch.Tensor:
+                computed CE loss (scalar)
         """
         loss = self.loss(yhat, target)
 

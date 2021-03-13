@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 from pathlib import Path
-from omegaconf import DictConfig
 from typing import List
+from omegaconf import DictConfig
 
 from src.utils.file_manager import FileManager
 
@@ -9,37 +9,40 @@ from src.utils.file_manager import FileManager
 # Inheriting Trainer does not work so init w/ class method only
 class SegTrainer:
     def __init__(self,
-                 experiment_args: DictConfig,
-                 dataset_args: DictConfig,
-                 runtime_args: DictConfig,
+                 experiment_name: str,
+                 experiment_version: str,
+                 num_gpus: int,
+                 num_epochs: int,
+                 resume_training: bool,
                  extra_callbacks: List[pl.Callback] = None) -> None:
         """
         Initializes lightning trainer based on the experiment.yml
 
         Args:
         -----------
-            experiment_args (omegaconf.DictConfig):
-                Omegaconf DictConfig specifying arguments that
-                are used for creating result folders and files.
-            dataset_args (omegaconf.DictConfig): 
-                Omegaconf DictConfig specifying arguments related 
-                to the dataset that is being used.
-            runtime_args (omegaconf.DictConfig): 
-                Omegaconf DictConfig specifying batch size and 
-                input image size for the model.
+            experiment_name (str):
+                Name of the experiment
+            experiment_version (str):
+                Name of the experiment version
+            num_gpus (int):
+                Number of GPUs used for training.
+            num_epochs (int):
+                Number of training epochs
+            resume_training (bool):
+                resume training where you left off
             extra_callbacks (List[pl.CallBack], default=None):
                 List of extra callbacks to add to the Trainer
         """
         # init file manager
         fm = FileManager(
-            experiment_args=experiment_args,
-            dataset_args=dataset_args
+            experiment_name=experiment_name,
+            experiment_version=experiment_version,
         )
         # set test tube logger
         self.tt_logger = pl.loggers.TestTubeLogger(
             save_dir=fm.result_folder,
-            name=experiment_args.experiment_name,
-            version=experiment_args.experiment_version
+            name=experiment_name,
+            version=experiment_version
         )
 
         # set save dir to results/{experiment_name}/version_{experiment_version}
@@ -62,9 +65,9 @@ class SegTrainer:
         # set attributes
         self.callbacks = [checkpoint_callback] #, gpu_callback]
         self.callbacks += extra_callbacks if extra_callbacks is not None else []
-        self.gpus = runtime_args.num_gpus
-        self.epochs = runtime_args.num_epochs
-        self.resume_training = runtime_args.resume_training
+        self.gpus = num_gpus
+        self.epochs = num_epochs
+        self.resume_training = resume_training
         self.last_ckpt = fm.get_model_checkpoint("last") if self.resume_training else None
     
         # set logging dir
@@ -72,14 +75,18 @@ class SegTrainer:
 
     @classmethod
     def from_conf(cls, conf: DictConfig, extra_callbacks: List[pl.Callback] = None):
-        dataset_args = conf.dataset_args
-        experiment_args = conf.experiment_args
-        runtime_args = conf.runtime_args
+        experiment_name = conf.experiment_args.experiment_name
+        experiment_version = conf.experiment_args.experiment_version
+        num_gpus = conf.runtime_args.num_gpus
+        num_epochs = conf.runtime_args.num_epochs
+        resume_training = conf.runtime_args.resume_training
 
         c = cls(
-            experiment_args,
-            dataset_args,
-            runtime_args,
+            experiment_name,
+            experiment_version,
+            num_gpus,
+            num_epochs,
+            resume_training,
             extra_callbacks
         )
 

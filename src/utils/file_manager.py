@@ -75,18 +75,6 @@ class FileHandler:
                     f.unlink()
 
     @staticmethod
-    def get_pannuke_folds() -> Dict[str, str]:
-        yml_path = [f for f in Path(CONF_DIR).iterdir() if "pannuke" in f.name][0]
-        data_conf = OmegaConf.load(yml_path)
-        return data_conf.folds
-        
-    @staticmethod
-    def get_pannuke_tissues() -> List[str]:
-        yml_path = [f for f in Path(CONF_DIR).iterdir() if "pannuke" in f.name][0]
-        data_conf = OmegaConf.load(yml_path)
-        return data_conf.tissues
-
-    @staticmethod
     def suffix(path: Union[str, Path]) -> str:
         path = Path(path)
         assert all([f.suffix for f in path.iterdir()]), "All files should be in same format"
@@ -98,42 +86,23 @@ class FileHandler:
         file_suffix = self.suffix(path)
         return sorted([x.as_posix() for x in path.glob(f"*{file_suffix}")])
 
-    def get_dataset_classes(self, dataset:str) -> Dict[str, int]:
-        yml_path = [f for f in Path(CONF_DIR).iterdir() if dataset in f.name][0]
-        data_conf = OmegaConf.load(yml_path)
-        classes = data_conf.class_types.type
-        return classes
-
 
 class FileManager(FileHandler):
     def __init__(self,
-                 experiment_args: DictConfig,
-                 dataset_args: DictConfig) -> None:
+                 experiment_name: str,
+                 experiment_version: str) -> None:
         """
         File hadling and managing
 
         Args:
         ------------
-            `experiment_args` (DictConfig): 
-                Omegaconfig DictConfig specifying arguments that
-                are used for creating result folders and files. 
-            `dataset_args` (DictConfig): 
-                Omegaconfig DictConfig specifying arguments related 
-                to the dataset that is being used.
+            experiment_name (str):
+                Name of the experiment
+            experiment_version (str):
+                Name of the experiment version
         """
-        self.__ex_name: str = experiment_args.experiment_name
-        self.__ex_version: str = experiment_args.experiment_version
-        self.__train_ds: str = dataset_args.train_dataset
-
-    @classmethod
-    def from_conf(cls, conf: DictConfig):
-        exargs = conf.experiment_args
-        dsargs = conf.dataset_args
-
-        return cls(
-            exargs,
-            dsargs
-        )
+        self.__ex_name = experiment_name
+        self.__ex_version = experiment_version
 
     @property
     def result_folder(self):
@@ -142,15 +111,9 @@ class FileManager(FileHandler):
     @property
     def experiment_dir(self) -> Path:
         return RESULT_DIR / f"{self.__ex_name}" / f"version_{self.__ex_version}"
-
-    @property
-    def train_dataset(self):
-        assert self.__train_ds in ("kumar","consep","pannuke","dsb2018", "monusac", "other")
-        return self.__train_ds
-
-    @property
-    def classes(self):
-        yml_path = [f for f in Path(CONF_DIR).iterdir() if self.train_dataset in f.name][0]
+    
+    def get_classes(self, dataset):
+        yml_path = [f for f in Path(CONF_DIR).iterdir() if dataset in f.name][0]
         data_conf = OmegaConf.load(yml_path)
         classes = data_conf.class_types.type
         return classes

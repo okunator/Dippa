@@ -1,22 +1,31 @@
 import numpy as np
 from typing import Tuple
+from abc import ABC, abstractmethod
 from albumentations import Compose
 
+from src.utils import FileHandler
 from src.dl.datasets.augs import rigid_augs_and_crop
 
 
-class BaseWriter:
-    """
-    Base class for writing datasets to disk
-    """
+class BaseWriter(ABC, FileHandler):
+    def __init__(self):
+        """
+        Base class for writing datasets to disk
+        """
+        super(BaseWriter, self).__init__()
+
+    @abstractmethod
+    def write2db(self):
+        raise NotImplementedError
+
     def _augment_patches(self, 
                          patches_im: np.ndarray, 
                          patches_mask: np.ndarray, 
                          crop_shape: Tuple[int]=(256, 256)) -> Tuple[np.ndarray]:
         """
         Rotations, flips and other rigid augmentations followed by a center crop.
-        For dataloading performance, if patches are big it's good to apply rigid 
-        augs and crop to rather than in the dataset class.
+        Big images can kill the datalaoding performance, so it's worth to apply rigid 
+        augs and crop already in here rather than in the dataset class. 
 
         Args:
         ---------
@@ -29,6 +38,7 @@ class BaseWriter:
                 Shape of the center crop.
 
         Returns:
+        ---------
             A tuple of nd.arrays of the transformed patches.
         """
         

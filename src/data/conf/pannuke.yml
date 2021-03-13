@@ -9,12 +9,7 @@ class_types:
         connective: 3
         dead: 4
         epithelial: 5
-        
-folds:
-    fold1: train
-    fold2: valid
-    fold3: test
-    
+            
 tissues:
     - Adrenal_gland
     - Bile-duct
@@ -35,8 +30,3 @@ tissues:
     - Testis
     - Thyroid 
     - Uterus
-
-img_types:
-    - img
-    - inst_map
-    - type_map
