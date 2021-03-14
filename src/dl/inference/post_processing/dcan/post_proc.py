@@ -9,7 +9,7 @@ from ..thresholding import naive_thresh_prob
 
 
 # Adapted from https://github.com/vqdang/hover_net/blob/tensorflow-final/src/postproc/other.py
-def post_proc_dcan(prob_map:np.ndarray, contour_map: np.ndarray) -> np-ndarray:
+def post_proc_dcan(prob_map: np.ndarray, contour_map: np.ndarray) -> np.ndarray:
     """
     DCAN post-processing pipeline:
     https://arxiv.org/abs/1604.02677
@@ -24,8 +24,8 @@ def post_proc_dcan(prob_map:np.ndarray, contour_map: np.ndarray) -> np-ndarray:
     contour_map = percentile_normalize_and_clamp(contour_map)
     sub = prob_map - contour_map
     pre_insts = naive_thresh_prob(sub)
+    
     inst_ids = np.unique(pre_insts)[1:]
-
     disk = morph.disk(3)
     inst_map = np.zeros_like(pre_insts)
     for inst_id in inst_ids:

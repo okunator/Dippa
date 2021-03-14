@@ -1,7 +1,5 @@
 import numpy as np
 from typing import Dict, Optional, Tuple, List
-from pathos.multiprocessing import ThreadPool as Pool
-from tqdm import tqdm
 
 from .post_proc import post_proc_hover
 from ..base_processor import PostProcessor
@@ -48,7 +46,6 @@ class HoverNetPostProcessor(PostProcessor):
         inst_map = self.threshold(prob_map)
         inst_map = post_proc_hover(inst_map, hover_map)
 
-        types = None
         combined = None
         if type_map is not None:
             combined = self.combine_inst_type(inst_map, type_map)
@@ -60,7 +57,7 @@ class HoverNetPostProcessor(PostProcessor):
 
     def run_post_processing(self,
                             inst_maps: Dict[str, np.ndarray],
-                            hover_maps: Dict[str, np.ndarray],
+                            aux_maps: Dict[str, np.ndarray],
                             type_maps: Dict[str, np.ndarray]):
         """
         Run post processing for all predictions
@@ -70,7 +67,7 @@ class HoverNetPostProcessor(PostProcessor):
             inst_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, soft instance map) pairs
                 inst_map shapes are (H, W, 2) 
-            hover_maps (OrderedDict[str, np.ndarray]):
+            aux_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, hover map) pairs.
                 hover_map[..., 0] = horizontal map
                 hover_map[..., 1] = vertical map
@@ -79,12 +76,6 @@ class HoverNetPostProcessor(PostProcessor):
                 type maps are in one hot format (H, W, n_classes).
         """
         # Set arguments for threading pool
-        maps = list(zip(inst_maps.keys(), inst_maps.values(), hover_maps.values(), type_maps.values()))
-
-        # Run post processing
-        seg_results = []
-        with Pool() as pool:
-            for x in tqdm(pool.imap_unordered(self.post_proc_pipeline, maps), total=len(maps)):
-                seg_results.append(x)
-
+        maps = list(zip(inst_maps.keys(), inst_maps.values(), aux_maps.values(), type_maps.values()))
+        seg_results = self.parallel_pipeline(maps)
         return seg_results

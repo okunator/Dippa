@@ -1,5 +1,8 @@
-from abc import ABC, abstractmethod 
 import numpy as np
+from abc import ABC, abstractmethod 
+from pathos.multiprocessing import ThreadPool as Pool
+from typing import Tuple, List
+from tqdm import tqdm
 
 from .thresholding import argmax, sauvola_thresh, niblack_thresh, naive_thresh_prob
 from .combine_type_inst import combine_inst_semantic
@@ -40,6 +43,28 @@ class PostProcessor(ABC):
     @abstractmethod
     def run_post_processing(self):
             raise NotImplementedError
+
+    def parallel_pipeline(self, maps: List[Tuple[np.ndarray]]) -> List[Tuple[np.ndarray]]:
+        """
+        Run post proc pipeline in parallel for each set of predictions
+
+        Args:
+        -----------
+            maps (List[Tuple[np.ndarray]]):
+                A list of tuples containing the inst_map, Optional[aux_map], Optional[type_map]
+                to be post processed.
+
+        Returns:
+        -----------
+            A list of tuples containing filename, post-processed inst map and type map
+            e.g. ("filename1", inst_map: np.ndarray, type_map: np.ndarray)
+        """
+        seg_results = []
+        with Pool() as pool:
+            for x in tqdm(pool.imap_unordered(self.post_proc_pipeline, maps), total=len(maps)):
+                seg_results.append(x)
+
+        return seg_results
 
     def threshold(self, prob_map: np.ndarray) -> np.ndarray:
         """

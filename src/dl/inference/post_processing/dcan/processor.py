@@ -1,13 +1,11 @@
 import numpy as np
-from tqdm import tqdm
 from typing import Dict, Optional, Tuple, List
-from pathos.multiprocessing import ThreadPool as Pool
 
 from ..base_processor import PostProcessor
 from .post_proc import post_proc_dcan
 
 
-class DcanPostProcessor(PostProcessor):
+class DCANPostProcessor(PostProcessor):
     def __init__(self,
                  thresh_method: str="naive",
                  thresh: float=0.5,
@@ -26,7 +24,7 @@ class DcanPostProcessor(PostProcessor):
             thresh (float, default = 0.5): 
                 threshold probability value. Only used if method == "naive"
         """
-        super(DcanPostProcessor, self).__init__(thresh_method, thresh)
+        super(DCANPostProcessor, self).__init__(thresh_method, thresh)
 
     def post_proc_pipeline(self, maps: List[np.ndarray]) -> Tuple[np.ndarray]:
         """
@@ -45,10 +43,9 @@ class DcanPostProcessor(PostProcessor):
 
         inst_map = post_proc_dcan(prob_map[..., 1], contour_map.squeeze())
 
-        types = None
         combined = None
         if type_map is not None:
-            combined = self.combine_inst_type(inst_map, types)
+            combined = self.combine_inst_type(inst_map, type_map)
         
         # Clean up the result
         inst_map = self.clean_up(inst_map)
@@ -58,7 +55,7 @@ class DcanPostProcessor(PostProcessor):
 
     def run_post_processing(self,
                             inst_maps: Dict[str, np.ndarray],
-                            dist_map: Dict[str, np.ndarray],
+                            aux_maps: Dict[str, np.ndarray],
                             type_maps: Dict[str, np.ndarray]):
         """
         Run post processing for all predictions
@@ -68,20 +65,14 @@ class DcanPostProcessor(PostProcessor):
             inst_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, soft instance map) pairs
                 inst_map shapes are (H, W, 2) 
-            dist_map (OrderedDict[str, np.ndarray]):
+            aux_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, dist map) pairs.
-                The regressed distance trasnform from auxiliary branch. Shape (H, W, 1)
+                The regressed contours from auxiliary branch. Shape (H, W, 1)
             type_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, type map) pairs.
                 type maps are in one hot format (H, W, n_classes).
         """
         # Set arguments for threading pool
-        maps = list(zip(inst_maps.keys(), inst_maps.values(), dist_map.values(), type_maps.values()))
-
-        # Run post processing
-        seg_results = []
-        with Pool() as pool:
-            for x in tqdm(pool.imap_unordered(self.post_proc_pipeline, maps), total=len(maps)):
-                seg_results.append(x)
-
+        maps = list(zip(inst_maps.keys(), inst_maps.values(), aux_maps.values(), type_maps.values()))
+        seg_results = self.parallel_pipeline(maps)
         return seg_results

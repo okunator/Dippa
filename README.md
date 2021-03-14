@@ -1,8 +1,7 @@
 # Dippa
-Work in progress...
-Benchmarking framework for simultaneous nuclei segmentation and cell type classification.
-Using encoders from: [segmentation_models_pytorch](https://github.com/qubvel/segmentation_models.pytorch).
-Also multi-task segmentation model wrappers for smp models. 
+(Master's thesis) Work in progress...
+Benchmarking framework for nuclei segmentation models.
+Using encoders from: [segmentation_models_pytorch](https://github.com/qubvel/segmentation_models.pytorch). 
 
 ## Download scripts for datasets
 * [x] [Kumar](https://ieeexplore.ieee.org/document/7872382) (Kumar et al.)
@@ -32,17 +31,14 @@ pip install -U pip
 pip install -r requirements.txt
 ```
 
-**Note**: dl framework is PyTorch (torch==1.4.0) which expects cuda 10.1. If you want to use the repo with other version of torch and cuda, just follow the installation details at https://pytorch.org/. At least 1.6.0 with cuda 10.1 worked ok. 
-
-
-Intsuctions to run coming later...
+Intructions to run coming later...
 
 ## experiment.yml
 
 ```yaml
 experiment_args:
-  experiment_name: my_tests
-  experiment_version: activation_relu
+  experiment_name: baseline_consep
+  experiment_version: unet_test
 
 dataset_args:
   train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
@@ -65,11 +61,16 @@ model_args:
       long_skips: unet          # One of (unet, unet++, unet3+, nope)
       merge_policy: sum         # One of (sum, cat) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
+      decoder_channels:         # Number of out channels for every decoder layer
+        - 256
+        - 128
+        - 64
+        - 32
+        - 16 
 
   decoder_branches:
-    type: True
-    aux: True
-    aux_type: hover              # One of (hover, dist, contour) (ignored if aux=False)
+    type_branch: True
+    aux_branch: null        # One of (hover, dist, contour, null)
 
 training_args:
   normalize_input: True          # minmax normalize input images after augs
@@ -95,7 +96,7 @@ training_args:
     inst_branch_loss: dice_ce
     type_branch_loss: dice_ce
     aux_branch_loss: mse_ssim
-    edge_weight: False         # Give penalty to nuclei borders in cross-entropy based losses
+    edge_weight: 1.1         # (float) Give penalty to nuclei borders in cross-entropy based losses
     class_weights: False       # Weight classes by the # of class pixels in the data
 
 runtime_args:
@@ -104,6 +105,7 @@ runtime_args:
   num_gpus: 1
   batch_size: 8
   num_workers: 8              # number workers for data loader
+  model_input_size: 256       # size of the model input (input_size, input_size)
   db_type: "zarr"             # The type of the input data db. One of (hdf5, zarr). 
 ```
 

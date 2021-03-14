@@ -1,8 +1,6 @@
 import numpy as np
 from collections import OrderedDict
 from typing import Dict, Optional, Tuple, List
-from tqdm import tqdm
-from pathos.multiprocessing import ThreadPool as Pool
 
 from .post_proc import post_proc_cellpose
 from ..base_processor import PostProcessor
@@ -51,7 +49,6 @@ class CellposePostProcessor(PostProcessor):
         hover_map = 5
         cellpose_dict = post_proc_cellpose(hover_map, inst_map)
 
-        types = None
         combined = None
         if type_map is not None:
             combined = self.combine_inst_type(cellpose_dict["inst_map"], type_map)
@@ -65,7 +62,7 @@ class CellposePostProcessor(PostProcessor):
 
     def run_post_processing(self,
                             inst_maps: Dict[str, np.ndarray],
-                            hover_maps: Dict[str, np.ndarray],
+                            aux_maps: Dict[str, np.ndarray],
                             type_maps: Dict[str, np.ndarray]):
         """
         Run post processing for all predictions
@@ -84,11 +81,6 @@ class CellposePostProcessor(PostProcessor):
                 type maps are in one hot format (H, W, n_classes).
         """
         # Set arguments for threading pool
-        maps = list(zip(inst_maps.keys(), inst_maps.values(), hover_maps.values(), type_maps.values()))
-
-        seg_results = []
-        with Pool() as pool:
-            for x in tqdm(pool.imap_unordered(self.post_proc_pipeline, maps), total=len(maps)):
-                seg_results.append(x)
-
+        maps = list(zip(inst_maps.keys(), inst_maps.values(), aux_maps.values(), type_maps.values()))
+        seg_results = self.parallel_pipeline(maps)
         return seg_results

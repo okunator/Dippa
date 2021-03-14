@@ -1,23 +1,22 @@
 import numpy as np
 from typing import Dict, Optional, Tuple, List
 
-from .post_proc import post_proc_drfns
 from ..base_processor import PostProcessor
+from .post_proc import post_proc_dran
 
 
-class DRFNSPostProcessor(PostProcessor):
+class DRANPostProcessor(PostProcessor):
     def __init__(self,
                  thresh_method: str="naive",
                  thresh: float=0.5,
                  **kwargs) -> None:
         """
-        Wrapper class to run the DRFNS post processing pipeline for networks
-        outputting instance maps, Optional[type maps], and distance transforms
+        Wrapper class for the DCAN post-processing pipeline for networks outputting
+        contour maps. 
 
-        DRFNS:
-        https://ieeexplore.ieee.org/document/8438559
+        https://arxiv.org/abs/1604.02677
 
-        Args:
+         Args:
         ----------
             thresh_method (str, default="naive"):
                 Thresholding method for the soft masks from the insntance branch.
@@ -25,26 +24,24 @@ class DRFNSPostProcessor(PostProcessor):
             thresh (float, default = 0.5): 
                 threshold probability value. Only used if method == "naive"
         """
-        super(DRFNSPostProcessor, self).__init__(thresh_method, thresh)
+        super(DRANPostProcessor, self).__init__(thresh_method, thresh)
 
     def post_proc_pipeline(self, maps: List[np.ndarray]) -> Tuple[np.ndarray]:
         """
-        1. Threshold
-        2. Post process instance map
-        3. Combine type map and instance map
+        1. Run the dcan post-proc.
+        2. Combine type map and instance map
 
         Args:
         -----------
             maps (List[np.ndarray]):
-                A list of the name of the file, soft mask, and dist map from the network
+                A list of the name of the file, soft mask, and contour map from the network
         """
         name = maps[0]
         prob_map = maps[1]
-        dist_map = maps[2]
+        contour_map = maps[2]
         type_map = maps[3]
 
-        inst_map = self.threshold(prob_map)
-        inst_map = post_proc_drfns(dist_map.squeeze(), inst_map)
+        inst_map = post_proc_dran(prob_map[..., 1], contour_map.squeeze())
 
         combined = None
         if type_map is not None:
@@ -54,6 +51,7 @@ class DRFNSPostProcessor(PostProcessor):
         inst_map = self.clean_up(inst_map)
 
         return name, inst_map, combined
+
 
     def run_post_processing(self,
                             inst_maps: Dict[str, np.ndarray],

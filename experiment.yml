@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: baseline_consep
-  experiment_version: contour_test
+  experiment_version: unet_test
 
 dataset_args:
   train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
@@ -32,7 +32,7 @@ model_args:
 
   decoder_branches:
     type_branch: True
-    aux_branch: contour         # One of (hover, dist, contour, null)
+    aux_branch: null        # One of (hover, dist, contour, null)
 
 training_args:
   normalize_input: True          # minmax normalize input images after augs
@@ -58,7 +58,7 @@ training_args:
     inst_branch_loss: dice_ce
     type_branch_loss: dice_ce
     aux_branch_loss: mse_ssim
-    edge_weight: null         # (float) Give penalty to nuclei borders in cross-entropy based losses
+    edge_weight: 1.1         # (float) Give penalty to nuclei borders in cross-entropy based losses
     class_weights: False       # Weight classes by the # of class pixels in the data
 
 runtime_args:

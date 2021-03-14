@@ -15,6 +15,7 @@ class ContourDataset(BaseDataset):
         Dataset where masks are pre-processed similarly to the Micro-Net paper
 
         Args:
+        ----------
             fname (str): 
                 Path to the pytables database
             transforms (albu.Compose): 
@@ -47,7 +48,6 @@ class ContourDataset(BaseDataset):
         # binarize inst branch input
         inst_patch = self.binary(inst_patch)
 
-        # augment
         augmented_data = self.transforms(image=im_patch, masks=[inst_patch, type_patch, weight_map, contour])
         img = augmented_data["image"]
         masks = augmented_data["masks"]

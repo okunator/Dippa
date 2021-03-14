@@ -120,6 +120,10 @@ def post_proc_drfns(dist_map: np.ndarray, inst_map: np.ndarray, thresh: float=0.
             If inst_map is labelled it will be binarized.
         thresh (float, default=0.5):
             threshold value for markers and binary mask 
+
+    Returns:
+    -----------
+            np.ndarray, the post-processed inst_map. Same shape as input (H, W)
     """
     dist_map = percentile_normalize_and_clamp(dist_map, a_min=0, a_max=1)
     binary_mask = binarize(inst_map)
