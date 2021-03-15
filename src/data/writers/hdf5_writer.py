@@ -77,10 +77,6 @@ class HDF5Writer(BaseWriter):
         self.rac = rigid_augs_and_crop
         self.crop_shape = crop_shape
 
-        assert self.img_dir.exists(), f"img_dir: {img_dir} does not exist."
-        assert self.mask_dir.exists(), f"mask_dir: {mask_dir} does not exist."
-        assert self.save_dir.exists(), f"write_dir: {save_dir} does not exist."
-        
         if self.patch_shape is not None:
             assert self.stride_size <= self.patch_shape[0]
 
@@ -94,7 +90,7 @@ class HDF5Writer(BaseWriter):
             skip (bool, default=False):
                 If True, skips the db writing and just returns the filename of the db
         """
-        # Open hdf5 root
+        self.create_dir(self.save_dir)
         fname = Path(self.save_dir / f"{self.file_name}.h5")
 
         if skip:
@@ -109,7 +105,7 @@ class HDF5Writer(BaseWriter):
         root._v_attrs.mask_dir = self.mask_dir.as_posix()
         root._v_attrs.classes = self.classes
 
-        ph, pw = self.patch_shape if not self.rac else self.crop_shape
+        ph, pw = self.patch_shape if not self.rac and self.patch_shape is not None else self.crop_shape
         imgs = h5.create_earray(
             where=root, 
             name="imgs", 

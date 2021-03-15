@@ -78,9 +78,9 @@ class ZarrWriter(BaseWriter):
         self.rac = rigid_augs_and_crop
         self.crop_shape = crop_shape
 
-        assert self.img_dir.exists(), f"img_dir: {img_dir} does not exist."
-        assert self.mask_dir.exists(), f"mask_dir: {mask_dir} does not exist."
-        assert self.save_dir.exists(), f"write_dir: {save_dir} does not exist."
+        # assert self.img_dir.exists(), f"img_dir: {img_dir} does not exist."
+        # assert self.mask_dir.exists(), f"mask_dir: {mask_dir} does not exist."
+        # assert self.save_dir.exists(), f"write_dir: {save_dir} does not exist."
         
         if self.patch_shape is not None:
             assert self.stride_size <= self.patch_shape[0]

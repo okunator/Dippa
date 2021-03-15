@@ -277,7 +277,6 @@ class Inferer:
                 # Set patching flag (most datasets require patching), Assumes square patches
                 requires_patching = True if batch.shape[-1] > self.model.input_size else False
                 patch_size = (self.model.input_size, self.model.input_size)
-
                 if requires_patching:
 
                     # Do patching if images bigger than model input size
@@ -318,15 +317,20 @@ class Inferer:
                 else:
                     # Ǐf no patching required (pannuke) -> straight forward inference
                     n_patches = batch.shape[0]
-                    insts, types, aux = self._predict_batch(batch)
+                    batch_instances, batch_types, batch_aux = self._predict_batch(batch)
+                    insts = zip(fnames, tensor_to_ndarray(batch_instances))
 
-                    soft_instances.extend(zip(fnames, tensor_to_ndarray(insts)))
-                    soft_types.extend(zip(fnames, tensor_to_ndarray(types)))
-                    aux_maps.extend(zip(fnames, tensor_to_ndarray(aux)))
+                    types = zip(fnames, [None]*len(fnames))
+                    if batch_types is not None:
+                        types = zip(fnames, tensor_to_ndarray(batch_types))
 
-                    # soft_instances.append((fnames, insts))
-                    # soft_types.append((fnames, types)) if types is not None else None
-                    # aux_maps.append((fnames, aux)) if aux is not None else None
+                    aux = zip(fnames, [None]*len(fnames))
+                    if batch_aux is not None:
+                        aux = zip(fnames, tensor_to_ndarray(batch_aux))
+                    
+                    soft_instances.extend(insts)
+                    soft_types.extend(types)
+                    aux_maps.extend(aux)
 
                     running_int += n_patches
                     batch_loader.set_postfix(patches=f"{running_int}/{len(self.folderset.fnames)}")
@@ -365,9 +369,9 @@ class Inferer:
         """
         assert "soft_insts" in self.__dict__.keys(), "No predictions found, run inference first."
         maps = self.post_processor.run_post_processing(
-            inst_maps=self.soft_insts, 
+            inst_probs=self.soft_insts, 
             aux_maps=self.aux_maps, 
-            type_maps=self.soft_types
+            type_probs=self.soft_types
         )
 
         # save to containers

@@ -12,11 +12,9 @@ class JointLoss(nn.ModuleDict):
         in the list and at the end sums the outputs together as one joint loss.
 
         Args:
+        ----------
             losses (List[nn.Module]): List of nn.Module losses
             weights (List[float]): List of weights for each loss
-
-        Returns:
-            torch.Tensor: computed joint loss from summed losses in the input List
         """
         super().__init__()
         if weights is not None:
@@ -26,7 +24,14 @@ class JointLoss(nn.ModuleDict):
         for i in range(len(losses)):
             self.add_module('loss%d' % (i + 1), losses[i])
 
-    def forward(self, **kwargs):
+    def forward(self, **kwargs) -> torch.Tensor:
+        """
+        Computes the joint-loss
+
+        Returns:
+        ----------
+            torch.Tensor: computed joint loss from summed losses in the input List
+        """
         if self.weights is not None:
             l = list(zip(self.values(), self.weigths))
         else:
@@ -46,6 +51,7 @@ class MultiTaskLoss(nn.Module):
         Combines losses for different branches to  a single multi-taks loss function
 
         Args:
+        ----------
             inst_loss (nn.Module): 
                 Loss function for the instance segmentation head
             type_loss (nn.Module, optional, default=None): 
@@ -69,7 +75,7 @@ class MultiTaskLoss(nn.Module):
 
     def forward(self,
                 yhat_inst: torch.Tensor,
-                target_inst: Optional[torch.Tensor] = None,
+                target_inst: torch.Tensor,
                 yhat_type: Optional[torch.Tensor] = None,
                 target_type: Optional[torch.Tensor] = None,
                 yhat_aux: Optional[torch.Tensor] = None,
@@ -81,9 +87,10 @@ class MultiTaskLoss(nn.Module):
         Computes the joint loss when objective is to do panoptic segmentation
 
         Args:
+        ------------
             yhat_inst (torch.Tensor): 
                 output of instance segmentation decoder branch. Shape: (B, 2, H, W) 
-            target_inst (torch.Tensor, optional, default=None): 
+            target_inst (torch.Tensor): 
                 ground truth annotations for instance segmentation. Shape: (B, H, W)
             yhat_type (torch.Tensor, optional, default=None): 
                 output of semantic segmetnation decoder branch. Shape: (B, C, H, W)
@@ -97,6 +104,10 @@ class MultiTaskLoss(nn.Module):
                 weight map for nuclei borders. Shape (B, H, W)
             edge_weight (float, optional, default=1.1): 
                 weight applied at the nuclei borders. (edge_weight**target_weight)
+
+        Returns:
+        ------------
+            torch.Tensor: computed multi-task loss
         """
 
         iw = self.weights[0]

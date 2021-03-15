@@ -61,26 +61,26 @@ class CellposePostProcessor(PostProcessor):
         return name, inst_map, combined
 
     def run_post_processing(self,
-                            inst_maps: Dict[str, np.ndarray],
+                            inst_probs: Dict[str, np.ndarray],
                             aux_maps: Dict[str, np.ndarray],
-                            type_maps: Dict[str, np.ndarray]):
+                            type_probs: Dict[str, np.ndarray]):
         """
         Run post processing for all predictions
 
         Args:
         ------------
-            inst_maps (OrderedDict[str, np.ndarray]):
+            inst_probs (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, soft instance map) pairs
                 inst_map shapes are (H, W, 2) 
             aux_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, hover map) pairs.
                 hover_map[..., 0] = horizontal map
                 hover_map[..., 1] = vertical map
-            type_maps (OrderedDict[str, np.ndarray]):
+            type_probs (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, type map) pairs.
                 type maps are in one hot format (H, W, n_classes).
         """
         # Set arguments for threading pool
-        maps = list(zip(inst_maps.keys(), inst_maps.values(), aux_maps.values(), type_maps.values()))
+        maps = list(zip(inst_probs.keys(), inst_probs.values(), aux_maps.values(), type_probs.values()))
         seg_results = self.parallel_pipeline(maps)
         return seg_results

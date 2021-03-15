@@ -1,9 +1,9 @@
 experiment_args:
-  experiment_name: baseline_consep
-  experiment_version: unet_test
+  experiment_name: baseline_pannuke
+  experiment_version: hover_test
 
 dataset_args:
-  train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
+  train_dataset: pannuke         # One of (consep, pannuke, kumar, monusac)
 
 model_args:
   architecture_design:
@@ -32,7 +32,7 @@ model_args:
 
   decoder_branches:
     type_branch: True
-    aux_branch: null        # One of (hover, dist, contour, null)
+    aux_branch: hover        # One of (hover, dist, contour, null)
 
 training_args:
   normalize_input: True          # minmax normalize input images after augs
@@ -68,6 +68,6 @@ runtime_args:
   batch_size: 8
   num_workers: 8              # number workers for data loader
   model_input_size: 256       # size of the model input (input_size, input_size)
-  db_type: "zarr"             # The type of the input data db. One of (hdf5, zarr). 
+  db_type: hdf5             # The type of the input data db. One of (hdf5, zarr). 
 
 

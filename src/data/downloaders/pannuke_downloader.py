@@ -38,9 +38,9 @@ class PANNUKE(FileHandler):
                 One of ("train", "test")
 
         """
-        assert self.phase in ("train", "test", "valid")
-        assert self.save_dir.exists(), f"save_dir: {self.save_dir} does not exists"
-        assert 1 <= self.fold <= 3, f"fold {self.fold}. Only three folds in the data"
+        assert phase in ("train", "test", "valid")
+        assert save_dir.exists(), f"save_dir: {save_dir} does not exists"
+        assert 1 <= fold <= 3, f"fold {fold}. Only three folds in the data"
 
         self.save_dir = Path(save_dir)
         self.fold = fold
@@ -103,7 +103,7 @@ class PANNUKE(FileHandler):
                 is_populated[3] = True
 
             if all(is_populated):
-                print(f"Files found in train and test dir. If need for re-downloading, remove 'pannuke' dir")
+                # print(f"Files found in train and test dir. If need for re-downloading, remove 'pannuke' dir")
                 return {
                     "img_test": imgs_test_dir, 
                     "mask_test": anns_test_dir, 
