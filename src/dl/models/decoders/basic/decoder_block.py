@@ -18,7 +18,7 @@ class BasicDecoderBlock(nn.Module):
                  n_blocks: int = 2,
                  up_sampling: str = "fixed_unpool",
                  long_skip: str = "unet",
-                 long_skip_merge_policy: str = "cat") -> None:
+                 long_skip_merge_policy: str = "summation") -> None:
 
         """
         Basic decoder block. 
@@ -56,12 +56,12 @@ class BasicDecoderBlock(nn.Module):
                 One of ("unet", "unet++", "unet3+", "nope")
             long_skip_merge_policy (str, default: "cat):
                 whether long skip is summed or concatenated
-                One of ("sum", "cat")        
+                One of ("summation", "concatenate")        
         """
         super(BasicDecoderBlock, self).__init__()
         assert up_sampling in ("interp", "max_unpool", "transconv", "fixed_unpool")
         assert long_skip in ("unet", "unet++", "unet3+", "nope")
-        assert long_skip_merge_policy in ("cat", "sum")
+        assert long_skip_merge_policy in ("concatenate", "summation")
 
         self.up_sampling = up_sampling
         self.long_skip = None if long_skip == "nope" else long_skip
@@ -79,8 +79,8 @@ class BasicDecoderBlock(nn.Module):
         self.skip_choices = None
         if self.long_skip is not None:
 
-            # adjust input channel dim if "cat"
-            if self.merge_pol == "cat":
+            # adjust input channel dim if "concatenate"
+            if self.merge_pol == "concatenate":
                 in_channels += skip_channels
 
             self.skip_choices = nn.ModuleDict({

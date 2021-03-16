@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from typing import Dict, Union
+from typing import Dict, Union, Tuple
 
 import src.dl.torch_utils as util
 from src.dl.torch_img_utils import minmax_normalize_torch
@@ -56,7 +56,7 @@ def compute_pyramid_patch_weight_loss(width: int, height: int) -> np.ndarray:
 
 
 class Predictor:
-    def __init__(self, model: nn.Module) -> None:
+    def __init__(self, model: nn.Module, patch_size: Tuple[int]=(256, 256)) -> None:
         """
         Helper class for predicting soft masks at inference time
         
@@ -70,7 +70,7 @@ class Predictor:
                 nn.Module pytorch model
         """
         self.model = model
-        weight_mat = compute_pyramid_patch_weight_loss(self.model.input_size, self.model.input_size)
+        weight_mat = compute_pyramid_patch_weight_loss(patch_size[0], patch_size[1])
         self.weight_mat = torch.from_numpy(weight_mat).float().to(self.model.device).unsqueeze(0).unsqueeze(0)
 
 

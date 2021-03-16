@@ -6,24 +6,18 @@ import src.dl.datasets as ds
 
 class DatasetBuilder:
     def __init__(self,
-                 augmentations: List[str],
-                 aux_branch: str=None,
+                 decoder_aux_branch: str=None,
                  **kwargs) -> None:
         """
         Initializes the train & test time datsets based on the experiment.yml
 
         Args:
         -----------
-            augmentations (List[str]): 
-                List of augmentations to be used for training
-                One of ("rigid", "non_rigid", "hue_sat", "blur", "non_spatial",
-                "random_crop", "center_crop", "resize")
-            aux_branch_type (str, default=None):
+            deocder_aux_branch (str, default=None):
                 The type of the auxiliary branch. If None, the unet dataset
                 is used in the dataloader.
         """
-        self.augs: List[str] = augmentations
-        self.ds_name: str = aux_branch if aux_branch is not None else "unet"
+        self.ds_name = decoder_aux_branch if decoder_aux_branch is not None else "unet"
         assert self.ds_name in ("hover", "dist", "contour", "unet", "basic")
 
     def get_augs(self, augs_list: Optional[List[str]] = None):
@@ -44,8 +38,8 @@ class DatasetBuilder:
     def set_train_dataset(cls,
                           fname: str,
                           augmentations: List[str]=None,
-                          aux_branch: str=None,
-                          norm: bool=True) -> Dataset:
+                          decoder_aux_branch: str=None,
+                          normalize_input: bool=True) -> Dataset:
         """
         Init the train dataset.
 
@@ -57,20 +51,21 @@ class DatasetBuilder:
                 List of augmentations to be used for training
                 One of ("rigid", "non_rigid", "hue_sat", "blur", "non_spatial",
                 "random_crop", "center_crop", "resize")
-            aux_branch (str, default=None):
+            decoder_aux_branch (str, default=None):
                 The type of the auxiliary branch. If None, the unet dataset
                 is used in the dataloader.
+            normalize_input (bool, default=True):
+                If True, channel-wise normalization for the input images is applied.
         """
-        c = cls(augmentations, aux_branch)
-        aug = c.get_augs(c.augs)
-        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug, norm=norm)
+        c = cls(decoder_aux_branch)
+        aug = c.get_augs(augmentations)
+        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug, norm=normalize_input)
 
     @classmethod
     def set_test_dataset(cls,
                          fname: str,
-                         augmentations: List[str]=None,
-                         aux_branch: str=None,
-                         norm: bool=True) -> Dataset:
+                         decoder_aux_branch: str=None,
+                         normalize_input: bool=True) -> Dataset:
         """
         Init the test dataset. No augmentations used. Only ndarray to tensor conversion.
 
@@ -78,14 +73,12 @@ class DatasetBuilder:
         ------------
             fname (str): 
                 path to the database file
-            augmentations (List[str]): 
-                List of augmentations to be used for training
-                One of ("rigid", "non_rigid", "hue_sat", "blur", "non_spatial",
-                "random_crop", "center_crop", "resize")
-            aux_branch (str, default=None):
+            decoder_aux_branch (str, default=None):
                 The type of the auxiliary branch. If None, the unet dataset
                 is used in the dataloader.
+            normalize_input (bool, default=True):
+                If True, channel-wise normalization for the input images is applied.
         """
-        c = cls(augmentations, aux_branch)
+        c = cls(decoder_aux_branch)
         aug = c.get_augs()
-        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug, norm=norm)
+        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug, norm=normalize_input)

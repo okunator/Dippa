@@ -12,11 +12,11 @@ class MultiTaskSegModel(nn.Module):
         init.initialize_decoder(self.inst_decoder)
         init.initialize_head(self.inst_seg_head)
 
-        if self.type_branch:
+        if self.decoder_type_branch:
             init.initialize_decoder(self.type_decoder)
             init.initialize_head(self.type_seg_head)
 
-        if self.aux_branch:
+        if self.decoder_aux_branch:
             init.initialize_decoder(self.aux_decoder)
             init.initialize_head(self.aux_seg_head)
 
@@ -26,12 +26,12 @@ class MultiTaskSegModel(nn.Module):
         insts = self.inst_seg_head(insts)
 
         types = None
-        if self.type_branch:
+        if self.decoder_type_branch:
             types = self.type_decoder(*features)
             types = self.type_seg_head(types)
 
         aux = None
-        if self.aux_branch:
+        if self.decoder_aux_branch:
             aux = self.aux_decoder(*features)
             aux = self.aux_seg_head(aux)
 

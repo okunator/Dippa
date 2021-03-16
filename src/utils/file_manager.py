@@ -54,12 +54,22 @@ class FileHandler:
         return im_patch, inst_patch, type_patch
 
     @staticmethod
-    def get_class_pixels(path: Union[str, Path]) -> np.ndarray:
+    def get_class_weights(path: Union[str, Path], binary: bool=False) -> np.ndarray:
         path = Path(path)
-        with tb.open_file(path.as_posix(), "r") as db:
-            weights = db.root.numpixels[:]
-        class_weight = weights[1, ]
-        return class_weight
+        if path.suffix == ".h5": 
+            with tb.open_file(path.as_posix(), "r") as db:
+                npixels = db.root.numpixels[:]
+        elif path.suffix == ".zarr":
+            z = zarr.open(path.as_posix(), mode="r")
+            npixels = z["npixels"][:]
+
+        if binary:
+            fg_npixels = np.sum(npixels, where=[False] + [True]*(npixels.shape[1]-1))
+            bg_npixels = npixels[0][0]
+            npixels = np.array([[bg_npixels, fg_npixels]])
+
+        class_weights = 1 - npixels / npixels.sum()
+        return class_weights
 
     @staticmethod
     def create_dir(path: Union[str, Path]) -> None:

@@ -67,12 +67,12 @@ class Inferer:
                  fn_pattern: str="*",
                  num_workers: int=8,
                  batch_size: int=8,
+                 patch_size: Tuple[int]=(256, 256),
                  stride_size: int=128,
                  thresh_method: int="naive",
                  thresh: float=0.5,
                  apply_weights: bool=False,
                  post_proc_method: str=None,
-                 normalize_input: bool=False,
                  **kwargs) -> None:
         """
         Class to perform inference and post-processing
@@ -81,7 +81,7 @@ class Inferer:
         -----------
             model (pl.LightningModule):
                 Input SegModel (lightning model) specified in lightning_model.py.
-            data_dir (str, optional, default=None):
+            in_data_dir (str, optional, default=None):
                 If not None this directory will be used as the input data directory.
                 Assumes that the directory contains only cv2 readable image files (.png, .tif, etc).
                 This argument overrides all other dataset related argument.
@@ -108,6 +108,8 @@ class Inferer:
                 Number of images loaded from the input folder by the workers per dataloader
                 iteration. This is not the batch size that is used during the forward pass
                 of the model.
+            patch_size (Tuple[int], default=(256, 256)):
+                The size of the input patches.
             stride_size (int, default=128):
                 If input images are larger than the model input image size, the images are tiled
                 with a sliding window into small patches with overlap. This param is the stride size 
@@ -132,29 +134,26 @@ class Inferer:
                 pipeline is defined by the aux_type of the model. If the aux_type of the model
                 is None, then the basic watershed post-processing pipeline is used. If the
                 aux_type == "hover", then the HoVer-Net and CellPose pipelines can be used.
-            normalize_input (bool, default=True):
-                Normalize the input in the same way as in training. Check the experiment.yml
-                whether inputs were normalized.
         """
         assert isinstance(model, pl.LightningModule), "Input model needs to be a lightning model"
         assert dataset in ("kumar", "consep", "pannuke", "dsb2018", "monusac", None)
         assert model_weights in ("best", "last")
         assert data_fold in ("train", "test")
+        assert stride_size <= patch_size[0], f"stride_size: {stride_size} > {patch_size[0]}"
 
         # set model to device and to inference mode
         self.model = model
         self.model.cuda() if torch.cuda.is_available() else self.model.cpu()
         self.model.eval()
         torch.no_grad()
-        
-        # set stride size and check it is correct
-        assert stride_size <= self.model.input_size, f"stride_size: {stride_size} > {self.model.input_size}"
-        self.stride_size = stride_size
 
         # Load trained weights for the model 
         ckpt_path = self.model.fm.get_model_checkpoint(model_weights)
         checkpoint = torch.load(ckpt_path, map_location = lambda storage, loc : storage)
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
+
+        self.patch_size = patch_size
+        self.stride_size = stride_size
 
         # Set input data folder and gt mask folder if there are gt masks
         self.dataset = dataset
@@ -179,7 +178,7 @@ class Inferer:
 
         # set apply weights flag for aux branch and prdeictor helper class
         self.apply_weights = apply_weights
-        self.predictor = Predictor(self.model)
+        self.predictor = Predictor(self.model, self.patch_size)
 
         # set the post-processing pipeline. Defaults to 
         # model.aux_type if model has an auxiliary branch
@@ -188,13 +187,13 @@ class Inferer:
             self.post_proc_method = self.model.aux_type if self.model.aux_branch else "basic"
 
         # Quick checks that a valid post-proc-method is used
-        msg = f"post_proc_method set to: {self.post_proc_method}, while model.aux_branch: {self.model.aux_branch}"
-        if self.model.aux_branch:
-            if self.model.aux_branch == "hover":
+        msg = f"post_proc_method set to: {self.post_proc_method}, while model.decoder_aux_branch: {self.model.decoder_aux_branch}"
+        if self.model.decoder_aux_branch:
+            if self.model.decoder_aux_branch == "hover":
                 assert self.post_proc_method in ("hover", "cellpose", "basic"), msg
-            elif self.model.aux_branch == "dist":
+            elif self.model.decoder_aux_branch == "dist":
                 assert self.post_proc_method in ("drfns", "basic"), msg
-            elif self.model.aux_branch == "contour":
+            elif self.model.decoder_aux_branch == "contour":
                 assert self.post_proc_method in ("dcan", "dran", "basic"), msg
         
         # init the post-processor
@@ -205,7 +204,7 @@ class Inferer:
         )
 
         # input scaling flag
-        self.norm = normalize_input
+        self.norm = self.model.normalize_input
 
     def _get_batch(self, patches: torch.Tensor, batch_size: int) -> torch.Tensor:
         """
@@ -275,12 +274,11 @@ class Inferer:
                 fnames = data["file"]
 
                 # Set patching flag (most datasets require patching), Assumes square patches
-                requires_patching = True if batch.shape[-1] > self.model.input_size else False
-                patch_size = (self.model.input_size, self.model.input_size)
+                requires_patching = True if batch.shape[-1] > self.patch_size[0] else False
                 if requires_patching:
 
                     # Do patching if images bigger than model input size
-                    tilertorch = TilerStitcherTorch(batch.shape, patch_size, self.stride_size, padding=True)
+                    tilertorch = TilerStitcherTorch(batch.shape, self.patch_size, self.stride_size, padding=True)
                     patches = tilertorch.extract_patches_from_batched(batch)
                     
                     # tqdm logging
@@ -356,7 +354,6 @@ class Inferer:
                     soft_instances.extend(insts)
                     soft_types.extend(types)
                     aux_maps.extend(aux)
-
 
         self.soft_insts = OrderedDict(soft_instances)
         self.soft_types = OrderedDict(soft_types)

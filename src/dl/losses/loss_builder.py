@@ -22,14 +22,14 @@ class LossBuilder:
 
     @classmethod
     def set_loss(cls,
-                 type_branch: bool,
-                 aux_branch: str,
+                 decoder_type_branch: bool,
+                 decoder_aux_branch: str,
                  inst_branch_loss: str,
                  type_branch_loss: str,
                  aux_branch_loss: str,
                  loss_weights: Optional[List[float]] = None,
                  binary_weights: Optional[torch.Tensor] = None,
-                 type_weights: Optional[torch.Tensor] = None,
+                 class_weights: Optional[torch.Tensor] = None,
                  edge_weight: Optional[float] = None,
                  **kwargs) -> nn.Module:
         """
@@ -37,9 +37,9 @@ class LossBuilder:
         
         Args:
         ------------
-            type_branch (bool):
+            decoder_type_branch (bool):
                 Flag to specify if the network contains a type classification branch
-            aux_branch (str):
+            decoder_aux_branch (str):
                 One of ("hover", "contour", "dist", None). Specifies the aux branch type
                 of the network. If None, network does not contain an aux branch.
             inst_branch_loss (str):
@@ -57,7 +57,7 @@ class LossBuilder:
             binary_weights (torch.Tensor, default=None): 
                 Tensor of size (2, ). Weights for background
                  and foreground.
-            type_weights (torch.Tensor, default=None): 
+            class_weights (torch.Tensor, default=None): 
                 Tensor of size (C, ). Each slot indicates the 
                 weight to be applied for each class
             edge_weight (float, optional, default=1.1): 
@@ -78,7 +78,7 @@ class LossBuilder:
         
         # set auxilliary branch loss
         loss_aux = None
-        if aux_branch:
+        if decoder_aux_branch:
             assert aux_branch_loss in losses.JOINT_AUX_LOSSES, f"aux_branch_loss need to be one of {losses.JOINT_AUX_LOSSES}"
             loss_keys_aux = c.solve_loss_key(aux_branch_loss, losses.JOINT_AUX_LOSSES)
             loss_names_aux = [losses.LOSS_LOOKUP[key] for key in loss_keys_aux]
@@ -87,9 +87,9 @@ class LossBuilder:
     
         # set type branch loss
         loss_type = None
-        if type_branch:
+        if decoder_type_branch:
             kwargs["edge_weight"] =  None # Take of edge weights
-            kwargs["class_weights"] = type_weights
+            kwargs["class_weights"] = class_weights
             assert type_branch_loss in losses.JOINT_SEG_LOSSES, f"type_branch_loss need to be one of {losses.JOINT_SEG_LOSSES}"
             loss_keys_type = c.solve_loss_key(type_branch_loss, losses.JOINT_SEG_LOSSES)
             loss_names_type = [losses.LOSS_LOOKUP[key] for key in loss_keys_type]

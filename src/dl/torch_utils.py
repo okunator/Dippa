@@ -47,9 +47,7 @@ def tensor_to_ndarray(tensor: torch.Tensor,
     """
     assert isinstance(tensor, torch.Tensor), f"Input type: {type(tensor)} is not torch.Tensor"
     assert 3 <= tensor.dim() <= 4, f"tensor needs to have shape (B, H, W) or (B, C, H, W). Shape {tensor.shape}"
-    assert tensor.shape[1] >= 2, f"tensor needs to have at least two channels. shape: {tensor.shape}" 
     
-
     res_tensor = tensor.detach()
     if tensor.is_cuda:
         res_tensor = res_tensor.cpu()

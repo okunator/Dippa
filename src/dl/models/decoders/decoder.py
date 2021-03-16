@@ -17,7 +17,7 @@ class BasicDecoder(nn.ModuleDict):
                  up_sampling: str = "fixed_unpool",
                  short_skip: str = "basic",
                  long_skip: str = "unet",
-                 long_skip_merge_policy: str ="cat",
+                 long_skip_merge_policy: str ="summation",
                  **kwargs) -> None:
         """
         Basic Decoder block. Adapted from the implementation of 
@@ -49,7 +49,7 @@ class BasicDecoder(nn.ModuleDict):
                 One of ("unet", "unet++", "unet3+", "nope")
             long_skip_merge_policy (str, default: "cat):
                 whether long skip is summed or concatenated
-                One of ("sum", "cat") 
+                One of ("summation", "concatenate") 
         """
         super(BasicDecoder, self).__init__()
         assert len(encoder_channels[1:]) == len(decoder_channels), "Encoder and decoder need to have same number of layers (symmetry)"

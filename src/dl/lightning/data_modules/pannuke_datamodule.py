@@ -76,7 +76,7 @@ class PannukeDataModule(pl.LightningDataModule):
 
 
     @classmethod
-    def from_conf(cls, conf: DictConfig, download_dir=None, database_dir=None):
+    def from_conf(cls, conf: DictConfig, download_dir: str=None, database_dir: str=None):
         download_dir = download_dir
         database_dir = database_dir
         db_type = conf.runtime_args.db_type
