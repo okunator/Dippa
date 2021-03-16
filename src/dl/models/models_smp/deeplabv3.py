@@ -55,6 +55,7 @@ class DeepLabV3SmpMulti(MultiTaskSegModel):
         outputs type maps (B, C, H, W). Adds also an optional aux branch for regressing (B, 2, H, W) outputs
         
         Args:
+        -----------
             encoder_name (str, default="resnet34"):
                 name of classification model (without last dense layers) used as feature
                 extractor to build segmentation model.
@@ -87,6 +88,7 @@ class DeepLabV3SmpMulti(MultiTaskSegModel):
                 number of output channels from the auxiliary branch
 
         Returns:
+        ----------
             ``torch.nn.Module``: **DeepLabV3**
         .. _DeeplabV3:
             https://arxiv.org/abs/1706.05587

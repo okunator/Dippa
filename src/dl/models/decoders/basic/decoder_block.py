@@ -29,6 +29,7 @@ class BasicDecoderBlock(nn.Module):
         3. Convolve
 
         Args:
+        -----------
             in_channels (int):
                 Number of input channels
             skip_channels (int):

@@ -55,6 +55,7 @@ class LinknetSmpMulti(MultiTaskSegModel):
         of the model and adds an optional aux branch for regressing (B, 2, H, W) outputs
 
         Args:
+        ------------
             encoder_name (str, default="resnet34"):
                 name of classification model (without last dense layers) used as feature
                 extractor to build segmentation model.
@@ -87,6 +88,7 @@ class LinknetSmpMulti(MultiTaskSegModel):
                 number of output channels from the auxiliary branch
 
         Returns:
+        -----------
             ``torch.nn.Module``: **Linknet**
         .. _Linknet:
             https://arxiv.org/pdf/1707.03718.pdf

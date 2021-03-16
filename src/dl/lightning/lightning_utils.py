@@ -130,6 +130,7 @@ class ModelSummary(object):
     Generates a summary of all layers in a :class:`~pytorch_lightning.core.lightning.LightningModule`.
 
     Args:
+    ---------
         model: The model to summarize (also referred to as the root module)
         mode: Can be one of
 
@@ -403,12 +404,14 @@ def get_memory_profile(mode: str) -> Union[Dict[str, int], Dict[int, int]]:
     """ Get a profile of the current memory usage.
 
     Args:
+    ---------
         mode: There are two modes:
 
             - 'all' means return memory for all gpus
             - 'min_max' means return memory for max and min
 
-    Return:
+    Returns:
+    ---------
         A dictionary in which the keys are device ids as integers and
         values are memory usage as integers in MB.
         If mode is 'min_max', the dictionary will also contain two additional keys:
@@ -430,7 +433,8 @@ def get_memory_profile(mode: str) -> Union[Dict[str, int], Dict[int, int]]:
 def get_gpu_memory_map() -> Dict[str, int]:
     """Get the current gpu usage.
 
-    Return:
+    Returns:
+    -----------
         A dictionary in which the keys are device ids as integers and
         values are memory usage as integers in MB.
     """
@@ -468,9 +472,11 @@ def get_human_readable_count(number: int) -> str:
         '5,000 T'
 
     Args:
+    ----------
         number: a positive integer number
 
-    Return:
+    Returns:
+    ----------
         A string formatted according to the pattern described above.
 
     """

@@ -20,11 +20,15 @@ class IoULoss(nn.Module):
         Computes the DICE coefficient
 
         Args:
-            yhat: input tensor of size (B, C, H, W)
-            target: target tensor of size (B, H, W), where
-                    values of a vector correspond to class index
+        ---------
+            yhat (torch.Tensor): 
+                Input tensor of size (B, C, H, W)
+            target (torch.Tensor): 
+                Target tensor of size (B, H, W), where values 
+                of a vector correspond to class index
 
         Returns:
+        ---------
             torch.Tensor: computed DICE loss (scalar)
         """
 

@@ -8,22 +8,23 @@ class UnetDataset(BaseDataset):
     def __init__(self,
                  fname: str,
                  transforms: List,
-                 norm: bool=False) -> None:
+                 normalize_input: bool=False) -> None:
         """
         Dataset where masks are pre-processed similarly to the U-net paper
         https://arxiv.org/abs/1505.04597
 
         Args:
+        -----------
             fname (str): 
                 path to the pytables database
             transforms (albu.Compose): 
                 albumentations.Compose obj (a list of augmentations)
-            norm (bool, default=False):
+            normalize_input (bool, default=False):
                 apply percentile normalization to inmut images after transforms
         """
         super(UnetDataset, self).__init__(fname)
         self.transforms = transforms
-        self.norm = norm
+        self.normalize_input = normalize_input
 
     def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
         """
@@ -46,7 +47,7 @@ class UnetDataset(BaseDataset):
         img = augmented_data["image"]
         masks = augmented_data["masks"]
 
-        if self.norm:
+        if self.normalize_input:
             img = self.normalize(img)
 
         result = {

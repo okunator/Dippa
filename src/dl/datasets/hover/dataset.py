@@ -12,7 +12,7 @@ class HoverDataset(BaseDataset):
     def __init__(self,
                  fname: str,
                  transforms: List,
-                 norm: bool=False) -> None:
+                 normalize_input: bool=False) -> None:
         """
         Dataset where masks are pre-processed similarly to the Hover-Net paper
         https://arxiv.org/abs/1812.06499
@@ -23,13 +23,13 @@ class HoverDataset(BaseDataset):
                 path to the pytables database
             transforms (albu.Compose): 
                 albumentations.Compose obj (a list of augmentations)
-            norm (bool, default=False):
+            normalize_input (bool, default=False):
                 apply percentile normalization to inmut images after transforms
         """
         assert transforms is not None, "No augmentations given. Give at least epmty albu.Compose"
         super(HoverDataset, self).__init__(fname)
         self.transforms = transforms
-        self.norm = norm
+        self.normalize_input = normalize_input
 
     def __getitem__(self, ix: int) -> Dict[str, torch.Tensor]:
         """
@@ -58,7 +58,7 @@ class HoverDataset(BaseDataset):
         img = augmented_data["image"]
         masks = augmented_data["masks"]
 
-        if self.norm:
+        if self.normalize_input:
             img = self.normalize(img)
 
         result = {

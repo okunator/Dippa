@@ -309,7 +309,7 @@ class SegModel(pl.LightningModule):
         records = df.to_dict("records")
         kwargs = dict((d["key"], d["value"]) for d in records)
 
-        # Convert lists, boold, and ints from str
+        # Convert lists, bools, and ints from str
         for k, v in kwargs.items():
             try:
                 kwargs[k] = eval(v)
@@ -326,7 +326,6 @@ class SegModel(pl.LightningModule):
 
         return cls(**kwargs)
 
-    # Lightning framework stuff:
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         return self.model(x)
 

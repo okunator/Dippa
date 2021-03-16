@@ -9,6 +9,7 @@ class FixedUnpool(nn.Module):
         TensorPack fixed unpooling in pytorch
 
         Args:
+        ------------
             scale_factor (int, default=2):
                 Upsampling scale factor. scale_factor*(H, W) 
         """

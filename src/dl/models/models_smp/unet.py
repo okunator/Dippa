@@ -57,6 +57,7 @@ class UnetSmpMulti(MultiTaskSegModel):
         of the model and adds an optional aux branch for regressing (B, 2, H, W) outputs
 
         Args:
+        ------------
             encoder_name (str, default="resnet34"):
                 name of classification model (without last dense layers) used as feature
                 extractor to build segmentation model.
@@ -94,6 +95,7 @@ class UnetSmpMulti(MultiTaskSegModel):
                 number of output channels from the auxiliary branch
 
         Returns:
+        ------------
             ``torch.nn.Module``: **Unet**
         .. _Unet:
             https://arxiv.org/pdf/1505.04597

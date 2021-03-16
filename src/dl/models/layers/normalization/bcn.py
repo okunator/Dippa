@@ -12,6 +12,7 @@ class EstBN(nn.Module):
         https://arxiv.org/abs/1911.09738
         
         Args:
+        ----------
             num_features (int):
                 Number of input channels/features
             eps (float, default=1e-7):
@@ -59,6 +60,7 @@ class BCNorm(nn.Module):
         https://arxiv.org/abs/1911.09738
 
         Args:
+        ----------
             num_features (int):
                 Number of input channels/features
             num_groups (int, default=32):

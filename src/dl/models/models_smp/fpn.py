@@ -61,6 +61,7 @@ class FpnSmpMulti(MultiTaskSegModel):
         outputs type maps (B, C, H, W). Adds also an optional aux branch for regressing (B, 2, H, W) outputs
 
         Args:
+        ------------
             encoder_name (str, default="resnet34"):
                 name of classification model (without last dense layers) used as feature
                 extractor to build segmentation model.
@@ -97,6 +98,7 @@ class FpnSmpMulti(MultiTaskSegModel):
                 number of output channels from the auxiliary branch
             
         Returns:
+        -----------
             ``torch.nn.Module``: **FPN**
             .. _FPN:
         http://presentations.cocodataset.org/COCO17-Stuff-FAIR.pdf

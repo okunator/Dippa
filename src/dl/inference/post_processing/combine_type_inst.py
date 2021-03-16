@@ -37,6 +37,7 @@ def combine_inst_semantic(inst_map: np.ndarray,
     one instance segmentation result
 
     Args:
+    -----------
         inst_map (np.ndarray): 
             the post processed output from the instance segmentation head of 
             the model. Shape (H, W)

@@ -20,7 +20,9 @@ class WSConv2d(nn.Conv2d):
 
         https://arxiv.org/abs/1903.10520
 
-        Args: Refer to https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py
+        Args: 
+        --------
+            Refer to https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/conv.py
         """
         super(WSConv2d, self).__init__(
             in_channels, out_channels, kernel_size,

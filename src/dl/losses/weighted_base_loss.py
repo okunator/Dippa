@@ -12,8 +12,11 @@ class WeightedBaseLoss(nn.Module):
         and classes can be given weights
 
         Args:
-            class_weights (torch.Tensor, optional): tensor of shape (C, )
-            edge_weight (float, optional): base weight for nuclei border pixels
+        ----------
+            Class weights (torch.Tensor, optional, default=None):
+                Tensor of shape (C, )
+            Edge weight (float, optional, default=None): 
+                base weight for nuclei border pixels
         """
         super(WeightedBaseLoss, self).__init__()
         self.class_weights = class_weights
@@ -27,8 +30,11 @@ class WeightedBaseLoss(nn.Module):
         Note: No normalization
 
         Args:
-            loss_matrix (torch.Tensor): pixelwise losses tensor of shape (B, H, W)
-            target (torch.Tensor): target mask. Shape (B, H, W)
+        ----------
+            Loss_matrix (torch.Tensor): 
+                Pixelwise losses tensor of shape (B, H, W)
+            Target (torch.Tensor): 
+                target mask. Shape (B, H, W)
         """
         # add weights
         weight_mat = self.class_weights[target].to(target.device)
@@ -44,7 +50,10 @@ class WeightedBaseLoss(nn.Module):
         loss _matrix
 
         Args:
-            loss_matrix (torch.Tensor): pixelwise losses tensor of shape (B, C, H, W)
-            weight_map (torch.Tensor): map that points to the pixels that will be weighted. Shape (B, H, W)
+        ----------
+            loss_matrix (torch.Tensor): 
+                Pixelwise losses tensor of shape (B, C, H, W)
+            weight_map (torch.Tensor):
+                Map that points to the pixels that will be weighted. Shape (B, H, W)
         """
         return loss_matrix*self.edge_weight**weight_map

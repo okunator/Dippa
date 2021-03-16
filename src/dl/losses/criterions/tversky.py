@@ -13,8 +13,11 @@ class TverskyLoss(nn.Module):
         Tversky loss: https://arxiv.org/abs/1706.05721
 
         Args:
-            fp dice coeff
-            fn tanimoto coeff
+        ---------
+            alpha (float, default=0.7):
+                 False positive dice coefficient
+            beta (float, default=0.3)
+                False negative tanimoto coefficient
         """
         super(TverskyLoss, self).__init__()
         self.alpha = alpha
@@ -29,11 +32,15 @@ class TverskyLoss(nn.Module):
         Computes the tversky loss
 
         Args:
-            yhat: input tensor of size (B, C, H, W)
-            target: target tensor of size (B, H, W), where
-                    values of a vector correspond to class index
+        ----------
+            yhat (torch.Tensor): 
+                Input tensor of size (B, C, H, W)
+            target (torch.Tensor): 
+                Target tensor of size (B, H, W), where values 
+                of a vector correspond to class index
                     
         Returns:
+        ----------
             torch.Tensor: computed Tversky loss (scalar)
         """
         yhat_soft = F.softmax(yhat, dim=1)

@@ -11,6 +11,7 @@ def naive_thresh_prob(prob_map: np.ndarray, threshold: float = 0.5, **kwargs) ->
     Threshold a sigmoid/softmax activated soft mask.
 
     Args:
+    ----------
         prob_map (np.ndarray): 
             Soft mask to be thresholded. Shape (H, W)
         threshold (float, default=0.5): 
@@ -28,6 +29,7 @@ def naive_thresh(prob_map: np.ndarray, threshold: int = 2, **kwargs) -> np.ndarr
     Threshold a soft mask. Values can be logits or probabilites
 
     Args:
+    -----------
         prob_map (np.ndarray): 
             Soft mask to be thresholded. Shape (H, W)
         threshold (int, default=2): 
@@ -46,6 +48,7 @@ def niblack_thresh(prob_map: np.ndarray, win_size: int = 13, **kwargs) -> np.nda
     https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_niblack_sauvola.html
     
     Args:
+    -----------
         prob_map (np.ndarray): 
             Soft mask to be thresholded. Shape (H, W)
         win_size (int, default=13): 
@@ -64,6 +67,7 @@ def sauvola_thresh(prob_map: np.ndarray, win_size: int=33, **kwargs) -> np.ndarr
     https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_niblack_sauvola.html
 
     Args:
+    -----------
         prob_map (np.ndarray): 
             Soft mask to be thresholded. Shape (H, W)
         win_size (int, default=33):
@@ -82,6 +86,7 @@ def morph_chan_vese_thresh(prob_map: np.ndarray, **kwargs) -> np.ndarray:
     https://scikit-image.org/docs/dev/api/skimage.segmentation.html#skimage.segmentation.morphological_chan_vese
 
     Args: 
+    -----------
         prob_map (np.ndarray): 
             soft mask to be thresholded. Shape (H, W)
     """
@@ -101,6 +106,7 @@ def argmax(prob_map: np.ndarray, **kwargs) -> np.ndarray:
     Wrapper to take argmax of a one_hot logits or prob map
 
     Args:
+    -----------
         prob_map (np.ndarray): 
             The probability map of shape (H, W, C)
 
@@ -118,6 +124,7 @@ def smoothed_thresh(prob_map: np.ndarray, eps: float = 0.01, **kwargs) -> np.nda
     value for threshold.
 
     Args:
+    -----------
         prob_map (np.ndarray): 
             Soft mask to be thresholded. Shape (H, W)
         eps (int): 

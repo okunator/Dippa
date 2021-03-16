@@ -24,6 +24,7 @@ class BasicDecoder(nn.ModuleDict):
         the unet model in segmentation_models_pytorch.
 
         Args:
+        ------------
             encoder_channels (List[int]):
                 Number of channels in each encoder layer output
             decoder_channels (List[int]):

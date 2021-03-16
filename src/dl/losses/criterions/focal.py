@@ -7,23 +7,26 @@ from src.dl.losses.weighted_base_loss import WeightedBaseLoss
 
 
 class WeightedFocalLoss(WeightedBaseLoss):
-    """
-    Focal loss criterion: https://arxiv.org/abs/1708.02002
-
-    Args:
-        alpha (float): weight factor b/w [0,1]
-        gamma (float): focusing factor
-        edge_weight (float, optional): weight to be added to nuclei borders like in Unet paper
-        class_weights (torch.Tensor, optional): Optional tensor of size (n_classes,) for class weights
-    """
-
     def __init__(self,
                  alpha: float = 0.5,
                  gamma: float = 2.0,
                  edge_weight: Optional[float] = None,
                  class_weights: Optional[torch.Tensor] = None,
                  **kwargs) -> None:
+        """
+        Focal loss criterion: https://arxiv.org/abs/1708.02002
 
+        Args:
+        ---------
+            alpha (float, default=0.5): 
+                Weight factor b/w [0,1]
+            gamma (float, default=2.0): 
+                Focusing factor
+            edge_weight (float, optional, default=None): 
+                Weight to be added to nuclei borders like in Unet paper
+            class_weights (torch.Tensor, optional, default=None): 
+                Optional tensor of size (n_classes,) for class weights
+        """
         super(WeightedFocalLoss, self).__init__(class_weights, edge_weight)
         self.alpha = alpha
         self.gamma = gamma
@@ -38,14 +41,18 @@ class WeightedFocalLoss(WeightedBaseLoss):
         Computes the focal loss. Option to apply nuclei borders weights and class weights
 
         Args:
-            yhat: input tensor of size (B, C, H, W)
-            target: target tensor of size (B, H, W), where
-                    values of a vector correspond to class index
-            target_weight (torch.Tensor): The weight map that points the pixels in clumped nuclei
-                           that are overlapping.
-            edge_weight (float): weights applied to the nuclei edges: edge_weight^target_weight
+        ---------
+            yhat (torch.Tensor): 
+                Input tensor of size (B, C, H, W)
+            target (torch.Tensor): 
+                Target tensor of size (B, H, W), where
+                values of a vector correspond to class index
+            target_weight (torch.Tensor): 
+                The weight map that points to the pixels
+                in clumped nuclei that are overlapping.
 
         Returns:
+        ----------
             torch.Tensor: computed focal loss (scalar)
         """
 

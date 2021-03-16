@@ -18,10 +18,15 @@ class WeightedSCELoss(WeightedBaseLoss):
         The Symmetric Cross Entropy loss: https://arxiv.org/abs/1908.06112
 
         Args:
-            alpha(float): corresponds to overfitting issue of CE
-            beta(float): corresponds to flexible exploration on the robustness of RCE
-            edge_weight (float, optional): weight to be added to nuclei borders like in Unet paper
-            class_weights (torch.Tensor, optional): Optional tensor of size (n_classes,) for class weights
+        ----------
+            alpha (float, default=0.5): 
+                Corresponds to overfitting issue of CE
+            beta (float, default=1.0): 
+                Corresponds to flexible exploration on the robustness of RCE
+            edge_weight (float, optional, default=None):
+                Weight to be added to nuclei borders like in Unet paper
+            class_weights (torch.Tensor, optional, None): 
+                Optional tensor of size (n_classes,) for class weights
         """
         super(WeightedSCELoss, self).__init__(class_weights, edge_weight)
         self.alpha = alpha
@@ -37,14 +42,18 @@ class WeightedSCELoss(WeightedBaseLoss):
         Computes the symmetric cross entropy loss between ``yhat`` and ``target`` tensors.
 
         Args:
-            yhat: input tensor of size (B, C, H, W)
-            target: target tensor of size (B, H, W), where
-                    values of a vector correspond to class index
-            target_weight (torch.Tensor): The weight map that points the pixels in clumped nuclei
-                                that are overlapping.
-            edge_weight (float): weights applied to the nuclei edges: edge_weight^target_weight
+        ----------
+            yhat (torch.Tensor): 
+                Input tensor of size (B, C, H, W)
+            target (torch.Tensor): 
+                Target tensor of size (B, H, W), where
+                values of a vector correspond to class index
+            target_weight (torch.Tensor): 
+                The weight map that points the pixels in 
+                clumped nuclei that are overlapping.
 
         Returns:
+        ----------
             torch.Tensor: computed SCE loss (scalar)
         """
         H = yhat.shape[2]

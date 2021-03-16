@@ -6,8 +6,15 @@ def filter2D(input_tensor: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
     Convolves a given kernel on input tensor without losing dimensional shape
 
     Args:
-        input_tensor (torch.Tensor): input image/tensor
-        kernel (torch.Tensor): convolution kernel/window
+    ----------
+        input_tensor (torch.Tensor): 
+            Input image/tensor
+        kernel (torch.Tensor):
+            Convolution kernel/window
+
+    Returns:
+    ----------
+        Convolved torch.Tensor. Same shape as input
     """
 
     (_, channel, _, _) = input_tensor.size()

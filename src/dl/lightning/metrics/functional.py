@@ -11,6 +11,7 @@ def confusion_mat(yhat: torch.Tensor,
     Computes confusion matrix from the soft mask and target tensor
 
     Args:
+    ----------
         yhat (torch.Tensor): 
             the soft mask from the network of shape (B, C, H, W)
         target (torch.Tensor): 
@@ -19,6 +20,7 @@ def confusion_mat(yhat: torch.Tensor,
             apply sigmoid or softmax activation before taking argmax
 
     Returns:
+    ----------
         torch.Tensor of shape (B, num_classes, num_classes)
     """
 
@@ -56,6 +58,7 @@ def iou(yhat: torch.Tensor,
     Compute the per class intersection over union for dense predictions
 
     Args:
+    -----------
         yhat (torch.Tensor): 
             the soft mask from the network of shape (B, C, H, W)
         target (torch.Tensor): 
@@ -66,6 +69,7 @@ def iou(yhat: torch.Tensor,
             small constant to avoid zero div error
 
     Returns:
+    ------------
         torch.Tensor of shape (B, num_classes, num_classes)
     """
     conf_mat = confusion_mat(yhat, target, activation)
@@ -85,12 +89,17 @@ def accuracy(yhat: torch.Tensor,
     Compute the per class accuracy for dense predictions
 
     Args:
+    -----------
         yhat (torch.Tensor): 
             the soft mask from the network of shape (B, C, H, W)
         target (torch.Tensor): 
             the target matrix of shape (B, H, W)
         activation (str, optional, default=None): 
             apply sigmoid or softmax activation before taking argmax
+
+    Returns:
+    ------------
+        torch.Tensor of shape (B, num_classes, num_classes)
     """
     conf_mat = confusion_mat(yhat, target, activation)
     diag = torch.diagonal(conf_mat, dim1=-2, dim2=-1) # batch diagonal

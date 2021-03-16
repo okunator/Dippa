@@ -12,6 +12,7 @@ class SegHead(nn.Module):
         Reduces the number of channels to out_channels
 
         Args:
+        ------------
             in_channels (int):
                 Number of channels in the input
             out_channels (int):

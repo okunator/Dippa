@@ -17,11 +17,16 @@ def ssim(img1: torch.Tensor,
     UNET3+ paper: https://arxiv.org/pdf/2004.08790.pdf
 
     Args:
-        img1 (torch.Tensor): input image 1. Shape (B, C, H, W)
-        img2 (torch.Tensor): input image 2. Shape (B, C, H, W)
-        window_size (int): size of the gaussian kernel
+    ----------
+        img1 (torch.Tensor): 
+            Input image 1. Shape (B, C, H, W)
+        img2 (torch.Tensor): 
+            Input image 2. Shape (B, C, H, W)
+        window_size (int, default=11): 
+            Size of the gaussian kernel
 
     Returns:
+    ----------
         torch.Tensor computed ssim loss and 
     """
     
@@ -74,8 +79,11 @@ class SSIM(nn.Module):
         and returns the structural dissimilarity (1 - SSIM(x, y)) / 2 That can be used as the loss function
 
         Args:
-            window_size (int): size of the gaussian kernel
-            return_cs (bool): return also the the contrast sensitivity coeff
+        ----------
+            window_size (int, default=11): 
+                Size of the gaussian kernel
+            return_cs (bool, default=False): 
+                Return also the the contrast sensitivity coeff
         """
         super(SSIM, self).__init__()
         self.window_size = window_size
@@ -89,10 +97,14 @@ class SSIM(nn.Module):
         Computes the SSIM loss i.e structural dissimilarity
 
         Args:
-            yhat (torch.Tensor): output from the instance segmentation branch
-            target (torch.Tensor): ground truth image
+        ----------
+            yhat (torch.Tensor): 
+                Output from the instance segmentation branch
+            target (torch.Tensor): 
+                Ground truth image
         
-        Returns 
+        Returns: 
+        ---------
             Computed MS-SSIM Loss
         """
 
@@ -125,7 +137,9 @@ class MSSSIM(nn.Module):
         to penalize fuzzy boundaries
 
         Args:
-            window_size (int): size of the gaussian kernel
+        -----------
+            window_size (int, default=11): 
+                Size of the gaussian kernel
         """
         super(MSSSIM, self).__init__()
         self.window_size = window_size
@@ -139,10 +153,14 @@ class MSSSIM(nn.Module):
         Computes the MS-SSIM loss
 
         Args:
-            yhat (torch.Tensor): output from the instance segmentation branch
-            target (torch.Tensor): ground truth image
+        ----------
+            yhat (torch.Tensor): 
+                Output from the instance segmentation branch
+            target (torch.Tensor): 
+                Ground truth image
         
-        Returns 
+        Returns:
+        ----------
             Computed MS-SSIM Loss
         """
         weights = torch.tensor([0.0448, 0.2856, 0.3001, 0.2363, 0.1333], device=yhat.device)

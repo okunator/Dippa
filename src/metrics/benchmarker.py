@@ -17,11 +17,13 @@ class Benchmarker:
         Computes metrics for one (inst_map, gt_mask) pair.
 
         Args:
+        -----------
             true_pred (List[np.ndarray]): 
                 Ground truth annotations in true_pred[1] and corresponding 
                 predicted instance map in true_pred[2]
 
         Returns:
+        -----------
             A Dict[str, float] of the metrics
         """
 
@@ -63,6 +65,7 @@ class Benchmarker:
         so that they align when computing metrics.
         
         Args:
+        -----------
             inst_maps (OrderedDict[str, np.ndarray]): 
                 A dict of file_name:inst_map key vals in order
             gt_masks (OrderedDict[str, np.ndarray]): 
@@ -78,6 +81,7 @@ class Benchmarker:
 
 
         Returns:
+        ----------
             a pandas dataframe of the metrics. Samples are rows and metrics are columns:
             _____________________
             |sample|PQ|SQ|DQ|AJI|
@@ -132,6 +136,7 @@ class Benchmarker:
         so that they align when computing metrics.
 
         Args:
+        -----------
             inst_maps (Dict[str, np.ndarray]): 
                 A dict of file_name:inst_map key vals in order
             type_maps (Dict[str, np.ndarray]): 
@@ -152,6 +157,7 @@ class Benchmarker:
                 adds a prefix to the .csv file name
 
         Returns:
+        -----------
             a pandas dataframe of the metrics. Samples are rows and metrics are columns:
             __________________________
             |sample      |PQ|SQ|DQ|AJI|

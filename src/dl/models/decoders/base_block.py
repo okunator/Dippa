@@ -19,6 +19,7 @@ class BaseConvBlock(nn.Module):
         to use.
 
         Args:
+        -----------
             in_channels (int):
                 Number of input channels
             out_channels (int):

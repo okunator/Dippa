@@ -60,6 +60,7 @@ class PanSmpMulti(MultiTaskSegModel):
         outputs type maps (B, C, H, W). Adds also an optional aux branch for regressing (B, 2, H, W) outputs
 
         Args:
+        -----------
             encoder_name (str, default="resnet34"):
                 name of classification model (without last dense layers) used as feature
                 extractor to build segmentation model.
@@ -88,6 +89,7 @@ class PanSmpMulti(MultiTaskSegModel):
                 number of output channels from the auxiliary branch
             
         Returns:
+        -----------
             ``torch.nn.Module``: **PAN**
         .. _PAN:
             https://arxiv.org/abs/1805.10180

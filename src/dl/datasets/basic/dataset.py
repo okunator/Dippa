@@ -8,22 +8,23 @@ class BasicDataset(BaseDataset):
     def __init__(self,
                  fname: str,
                  transforms: List,
-                 norm: bool=False) -> None:
+                 normalize_input: bool=False) -> None:
         """
         Basic dataset without any task-specific pre-processing for labels
 
         Args:
+        -----------
             fname (str): 
                 Path to the pytables database
             transforms (albu.Compose): 
                 Albumentations.Compose obj (a list of augmentations)
-            norm (bool, default=False):
+            normalize_input (bool, default=False):
                 apply percentile normalization to inmut images after transforms
         """
         assert transforms is not None, "No augmentations given. Give at least epmty albu.Compose"
         super(BasicDataset, self).__init__(fname)
         self.transforms = transforms
-        self.norm = norm
+        self.normalize_input = normalize_input
 
     def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
         """
@@ -45,7 +46,7 @@ class BasicDataset(BaseDataset):
         img = augmented_data["image"]
         masks = augmented_data["masks"]
 
-        if self.norm:
+        if self.normalize_input:
             img = self.normalize(img)
 
         result = {

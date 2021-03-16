@@ -25,19 +25,31 @@ SOFTWARE.
 import numpy as np
 import cv2
 
+from typing import Dict
 from scipy import ndimage as ndi
 from scipy.optimize import linear_sum_assignment
 from skimage.metrics import variation_of_information
 
 
 # Ported from here: https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
-def AJI(true, pred):
+def AJI(true: np.ndarray, pred: np.ndarray) -> float:
     """
     AJI version distributed by MoNuSeg, has no permutation problem but suffered from 
     over-penalisation similar to DICE2
     Fast computation requires instance IDs are in contiguous orderding i.e [1, 2, 3, 4] 
     not [2, 3, 6, 10]. Please call `remap_label` before hand and `by_size` flag has no 
     effect on the result. 
+
+    Args:
+    ----------
+        true (np.ndarray):
+            Ground truth mask (labelled). Shape (H, W)
+        pred (np.ndarray):
+            Predicted mask (labelled). Shape 
+
+    Returns:
+    ----------
+        float: the computed metric
     """
     true_id_list = list(np.unique(true))
     pred_id_list = list(np.unique(pred))
@@ -126,7 +138,7 @@ def AJI(true, pred):
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
-def AJI_plus(true, pred):
+def AJI_plus(true: np.ndarray, pred: np.ndarray) -> float:
     """
     AJI+, an AJI version with maximal unique pairing to obtain overall intersecion.
     Every prediction instance is paired with at most 1 GT instance (1 to 1) mapping, unlike AJI 
@@ -136,6 +148,17 @@ def AJI_plus(true, pred):
     Fast computation requires instance IDs are in contiguous orderding i.e [1, 2, 3, 4] 
     not [2, 3, 6, 10]. Please call `remap_label` before hand and `by_size` flag has no 
     effect on the result.
+
+    Args:
+    ----------
+        true (np.ndarray):
+            Ground truth mask (labelled). Shape (H, W)
+        pred (np.ndarray):
+            Predicted mask (labelled). Shape 
+
+    Returns:
+    ----------
+        float: the computed metric
     """        
     true_id_list = list(np.unique(true))
     pred_id_list = list(np.unique(pred))
@@ -206,9 +229,20 @@ def AJI_plus(true, pred):
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
-def DICE2(true, pred):
+def DICE2(true: np.ndarray, pred:np.ndarray) -> float:
     """
     Ensemble dice.
+
+    Args:
+    ----------
+        true (np.ndarray):
+            Ground truth mask (labelled). Shape (H, W)
+        pred (np.ndarray):
+            Predicted mask (labelled). Shape 
+
+    Returns:
+    ----------
+        float: the computed metric
     """
     true_id_list = list(np.unique(true))
     pred_id_list = list(np.unique(pred))
@@ -246,7 +280,7 @@ def DICE2(true, pred):
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
-def PQ(true, pred, match_iou=0.5):
+def PQ(true: np.ndarray, pred: np.ndarray, match_iou: float=0.5) -> Dict[str, float]:
     """
     `match_iou` is the IoU threshold level to determine the pairing between
     GT instances `p` and prediction instances `g`. `p` and `g` is a pair
@@ -260,10 +294,17 @@ def PQ(true, pred, match_iou=0.5):
     Fast computation requires instance IDs are in contiguous orderding 
     i.e [1, 2, 3, 4] not [2, 3, 6, 10]. Please call `remap_label` beforehand 
     and `by_size` flag has no effect on the result.
+
+    Args:
+    ----------
+        true (np.ndarray):
+            Ground truth mask (labelled). Shape (H, W)
+        pred (np.ndarray):
+            Predicted mask (labelled). Shape 
+
     Returns:
-        [dq, sq, pq]: measurement statistic
-        [paired_true, paired_pred, unpaired_true, unpaired_pred]: 
-                      pairing information to perform measurement
+    ----------
+        Dictionary of computed metrics. Metrics included: PQ, SQ, DQ, recall, precision 
                     
     """
     assert match_iou >= 0.0, "Cant' be negative"
@@ -349,12 +390,23 @@ def PQ(true, pred, match_iou=0.5):
     return res
 
 
-def conventional_metrics(true, pred):
+def conventional_metrics(true: np.ndarray, pred: np.ndarray) -> Dict[str, float]:
     """
     DICE = 2TP/(2TP + FP + FN)
     JACCARD = TP/(TP+FP+FN) or just DICE/(2-DICE) also called intersection over union IoU
     sensitivity = TP/(TP+FN)
     specificity = TN/(TN+FP)
+
+    Args:
+    ----------
+        true (np.ndarray):
+            Ground truth mask (labelled). Shape (H, W)
+        pred (np.ndarray):
+            Predicted mask (labelled). Shape 
+
+    Returns:
+    ----------
+        Dictionary of the computed metrics. (dice, iou, sensitivity, specificity)
     """
     true[true > 0] = 1
     pred[pred > 0] = 1 
@@ -369,12 +421,29 @@ def conventional_metrics(true, pred):
     JACCARD = DICE1/(2-DICE1) # IoU
     sensitivity = TP/(TP+FN)
     specificity = TN/(TN+FP)
-    return (DICE1, JACCARD, sensitivity, specificity)
+
+    return {
+        "dice":DICE1, 
+        "iou":JACCARD, 
+        "sensitivity":sensitivity, 
+        "specificity":specificity
+    }
 
 
-def split_and_merge(true, pred):
+def split_and_merge(true: np.ndarray, pred: np.ndarray) -> float:
     """
     Split and merge for all the predicted nuclei instances vs gt nuclei instances
+
+    Args:
+    ----------
+        true (np.ndarray):
+            Ground truth mask (labelled). Shape (H, W)
+        pred (np.ndarray):
+            Predicted mask (labelled). Shape 
+
+    Returns:
+    ----------
+        float: the computed metric
     
     """
     return variation_of_information(true, pred)

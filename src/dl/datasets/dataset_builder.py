@@ -59,7 +59,7 @@ class DatasetBuilder:
         """
         c = cls(decoder_aux_branch)
         aug = c.get_augs(augmentations)
-        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug, norm=normalize_input)
+        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug, normalize_input=normalize_input)
 
     @classmethod
     def set_test_dataset(cls,
@@ -81,4 +81,4 @@ class DatasetBuilder:
         """
         c = cls(decoder_aux_branch)
         aug = c.get_augs()
-        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug, norm=normalize_input)
+        return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](fname=fname, transforms=aug, normalize_input=normalize_input)

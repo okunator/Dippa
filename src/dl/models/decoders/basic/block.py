@@ -18,6 +18,7 @@ class BasicConvBlock(BaseConvBlock):
         Basic conv block that can be used in decoders
 
         Args:
+        ----------
             in_channels (int):
                 Number of input channels
             out_channels (int):
@@ -64,6 +65,7 @@ class MultiBlockBasic(nn.ModuleDict):
         adjusted. Default is 2.
 
         Args:
+        ----------
             in_channels (int):
                 Number of input channels
             out_channels (int):

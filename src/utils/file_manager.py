@@ -260,8 +260,8 @@ class FileManager(FileHandler):
         valid_dbs = list(db_dir.glob(f"*valid_{dataset}*"))
         test_dbs = list(db_dir.glob(f"*test_{dataset}*"))
         
-        assert train_dbs, (f"{train_dbs} HDF5 training db not found. Create the dbs first. Check instructions.")
-        assert test_dbs, (f"{test_dbs} HDF5 test db not found. Create the dbs first. Check instructions.")
+        assert train_dbs, (f"{train_dbs} training db not found. Create the dbs first. Check instructions.")
+        assert test_dbs, (f"{test_dbs} test db not found. Create the dbs first. Check instructions.")
         
         if not valid_dbs:
             valid_dbs = test_dbs

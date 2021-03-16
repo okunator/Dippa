@@ -20,12 +20,14 @@ def compute_pyramid_patch_weight_loss(width: int, height: int) -> np.ndarray:
     https://github.com/BloodAxe/pytorch-toolbelt/blob/develop/pytorch_toolbelt/inference/tiles.py
 
     Args:
+    ----------
         width (int):
             Tile width
         height (int): 
             Tile height
 
     Returns:
+    ----------
         np.ndarray since-channel image. Shape (H, W)
     """
     xc = width * 0.5
