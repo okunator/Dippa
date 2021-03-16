@@ -409,7 +409,7 @@ class Inferer:
         assert "inst_maps" in self.__dict__.keys(), "No instance maps found, run inference and post proc first."
         assert "type_maps" in self.__dict__.keys(), "No type maps found, run inference and post proc first."
         assert self.gt_mask_dir is not None, f"gt_mask_dir is None. Benchmarking only with consep, kumar, pannuke"
-        assert self.model.type_branch, "the netowork model does not contain type branch"
+        assert self.model.decoder_type_branch, "the netowork model does not contain type branch"
         assert self.dataset == self.model.train_dataset, (
             "benchmarking per type can be done only for the same data set as the model training set",
             f"Given dataset for the inferer is not the training set: {self.dataset} != {self.model.train_dataset}"

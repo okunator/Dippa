@@ -15,6 +15,7 @@ class Benchmarker:
     def compute_metrics(self, true_pred: List[np.ndarray]) -> Dict[str, float]:
         """
         Computes metrics for one (inst_map, gt_mask) pair.
+        If GT does not contain any nuclear objects, returns None
 
         Args:
         -----------
@@ -30,6 +31,8 @@ class Benchmarker:
         name = true_pred[0]
         true = true_pred[1]
         pred = true_pred[2]
+
+        # Skip empty GTs
         if len(np.unique(true)) > 1:
             pq = PQ(remap_label(true), remap_label(pred))
             aji = AJI(remap_label(true), remap_label(pred))
@@ -106,6 +109,8 @@ class Benchmarker:
             for x in tqdm(pool.imap_unordered(self.compute_metrics, masks), total=len(masks)):
                 metrics.append(x)
         
+        # drop Nones if no nuclei are found in an image
+        metrics = [metric for metric in metrics if metric]
         score_df = pd.DataFrame.from_records(metrics).set_index("name").sort_index()
         score_df.loc["averages_for_the_set"] = score_df.mean(axis=0)
 
@@ -195,7 +200,7 @@ class Benchmarker:
                     metrics.append(x)
             
             # drop Nones if no classes are found in an image
-            metrics = [metric for metric in metrics if metric] 
+            metrics = [metric for metric in metrics if metric]
             score_df = pd.DataFrame.from_records(metrics).set_index("name").sort_index()
             score_df.loc[f"{c}_avg_for_the_set"] = score_df.mean(axis=0)
 

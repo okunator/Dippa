@@ -37,7 +37,8 @@ from src.utils.mask_utils import (
     bounding_box, 
     remap_label,
     remove_debris, 
-    binarize
+    binarize,
+    remove_small_objects
 )
 
 
@@ -96,7 +97,7 @@ def post_proc_hover(inst_map: np.ndarray,
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5, 5))
     marker = cv2.morphologyEx(marker, cv2.MORPH_OPEN, kernel)
     marker = ndi.label(marker)[0]
-    marker = morph.remove_small_objects(marker, min_size=10)
+    marker = remove_small_objects(marker, min_size=10)
 
     ws_temp = segm.watershed(dist, marker, mask=inst_map)
 
@@ -142,7 +143,7 @@ def post_proc_hover2(aux_map: np.ndarray, inst_map: np.ndarray, sigma: float = 2
     maxed_shape[maxed_shape <= 1/8] = 0
     maxed_shape[maxed_shape != 0] = 1
     maxed_shape = ndi.binary_fill_holes(maxed_shape.astype(bool)).astype('uint8')
-    maxed_shape = morph.remove_small_objects(maxed_shape.astype(bool), 8, connectivity=1)
+    maxed_shape = remove_small_objects(maxed_shape.astype(bool), 8, connectivity=1)
     maxed_shape = ndi.label(maxed_shape)[0]
 
     markers = maxed_shape

@@ -4,7 +4,7 @@ import scipy.ndimage as ndi
 import skimage.morphology as morph
 import skimage.segmentation as segm
 
-from src.utils.mask_utils import binarize
+from src.utils.mask_utils import binarize, remove_small_objects
 from src.utils.img_utils import percentile_normalize_and_clamp
 from ..thresholding import naive_thresh_prob
 
@@ -35,7 +35,7 @@ def post_proc_dran(prob_map: np.ndarray, contour_map: np.ndarray) -> np.ndarray:
 
     # thresh the binary map and remove artefacts
     binary = binarize(naive_thresh_prob(prob_map))
-    binary = morph.remove_small_objects(binary.astype(bool), min_size=10).astype("uint8")
+    binary = remove_small_objects(binary.astype(bool), min_size=10).astype("uint8")
 
     # subtract contour map from binary and use as markers 
     markers = (binary - cnt_binary)

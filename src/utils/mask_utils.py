@@ -6,6 +6,95 @@ from skimage import morphology as morph
 from scipy.ndimage.morphology import distance_transform_edt
 
 
+# From https://github.com/scikit-image/scikit-image/blob/main/skimage/morphology/misc.py
+# warning removed
+def remove_small_objects(ar, min_size=64, connectivity=1, in_place=False, *, out=None):
+    """Remove objects smaller than the specified size.
+    Expects ar to be an array with labeled objects, and removes objects
+    smaller than min_size. If `ar` is bool, the image is first labeled.
+    This leads to potentially different behavior for bool and 0-and-1
+    arrays.
+
+    Parameters
+    ----------
+    ar : ndarray (arbitrary shape, int or bool type)
+        The array containing the objects of interest. If the array type is
+        int, the ints must be non-negative.
+    min_size : int, optional (default: 64)
+        The smallest allowable object size.
+    connectivity : int, {1, 2, ..., ar.ndim}, optional (default: 1)
+        The connectivity defining the neighborhood of a pixel. Used during
+        labelling if `ar` is bool.
+    in_place : bool, optional (default: False)
+        If ``True``, remove the objects in the input array itself.
+        Otherwise, make a copy. Deprecated since version 0.19. Please
+        use `out` instead.
+    out : ndarray
+        Array of the same shape as `ar`, into which the output is
+        placed. By default, a new array is created.
+    Raises
+    ------
+    TypeError
+        If the input array is of an invalid type, such as float or string.
+    ValueError
+        If the input array contains negative values.
+    Returns
+    -------
+    out : ndarray, same shape and type as input `ar`
+        The input array with small connected components removed.
+    Examples
+    --------
+    >>> from skimage import morphology
+    >>> a = np.array([[0, 0, 0, 1, 0],
+    ...               [1, 1, 1, 0, 0],
+    ...               [1, 1, 1, 0, 1]], bool)
+    >>> b = morphology.remove_small_objects(a, 6)
+    >>> b
+    array([[False, False, False, False, False],
+           [ True,  True,  True, False, False],
+           [ True,  True,  True, False, False]])
+    >>> c = morphology.remove_small_objects(a, 7, connectivity=2)
+    >>> c
+    array([[False, False, False,  True, False],
+           [ True,  True,  True, False, False],
+           [ True,  True,  True, False, False]])
+    >>> d = morphology.remove_small_objects(a, 6, out=a)
+    >>> d is a
+    True
+    """
+
+    if out is not None:
+        in_place = False
+
+    if in_place:
+        out = ar
+    elif out is None:
+        out = ar.copy()
+
+    if min_size == 0:  # shortcut for efficiency
+        return out
+
+    if out.dtype == bool:
+        selem = ndi.generate_binary_structure(ar.ndim, connectivity)
+        ccs = np.zeros_like(ar, dtype=np.int32)
+        ndi.label(ar, selem, output=ccs)
+    else:
+        ccs = out
+
+    try:
+        component_sizes = np.bincount(ccs.ravel())
+    except ValueError:
+        raise ValueError("Negative value labels are not supported. Try "
+                         "relabeling the input with `scipy.ndimage.label` or "
+                         "`skimage.morphology.label`.")
+
+    too_small = component_sizes < min_size
+    too_small_mask = too_small[ccs]
+    out[too_small_mask] = 0
+
+    return out
+
+
 def binarize(inst_map: np.ndarray) -> np.ndarray:
     """
     Binarize a labelled instance map
@@ -109,95 +198,6 @@ def get_weight_map(inst_map: np.ndarray, sigma: float = 5.0, w0: float = 10.0):
     pen_map = w0 * np.exp(- pen_map**2 / 2)
     pen_map[inst_map > 0] = 0 # inner instances zero
     return pen_map
-
-
-# From https://github.com/scikit-image/scikit-image/blob/main/skimage/morphology/misc.py
-# warning removed
-def remove_small_objects(ar, min_size=64, connectivity=1, in_place=False, *, out=None):
-    """Remove objects smaller than the specified size.
-    Expects ar to be an array with labeled objects, and removes objects
-    smaller than min_size. If `ar` is bool, the image is first labeled.
-    This leads to potentially different behavior for bool and 0-and-1
-    arrays.
-
-    Parameters
-    ----------
-    ar : ndarray (arbitrary shape, int or bool type)
-        The array containing the objects of interest. If the array type is
-        int, the ints must be non-negative.
-    min_size : int, optional (default: 64)
-        The smallest allowable object size.
-    connectivity : int, {1, 2, ..., ar.ndim}, optional (default: 1)
-        The connectivity defining the neighborhood of a pixel. Used during
-        labelling if `ar` is bool.
-    in_place : bool, optional (default: False)
-        If ``True``, remove the objects in the input array itself.
-        Otherwise, make a copy. Deprecated since version 0.19. Please
-        use `out` instead.
-    out : ndarray
-        Array of the same shape as `ar`, into which the output is
-        placed. By default, a new array is created.
-    Raises
-    ------
-    TypeError
-        If the input array is of an invalid type, such as float or string.
-    ValueError
-        If the input array contains negative values.
-    Returns
-    -------
-    out : ndarray, same shape and type as input `ar`
-        The input array with small connected components removed.
-    Examples
-    --------
-    >>> from skimage import morphology
-    >>> a = np.array([[0, 0, 0, 1, 0],
-    ...               [1, 1, 1, 0, 0],
-    ...               [1, 1, 1, 0, 1]], bool)
-    >>> b = morphology.remove_small_objects(a, 6)
-    >>> b
-    array([[False, False, False, False, False],
-           [ True,  True,  True, False, False],
-           [ True,  True,  True, False, False]])
-    >>> c = morphology.remove_small_objects(a, 7, connectivity=2)
-    >>> c
-    array([[False, False, False,  True, False],
-           [ True,  True,  True, False, False],
-           [ True,  True,  True, False, False]])
-    >>> d = morphology.remove_small_objects(a, 6, out=a)
-    >>> d is a
-    True
-    """
-
-    if out is not None:
-        in_place = False
-
-    if in_place:
-        out = ar
-    elif out is None:
-        out = ar.copy()
-
-    if min_size == 0:  # shortcut for efficiency
-        return out
-
-    if out.dtype == bool:
-        selem = ndi.generate_binary_structure(ar.ndim, connectivity)
-        ccs = np.zeros_like(ar, dtype=np.int32)
-        ndi.label(ar, selem, output=ccs)
-    else:
-        ccs = out
-
-    try:
-        component_sizes = np.bincount(ccs.ravel())
-    except ValueError:
-        raise ValueError("Negative value labels are not supported. Try "
-                         "relabeling the input with `scipy.ndimage.label` or "
-                         "`skimage.morphology.label`.")
-
-    too_small = component_sizes < min_size
-    too_small_mask = too_small[ccs]
-    out[too_small_mask] = 0
-
-    return out
 
 
 def center_crop(img: np.ndarray, ch: int, cw: int) -> np.ndarray:
@@ -416,7 +416,7 @@ def to_inst_map(binary_mask: np.ndarray) -> np.ndarray:
         binary_mask = binary_mask[..., 1]
 
     mask = ndi.binary_fill_holes(binary_mask)
-    mask = morph.remove_small_objects(binary_mask.astype(bool), min_size=10)
+    mask = remove_small_objects(binary_mask.astype(bool), min_size=10)
     inst_map = ndi.label(mask)[0]
 
     return inst_map
@@ -481,7 +481,7 @@ def remove_debris(inst_map: np.ndarray, min_size: int = 10):
         x2 = x2 + 2 if x2 + 2 <= inst_map.shape[1] - 1 else x2
         y2 = y2 + 2 if y2 + 2 <= inst_map.shape[0] - 1 else y2
         nuc_map_crop = nuc_map[y1:y2, x1:x2].astype("int32")
-        nuc_map_crop = morph.remove_small_objects(
+        nuc_map_crop = remove_small_objects(
             nuc_map_crop.astype(bool), min_size, connectivity=1).astype("int32")
         nuc_map_crop[nuc_map_crop > 0] = ix
         res[y1:y2, x1:x2] += nuc_map_crop

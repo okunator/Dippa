@@ -14,7 +14,8 @@ from src.utils.mask_utils import (
     remap_label,
     remove_debris, 
     cv2_opening, 
-    binarize
+    binarize,
+    remove_small_objects
 )
 
 
@@ -47,7 +48,7 @@ def shape_index_watershed2(prob_map: np.ndarray,
     s[s > 1] = 1
     s[s <= 1] = 0
     s = ndi.binary_fill_holes(np.nan_to_num(s*inst_map))
-    s = morph.remove_small_objects(s.astype(bool), 8, connectivity=1)
+    s = remove_small_objects(s.astype(bool), 8, connectivity=1)
     s = ndi.label(s)[0]
 
     shape = s.shape[:2]

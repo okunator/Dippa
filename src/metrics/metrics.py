@@ -229,7 +229,7 @@ def AJI_plus(true: np.ndarray, pred: np.ndarray) -> float:
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
-def DICE2(true: np.ndarray, pred:np.ndarray) -> float:
+def DICE2(true: np.ndarray, pred: np.ndarray) -> float:
     """
     Ensemble dice.
 
@@ -301,6 +301,8 @@ def PQ(true: np.ndarray, pred: np.ndarray, match_iou: float=0.5) -> Dict[str, fl
             Ground truth mask (labelled). Shape (H, W)
         pred (np.ndarray):
             Predicted mask (labelled). Shape 
+        match_iou (float, default=0.5):
+            threshold for iou to include the prediction as TP
 
     Returns:
     ----------
@@ -322,8 +324,7 @@ def PQ(true: np.ndarray, pred: np.ndarray, match_iou: float=0.5) -> Dict[str, fl
         p_mask = np.array(pred == p, np.uint8)
         pred_masks.append(p_mask)
         
-    pairwise_iou = np.zeros([len(true_id_list) -1, 
-                             len(pred_id_list) -1], dtype=np.float64)
+    pairwise_iou = np.zeros([len(true_id_list)-1, len(pred_id_list)-1], dtype=np.float64)
 
     # caching pairwise iou
     for true_id in true_id_list[1:]: # 0-th is background
