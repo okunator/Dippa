@@ -45,8 +45,8 @@ def shape_index_watershed2(prob_map: np.ndarray,
     s = feat.shape_index(prob_map, sigma=sigma)
     
     # Spherical cap
-    s[s > 1] = 1
-    s[s <= 1] = 0
+    s[s > 0] = 1
+    s[s <= 0] = 0
     s = ndi.binary_fill_holes(np.nan_to_num(s*inst_map))
     s = remove_small_objects(s.astype(bool), 8, connectivity=1)
     s = ndi.label(s)[0]

@@ -1,9 +1,53 @@
 import torch
+import numpy as np
 from typing import Union
 
 
-# Channel-wise normalizations per image. Normalizations per full training data not yet implemented.
+# Dataset level normalization
+# adapted from https://github.com/pytorch/vision/blob/master/torchvision/transforms/functional.py
+def normalize(img: torch.Tensor, mean: np.ndarray, std: np.ndarray, to_uint8: bool=True) -> torch.Tensor:
+    """
+    Normalize a tensor with mean and standard deviation of the dataset.
 
+    Args:
+    ---------
+        img (torch.Tensor): 
+            Tensor img of Shape (C, H, W) or (B, C, H, W).
+        mean (np.ndarray): 
+            Means for each channel. Shape (1, 3)
+        std (np.ndarray): 
+            Standard deviations for each channel. Shape (1, 3)
+        to_uint8 (bool, default=True):
+            If input tensor values between [0, 255]. The std and mean
+            can be scaled from [0, 1] -> [0, 255].
+
+    Returns:
+    ----------
+        Tensor: Normalized Tensor image.
+    """
+    assert isinstance(img, torch.Tensor), f"input img needs to be a  tensor. Got {img.dtype}."
+    assert img.ndim >= 3, f"img tensor shae should be either (C, H, W)|(B, C, H, W)"
+
+    if to_uint8:
+        mean = mean*255
+        std = std*255
+
+    img = img.float()
+    mean = torch.as_tensor(mean[0], dtype=img.dtype, device=img.device)
+    std = torch.as_tensor(std[0], dtype=img.dtype, device=img.device)
+
+    assert not (std == 0).any(), "zeros detected in std-values -> would lead to zero-div error"
+
+    if mean.ndim == 1:
+        mean = mean.view(-1, 1, 1)
+    if std.ndim == 1:
+        std = std.view(-1, 1, 1)
+    
+    img.sub_(mean).div_(std)
+    return img
+
+
+# Channel-wise normalizations per image.
 # Ported from: https://gist.github.com/spezold/42a451682422beb42bc43ad0c0967a30
 def percentile(t: torch.tensor, q: float) -> Union[int, float]:
     """
@@ -82,8 +126,8 @@ def normalize_torch(img: torch.Tensor) -> torch.Tensor:
             input image tensor. shape (C, H, W).
     """
     img = img.float()
-    chl_means = torch.mean(img1.float(), dim=(1, 2))
-    chl_stds = torch.std(img1.float(), dim=(1, 2))
+    chl_means = torch.mean(img.float(), dim=(1, 2))
+    chl_stds = torch.std(img.float(), dim=(1, 2))
 
     img.sub_(chl_means.view(-1, 1, 1)).div_(chl_stds.view(-1, 1, 1))
     return img

@@ -76,7 +76,11 @@ class Predictor:
         self.weight_mat = torch.from_numpy(weight_mat).float().to(self.model.device).unsqueeze(0).unsqueeze(0)
 
 
-    def forward_pass(self, patch: Union[np.ndarray, torch.Tensor], norm: bool=False) -> Dict[str, torch.Tensor]:
+    def forward_pass(self, 
+                     patch: Union[np.ndarray, torch.Tensor],
+                     norm: bool=False,
+                     mean: np.ndarray=None,
+                     std: np.ndarray=None) -> Dict[str, torch.Tensor]:
         """
         Input an image patch or batch of patches to the network and return logits.
         patch input_size likely to be 256x256 depending how the images were patched
@@ -89,6 +93,10 @@ class Predictor:
             norm (bool, default=False):
                 Normalize input data. Set to True only if input data was
                 normalized in the training phase.
+            mean (np.ndarray): 
+                Means for each channel. Shape (1, 3). Ignored id norm = False
+            std (np.ndarray): 
+                Standard deviations for each channel. Shape (1, 3). Ignored if norm = False
 
         Returns:
         -----------
@@ -101,7 +109,6 @@ class Predictor:
             for i in range(patch.shape[0]):
                 patch[i] = minmax_normalize_torch(patch[i])
             
-
         input_tensor = util.to_device(patch) # to cpu|gpu
         return self.model(input_tensor)  # Dict[(B, 2, H, W), (B, C, H, W)]
 

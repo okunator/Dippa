@@ -19,7 +19,6 @@ from src.utils import (
 
 
 class BaseDataset(Dataset, FileHandler):
-
     def __init__(self, fname:str) -> None:
         """
         Base dataset class
@@ -40,6 +39,8 @@ class BaseDataset(Dataset, FileHandler):
             with tb.open_file(self.fname) as h5:
                 self.n_items = h5.root._v_attrs["n_items"]
 
+        # Get the dataset stats
+        self.stats = self.get_dataset_stats(self.fname)
 
     def __len__(self): 
         return self.n_items

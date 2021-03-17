@@ -16,7 +16,7 @@ from src.dl.optimizers.optim_builder import OptimizerBuilder
 from src.dl.losses.loss_builder import LossBuilder
 from src.dl.models.model_builder import Model
 from src.dl.torch_utils import to_device
-from .metrics.functional import iou, accuracy
+from .metrics.functional import iou
 
 
 class SegModel(pl.LightningModule):
@@ -245,6 +245,9 @@ class SegModel(pl.LightningModule):
         # init multi loss function
         self.criterion = self.configure_loss()
 
+        # init pl metrics
+        self.accuracy = pl.metrics.Accuracy()
+
     @classmethod
     def from_conf(cls, conf: DictConfig):
         """
@@ -372,12 +375,12 @@ class SegModel(pl.LightningModule):
 
         # Compute metrics for monitoring
         key = "types" if self.decoder_type_branch else "instances" 
-        type_acc = accuracy(soft_mask[key], type_target, "softmax")
+        type_acc = self.accuracy(soft_mask[key], type_target)
         type_iou = iou(soft_mask[key], type_target, "softmax")
 
         return {
             "loss":loss,
-            "accuracy":type_acc.mean(), # accuracy computation not working
+            "accuracy":type_acc, # accuracy computation not working
             "mean_iou":type_iou.mean()
         }
 
@@ -391,7 +394,8 @@ class SegModel(pl.LightningModule):
             f"{phase}_mean_iou": z["mean_iou"]
         }
 
-        self.log_dict(logs, on_step=True, on_epoch=True, prog_bar=False, logger=True)
+        prog_bar = phase == "train"
+        self.log_dict(logs, on_step=True, on_epoch=True, prog_bar=prog_bar, logger=True)
 
         return {
             "loss": z["loss"],

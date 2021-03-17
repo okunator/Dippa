@@ -77,10 +77,6 @@ class ZarrWriter(BaseWriter):
         self.classes = classes
         self.rac = rigid_augs_and_crop
         self.crop_shape = crop_shape
-
-        # assert self.img_dir.exists(), f"img_dir: {img_dir} does not exist."
-        # assert self.mask_dir.exists(), f"mask_dir: {mask_dir} does not exist."
-        # assert self.save_dir.exists(), f"write_dir: {save_dir} does not exist."
         
         if self.patch_shape is not None:
             assert self.stride_size <= self.patch_shape[0]
@@ -110,7 +106,7 @@ class ZarrWriter(BaseWriter):
         root.attrs["classes"] = self.classes
 
         # init zarrays for data
-        ph, pw = self.patch_shape if not self.rac else self.crop_shape
+        ph, pw = self.patch_shape if not self.rac and self.patch_shape is not None else self.crop_shape
         imgs = root.zeros(
             "imgs", 
             mode="w", 
@@ -146,9 +142,30 @@ class ZarrWriter(BaseWriter):
             dtype="i4"
         )
 
+        dataset_mean = root.zeros(
+            "dataset_mean", 
+            mode="w", 
+            shape=(1, 3), 
+            chunks=False,
+            dtype="f4"
+        )
+
+        dataset_std = root.zeros(
+            "dataset_std", 
+            mode="w", 
+            shape=(1, 3), 
+            chunks=False,
+            dtype="f4"
+        )
+
         # Iterate imgs and masks -> patch -> save to zarr
         img_files = self.get_files(self.img_dir)
         mask_files = self.get_files(self.mask_dir)
+
+        # For dataset stats computations
+        channel_sum = np.zeros(3)
+        channel_sum_sq = np.zeros(3)
+        pixel_num = 0
         
         with tqdm(total=len(img_files), unit="file") as pbar:
             for i, (img_path, mask_path) in enumerate(zip(img_files, mask_files), 1):
@@ -175,6 +192,12 @@ class ZarrWriter(BaseWriter):
                         patches_mask=patches[..., 3:],
                         crop_shape=self.crop_shape
                     )
+
+                # Compute stats from the patches
+                pixel_stats = self._patch_stats(patches[..., :3])
+                pixel_num += pixel_stats[0]
+                channel_sum += pixel_stats[1]
+                channel_sum_sq += pixel_stats[2]
                 
                 im_p = patches[..., :3].astype("uint8")
                 inst_p = patches[..., 3].astype("int32")
@@ -190,6 +213,9 @@ class ZarrWriter(BaseWriter):
                     info=f"Writing {npatch} mask and image patches from file: {Path(img_path).name} to zarr array"
                 )
                 pbar.update(1)
+
+        dataset_mean[:] += channel_sum / pixel_num
+        dataset_std[:] += np.sqrt(channel_sum_sq / pixel_num - np.square(dataset_mean))
 
         # Add # of patches to attrs
         root.attrs["n_items"] = len(imgs)

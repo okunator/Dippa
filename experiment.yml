@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: baseline_pannuke
-  experiment_version: hover_test3
+  experiment_version: basic_test4_datanorm
 
 dataset_args:
   train_dataset: pannuke         # One of (consep, pannuke, kumar, monusac)
@@ -32,7 +32,7 @@ model_args:
 
   decoder_branches:
     type_branch: True
-    aux_branch: hover        # One of (hover, dist, contour, null)
+    aux_branch: null        # One of (hover, dist, contour, null)
 
 training_args:
   normalize_input: False          # minmax normalize input images after augs
@@ -63,7 +63,7 @@ training_args:
 
 runtime_args:
   resume_training: False
-  num_epochs: 5
+  num_epochs: 3
   num_gpus: 1
   batch_size: 8
   num_workers: 8              # number workers for data loader

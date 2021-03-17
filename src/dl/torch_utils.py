@@ -5,27 +5,37 @@ import numpy as np
 from typing import Union, Optional
 
 
-def ndarray_to_tensor(array: np.ndarray) -> torch.Tensor:
+def ndarray_to_tensor(array: np.ndarray, dim_order: str="HWC", add_channel: bool=False) -> torch.Tensor:
     """
     Convert img or mask of shape (H, W)|(H, W, C)|(B, H, W, C) to tensor (B, C, H, W)
 
     Args:
     -----------
-        array (np.ndarray) : 
+        array (np.ndarray): 
             numpy matrix of shape (H, W) or (H, W, C)
+        dim_order (str, default="HWC"):
+            The order of the dimensions in the tensor
     """
     assert isinstance(array, np.ndarray), f"Input type: {type(array)} is not np.ndarray"
     assert 1 < len(array.shape) <= 4, f"ndarray.shape {array.shape}, rank needs to be bw [2, 4]" 
+    assert dim_order in ("HW", "HWC", "BHWC", "BCHW", "BHW")
 
     # Add channel dim if needed
-    if len(array.shape) == 2:
-        array = array[..., None]
+    if add_channel:
+        if dim_order == "HW":
+            array = array[None, ...]
+        elif dim_order ==  "BHW":
+            array = array[:, None, ...]
 
     # Add batch dim if needed
-    if len(array.shape) < 4:
+    if dim_order not in ("BHWC", "BCHW", "BHW"):
         array = array[None, ...]
+    
 
-    return torch.from_numpy(array.transpose(0, 3, 1, 2))
+    if dim_order in ("BHWC", "HWC"):
+        array = array.transpose(0, 3, 1, 2)
+
+    return torch.from_numpy(array)
 
 
 def tensor_to_ndarray(tensor: torch.Tensor, 

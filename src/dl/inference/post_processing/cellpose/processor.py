@@ -46,7 +46,6 @@ class CellposePostProcessor(PostProcessor):
         type_map = maps[3]
 
         inst_map = self.threshold(prob_map)
-        hover_map = 5
         cellpose_dict = post_proc_cellpose(hover_map, inst_map)
 
         combined = None

@@ -15,7 +15,7 @@ from .post_processing.processor_builder import PostProcBuilder
 from .predictor import Predictor
 
 
-SUFFIXES = (".jpeg", ".jpg", "tif", ".tiff", ".png")
+SUFFIXES = (".jpeg", ".jpg", ".tif", ".tiff", ".png")
 
 
 class FolderDataset(Dataset, FileHandler):
@@ -47,7 +47,6 @@ class FolderDataset(Dataset, FileHandler):
     def __getitem__(self, index: int) -> torch.Tensor:
         fn = self.fnames[index]
         im = FileHandler.read_img(fn.as_posix())
-
         im = torch.from_numpy(im.transpose(2, 0, 1))
 
         return {
@@ -203,8 +202,9 @@ class Inferer:
             thresh=thresh
         )
 
-        # input scaling flag
+        # input norm flag and train data stats
         self.norm = self.model.normalize_input
+        self.stats = self.model.fm.get_dataset_stats(self.model.train_data.as_posix())
 
     def _get_batch(self, patches: torch.Tensor, batch_size: int) -> torch.Tensor:
         """
@@ -240,7 +240,7 @@ class Inferer:
             contain aux or type branch the predictions are None
         """
         # TODO: tta
-        pred = self.predictor.forward_pass(batch, norm=self.norm)
+        pred = self.predictor.forward_pass(batch, norm=self.norm, mean=self.stats[0], std=self.stats[1])
         insts = self.predictor.classify(pred["instances"], act="softmax") # goes to cpu
         types = self.predictor.classify(pred["types"], act="softmax") if pred["types"] is not None else None
         aux = self.predictor.classify(pred["aux"], act=None, apply_weights=self.apply_weights) if pred["aux"] is not None else None

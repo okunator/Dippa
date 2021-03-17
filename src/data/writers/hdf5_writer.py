@@ -140,10 +140,29 @@ class HDF5Writer(BaseWriter):
             shape=(1, len(self.classes))
         )
 
+        dataset_mean = h5.create_carray(
+            where=root, 
+            name="dataset_mean", 
+            atom=tb.Float32Atom(), 
+            shape=(1, 3)
+        )
+
+        dataset_std = h5.create_carray(
+            where=root, 
+            name="dataset_std", 
+            atom=tb.Float32Atom(), 
+            shape=(1, 3)
+        )
+
         # Iterate imgs and masks -> patch -> save to hdf5
         img_files = self.get_files(self.img_dir)
         mask_files = self.get_files(self.mask_dir)
-        
+
+        # Channel-wise mean & std for the whole dataset
+        channel_sum = np.zeros(3)
+        channel_sum_sq = np.zeros(3)
+        pixel_num = 0
+                
         with tqdm(total=len(img_files), unit="file") as pbar:
             for i, (img_path, mask_path) in enumerate(zip(img_files, mask_files), 1):
                 # get data
@@ -169,6 +188,12 @@ class HDF5Writer(BaseWriter):
                         patches_mask=patches[..., 3:],
                         crop_shape=self.crop_shape
                     )
+
+                # Compute stats from the patches
+                pixel_stats = self._patch_stats(patches[..., :3])
+                pixel_num += pixel_stats[0]
+                channel_sum += pixel_stats[1]
+                channel_sum_sq += pixel_stats[2]
                 
                 im_p = patches[..., :3].astype("uint8")
                 inst_p = patches[..., 3].astype("int32")
@@ -184,6 +209,10 @@ class HDF5Writer(BaseWriter):
                     info=f"Writing {npatch} mask and image patches from file: {Path(img_path).name} to hdf5 storage"
                 )
                 pbar.update(1)
+
+        # Compute dataset level mean & std 
+        dataset_mean[:] += channel_sum / pixel_num
+        dataset_std[:] += np.sqrt(channel_sum_sq / pixel_num - np.square(dataset_mean))
 
         # Add # of patches to attrs
         root._v_attrs.n_items = imgs.shape[0]

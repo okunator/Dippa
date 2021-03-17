@@ -24,14 +24,14 @@ def confusion_mat(yhat: torch.Tensor,
         torch.Tensor of shape (B, num_classes, num_classes)
     """
 
+    yhat_soft = yhat
     if activation is not None:
         assert activation in ("sigmoid", "softmax"), f"activation: {activation} sigmoid and softmax allowed."
         if activation == "sigmoid":
             yhat_soft = torch.sigmoid(yhat)
         elif activation == "softmax":
             yhat_soft = F.softmax(yhat, dim=1)
-        else:
-            yhat_soft = yhat
+            
     
     n_classes = yhat_soft.shape[1]
     batch_size = yhat_soft.shape[0]

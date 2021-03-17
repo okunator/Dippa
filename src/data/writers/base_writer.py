@@ -18,6 +18,33 @@ class BaseWriter(ABC, FileHandler):
     def write2db(self):
         raise NotImplementedError
 
+    def _patch_stats(self, patches_im: np.ndarray, num_channels: int=3) -> np.ndarray:
+        """
+        Compute the number of pixels. Channel-wise sum and channel-wise squared sum
+        for dataset mean & std computations.
+
+        Args:
+        ----------
+            patches_im (np.ndarray):
+                Image patches. Shape (n_patches, pH, pW, num_channels)
+            num_channels (int, default=3):
+                number of channels in the patches
+
+        Returns: 
+        ----------
+            Tuple[Union[int, np.ndarray]] : The computed statistics. np.ndarrays have shape (3, ).
+        """
+        pixel_num = 0 
+        channel_sum = np.zeros(num_channels)
+        channel_sum_sq = np.zeros(num_channels)
+        for i in range(patches_im.shape[0]):
+            img = patches_im[i] / 255
+            pixel_num += (img.size/num_channels)
+            channel_sum += np.sum(img, axis=(0, 1))
+            channel_sum_sq += np.sum(np.square(img), axis=(0, 1))
+        
+        return pixel_num, channel_sum.astype("f4"), channel_sum_sq.astype("f4")
+
     def _augment_patches(self, 
                          patches_im: np.ndarray, 
                          patches_mask: np.ndarray, 
@@ -73,8 +100,8 @@ class BaseWriter(ABC, FileHandler):
         ---------
             np.ndarray of shape (C, ). indices are classes, values teh number of pixels per cls
         """
-        totals = np.zeros(len(self.classes))
+        pixels = np.zeros(len(self.classes))
         for j, val in enumerate(self.classes.values()):
-            totals[j] += sum(sum(type_map == val))
+            pixels[j] += sum(sum(type_map == val))
             
-        return totals.astype("int32")
+        return pixels.astype("int32")

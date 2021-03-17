@@ -14,7 +14,7 @@ from src.settings import DATA_DIR, CONF_DIR, PATCH_DIR, RESULT_DIR
 
 class FileHandler:
     """
-    Class for handling different file formats that are needed in the project.
+    Class for handling flie reading
     """
     @staticmethod
     def read_img(path: Union[str, Path]) -> np.ndarray:
@@ -70,6 +70,21 @@ class FileHandler:
 
         class_weights = 1 - npixels / npixels.sum()
         return class_weights
+
+    @staticmethod
+    def get_dataset_stats(path: Union[str, Path]) -> Tuple[np.ndarray]:
+        path = Path(path)
+        if path.suffix == ".h5": 
+            with tb.open_file(path.as_posix(), "r") as db:
+                mean = db.root.dataset_mean[:]
+                std = db.root.dataset_std[:]
+
+        elif path.suffix == ".zarr":
+            z = zarr.open(path.as_posix(), mode="r")
+            mean = z["dataset_mean"][:]
+            std = z["dataset_std"][:]
+        
+        return mean, std
 
     @staticmethod
     def create_dir(path: Union[str, Path]) -> None:
