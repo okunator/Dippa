@@ -492,6 +492,7 @@ class SegModel(pl.LightningModule):
             aux_branch_loss=self.aux_branch_loss,
             binary_weights=self.binary_weights,
             class_weights=self.type_weights,
+            edge_weight=self.edge_weight
         )
         return loss
 

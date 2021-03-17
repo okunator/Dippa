@@ -58,7 +58,7 @@ training_args:
     inst_branch_loss: dice_ce
     type_branch_loss: dice_ce
     aux_branch_loss: mse_ssim
-    edge_weight: 1.1         # (float) Give penalty to nuclei borders in cross-entropy based losses
+    edge_weight: 1.1         # (float|null) Give penalty to nuclei borders in cross-entropy based losses
     class_weights: False     # Weight classes by the # of class pixels in the data
 
 runtime_args:
