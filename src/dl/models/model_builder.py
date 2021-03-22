@@ -4,7 +4,7 @@ import segmentation_models_pytorch as smp
 from omegaconf import DictConfig
 from typing import Optional, List
 
-from .decoders import BasicDecoder
+from .decoders import Decoder
 from .base_model import MultiTaskSegModel
 from .heads import SegHead
 
@@ -77,9 +77,10 @@ class Model(MultiTaskSegModel):
                 Number of classes in the dataset. Type decoder branch is set to output this 
                 number of classes. If type_branch = False, this is ignored.
         """
-        assert len(decoder_channels) == encoder_depth, (
-            f"encoder dept: {encoder_depth} != len(decoder_channels): {len(decoder_channels)}" 
-        )
+        if decoder_channels is not None:
+            assert len(decoder_channels) == encoder_depth, (
+                f"encoder dept: {encoder_depth} != len(decoder_channels): {len(decoder_channels)}" 
+            )
         super(Model, self).__init__()
 
         # encoder args
@@ -97,7 +98,7 @@ class Model(MultiTaskSegModel):
         self.decoder_n_blocks = decoder_n_blocks
         self.decoder_short_skips = decoder_short_skips
         self.decoder_upsampling = decoder_upsampling
-        self.decoder_channels = [256, 128, 64, 32, 16] if decoder_channels is not None else decoder_channels
+        self.decoder_channels = [256, 128, 64, 32, 16] if decoder_channels is None else decoder_channels
         self.long_skips = long_skips
         self.merge_policy = long_skip_merge_policy
 
@@ -114,7 +115,7 @@ class Model(MultiTaskSegModel):
             weights=self.encoder_weights
         )
         
-        self.inst_decoder = BasicDecoder(
+        self.inst_decoder = Decoder(
             encoder_channels=list(self.encoder.out_channels),
             decoder_channels=self.decoder_channels,
             same_padding=True,
@@ -137,7 +138,7 @@ class Model(MultiTaskSegModel):
         self.type_decoder = None
         self.type_seg_head = None
         if self.decoder_type_branch:
-            self.type_decoder = BasicDecoder(
+            self.type_decoder = Decoder(
                 encoder_channels=list(self.encoder.out_channels),
                 decoder_channels=self.decoder_channels,
                 same_padding=True,
@@ -152,7 +153,7 @@ class Model(MultiTaskSegModel):
             )
 
             self.type_seg_head = SegHead(
-                in_channels=decoder_channels[-1],
+                in_channels=self.decoder_channels[-1],
                 out_channels=n_types,
                 kernel_size=1
             )
@@ -161,7 +162,7 @@ class Model(MultiTaskSegModel):
         self.aux_seg_head = None
         if self.decoder_aux_branch is not None:
             aux_out_channels = 2 if self.decoder_aux_branch == "hover" else 1
-            self.aux_decoder = BasicDecoder(
+            self.aux_decoder = Decoder(
                 encoder_channels=list(self.encoder.out_channels),
                 decoder_channels=self.decoder_channels,
                 same_padding=True,

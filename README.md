@@ -106,7 +106,7 @@ runtime_args:
   batch_size: 8
   num_workers: 8              # number workers for data loader
   model_input_size: 256       # size of the model input (input_size, input_size)
-  db_type: "zarr"             # The type of the input data db. One of (hdf5, zarr). 
+  db_type: zarr             # The type of the input data db. One of (hdf5, zarr). 
 ```
 
 Borrowing functions and utilities from:

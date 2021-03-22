@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: baseline_pannuke
-  experiment_version: basic_test4_datanorm
+  experiment_version: residual_hover
 
 dataset_args:
   train_dataset: pannuke         # One of (consep, pannuke, kumar, monusac)
@@ -19,7 +19,7 @@ model_args:
       depth: 5                  # Number of layers in encoder
     decoder_args:
       n_blocks: 2               # Number of convolutions blocks in each decoder block
-      short_skips: nope         # One of (residual, dense, nope) (for decoder branch only)
+      short_skips: residual         # One of (residual, dense, nope) (for decoder branch only)
       long_skips: unet          # One of (unet, unet++, unet3+, nope)
       merge_policy: summation   # One of (sum, cat) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
@@ -32,7 +32,7 @@ model_args:
 
   decoder_branches:
     type_branch: True
-    aux_branch: null        # One of (hover, dist, contour, null)
+    aux_branch: hover        # One of (hover, dist, contour, null)
 
 training_args:
   normalize_input: False          # minmax normalize input images after augs

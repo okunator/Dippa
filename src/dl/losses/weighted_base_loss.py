@@ -21,7 +21,6 @@ class WeightedBaseLoss(nn.Module):
         super(WeightedBaseLoss, self).__init__()
         self.class_weights = class_weights
         self.edge_weight = edge_weight
-        print(self.edge_weight)
     
     def apply_class_weights(self, 
                             loss_matrix: torch.Tensor,

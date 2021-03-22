@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 from typing import List, Tuple
 
-from . import BasicDecoderBlock
+from . import BasicDecoderBlock, ResidualDecoderBlock
 
 
-class BasicDecoder(nn.ModuleDict):
+class Decoder(nn.ModuleDict):
     def __init__(self,
                  encoder_channels: List[int],
                  decoder_channels: List[int],
@@ -44,7 +44,9 @@ class BasicDecoder(nn.ModuleDict):
             up_sampling (str, default="fixed_unpool"):
                 up sampling method to be used.
                 One of ("interp", "max_unpool", "transconv", "fixed_unpool")
-            short_skip ()
+            short_skip (str, default="nope"):
+                Use short skip connections inside the decoder blocks.
+                One of ("resdidual", "dense", "nope") ("nope"=None)
             long_skip (str, default="unet"):
                 long skip connection style to be used.
                 One of ("unet", "unet++", "unet3+", "nope")
@@ -52,7 +54,7 @@ class BasicDecoder(nn.ModuleDict):
                 whether long skip is summed or concatenated
                 One of ("summation", "concatenate") 
         """
-        super(BasicDecoder, self).__init__()
+        super(Decoder, self).__init__()
         assert len(encoder_channels[1:]) == len(decoder_channels), "Encoder and decoder need to have same number of layers (symmetry)"
         assert short_skip in ("residual", "dense", "nope")
         self.decoder_type = short_skip
@@ -65,7 +67,7 @@ class BasicDecoder(nn.ModuleDict):
         head_channels = encoder_channels[0]
 
         # in_channels for all decoder layers
-        in_channels = [head_channels] + decoder_channels
+        in_channels = [head_channels] + list(decoder_channels)
 
         # skip channels for every decoder layer
         # no skip connection at the last decoder layer
@@ -86,7 +88,7 @@ class BasicDecoder(nn.ModuleDict):
         for i, (in_ch, skip_ch, out_ch) in enumerate(zip(in_channels, skip_channels, decoder_channels), 1):
             decoder_block = nn.ModuleDict({
                 "nope": BasicDecoderBlock(in_ch, skip_ch, out_ch, **kwargs),
-                "residual":None,
+                "residual":ResidualDecoderBlock(in_ch, skip_ch, out_ch, **kwargs),
                 "dense":None
             })
             self.add_module(f"decoder_block{i}", decoder_block)
