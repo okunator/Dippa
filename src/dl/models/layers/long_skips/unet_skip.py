@@ -49,6 +49,7 @@ class UnetSkipBlock(nn.ModuleDict):
                 x = torch.cat([x, skip], dim=1)
             elif self.merge_policy == "summation":
                 skip = skips[idx]
+                # if num skip channels != num input channels
                 if skip.shape[1] != x.shape[1]:
                     skip = self.ch_pool(skips[idx])
                 x += skip

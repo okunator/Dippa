@@ -11,14 +11,15 @@ class BasicDecoderBlock(nn.Module):
                  in_channels: int,
                  skip_channels: int,
                  out_channels: int,
-                 same_padding: bool = True,
-                 batch_norm: str = "bn",
-                 activation: str = "relu",
-                 weight_standardize: bool = False,
-                 n_blocks: int = 2,
-                 up_sampling: str = "fixed_unpool",
-                 long_skip: str = "unet",
-                 long_skip_merge_policy: str = "summation") -> None:
+                 same_padding: bool=True,
+                 batch_norm: str="bn",
+                 activation: str="relu",
+                 weight_standardize: bool=False,
+                 up_sampling: str="fixed_unpool",
+                 long_skip: str="unet",
+                 long_skip_merge_policy: str="summation",
+                 n_layers: int=1,
+                 n_blocks: int=2) -> None:
 
         """
         Basic decoder block. 
@@ -47,8 +48,6 @@ class BasicDecoderBlock(nn.Module):
                 Activation method. One of ("relu", "swish". "mish")
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
-            n_blocks (int, default=2):
-                Number of basic convolution blocks in this Decoder block
             up_sampling (str, default="fixed_unpool"):
                 up sampling method to be used.
                 One of ("interp", "max_unpool", "transconv", "fixed_unpool")
@@ -57,7 +56,13 @@ class BasicDecoderBlock(nn.Module):
                 One of ("unet", "unet++", "unet3+", "nope")
             long_skip_merge_policy (str, default: "cat):
                 whether long skip is summed or concatenated
-                One of ("summation", "concatenate")        
+                One of ("summation", "concatenate")
+            n_layers (int, default=1):
+                The number of residual multiconv blocks inside one residual 
+                decoder block
+            n_blocks (int, default=2):
+                Number of basic (bn->relu->conv)-blocks inside one residual
+                multiconv block        
         """
         super(BasicDecoderBlock, self).__init__()
         assert up_sampling in ("interp", "max_unpool", "transconv", "fixed_unpool")
@@ -94,19 +99,25 @@ class BasicDecoderBlock(nn.Module):
                 "unet3+": None,
             })
 
-        # multi conv block
-        self.multiconv_block = MultiBlockBasic(
-            in_channels=in_channels, 
-            out_channels=out_channels,
-            n_blocks=n_blocks,
-            batch_norm=batch_norm, 
-            activation=activation,
-            weight_standardize=weight_standardize
-        )
+        # multi conv blocks
+        self.conv_modules = nn.ModuleDict()
+        for i in range(n_layers):
+            num_in_features = in_channels if i == 0 else out_channels
+            layer = MultiBlockBasic(
+                in_channels=num_in_features, 
+                out_channels=out_channels,
+                n_blocks=n_blocks,
+                batch_norm=batch_norm, 
+                activation=activation,
+                weight_standardize=weight_standardize
+            )
+            self.conv_modules[f"multiconv_block{i + 1}"] = layer
         
     def forward(self, x: torch.Tensor, skips: Tuple[torch.Tensor], **kwargs) -> torch.Tensor:
         x = self.up_choices[self.up_sampling](x)
         if self.skip_choices is not None:
             x = self.skip_choices[self.long_skip](x, skips, **kwargs)
-        x = self.multiconv_block(x)
+           
+        for name, module in self.conv_modules.items():
+            x = module(x)
         return x

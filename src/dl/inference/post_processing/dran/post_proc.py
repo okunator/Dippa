@@ -44,7 +44,7 @@ def post_proc_dran(prob_map: np.ndarray, contour_map: np.ndarray) -> np.ndarray:
 
     # Find the distance map of the markers and normalize
     distance = ndi.distance_transform_edt(markers)
-    distance = 255 * (distance / np.amax(distance))
+    distance = 255 * (distance / (np.amax(distance) + 1e-7))
 
     # watershed
     inst_map = segm.watershed(-distance, markers=markers, mask=binary)

@@ -24,7 +24,7 @@ class PostProcBuilder:
             thresh (float, default = 0.5): 
                 threshold probability value. Only used if method == "naive"  
         """
-        assert post_proc_method in ("dcan", "dran", "cellpose", "hover", "basic")
+        assert post_proc_method in ("drfns", "dcan", "dran", "cellpose", "hover", "basic")
         c = cls()
         key = post_proc.POST_PROC_LOOKUP[post_proc_method]
         return post_proc.__dict__[key](thresh_method, thresh)

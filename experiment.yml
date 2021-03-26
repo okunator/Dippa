@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: baseline_pannuke
-  experiment_version: residual_hover
+  experiment_version: dense_hover_depth_test_4
 
 dataset_args:
   train_dataset: pannuke         # One of (consep, pannuke, kumar, monusac)
@@ -18,8 +18,9 @@ model_args:
       pretrain: True            # Use imagenet pre-trained encoder
       depth: 5                  # Number of layers in encoder
     decoder_args:
-      n_blocks: 2               # Number of convolutions blocks in each decoder block
-      short_skips: residual         # One of (residual, dense, nope) (for decoder branch only)
+      n_layers: 1               # Number multi conv blocks inside one decoder level 
+      n_blocks: 2               # Number of convolutions blocks in each multi conv block
+      short_skips: dense     # One of (residual, dense, nope) (for decoder branch only)
       long_skips: unet          # One of (unet, unet++, unet3+, nope)
       merge_policy: summation   # One of (sum, cat) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
@@ -58,7 +59,7 @@ training_args:
     inst_branch_loss: dice_ce
     type_branch_loss: dice_ce
     aux_branch_loss: mse_ssim
-    edge_weight: 1.1         # (float|null) Give penalty to nuclei borders in cross-entropy based losses
+    edge_weight: null         # (float|null) Give penalty to nuclei borders in cross-entropy based losses
     class_weights: False     # Weight classes by the # of class pixels in the data
 
 runtime_args:

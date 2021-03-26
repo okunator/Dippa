@@ -18,6 +18,7 @@ class Model(MultiTaskSegModel):
                  encoder_freeze: bool=False,
                  decoder_type_branch: bool=True,
                  decoder_aux_branch: str=True,
+                 decoder_n_layers: int=1,
                  decoder_n_blocks: int=2,
                  decoder_upsampling: str="fixed_unpool",
                  decoder_weight_init: str="he",
@@ -51,8 +52,11 @@ class Model(MultiTaskSegModel):
             decoder_aux_branch (str, default=True):
                 The auxiliary branch type. One of ("hover", "dist", "contour", None). If None, no
                 auxiliary branch is included in the network.
+            decoder_n_layers (int, default=1):
+                Number of multi-conv blocks inside each level of the decoder
             decoder_n_blocks (int, default=2):
-                Number of conv blocks in each layer of the decoder.
+                Number of conv blocks inside each multiconv block at every level
+                in the decoder.
             decoder_upsampling (str, default="fixed_unpool"):
                 The upsampling method. One of ("interp", "max_unpool", transconv", "fixed_unpool")
             decoder_weight_init (str, default="he"):
@@ -95,6 +99,7 @@ class Model(MultiTaskSegModel):
         self.decoder_type_branch = decoder_type_branch
         self.decoder_aux_branch = decoder_aux_branch
         self.decoder_weight_init = decoder_weight_init
+        self.decoder_n_layers = decoder_n_layers
         self.decoder_n_blocks = decoder_n_blocks
         self.decoder_short_skips = decoder_short_skips
         self.decoder_upsampling = decoder_upsampling
@@ -123,6 +128,7 @@ class Model(MultiTaskSegModel):
             activation=self.activation,
             weight_standardize=self.weight_standardize,
             n_blocks=self.decoder_n_blocks,
+            n_layers=self.decoder_n_layers,
             up_sampling=self.decoder_upsampling,
             short_skip=self.decoder_short_skips,
             long_skip=self.long_skips,
@@ -145,6 +151,7 @@ class Model(MultiTaskSegModel):
                 batch_norm=self.normalization,
                 activation=self.activation,
                 weight_standardize=self.weight_standardize,
+                n_layers=self.decoder_n_layers,
                 n_blocks=self.decoder_n_blocks,
                 up_sampling=self.decoder_upsampling,
                 short_skip=self.decoder_short_skips,
@@ -169,6 +176,7 @@ class Model(MultiTaskSegModel):
                 batch_norm=self.normalization,
                 activation=self.activation,
                 weight_standardize=self.weight_standardize,
+                n_layers=self.decoder_n_layers,
                 n_blocks=self.decoder_n_blocks,
                 up_sampling=self.decoder_upsampling,
                 short_skip=self.decoder_short_skips,

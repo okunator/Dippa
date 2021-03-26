@@ -31,6 +31,7 @@ class SegModel(pl.LightningModule):
                  encoder_freeze: bool=False,
                  decoder_type_branch: bool=True,
                  decoder_aux_branch: str=True,
+                 decoder_n_layers: int=1,
                  decoder_n_blocks: int=2,
                  decoder_weight_init: str="he",
                  decoder_short_skips: str="nope",
@@ -89,8 +90,11 @@ class SegModel(pl.LightningModule):
             decoder_aux_branch (str, default=True):
                 The auxiliary branch type. One of ("hover", "dist", "contour", None). If None, no
                 auxiliary branch is included in the network.
+            decoder_n_layers (int, default=1):
+                Number of multi-conv blocks inside each level of the decoder
             decoder_n_blocks (int, default=2):
-                Number of conv blocks in each layer of the decoder.
+                Number of conv blocks inside each multiconv block at every level
+                in the decoder.
             decoder_upsampling (str, default="fixed_unpool"):
                 The upsampling method. One of ("interp", "max_unpool", transconv", "fixed_unpool")
             decoder_weight_init (str, default="he"):
@@ -100,7 +104,7 @@ class SegModel(pl.LightningModule):
                 ("residual", "dense", "nope") where "nope" = None.
             decoder_channels (List[int], default=None):
                 list of integers for the number of channels in each decoder block.
-                Length of the list has to be equal to n_blocks.
+                Length of the list has to be equal to encoder_depth.
             activation (str, default="relu"):
                 Activation method. One of ("mish", "swish", "relu")
             normalization (str, default="bn"):
@@ -167,6 +171,7 @@ class SegModel(pl.LightningModule):
         # Decoder_args
         self.decoder_type_branch = decoder_type_branch
         self.decoder_aux_branch = decoder_aux_branch
+        self.decoder_n_layers = decoder_n_layers
         self.decoder_n_blocks = decoder_n_blocks
         self.decoder_weight_init = decoder_weight_init
         self.decoder_short_skips = decoder_short_skips
@@ -229,6 +234,7 @@ class SegModel(pl.LightningModule):
             encoder_freeze=self.encoder_freeze,
             decoder_type_branch=self.decoder_type_branch,
             decoder_aux_branch=self.decoder_aux_branch,
+            decoder_n_layers=self.decoder_n_layers,
             decoder_n_blocks=self.decoder_n_blocks,
             decoder_upsampling=self.decoder_upsampling,
             decoder_weight_init=self.decoder_weight_init,
@@ -265,6 +271,7 @@ class SegModel(pl.LightningModule):
             decoder_type_branch=conf.model_args.decoder_branches.type_branch,
             decoder_aux_branch=conf.model_args.decoder_branches.aux_branch,
             decoder_upsampling=conf.model_args.architecture_design.decoder_args.upsampling,
+            decoder_n_layers=conf.model_args.architecture_design.decoder_args.n_layers,
             decoder_n_blocks=conf.model_args.architecture_design.decoder_args.n_blocks,
             decoder_weight_init=conf.model_args.architecture_design.module_args.weight_init,
             decoder_short_skips=conf.model_args.architecture_design.decoder_args.short_skips,

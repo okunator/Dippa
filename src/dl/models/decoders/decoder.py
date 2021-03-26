@@ -2,22 +2,23 @@ import torch
 import torch.nn as nn
 from typing import List, Tuple
 
-from . import BasicDecoderBlock, ResidualDecoderBlock
+from . import BasicDecoderBlock, ResidualDecoderBlock, DenseDecoderBlock
 
 
 class Decoder(nn.ModuleDict):
     def __init__(self,
                  encoder_channels: List[int],
                  decoder_channels: List[int],
-                 same_padding: bool = True,
-                 batch_norm: str = "bn",
-                 activation: str = "relu",
-                 weight_standardize: bool = False,
-                 n_blocks: int = 2,
-                 up_sampling: str = "fixed_unpool",
-                 short_skip: str = "basic",
-                 long_skip: str = "unet",
+                 same_padding: bool=True,
+                 batch_norm: str="bn",
+                 activation: str="relu",
+                 weight_standardize: bool=False,
+                 up_sampling: str="fixed_unpool",
+                 short_skip: str="basic",
+                 long_skip: str="unet",
                  long_skip_merge_policy: str ="summation",
+                 n_layers: int=1,
+                 n_blocks: int=2,
                  **kwargs) -> None:
         """
         Basic Decoder block. Adapted from the implementation of 
@@ -53,6 +54,13 @@ class Decoder(nn.ModuleDict):
             long_skip_merge_policy (str, default: "cat):
                 whether long skip is summed or concatenated
                 One of ("summation", "concatenate") 
+            n_layers (int, default=1):
+                The number of multiconv blocks inside one decoder block
+                A multiconv block is a block containing atleast two 
+                (bn->relu->conv)-operations
+            n_blocks (int, default=2):
+                Number of basic (bn->relu->conv)-blocks inside one dense 
+                multiconv block.
         """
         super(Decoder, self).__init__()
         assert len(encoder_channels[1:]) == len(decoder_channels), "Encoder and decoder need to have same number of layers (symmetry)"
@@ -79,6 +87,7 @@ class Decoder(nn.ModuleDict):
         kwargs.setdefault("batch_norm", batch_norm)
         kwargs.setdefault("activation", activation)
         kwargs.setdefault("weight_standardize", weight_standardize)
+        kwargs.setdefault("n_layers", n_layers)
         kwargs.setdefault("n_blocks", n_blocks)
         kwargs.setdefault("up_sampling", up_sampling)
         kwargs.setdefault("long_skip", long_skip)
@@ -89,7 +98,7 @@ class Decoder(nn.ModuleDict):
             decoder_block = nn.ModuleDict({
                 "nope": BasicDecoderBlock(in_ch, skip_ch, out_ch, **kwargs),
                 "residual":ResidualDecoderBlock(in_ch, skip_ch, out_ch, **kwargs),
-                "dense":None
+                "dense":DenseDecoderBlock(in_ch, skip_ch, out_ch, **kwargs),
             })
             self.add_module(f"decoder_block{i}", decoder_block)
 

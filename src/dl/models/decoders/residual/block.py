@@ -36,8 +36,8 @@ class ResidualConvBlock(BaseConvBlock):
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             use_residual (bool, default=True):
-                If True, the identity is summed to the activated 
-                linear unit.
+                If True, the identity is summed to the linear unit 
+                before the final activation
         """
         super(ResidualConvBlock, self).__init__(
             in_channels=in_channels,
@@ -45,7 +45,8 @@ class ResidualConvBlock(BaseConvBlock):
             same_padding=same_padding,
             batch_norm=batch_norm,
             activation=activation,
-            weight_standardize=weight_standardize
+            weight_standardize=weight_standardize,
+            preactivate=False
         )
         self.use_residual = use_residual
 
@@ -65,11 +66,11 @@ class MultiBlockResidual(nn.ModuleDict):
     def __init__(self,
                  in_channels: int,
                  out_channels: int,
-                 same_padding: bool = True,
-                 batch_norm: str = "bn",
-                 activation: str = "relu",
-                 weight_standardize: bool = False,
-                 n_blocks: int = 2) -> None:
+                 same_padding: bool=True,
+                 batch_norm: str="bn",
+                 activation: str="relu",
+                 weight_standardize: bool=False,
+                 n_blocks: int=2) -> None:
         """
         Stack residual conv blocks in a ModuleDict. These are used in the
         full sized decoderblocks. The number of basic conv blocks can be 
@@ -108,8 +109,8 @@ class MultiBlockResidual(nn.ModuleDict):
 
         blocks = list(range(1, n_blocks))
         for i in blocks:
-            # apply residual connection at the final block
-            use_residual = True if i == blocks[-1] else False
+            # apply residual connection at the final conv block
+            use_residual = i == blocks[-1]
             conv_block = ResidualConvBlock(
                 in_channels=out_channels, 
                 out_channels=out_channels, 
