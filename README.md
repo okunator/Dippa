@@ -37,11 +37,11 @@ Intructions to run coming later...
 
 ```yaml
 experiment_args:
-  experiment_name: baseline_consep
-  experiment_version: unet_test
+  experiment_name: baseline_pannuke
+  experiment_version: dense_hover_depth_test_4
 
 dataset_args:
-  train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
+  train_dataset: pannuke         # One of (consep, pannuke, kumar, monusac)
 
 model_args:
   architecture_design:
@@ -54,12 +54,14 @@ model_args:
       in_channels: 3            # RGB input images
       encoder: resnet50         # https://github.com/qubvel/segmentation_models.pytorch
       pretrain: True            # Use imagenet pre-trained encoder
-      encoder_depth: 5          # Number of layers in encoder
+      depth: 5                  # Number of layers in encoder
     decoder_args:
-      n_blocks: 2               # Number of convolutions blocks in each decoder block
-      short_skips: nope         # One of (residual, dense, nope) (for decoder branch only)
+      n_layers: 1               # Number multi conv blocks inside one decoder level 
+      n_blocks: 2               # Number of convolutions blocks in each multi conv block
+      preactivate: False        # If True, BN & RELU applied before CONV
+      short_skips: dense        # One of (residual, dense, nope) (for decoder branch only)
       long_skips: unet          # One of (unet, unet++, unet3+, nope)
-      merge_policy: sum         # One of (sum, cat) (for long skips)
+      merge_policy: summation   # One of (sum, cat) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
       decoder_channels:         # Number of out channels for every decoder layer
         - 256
@@ -70,10 +72,10 @@ model_args:
 
   decoder_branches:
     type_branch: True
-    aux_branch: null        # One of (hover, dist, contour, null)
+    aux_branch: hover        # One of (hover, dist, contour, null)
 
 training_args:
-  normalize_input: True          # minmax normalize input images after augs
+  normalize_input: False          # minmax normalize input images after augs
   freeze_encoder: False          # freeze the weights in the encoder (for fine tuning)
   weight_balancing: null         # One of (gradnorm, uncertainty, null)
   augmentations:
@@ -96,17 +98,18 @@ training_args:
     inst_branch_loss: dice_ce
     type_branch_loss: dice_ce
     aux_branch_loss: mse_ssim
-    edge_weight: 1.1         # (float) Give penalty to nuclei borders in cross-entropy based losses
-    class_weights: False       # Weight classes by the # of class pixels in the data
+    edge_weight: null         # (float|null) Give penalty to nuclei borders in cross-entropy based losses
+    class_weights: False     # Weight classes by the # of class pixels in the data
 
 runtime_args:
   resume_training: False
-  num_epochs: 5
+  num_epochs: 3
   num_gpus: 1
   batch_size: 8
   num_workers: 8              # number workers for data loader
   model_input_size: 256       # size of the model input (input_size, input_size)
-  db_type: zarr             # The type of the input data db. One of (hdf5, zarr). 
+  db_type: hdf5             # The type of the input data db. One of (hdf5, zarr). 
+
 ```
 
 Borrowing functions and utilities from:

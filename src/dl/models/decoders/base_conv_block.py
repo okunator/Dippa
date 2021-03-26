@@ -40,7 +40,7 @@ class BaseConvBlock(nn.Module):
                 applied before the convolution.
         """
         super(BaseConvBlock, self).__init__()
-        assert batch_norm in ("bn", "bcn", "nope")
+        assert batch_norm in ("bn", "bcn", None)
         assert activation in ("relu", "mish", "swish")
         
         self.batch_norm = batch_norm

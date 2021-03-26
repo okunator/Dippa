@@ -20,9 +20,10 @@ class Model(MultiTaskSegModel):
                  decoder_aux_branch: str=True,
                  decoder_n_layers: int=1,
                  decoder_n_blocks: int=2,
+                 decoder_preactivate: bool=False,
                  decoder_upsampling: str="fixed_unpool",
                  decoder_weight_init: str="he",
-                 decoder_short_skips: str="nope",
+                 decoder_short_skips: str=None,
                  decoder_channels: List[int]=None,
                  activation: str="relu",
                  normalization: str="bn",
@@ -57,20 +58,22 @@ class Model(MultiTaskSegModel):
             decoder_n_blocks (int, default=2):
                 Number of conv blocks inside each multiconv block at every level
                 in the decoder.
+            decoder_preactivate (bool, default=False):
+                If True, normalization and activation are applied before convolution
             decoder_upsampling (str, default="fixed_unpool"):
                 The upsampling method. One of ("interp", "max_unpool", transconv", "fixed_unpool")
             decoder_weight_init (str, default="he"):
                 weight initialization method One of ("he", "eoc", "fixup")
-            decoder_short_skips (str, default="nope"):
+            decoder_short_skips (str, default=None):
                 The short skip connection style of the decoder. One of 
-                ("residual", "dense", "nope") where "nope" = None.
+                ("residual", "dense", None)
             decoder_channels (List[int], default=None):
                 list of integers for the number of channels in each decoder block.
                 Length of the list has to be equal to n_blocks.
             activation (str, default="relu"):
                 Activation method. One of ("mish", "swish", "relu")
             normalization (str, default="bn"):
-                Normalization method. One of ("bn", "bcn" "nope") where "nope" = None
+                Normalization method. One of ("bn", "bcn" None)
             weight_standardize (bool, default=False):
                 Apply weight standardization in conv layers
             long_skips (str, default="unet"):
@@ -101,6 +104,7 @@ class Model(MultiTaskSegModel):
         self.decoder_weight_init = decoder_weight_init
         self.decoder_n_layers = decoder_n_layers
         self.decoder_n_blocks = decoder_n_blocks
+        self.decoder_preactivate = decoder_preactivate
         self.decoder_short_skips = decoder_short_skips
         self.decoder_upsampling = decoder_upsampling
         self.decoder_channels = [256, 128, 64, 32, 16] if decoder_channels is None else decoder_channels
@@ -127,8 +131,9 @@ class Model(MultiTaskSegModel):
             batch_norm=self.normalization,
             activation=self.activation,
             weight_standardize=self.weight_standardize,
-            n_blocks=self.decoder_n_blocks,
             n_layers=self.decoder_n_layers,
+            n_blocks=self.decoder_n_blocks,
+            preactivate=self.decoder_preactivate,
             up_sampling=self.decoder_upsampling,
             short_skip=self.decoder_short_skips,
             long_skip=self.long_skips,
@@ -153,6 +158,7 @@ class Model(MultiTaskSegModel):
                 weight_standardize=self.weight_standardize,
                 n_layers=self.decoder_n_layers,
                 n_blocks=self.decoder_n_blocks,
+                preactivate=self.decoder_preactivate,
                 up_sampling=self.decoder_upsampling,
                 short_skip=self.decoder_short_skips,
                 long_skip=self.long_skips,
@@ -178,6 +184,7 @@ class Model(MultiTaskSegModel):
                 weight_standardize=self.weight_standardize,
                 n_layers=self.decoder_n_layers,
                 n_blocks=self.decoder_n_blocks,
+                preactivate=self.decoder_preactivate,
                 up_sampling=self.decoder_upsampling,
                 short_skip=self.decoder_short_skips,
                 long_skip=self.long_skips,

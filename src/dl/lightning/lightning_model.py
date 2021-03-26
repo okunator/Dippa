@@ -33,8 +33,9 @@ class SegModel(pl.LightningModule):
                  decoder_aux_branch: str=True,
                  decoder_n_layers: int=1,
                  decoder_n_blocks: int=2,
+                 decoder_preactivate: bool=False,
                  decoder_weight_init: str="he",
-                 decoder_short_skips: str="nope",
+                 decoder_short_skips: str=None,
                  decoder_upsampling: str="fixed_unpool",
                  decoder_channels: List[int]=None,
                  activation: str="relu",
@@ -95,20 +96,22 @@ class SegModel(pl.LightningModule):
             decoder_n_blocks (int, default=2):
                 Number of conv blocks inside each multiconv block at every level
                 in the decoder.
+            decoder_preactivate (bool, default=False):
+                If True, normalization and activation are applied before convolution
             decoder_upsampling (str, default="fixed_unpool"):
                 The upsampling method. One of ("interp", "max_unpool", transconv", "fixed_unpool")
             decoder_weight_init (str, default="he"):
                 weight initialization method One of ("he", "eoc", "fixup")
-            decoder_short_skips (str, default="nope"):
+            decoder_short_skips (str, default=None):
                 The short skip connection style of the decoder. One of 
-                ("residual", "dense", "nope") where "nope" = None.
+                ("residual", "dense", None)
             decoder_channels (List[int], default=None):
                 list of integers for the number of channels in each decoder block.
                 Length of the list has to be equal to encoder_depth.
             activation (str, default="relu"):
                 Activation method. One of ("mish", "swish", "relu")
             normalization (str, default="bn"):
-                Normalization method. One of ("bn", "bcn" "nope") where "nope" = None
+                Normalization method. One of ("bn", "bcn" None)
             weight_standardize (bool, default=False):
                 Apply weight standardization in conv layers
             long_skips (str, default="unet"):
@@ -173,6 +176,7 @@ class SegModel(pl.LightningModule):
         self.decoder_aux_branch = decoder_aux_branch
         self.decoder_n_layers = decoder_n_layers
         self.decoder_n_blocks = decoder_n_blocks
+        self.decoder_preactivate = decoder_preactivate
         self.decoder_weight_init = decoder_weight_init
         self.decoder_short_skips = decoder_short_skips
         self.decoder_upsampling = decoder_upsampling
@@ -236,6 +240,7 @@ class SegModel(pl.LightningModule):
             decoder_aux_branch=self.decoder_aux_branch,
             decoder_n_layers=self.decoder_n_layers,
             decoder_n_blocks=self.decoder_n_blocks,
+            decoder_preactivate=self.decoder_preactivate,
             decoder_upsampling=self.decoder_upsampling,
             decoder_weight_init=self.decoder_weight_init,
             decoder_short_skips=self.decoder_short_skips,
@@ -273,6 +278,7 @@ class SegModel(pl.LightningModule):
             decoder_upsampling=conf.model_args.architecture_design.decoder_args.upsampling,
             decoder_n_layers=conf.model_args.architecture_design.decoder_args.n_layers,
             decoder_n_blocks=conf.model_args.architecture_design.decoder_args.n_blocks,
+            decoder_preactivate=conf.model_args.architecture_design.decoder_args.preactivate,
             decoder_weight_init=conf.model_args.architecture_design.module_args.weight_init,
             decoder_short_skips=conf.model_args.architecture_design.decoder_args.short_skips,
             decoder_channels=conf.model_args.architecture_design.decoder_args.decoder_channels,

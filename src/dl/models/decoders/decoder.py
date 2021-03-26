@@ -19,6 +19,7 @@ class Decoder(nn.ModuleDict):
                  long_skip_merge_policy: str ="summation",
                  n_layers: int=1,
                  n_blocks: int=2,
+                 preactivate: bool=False,
                  **kwargs) -> None:
         """
         Basic Decoder block. Adapted from the implementation of 
@@ -45,12 +46,12 @@ class Decoder(nn.ModuleDict):
             up_sampling (str, default="fixed_unpool"):
                 up sampling method to be used.
                 One of ("interp", "max_unpool", "transconv", "fixed_unpool")
-            short_skip (str, default="nope"):
+            short_skip (str, default=None):
                 Use short skip connections inside the decoder blocks.
-                One of ("resdidual", "dense", "nope") ("nope"=None)
+                One of ("resdidual", "dense", None)
             long_skip (str, default="unet"):
                 long skip connection style to be used.
-                One of ("unet", "unet++", "unet3+", "nope")
+                One of ("unet", "unet++", "unet3+", None)
             long_skip_merge_policy (str, default: "cat):
                 whether long skip is summed or concatenated
                 One of ("summation", "concatenate") 
@@ -61,10 +62,12 @@ class Decoder(nn.ModuleDict):
             n_blocks (int, default=2):
                 Number of basic (bn->relu->conv)-blocks inside one dense 
                 multiconv block.
+            preactivate (bool, default=False)
+                If True, normalization and activation are applied before convolution
         """
         super(Decoder, self).__init__()
         assert len(encoder_channels[1:]) == len(decoder_channels), "Encoder and decoder need to have same number of layers (symmetry)"
-        assert short_skip in ("residual", "dense", "nope")
+        assert short_skip in ("residual", "dense", None)
         self.decoder_type = short_skip
 
         # flip channels nums to start from the deepest channel
@@ -89,17 +92,22 @@ class Decoder(nn.ModuleDict):
         kwargs.setdefault("weight_standardize", weight_standardize)
         kwargs.setdefault("n_layers", n_layers)
         kwargs.setdefault("n_blocks", n_blocks)
+        kwargs.setdefault("preactivate", preactivate)
         kwargs.setdefault("up_sampling", up_sampling)
         kwargs.setdefault("long_skip", long_skip)
         kwargs.setdefault("long_skip_merge_policy", long_skip_merge_policy)
 
-        # Build decoder
+        # Set decoder type
+        if short_skip == "dense":
+            DecoderBlock = DenseDecoderBlock
+        elif short_skip == "residual":
+            DecoderBlock = ResidualDecoderBlock
+        else:
+            DecoderBlock = BasicDecoderBlock
+
+        # Build decoder        
         for i, (in_ch, skip_ch, out_ch) in enumerate(zip(in_channels, skip_channels, decoder_channels), 1):
-            decoder_block = nn.ModuleDict({
-                "nope": BasicDecoderBlock(in_ch, skip_ch, out_ch, **kwargs),
-                "residual":ResidualDecoderBlock(in_ch, skip_ch, out_ch, **kwargs),
-                "dense":DenseDecoderBlock(in_ch, skip_ch, out_ch, **kwargs),
-            })
+            decoder_block = DecoderBlock(in_ch, skip_ch, out_ch, **kwargs)
             self.add_module(f"decoder_block{i}", decoder_block)
 
     def forward(self, *features: Tuple[torch.Tensor]):
@@ -111,5 +119,5 @@ class Decoder(nn.ModuleDict):
         for i, (key, block) in enumerate(self.items()):
             kwargs = {}
             kwargs["idx"] = i
-            x = block[self.decoder_type](x, skips, **kwargs)
+            x = block(x, skips, **kwargs)
         return x

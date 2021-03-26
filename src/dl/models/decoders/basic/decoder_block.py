@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 from typing import Tuple
 
-import src.dl.models.layers as layers
 from .block import MultiBlockBasic
+from ..base_decoder_block import BaseDecoderBlock
 
 
-class BasicDecoderBlock(nn.Module):
+class BasicDecoderBlock(BaseDecoderBlock):
     def __init__(self,
                  in_channels: int,
                  skip_channels: int,
@@ -19,7 +19,8 @@ class BasicDecoderBlock(nn.Module):
                  long_skip: str="unet",
                  long_skip_merge_policy: str="summation",
                  n_layers: int=1,
-                 n_blocks: int=2) -> None:
+                 n_blocks: int=2,
+                 preactivate: bool=False) -> None:
 
         """
         Basic decoder block. 
@@ -35,7 +36,7 @@ class BasicDecoderBlock(nn.Module):
                 Number of input channels
             skip_channels (int):
                 Number of channels in the encoder skip tensor.
-                Ignored if long_skip == "nope".
+                Ignored if long_skip == None.
             out_channels (int):
                 Number of output channels
             same_padding (bool, default=True):
@@ -53,7 +54,7 @@ class BasicDecoderBlock(nn.Module):
                 One of ("interp", "max_unpool", "transconv", "fixed_unpool")
             long_skip (str, default="unet"):
                 long skip connection style to be used.
-                One of ("unet", "unet++", "unet3+", "nope")
+                One of ("unet", "unet++", "unet3+", None)
             long_skip_merge_policy (str, default: "cat):
                 whether long skip is summed or concatenated
                 One of ("summation", "concatenate")
@@ -63,61 +64,40 @@ class BasicDecoderBlock(nn.Module):
             n_blocks (int, default=2):
                 Number of basic (bn->relu->conv)-blocks inside one residual
                 multiconv block        
+            preactivate (bool, default=False)
+                If True, normalization and activation are applied before convolution
         """
-        super(BasicDecoderBlock, self).__init__()
-        assert up_sampling in ("interp", "max_unpool", "transconv", "fixed_unpool")
-        assert long_skip in ("unet", "unet++", "unet3+", "nope")
-        assert long_skip_merge_policy in ("concatenate", "summation")
-
-        self.up_sampling = up_sampling
-        self.long_skip = None if long_skip == "nope" else long_skip
-        self.merge_pol = long_skip_merge_policy
-
-        # set upsampling choices
-        self.up_choices = nn.ModuleDict({
-            "fixed_unpool": layers.FixedUnpool(scale_factor=2),
-            "interp": None,
-            "transconv":None,
-            "max_unpool":None
-        })
-        
-        # Set skip connection block choices
-        self.skip_choices = None
-        if self.long_skip is not None:
-
-            # adjust input channel dim if "concatenate"
-            if self.merge_pol == "concatenate":
-                in_channels += skip_channels
-
-            self.skip_choices = nn.ModuleDict({
-                "unet": layers.UnetSkipBlock(
-                    merge_policy=self.merge_pol, 
-                    skip_channels=skip_channels, 
-                    in_channels=in_channels
-                ),
-                "unet++": None,
-                "unet3+": None,
-            })
+        super(BasicDecoderBlock, self).__init__(
+            in_channels=in_channels,
+            skip_channels=skip_channels,
+            up_sampling=up_sampling,
+            long_skip=long_skip,
+            long_skip_merge_policy=long_skip_merge_policy,
+            preactivate=preactivate
+        )
 
         # multi conv blocks
         self.conv_modules = nn.ModuleDict()
         for i in range(n_layers):
-            num_in_features = in_channels if i == 0 else out_channels
+            num_in_features = self.in_channels if i == 0 else out_channels
             layer = MultiBlockBasic(
                 in_channels=num_in_features, 
                 out_channels=out_channels,
                 n_blocks=n_blocks,
                 batch_norm=batch_norm, 
                 activation=activation,
-                weight_standardize=weight_standardize
+                weight_standardize=weight_standardize,
+                preactivate=preactivate
             )
             self.conv_modules[f"multiconv_block{i + 1}"] = layer
         
     def forward(self, x: torch.Tensor, skips: Tuple[torch.Tensor], **kwargs) -> torch.Tensor:
-        x = self.up_choices[self.up_sampling](x)
-        if self.skip_choices is not None:
-            x = self.skip_choices[self.long_skip](x, skips, **kwargs)
-           
+        # upsample and long skip
+        x = self.upsample(x)
+        if self.skip is not None:
+            x = self.skip(x, skips, **kwargs)
+        
+        # basic conv blocks
         for name, module in self.conv_modules.items():
             x = module(x)
         return x
