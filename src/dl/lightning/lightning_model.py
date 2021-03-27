@@ -30,7 +30,7 @@ class SegModel(pl.LightningModule):
                  encoder_depth: int=5,
                  encoder_freeze: bool=False,
                  decoder_type_branch: bool=True,
-                 decoder_aux_branch: str=True,
+                 decoder_aux_branch: str="hover",
                  decoder_n_layers: int=1,
                  decoder_n_blocks: int=2,
                  decoder_preactivate: bool=False,

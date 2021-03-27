@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: baseline_pannuke
-  experiment_version: res_hover_postact
+  experiment_version: basic_hover_preact
 
 dataset_args:
   train_dataset: pannuke         # One of (consep, pannuke, kumar, monusac)
@@ -20,8 +20,8 @@ model_args:
     decoder_args:
       n_layers: 1               # Number multi conv blocks inside one decoder level 
       n_blocks: 2               # Number of convolutions blocks in each multi conv block
-      preactivate: False        # If True, BN & RELU applied before CONV
-      short_skips: residual        # One of (residual, dense, null) (for decoder branch only)
+      preactivate: True        # If True, BN & RELU applied before CONV
+      short_skips: null        # One of (residual, dense, null) (for decoder branch only)
       long_skips: unet          # One of (unet, unet++, unet3+, null)
       merge_policy: summation   # One of (sum, cat) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)

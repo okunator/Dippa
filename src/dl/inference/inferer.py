@@ -68,7 +68,7 @@ class Inferer:
                  batch_size: int=8,
                  patch_size: Tuple[int]=(256, 256),
                  stride_size: int=128,
-                 thresh_method: int="naive",
+                 thresh_method: str="naive",
                  thresh: float=0.5,
                  apply_weights: bool=False,
                  post_proc_method: str=None,

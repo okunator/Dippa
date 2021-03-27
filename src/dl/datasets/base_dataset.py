@@ -26,7 +26,7 @@ class BaseDataset(Dataset, FileHandler):
         Args:
         ----------
             fname (str): 
-                path to the pytables database
+                path to the zarr/hdf5 database
         """
         self.fname = fname
         self.suffix = Path(self.fname).suffix 
