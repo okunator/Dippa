@@ -47,21 +47,27 @@ class BaseConvBlock(nn.Module):
         self.activation = activation
         self.conv_choice = "wsconv" if weight_standardize else "conv"
 
+        # set norm channel number for preactivation or normal 
         bn_channels = in_channels if preactivate else out_channels
         
-        self.conv_choices = nn.ModuleDict({
-            "wsconv": norm.WSConv2d(in_channels, out_channels, kernel_size=3, padding=int(same_padding)),
-            "conv": nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=int(same_padding))
-        })
+        # set convolution module
+        if self.conv_choice == "wsconv":
+            self.conv = norm.WSConv2d(in_channels, out_channels, kernel_size=3, padding=int(same_padding))
+        elif self.conv_choice == "conv":
+            self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=int(same_padding))
 
-        self.bn_choices = nn.ModuleDict({
-            "bn": nn.BatchNorm2d(num_features=bn_channels),
-            "bcn": norm.BCNorm(num_features=bn_channels, num_groups=32),
-            "nope": nn.Identity()
-        })
-
-        self.act_choices = nn.ModuleDict({
-            "relu": nn.ReLU(inplace=True),
-            "mish": act.Mish(),
-            "swish": act.Swish()
-        })
+        # set normalization module
+        if self.batch_norm == "bn":
+            self.bn = nn.BatchNorm2d(num_features=bn_channels)
+        elif self.batch_norm == "bcn":
+            self.bn = norm.BCNorm(num_features=bn_channels, num_groups=32)
+        else:
+            self.bn = nn.Identity()
+            
+        # set activation module
+        if self.activation == "relu":
+            self.act = nn.ReLU(inplace=True)
+        elif self.activation == "mish":
+            self.act = act.Mish()
+        elif self.activation == "swish":
+            self.act = act.Swish()

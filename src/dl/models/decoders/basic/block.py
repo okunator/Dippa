@@ -45,9 +45,9 @@ class BasicConvBlockPreact(BaseConvBlock):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.bn_choices[self.batch_norm](x)
-        x = self.act_choices[self.activation](x)
-        x = self.conv_choices[self.conv_choice](x)
+        x = self.bn(x)
+        x = self.act(x)
+        x = self.conv(x)
         return x
 
 
@@ -90,9 +90,9 @@ class BasicConvBlock(BaseConvBlock):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.conv_choices[self.conv_choice](x)
-        x = self.bn_choices[self.batch_norm](x)
-        x = self.act_choices[self.activation](x)
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.act(x)
         return x
 
 

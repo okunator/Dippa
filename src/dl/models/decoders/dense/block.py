@@ -49,9 +49,9 @@ class DenseConvBlockPreact(BaseConvBlock):
         prev_features = [x] if isinstance(x, torch.Tensor) else x
         x = torch.cat(prev_features, dim=1)
 
-        x = self.bn_choices[self.batch_norm](x)
-        x = self.act_choices[self.activation](x)
-        x = self.conv_choices[self.conv_choice](x)
+        x = self.bn(x)
+        x = self.act(x)
+        x = self.conv(x)
         return x
 
 
@@ -97,9 +97,9 @@ class DenseConvBlock(BaseConvBlock):
         prev_features = [x] if isinstance(x, torch.Tensor) else x
         x = torch.cat(prev_features, dim=1)
 
-        x = self.conv_choices[self.conv_choice](x)
-        x = self.bn_choices[self.batch_norm](x)
-        x = self.act_choices[self.activation](x)
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.act(x)
         return x
 
 

@@ -63,9 +63,9 @@ class ResidualConvBlockPreact(BaseConvBlock):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         identity = x
-        x = self.bn_choices[self.batch_norm](x)
-        x = self.act_choices[self.activation](x)
-        x = self.conv_choices[self.conv_choice](x)
+        x = self.bn(x)
+        x = self.act(x)
+        x = self.conv(x)
 
         if self.use_residual:
             if identity.shape[1] != x.shape[1]:
@@ -132,15 +132,15 @@ class ResidualConvBlock(BaseConvBlock):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         identity = x
-        x = self.conv_choices[self.conv_choice](x)
-        x = self.bn_choices[self.batch_norm](x)
+        x = self.conv(x)
+        x = self.bn(x)
 
         if self.use_residual:
             if identity.shape[1] != x.shape[1]:
                 identity = self.ch_pool(identity)
             x += identity
 
-        x = self.act_choices[self.activation](x)
+        x = self.act(x)
         return x
 
 
