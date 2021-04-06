@@ -30,7 +30,8 @@ class Model(MultiTaskSegModel):
                  weight_standardize: bool=False,
                  long_skips: str="unet",
                  long_skip_merge_policy: str="sum",
-                 n_types: int=2) -> None: 
+                 n_types: int=2,
+                 model_input_size: int=256) -> None: 
         """
         Class which builds the model from the architectural desing choices 
         Encoders are from the segmentation_models_pytorch library.
@@ -83,6 +84,9 @@ class Model(MultiTaskSegModel):
             n_types (int, default=2):
                 Number of classes in the dataset. Type decoder branch is set to output this 
                 number of classes. If type_branch = False, this is ignored.
+            model_input_size (int, default=256):
+                The input image size of the model. Assumes that input images are square
+                patches i.e. H == W.
         """
         if decoder_channels is not None:
             assert len(decoder_channels) == encoder_depth, (
@@ -116,6 +120,9 @@ class Model(MultiTaskSegModel):
         self.normalization = normalization
         self.weight_standardize = weight_standardize
 
+        # model input size
+        self.model_input_size = model_input_size
+
         # set encoder
         self.encoder = smp.encoders.get_encoder(
             self.encoder_name,
@@ -137,7 +144,8 @@ class Model(MultiTaskSegModel):
             up_sampling=self.decoder_upsampling,
             short_skip=self.decoder_short_skips,
             long_skip=self.long_skips,
-            long_skip_merge_policy=self.merge_policy
+            long_skip_merge_policy=self.merge_policy,
+            model_input_size=self.model_input_size
         )
 
         self.inst_seg_head = SegHead(
@@ -162,7 +170,8 @@ class Model(MultiTaskSegModel):
                 up_sampling=self.decoder_upsampling,
                 short_skip=self.decoder_short_skips,
                 long_skip=self.long_skips,
-                long_skip_merge_policy=self.merge_policy
+                long_skip_merge_policy=self.merge_policy,
+                model_input_size=self.model_input_size
             )
 
             self.type_seg_head = SegHead(
@@ -188,7 +197,8 @@ class Model(MultiTaskSegModel):
                 up_sampling=self.decoder_upsampling,
                 short_skip=self.decoder_short_skips,
                 long_skip=self.long_skips,
-                long_skip_merge_policy=self.merge_policy
+                long_skip_merge_policy=self.merge_policy,
+                model_input_size=self.model_input_size
             )
 
             self.aux_seg_head = SegHead(

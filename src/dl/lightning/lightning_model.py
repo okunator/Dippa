@@ -24,6 +24,7 @@ class SegModel(pl.LightningModule):
                  experiment_name: str,
                  experiment_version: str,
                  train_dataset: str,
+                 model_input_size: int=256,
                  encoder_in_channels: int=3,
                  encoder_name: str="resnet50",
                  encoder_pretrain: bool=True,
@@ -75,6 +76,9 @@ class SegModel(pl.LightningModule):
             train_dataset (str):
                 Name of thre training dataset.
                 One of ("consep", "pannuke", "kumar")
+            model_input_size (int, default=256):
+                The input image size of the model. Assumes that input images are square
+                patches i.e. H == W.
             encoder_name (str, default="resnet50"):
                 Name of the encoder. Available encoders from:
                 https://github.com/qubvel/segmentation_models.pytorch
@@ -163,6 +167,7 @@ class SegModel(pl.LightningModule):
         self.experiment_name = experiment_name
         self.experiment_version = experiment_version
         self.train_dataset = train_dataset
+        self.model_input_size = model_input_size
 
         # Encoder args
         self.encoder_in_channels = encoder_in_channels
@@ -251,6 +256,7 @@ class SegModel(pl.LightningModule):
             normalization=self.normalization,
             weight_standardize=self.weight_standardize,
             n_types=len(self.fm.get_classes(self.train_dataset)),
+            model_input_size=self.model_input_size
         )
 
         # init multi loss function
@@ -268,6 +274,7 @@ class SegModel(pl.LightningModule):
             experiment_name=conf.experiment_args.experiment_name,
             experiment_version=conf.experiment_args.experiment_version,
             train_dataset=conf.dataset_args.train_dataset,
+            model_input_size=conf.runtime_args.model_input_size,
             encoder_in_channels=conf.model_args.architecture_design.encoder_args.in_channels,
             encoder_name=conf.model_args.architecture_design.encoder_args.encoder,
             encoder_pretrain=conf.model_args.architecture_design.encoder_args.pretrain,
@@ -340,6 +347,8 @@ class SegModel(pl.LightningModule):
             if kwargs[k] == "TRUE" or kwargs[k] == "FALSE":
                 kwargs[k] = kwargs[k] == "TRUE"
 
+        kwargs["experiment_name"] = name
+        kwargs["experiment_version"] = version
         return cls(**kwargs)
 
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from typing import List
 
 import src.dl.models.layers as layers
 
@@ -7,21 +8,31 @@ import src.dl.models.layers as layers
 class BaseDecoderBlock(nn.Module):
     def __init__(self,
                  in_channels: int,
-                 skip_channels: int,
+                 out_channels: List[int],
+                 skip_channels: List[int],
                  up_sampling: str,
                  long_skip: str,
                  long_skip_merge_policy: str,
-                 preactivate: bool) -> None:
+                 skip_index: int=None,
+                 out_dims: List[int]=None,
+                 same_padding: bool=True,
+                 batch_norm: str="bn",
+                 activation: str="relu",
+                 weight_standardize: bool=False,
+                 n_blocks: int=2,
+                 preactivate: bool=False) -> None:
         """
         Base class for all decoder blocks. Inits the upsampling and long skip
-        connection that is the same for each decoder block.
+        connection that is the same for each decoder block. 
 
         Args:
         ---------
             in_channels (int):
                 Number of input channels
-            skip_channels (int):
-                Number of channels in the encoder skip tensor.
+            out_channels (List[int]):
+                List of the number of output channels at each of the decoder blocks
+            skip_channels (List[int]):
+                List of the number of channels in the each of the encoder skip tensors.
                 Ignored if long_skip is None.
             up_sampling (str):
                 up sampling method to be used.
@@ -32,7 +43,29 @@ class BaseDecoderBlock(nn.Module):
             long_skip_merge_policy (str):
                 whether long skip is summed or concatenated
                 One of ("summation", "concatenate")
-            preactivate (bool)
+            skip_index (int, default=Nome):
+                the index of the skip_channels list. Used if long_skip="unet"
+            out_dims (List[int]):
+                List of the heights/widths of each encoder/decoder feature map
+                e.g. [256, 128, 64, 32, 16]. Assumption is that feature maps are
+                square. This is used for skip blocks (unet3+, unet++)
+            same_padding (bool, default=True):
+                if True, performs same-covolution
+            batch_norm (str, default="bn"): 
+                Perform normalization. Methods:
+                Batch norm, batch channel norm, group norm, etc.
+                One of ("bn", "bcn", None)
+            activation (str, default="relu"):
+                Activation method. One of ("relu", "swish". "mish")
+            weight_standardize (bool, default=False):
+                If True, perform weight standardization
+            up_sampling (str, default="fixed_unpool"):
+                up sampling method to be used.
+                One of ("interp", "max_unpool", "transconv", "fixed_unpool")
+            n_blocks (int, default=2):
+                Number of basic (bn->relu->conv)-blocks inside one residual
+                multiconv block        
+            preactivate (bool, default=False)
                 If True, normalization and activation are applied before convolution
         """
 
@@ -40,13 +73,6 @@ class BaseDecoderBlock(nn.Module):
         assert long_skip in ("unet", "unet++", "unet3+", None)
         assert long_skip_merge_policy in ("concatenate", "summation")
         super(BaseDecoderBlock, self).__init__()
-
-        self.up_sampling = up_sampling
-        self.long_skip = long_skip
-        self.merge_pol = long_skip_merge_policy
-        self.preactivate = preactivate
-        self.in_channels = in_channels
-        self.skip_channels = skip_channels
 
         # set upsampling method
         if up_sampling == "fixed_unpool":
@@ -60,19 +86,29 @@ class BaseDecoderBlock(nn.Module):
         
         # Set skip long skip connection if not None
         self.skip = None
-        if self.long_skip is not None:
+        if long_skip is not None:
 
-            # adjust input channel dim if "concatenate"
-            if self.merge_pol == "concatenate":
-                self.in_channels += self.skip_channels
+            if long_skip == "unet":
+                # adjust input channel dim if "concatenate"
+                if long_skip_merge_policy == "concatenate":
+                    self.in_channels += self.skip_channels
 
-            if self.long_skip == "unet":
                 self.skip = layers.UnetSkipBlock(
                     merge_policy=self.merge_pol, 
-                    skip_channels=self.skip_channels, 
+                    skip_channels=self.skip_channels[skip_index], 
                     in_channels=self.in_channels
                 )
-            elif self.long_skip == "unet++":
-                pass
             elif self.long_skip == "unet3+":
+                self.skip = layers.Unet3pSkipBlock(
+                    in_channels=in_channels,
+                    out_channels=out_channels[skip_index],
+                    skip_channels=skip_channels[skip_index:],
+                    out_dims=out_dims[skip_index:],
+                    same_padding=same_padding,
+                    batch_norm=batch_norm,
+                    activation=activation,
+                    weight_standardize=weight_standardize,
+                    n_conv_blocks=n_blocks
+            )
+            elif self.long_skip == "unet++":
                 pass

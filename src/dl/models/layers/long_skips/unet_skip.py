@@ -5,9 +5,9 @@ from typing import Tuple
 
 class UnetSkipBlock(nn.ModuleDict):
     def __init__(self, 
-                 merge_policy: str = "summation",
-                 skip_channels: int = None,
-                 in_channels: int = None) -> None:
+                 merge_policy: str="summation",
+                 skip_channels: int=None,
+                 in_channels: int=None) -> None:
         """
         Simple U-net like skip connection block
 

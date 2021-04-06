@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Tuple
+from typing import Tuple, List
 
 from .block import MultiBlockBasic
 from ..base_decoder_block import BaseDecoderBlock
@@ -9,8 +9,8 @@ from ..base_decoder_block import BaseDecoderBlock
 class BasicDecoderBlock(BaseDecoderBlock):
     def __init__(self,
                  in_channels: int,
-                 skip_channels: int,
-                 out_channels: int,
+                 skip_channels: List[int],
+                 out_channels: List[int],
                  same_padding: bool=True,
                  batch_norm: str="bn",
                  activation: str="relu",
@@ -20,7 +20,9 @@ class BasicDecoderBlock(BaseDecoderBlock):
                  long_skip_merge_policy: str="summation",
                  n_layers: int=1,
                  n_blocks: int=2,
-                 preactivate: bool=False) -> None:
+                 preactivate: bool=False,
+                 skip_index: int=None,
+                 out_dims: List[int]=None) -> None:
 
         """
         Basic decoder block. 
@@ -34,11 +36,12 @@ class BasicDecoderBlock(BaseDecoderBlock):
         -----------
             in_channels (int):
                 Number of input channels
-            skip_channels (int):
-                Number of channels in the encoder skip tensor.
+            out_channels (List[int]):
+                List of the number of output channels in the output tensors 
+            skip_channels (List[int]):
+                List of the number of channels in the encoder skip tensors.
                 Ignored if long_skip == None.
-            out_channels (int):
-                Number of output channels
+                of the decoder blocks 
             same_padding (bool, default=True):
                 if True, performs same-covolution
             batch_norm (str, default="bn"): 
@@ -66,20 +69,34 @@ class BasicDecoderBlock(BaseDecoderBlock):
                 multiconv block        
             preactivate (bool, default=False)
                 If True, normalization and activation are applied before convolution
+            skip_index (int, default=Nome):
+                the index of the skip_channels list. Used if long_skip="unet"
+            out_dims (List[int], default=None):
+                List of the heights/widths of each encoder/decoder feature map
+                e.g. [256, 128, 64, 32, 16]. Assumption is that feature maps are
+                square. This is used for skip blocks (unet3+, unet++)
         """
         super(BasicDecoderBlock, self).__init__(
             in_channels=in_channels,
+            out_channels=out_channels,
             skip_channels=skip_channels,
             up_sampling=up_sampling,
             long_skip=long_skip,
             long_skip_merge_policy=long_skip_merge_policy,
-            preactivate=preactivate
+            skip_index=skip_index,
+            out_dims=out_dims,
+            same_padding=same_padding,
+            batch_norm=batch_norm,
+            activation=activation,
+            weight_standardize=weight_standardize,
+            preactivate=preactivate,
+            n_blocks=n_blocks,
         )
 
         # multi conv blocks
         self.conv_modules = nn.ModuleDict()
         for i in range(n_layers):
-            num_in_features = self.in_channels if i == 0 else out_channels
+            num_in_features = self.in_channels if i == 0 else out_channels[skip_index]
             layer = MultiBlockBasic(
                 in_channels=num_in_features, 
                 out_channels=out_channels,

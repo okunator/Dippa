@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Tuple
+from typing import Tuple, List
 
 from .block import MultiBlockDense, DenseConvBlock, DenseConvBlockPreact
 from ..base_decoder_block import BaseDecoderBlock
@@ -9,7 +9,7 @@ from ..base_decoder_block import BaseDecoderBlock
 class DenseDecoderBlock(BaseDecoderBlock):
     def __init__(self,
                  in_channels: int,
-                 skip_channels: int,
+                 skip_channels: List[int],
                  out_channels: int,
                  same_padding: bool=True,
                  batch_norm: str="bn",
@@ -20,7 +20,9 @@ class DenseDecoderBlock(BaseDecoderBlock):
                  long_skip_merge_policy: str="summation",
                  n_layers: int=1,
                  n_blocks: int=2,
-                 preactivate: bool=False) -> None:
+                 preactivate: bool=False,
+                 skip_index: int=None,
+                 out_dims: List[int]=None) -> None:
 
         """
         Dense decoder block. 
@@ -34,8 +36,8 @@ class DenseDecoderBlock(BaseDecoderBlock):
         -----------
             in_channels (int):
                 Number of input channels
-            skip_channels (int):
-                Number of channels in the encoder skip tensor.
+            skip_channels (List[int]):
+                List of the number of channels in the encoder skip tensors.
                 Ignored if long_skip == None.
             out_channels (int):
                 Number of output channels
@@ -64,14 +66,28 @@ class DenseDecoderBlock(BaseDecoderBlock):
                 Number of basic (bn->relu->conv)-blocks inside one dense multiconv block
             preactivate (bool, default=False)
                 If True, normalization and activation are applied before convolution
+            skip_index (int, default=Nome):
+                the index of the skip_channels list. Used if long_skip="unet"
+            out_dims (List[int]):
+                List of the heights/widths of each encoder/decoder feature map
+                e.g. [256, 128, 64, 32, 16]. Assumption is that feature maps are
+                square. This is used for skip blocks (unet3+, unet++)
         """
         super(DenseDecoderBlock, self).__init__(
             in_channels=in_channels,
+            out_channels=out_channels,
             skip_channels=skip_channels,
             up_sampling=up_sampling,
             long_skip=long_skip,
             long_skip_merge_policy=long_skip_merge_policy,
-            preactivate=preactivate
+            skip_index=skip_index,
+            out_dims=out_dims,
+            same_padding=same_padding,
+            batch_norm=batch_norm,
+            activation=activation,
+            weight_standardize=weight_standardize,
+            preactivate=preactivate,
+            n_blocks=n_blocks,
         )
 
        # layered multi conv blocks
