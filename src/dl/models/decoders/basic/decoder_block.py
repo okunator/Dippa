@@ -37,7 +37,7 @@ class BasicDecoderBlock(BaseDecoderBlock):
             in_channels (int):
                 Number of input channels
             out_channels (List[int]):
-                List of the number of output channels in the output tensors 
+                List of the number of output channels in the decoder output tensors 
             skip_channels (List[int]):
                 List of the number of channels in the encoder skip tensors.
                 Ignored if long_skip == None.
@@ -90,16 +90,16 @@ class BasicDecoderBlock(BaseDecoderBlock):
             activation=activation,
             weight_standardize=weight_standardize,
             preactivate=preactivate,
-            n_blocks=n_blocks,
+            n_blocks=1,
         )
 
         # multi conv blocks
         self.conv_modules = nn.ModuleDict()
         for i in range(n_layers):
-            num_in_features = self.in_channels if i == 0 else out_channels[skip_index]
+            num_in_features = self.in_channels if i == 0 and long_skip == "unet" else out_channels[skip_index]
             layer = MultiBlockBasic(
                 in_channels=num_in_features, 
-                out_channels=out_channels,
+                out_channels=out_channels[skip_index],
                 n_blocks=n_blocks,
                 batch_norm=batch_norm, 
                 activation=activation,

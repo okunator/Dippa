@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 from typing import List
 
-import src.dl.models.layers as layers
+from .long_skips import Unet3pSkipBlock, UnetSkipBlock
+from ..modules import FixedUnpool
 
 
 class BaseDecoderBlock(nn.Module):
@@ -73,10 +74,11 @@ class BaseDecoderBlock(nn.Module):
         assert long_skip in ("unet", "unet++", "unet3+", None)
         assert long_skip_merge_policy in ("concatenate", "summation")
         super(BaseDecoderBlock, self).__init__()
+        self.in_channels = in_channels
 
         # set upsampling method
         if up_sampling == "fixed_unpool":
-            self.upsample = layers.FixedUnpool(scale_factor=2)
+            self.upsample = FixedUnpool(scale_factor=2)
         elif up_sampling == "interp":
             pass
         elif up_sampling == "transconv":
@@ -91,15 +93,15 @@ class BaseDecoderBlock(nn.Module):
             if long_skip == "unet":
                 # adjust input channel dim if "concatenate"
                 if long_skip_merge_policy == "concatenate":
-                    self.in_channels += self.skip_channels
+                    self.in_channels += skip_channels[skip_index]
 
-                self.skip = layers.UnetSkipBlock(
-                    merge_policy=self.merge_pol, 
-                    skip_channels=self.skip_channels[skip_index], 
-                    in_channels=self.in_channels
+                self.skip = UnetSkipBlock(
+                    merge_policy=long_skip_merge_policy, 
+                    skip_channels=skip_channels[skip_index], 
+                    in_channels=in_channels
                 )
-            elif self.long_skip == "unet3+":
-                self.skip = layers.Unet3pSkipBlock(
+            elif long_skip == "unet3+":
+                self.skip = Unet3pSkipBlock(
                     in_channels=in_channels,
                     out_channels=out_channels[skip_index],
                     skip_channels=skip_channels[skip_index:],
@@ -108,7 +110,8 @@ class BaseDecoderBlock(nn.Module):
                     batch_norm=batch_norm,
                     activation=activation,
                     weight_standardize=weight_standardize,
+                    preactivate=preactivate,
                     n_conv_blocks=n_blocks
             )
-            elif self.long_skip == "unet++":
+            elif long_skip == "unet++":
                 pass

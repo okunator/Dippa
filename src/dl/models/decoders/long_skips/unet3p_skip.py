@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 from typing import Tuple, List
-from src.dl.models.decoders import MultiBlockBasic
 
+# from ...decoders import MultiBlockBasic, MultiBlockDense, MultiBlockResidual
+from .. import MultiBlockBasic, MultiBlockDense, MultiBlockResidual
 
 class Unet3pSkipBlock(nn.Module):
     def __init__(self,
@@ -54,25 +55,33 @@ class Unet3pSkipBlock(nn.Module):
         """
         super(Unet3pSkipBlock, self).__init__()
 
+        # ignore the last elements, since no skips are applied at the final block
         out_dims = out_dims[:-1]
         skip_channels = skip_channels[:-1]
 
+        # divide the number of out channels for conv blocks evenly and save the 
+        # remainder so that the final number of out channels is the same as out_channels
+        cat_channels, reminder = divmod(out_channels, (len(skip_channels) + 1))
+       
+        # at the final deocder block out_channels need to be same as the input arg 
+        num_out_features = cat_channels+reminder if skip_channels else out_channels
+
+        self.decoder_feat_conv = MultiBlockBasic(
+            in_channels=in_channels, 
+            out_channels=num_out_features,
+            n_blocks=n_conv_blocks,
+            batch_norm=batch_norm, 
+            activation=activation,
+            weight_standardize=weight_standardize,
+            preactivate=preactivate
+        )
+
+        # if there are skip channels, init the convs
         if skip_channels:
-            cat_channels, reminder = divmod(out_channels, (len(skip_channels) + 1))
             target_size = out_dims[0]
 
             self.down_scales = nn.ModuleDict()
             self.skip_convs = nn.ModuleDict()
-            self.decoder_feat_conv = MultiBlockBasic(
-                in_channels=in_channels, 
-                out_channels=cat_channels+reminder,
-                n_blocks=n_conv_blocks,
-                batch_norm=batch_norm, 
-                activation=activation,
-                weight_standardize=weight_standardize,
-                preactivate=preactivate
-            )
-
             for i, (in_chl, out_dim) in enumerate(zip(skip_channels, out_dims)):
                 down_scale = self.scale(out_dim, target_size)
                 self.down_scales[f"down_scale{i + 1}"] = down_scale
@@ -123,9 +132,10 @@ class Unet3pSkipBlock(nn.Module):
             idx (int):
                 index for the for the feature from the encoder
         """
+        print("idx: ", idx)
+        x = self.decoder_feat_conv(x)
         if idx < len(skips):
             skips = skips[idx:]
-            decoder_feat = self.decoder_feat_conv(x)
 
             skip_features = []
             for i, (scale, conv_block) in enumerate(zip(self.down_scales.values(), self.skip_convs.values())):
@@ -133,7 +143,7 @@ class Unet3pSkipBlock(nn.Module):
                 skip_feat = conv_block(skip_feat)
                 skip_features.append(skip_feat)
 
-            skip_features.append(decoder_feat)
+            skip_features.append(x)
             x = torch.cat(skip_features, dim=1)
 
         return x

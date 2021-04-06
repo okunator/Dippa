@@ -116,8 +116,8 @@ class Decoder(nn.ModuleDict):
         else:
             DecoderBlock = BasicDecoderBlock
 
-        # Build decoder        
-        for i, in_ch in enumerate(in_channels):
+        # Build decoder  
+        for i, (in_ch, _) in enumerate(zip(in_channels, skip_channels)):
             kwargs["skip_index"] = i
             decoder_block = DecoderBlock(in_ch, skip_channels, decoder_channels, **kwargs)
             self.add_module(f"decoder_block{i + 1}", decoder_block)

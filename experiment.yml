@@ -1,6 +1,6 @@
 experiment_args:
-  experiment_name: short_skip_pannuke
-  experiment_version: residual_hover_preact
+  experiment_name: long_skip_pannuke_tests
+  experiment_version: hover_unet3p
 
 dataset_args:
   train_dataset: pannuke         # One of (consep, pannuke, kumar, monusac)
@@ -20,9 +20,9 @@ model_args:
     decoder_args:
       n_layers: 1               # Number multi conv blocks inside one decoder level 
       n_blocks: 2               # Number of convolutions blocks in each multi conv block
-      preactivate: True        # If True, BN & RELU applied before CONV
-      short_skips: residual        # One of (residual, dense, null) (for decoder branch only)
-      long_skips: unet          # One of (unet, unet++, unet3+, null)
+      preactivate: False        # If True, BN & RELU applied before CONV
+      short_skips: null        # One of (residual, dense, null) (for decoder branch only)
+      long_skips: unet3+          # One of (unet, unet++, unet3+, null)
       merge_policy: summation   # One of (sum, cat) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
       decoder_channels:         # Number of out channels for every decoder layer

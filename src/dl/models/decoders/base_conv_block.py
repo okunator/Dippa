@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 
-import src.dl.models.layers.activations as act
-import src.dl.models.layers.normalization as norm
+from ..modules import (
+    Mish, Swish, BCNorm, WSConv2d
+)
 
 
 class BaseConvBlock(nn.Module):
@@ -52,7 +53,7 @@ class BaseConvBlock(nn.Module):
         
         # set convolution module
         if self.conv_choice == "wsconv":
-            self.conv = norm.WSConv2d(in_channels, out_channels, kernel_size=3, padding=int(same_padding))
+            self.conv = WSConv2d(in_channels, out_channels, kernel_size=3, padding=int(same_padding))
         elif self.conv_choice == "conv":
             self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=int(same_padding))
 
@@ -60,7 +61,7 @@ class BaseConvBlock(nn.Module):
         if self.batch_norm == "bn":
             self.bn = nn.BatchNorm2d(num_features=bn_channels)
         elif self.batch_norm == "bcn":
-            self.bn = norm.BCNorm(num_features=bn_channels, num_groups=32)
+            self.bn = BCNorm(num_features=bn_channels, num_groups=32)
         else:
             self.bn = nn.Identity()
             
@@ -68,6 +69,6 @@ class BaseConvBlock(nn.Module):
         if self.activation == "relu":
             self.act = nn.ReLU(inplace=True)
         elif self.activation == "mish":
-            self.act = act.Mish()
+            self.act = Mish()
         elif self.activation == "swish":
-            self.act = act.Swish()
+            self.act = Swish()
