@@ -9,8 +9,8 @@ from ..base_decoder_block import BaseDecoderBlock
 class BasicDecoderBlock(BaseDecoderBlock):
     def __init__(self,
                  in_channels: int,
-                 skip_channels: List[int],
                  out_channels: List[int],
+                 skip_channels: List[int],
                  same_padding: bool=True,
                  batch_norm: str="bn",
                  activation: str="relu",

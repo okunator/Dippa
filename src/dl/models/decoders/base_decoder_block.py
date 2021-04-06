@@ -98,7 +98,7 @@ class BaseDecoderBlock(nn.Module):
                 self.skip = UnetSkipBlock(
                     merge_policy=long_skip_merge_policy, 
                     skip_channels=skip_channels[skip_index], 
-                    in_channels=in_channels
+                    in_channels=self.in_channels
                 )
             elif long_skip == "unet3+":
                 self.skip = Unet3pSkipBlock(

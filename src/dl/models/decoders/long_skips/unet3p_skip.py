@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 from typing import Tuple, List
 
-# from ...decoders import MultiBlockBasic, MultiBlockDense, MultiBlockResidual
-from .. import MultiBlockBasic, MultiBlockDense, MultiBlockResidual
+from .. import MultiBlockBasic
+
 
 class Unet3pSkipBlock(nn.Module):
     def __init__(self,
@@ -23,7 +23,7 @@ class Unet3pSkipBlock(nn.Module):
         https://arxiv.org/abs/2004.08790
 
         This includes only the skips from the encoder to decoder.
-        Not the decoder to decoder skips 
+        Not the decoder to decoder skips.
 
         Args:
         ----------
@@ -37,6 +37,9 @@ class Unet3pSkipBlock(nn.Module):
                 List of the heights/widths of each encoder/decoder feature map
                 e.g. [256, 128, 64, 32, 16]. Again, assumption is that feature maps are
                 square shapes like in the target_size argument.
+            short_skip (str, default=None):
+                Use short skip connections inside the decoder blocks.
+                One of ("resdidual", "dense", None)
             same_padding (bool, default=True):
                 if True, performs same-covolution
             batch_norm (str, default="bn"): 
@@ -58,14 +61,15 @@ class Unet3pSkipBlock(nn.Module):
         # ignore the last elements, since no skips are applied at the final block
         out_dims = out_dims[:-1]
         skip_channels = skip_channels[:-1]
-
+        
         # divide the number of out channels for conv blocks evenly and save the 
-        # remainder so that the final number of out channels is the same as out_channels
+        # remainder so that the final number of out channels can be set to out_channels
         cat_channels, reminder = divmod(out_channels, (len(skip_channels) + 1))
        
         # at the final deocder block out_channels need to be same as the input arg 
         num_out_features = cat_channels+reminder if skip_channels else out_channels
-
+        
+        # TODO option for short skips
         self.decoder_feat_conv = MultiBlockBasic(
             in_channels=in_channels, 
             out_channels=num_out_features,
@@ -99,7 +103,7 @@ class Unet3pSkipBlock(nn.Module):
     def scale(in_size: int, target_size: int) -> nn.Module:
         """
         Get the scaling operation for the feature map
-        Can be up or downsampling or identity
+        Can be downsampling or identity
 
         Args:
         ---------
@@ -130,9 +134,8 @@ class Unet3pSkipBlock(nn.Module):
             skips (Tuple[torch.Tensor]):
                 all the features from the encoder
             idx (int):
-                index for the for the feature from the encoder
+                index for the the feature from the encoder
         """
-        print("idx: ", idx)
         x = self.decoder_feat_conv(x)
         if idx < len(skips):
             skips = skips[idx:]

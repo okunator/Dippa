@@ -9,8 +9,8 @@ from ..base_decoder_block import BaseDecoderBlock
 class DenseDecoderBlock(BaseDecoderBlock):
     def __init__(self,
                  in_channels: int,
+                 out_channels: List[int],
                  skip_channels: List[int],
-                 out_channels: int,
                  same_padding: bool=True,
                  batch_norm: str="bn",
                  activation: str="relu",
@@ -30,17 +30,17 @@ class DenseDecoderBlock(BaseDecoderBlock):
         Operations:
         1. Upsample
         2. Long skip from encoder to decoder if specified.
-        3. Convolve + dense short skips from the layers in this block
+        3. Convolve + dense short skip connectin
 
         Args:
         -----------
             in_channels (int):
                 Number of input channels
+            out_channels (List[int]):
+                List of the number of output channels in the decoder output tensors 
             skip_channels (List[int]):
                 List of the number of channels in the encoder skip tensors.
                 Ignored if long_skip == None.
-            out_channels (int):
-                Number of output channels
             same_padding (bool, default=True):
                 if True, performs same-covolution
             batch_norm (str, default="bn"): 
@@ -87,14 +87,14 @@ class DenseDecoderBlock(BaseDecoderBlock):
             activation=activation,
             weight_standardize=weight_standardize,
             preactivate=preactivate,
-            n_blocks=n_blocks,
+            n_blocks=1,
         )
 
        # layered multi conv blocks
         self.conv_modules = nn.ModuleDict()
-        num_in_features = self.in_channels
+        num_in_features = self.in_channels if long_skip == "unet" else out_channels[skip_index]
         for i in range(n_layers):
-            num_out_features = out_channels # num_in_features // 2 
+            num_out_features = out_channels[skip_index] # num_in_features // 2
             layer = MultiBlockDense(
                 in_channels=num_in_features, 
                 out_channels=num_out_features,
@@ -104,7 +104,6 @@ class DenseDecoderBlock(BaseDecoderBlock):
                 weight_standardize=weight_standardize,
                 preactivate=preactivate
             )
-
             self.conv_modules[f"multiconv_block{i + 1}"] = layer
             num_in_features += num_out_features
 
@@ -112,7 +111,7 @@ class DenseDecoderBlock(BaseDecoderBlock):
         DenseBlock = DenseConvBlockPreact if preactivate else DenseConvBlock
         self.transition = DenseBlock(
             in_channels=num_in_features, 
-            out_channels=out_channels, 
+            out_channels=out_channels[skip_index], 
             same_padding=same_padding,
             batch_norm=batch_norm, 
             activation=activation, 
