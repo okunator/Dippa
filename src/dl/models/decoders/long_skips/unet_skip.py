@@ -13,8 +13,9 @@ class UnetSkipBlock(nn.ModuleDict):
 
         Args:
         ----------
-            merge_policy (str, default="cat"):
-                sum or concatenate the features together
+            merge_policy (str, default="summation"):
+                Sum or concatenate the features together.
+                One of ("summation", "concatenate")
             skip_channels (int, default=None)
                 The number of channels in the skip tensor
                 If merge policy is "sum". The skip feature channel dim 
