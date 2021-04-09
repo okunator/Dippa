@@ -17,7 +17,7 @@ class UnetSkipBlock(nn.ModuleDict):
                 Sum or concatenate the features together.
                 One of ("summation", "concatenate")
             skip_channels (int, default=None)
-                The number of channels in the skip tensor
+                The number of channels in the (encoder) skip tensor
                 If merge policy is "sum". The skip feature channel dim 
                 needs to be pooled with 1x1 conv to match input size.
             in_channels (int, default=None):
