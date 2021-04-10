@@ -32,14 +32,11 @@ class Unet3pSkipBlock(nn.Module):
             out_channels (int):
                 Number of output channels in the decoder block
             skip_channels (List[int]):
-                List of the number of channels in the each of the encoder skip tensors.
+                List of the number of channels in each of the encoder skip tensors.
             out_dims (List[int]):
                 List of the heights/widths of each encoder/decoder feature map
                 e.g. [256, 128, 64, 32, 16]. Again, assumption is that feature maps are
                 square shapes like in the target_size argument.
-            short_skip (str, default=None):
-                Use short skip connections inside the decoder blocks.
-                One of ("resdidual", "dense", None)
             same_padding (bool, default=True):
                 if True, performs same-covolution
             batch_norm (str, default="bn"): 
@@ -140,6 +137,7 @@ class Unet3pSkipBlock(nn.Module):
         if idx < len(skips):
             skips = skips[idx:]
 
+            # Down scale skip features and convolve
             skip_features = []
             for i, (scale, conv_block) in enumerate(zip(self.down_scales.values(), self.skip_convs.values())):
                 skip_feat = scale(skips[i])

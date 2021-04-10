@@ -82,7 +82,7 @@ class Decoder(nn.ModuleDict):
         head_channels = encoder_channels[0]
 
         # in_channels for all decoder layers
-        in_channels = [head_channels] + list(decoder_channels)
+        decoder_channels = [head_channels] + list(decoder_channels)
 
         # skip channels for every decoder layer
         # no skip connection at the last decoder layer
@@ -108,7 +108,7 @@ class Decoder(nn.ModuleDict):
         kwargs.setdefault("long_skip_merge_policy", long_skip_merge_policy)
         kwargs.setdefault("out_dims", out_dims)
 
-        # Set decoder type
+        # Set decoder block type
         if short_skip == "dense":
             DecoderBlock = DenseDecoderBlock
         elif short_skip == "residual":
@@ -117,9 +117,9 @@ class Decoder(nn.ModuleDict):
             DecoderBlock = BasicDecoderBlock
 
         # Build decoder
-        for i, (in_ch, _) in enumerate(zip(in_channels, skip_channels)):
+        for i in range(len(skip_channels)):
             kwargs["skip_index"] = i
-            decoder_block = DecoderBlock(in_ch, decoder_channels, skip_channels, **kwargs)
+            decoder_block = DecoderBlock(decoder_channels, skip_channels, **kwargs)
             self.add_module(f"decoder_block{i + 1}", decoder_block)
 
     def forward(self, *features: Tuple[torch.Tensor]):
@@ -129,7 +129,5 @@ class Decoder(nn.ModuleDict):
         
         x = head
         for i, (key, block) in enumerate(self.items()):
-            kwargs = {}
-            kwargs["idx"] = i
-            x = block(x, skips, **kwargs)
+            x = block(x, skips, idx=i)
         return x

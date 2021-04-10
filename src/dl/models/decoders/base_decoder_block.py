@@ -2,14 +2,13 @@ import torch
 import torch.nn as nn
 from typing import List
 
-from .long_skips import Unet3pSkipBlock, UnetSkipBlock
+from .long_skips import Unet3pSkipBlock, UnetSkipBlock, UnetppSkipBlock
 from ..modules import FixedUnpool
 
 
 class BaseDecoderBlock(nn.Module):
     def __init__(self,
-                 in_channels: int,
-                 out_channels: List[int],
+                 decoder_channels: List[int],
                  skip_channels: List[int],
                  up_sampling: str,
                  long_skip: str,
@@ -28,12 +27,10 @@ class BaseDecoderBlock(nn.Module):
 
         Args:
         ---------
-            in_channels (int):
-                Number of input channels
-            out_channels (List[int]):
-                List of the number of output channels at each of the decoder blocks
+            decoder_channels (List[int]):
+                List of the number of consecutive input channels in the decoder branch
             skip_channels (List[int]):
-                List of the number of channels in the each of the encoder skip tensors.
+                List of the number of channels in each of the encoder skip tensors.
                 Ignored if long_skip is None.
             up_sampling (str):
                 up sampling method to be used.
@@ -74,7 +71,7 @@ class BaseDecoderBlock(nn.Module):
         assert long_skip in ("unet", "unet++", "unet3+", None)
         assert long_skip_merge_policy in ("concatenate", "summation")
         super(BaseDecoderBlock, self).__init__()
-        self.in_channels = in_channels
+        self.in_channels = decoder_channels[skip_index]
 
         # set upsampling method
         if up_sampling == "fixed_unpool":
@@ -96,14 +93,14 @@ class BaseDecoderBlock(nn.Module):
                     self.in_channels += skip_channels[skip_index]
 
                 self.skip = UnetSkipBlock(
+                    enc_skip_channels=skip_channels[skip_index], 
+                    prev_dec_channels=self.in_channels,
                     merge_policy=long_skip_merge_policy, 
-                    skip_channels=skip_channels[skip_index], 
-                    in_channels=self.in_channels
                 )
             elif long_skip == "unet3+":
                 self.skip = Unet3pSkipBlock(
-                    in_channels=in_channels,
-                    out_channels=out_channels[skip_index],
+                    in_channels=self.in_channels,
+                    out_channels=decoder_channels[skip_index + 1],
                     skip_channels=skip_channels[skip_index:],
                     out_dims=out_dims[skip_index:],
                     same_padding=same_padding,
@@ -114,4 +111,15 @@ class BaseDecoderBlock(nn.Module):
                     n_conv_blocks=n_blocks
             )
             elif long_skip == "unet++":
-                pass
+                self.skip = UnetppSkipBlock(
+                    decoder_channels=decoder_channels,
+                    skip_channels=skip_channels,
+                    skip_index=skip_index,
+                    merge_policy=long_skip_merge_policy,
+                    same_padding=same_padding,
+                    batch_norm=batch_norm,
+                    activation=activation,
+                    weight_standardize=weight_standardize,
+                    preactivate=preactivate,
+                    n_conv_blocks=n_blocks
+                )

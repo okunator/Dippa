@@ -66,7 +66,7 @@ class DenseDecoderBlock(BaseDecoderBlock):
                 Number of basic (bn->relu->conv)-blocks inside one dense multiconv block
             preactivate (bool, default=False)
                 If True, normalization and activation are applied before convolution
-            skip_index (int, default=Nome):
+            skip_index (int, default=None):
                 the index of the skip_channels list. Used if long_skip="unet"
             out_dims (List[int]):
                 List of the heights/widths of each encoder/decoder feature map
@@ -118,11 +118,23 @@ class DenseDecoderBlock(BaseDecoderBlock):
             weight_standardize=weight_standardize,
         )
         
-    def forward(self, x: torch.Tensor, skips: Tuple[torch.Tensor], **kwargs) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, skips: Tuple[torch.Tensor], idx: int=None) -> torch.Tensor:
+        """
+        Args:
+        -----------
+            x (torch.Tensor):
+                Input tensor. Shape (B, C, H, W).
+            skips (Tuple[torch.Tensor]):
+                Tuple of tensors generated from consecutive encoder blocks.
+                Shapes (B, C, H, W).
+            idx (int, default=None):
+                runnning index used to get the right skip tensor(s) from the skips
+                Tuple for the skip connection.
+        """
         # upsample and long skip
         x = self.upsample(x)
         if self.skip is not None:
-            x = self.skip(x, skips, **kwargs)
+            x = self.skip(x, skips, idx=idx)
 
         # dense blocks and append to feature list
         features = [x]

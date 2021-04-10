@@ -68,12 +68,12 @@ class ResidualDecoderBlock(BaseDecoderBlock):
                 multiconv block
             preactivate (bool, default=False)
                 If True, normalization and activation are applied before convolution
-            skip_index (int, default=Nome):
+            skip_index (int, default=None):
                 the index of the skip_channels list. Used if long_skip="unet"
             out_dims (List[int], default=None):
                 List of the heights/widths of each encoder/decoder feature map
                 e.g. [256, 128, 64, 32, 16]. Assumption is that feature maps are
-                square. This is used for skip blocks (unet3+, unet++)
+                square. This is used for skip blocks unet3+
         """
         super(ResidualDecoderBlock, self).__init__(
             in_channels=in_channels,
@@ -107,11 +107,23 @@ class ResidualDecoderBlock(BaseDecoderBlock):
             )
             self.conv_modules[f"multiconv_block{i + 1}"] = layer
         
-    def forward(self, x: torch.Tensor, skips: Tuple[torch.Tensor], **kwargs) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, skips: Tuple[torch.Tensor], idx: int=None) -> torch.Tensor:
+        """
+        Args:
+        ----------
+            x (torch.Tensor):
+                Input tensor. Shape (B, C, H, W).
+            skips (Tuple[torch.Tensor]):
+                Tuple of tensors generated from consecutive encoder blocks.
+                Shapes (B, C, H, W).
+            idx (int, default=None):
+                runnning index used to get the right skip tensor(s) from the skips
+                Tuple for the skip connection.
+        """
         # upsample and long skip
         x = self.upsample(x)
         if self.skip is not None:
-            x = self.skip(x, skips, **kwargs)
+            x = self.skip(x, skips, idx=idx)
         
         # residual conv blocks
         for name, module in self.conv_modules.items():
