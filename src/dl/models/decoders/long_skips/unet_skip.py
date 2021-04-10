@@ -29,7 +29,7 @@ class UnetSkipBlock(nn.ModuleDict):
         assert merge_policy in ("concatenate", "summation")
         self.merge_policy = merge_policy
 
-        # channel pooling for skip features if "sum"
+        # channel pooling for skip features if "summation"
         if self.merge_policy == "summation" and skip_channels > 0:
             self.add_module("ch_pool", nn.Conv2d(skip_channels, in_channels, kernel_size=1, padding=0, bias=False))
 
