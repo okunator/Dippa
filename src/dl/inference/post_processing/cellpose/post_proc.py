@@ -184,11 +184,15 @@ def follow_flows(dP: np.ndarray, niter: int=200) -> np.ndarray:
     inds = np.array(np.nonzero(np.abs(dP[0]) > 1e-3)).astype(np.int32).T
 
     # Interpolation mode
-    p[:, inds[:,0], inds[:,1]] = steps2D_interp_torch(
-        p=p[:, inds[:,0], inds[:,1]], 
-        dP=dP, 
-        niter=niter,
-    )
+    # Sometimes a random error in empty images.. errr... dunno...
+    try:
+        p[:, inds[:,0], inds[:,1]] = steps2D_interp_torch(
+            p=p[:, inds[:,0], inds[:,1]], 
+            dP=dP, 
+            niter=niter,
+        )
+    except:
+        pass
 
     return p
 

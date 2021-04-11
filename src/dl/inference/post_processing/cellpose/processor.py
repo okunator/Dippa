@@ -46,12 +46,12 @@ class CellposePostProcessor(PostProcessor):
         type_map = maps[3]
 
         inst_map = self.threshold(prob_map)
-        cellpose_dict = post_proc_cellpose(hover_map, inst_map)
-
+        cellpose_dict = post_proc_cellpose(hover_map, inst_map)      
+        
         combined = None
         if type_map is not None:
             combined = self.combine_inst_type(cellpose_dict["inst_map"], type_map)
-
+        
         inst_map = self.clean_up(cellpose_dict["inst_map"])
 
         # save the flows here to avoid complicating the inferer code
