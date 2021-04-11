@@ -106,7 +106,7 @@ class Benchmarker:
         
         metrics = []
         with Pool() as pool:
-            for x in tqdm(pool.imap_unordered(self.compute_metrics, masks), total=len(masks)):
+            for x in tqdm(pool.imap_unordered(self.compute_metrics, masks), total=len(masks), desc="Runnning metrics"):
                 metrics.append(x)
         
         # drop Nones if no nuclei are found in an image
@@ -196,7 +196,7 @@ class Benchmarker:
 
             metrics = []
             with Pool() as pool:
-                for x in tqdm(pool.imap_unordered(self.compute_metrics, masks), total=len(masks)):
+                for x in tqdm(pool.imap_unordered(self.compute_metrics, masks), total=len(masks), desc=f"Running metrics for {c}"):
                     metrics.append(x)
             
             # drop Nones if no classes are found in an image
