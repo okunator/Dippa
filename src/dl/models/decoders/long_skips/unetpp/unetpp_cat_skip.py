@@ -2,44 +2,17 @@ import torch
 import torch.nn as nn
 from typing import List, Tuple
 
-from ...modules import FixedUnpool
-from .. import MultiBlockBasic
+from ....modules import FixedUnpool
+from ... import MultiBlockBasic
 
 
-class MergeBlock(nn.ModuleDict):
-    def __init__(self, 
-                 prev_channels: int=None,
-                 current_channels: int=None,
-                 merge_policy: str="summation") -> None:
+class CatBlock(nn.ModuleDict):
+    def __init__(self) -> None:
         """
-        Merge block for all the skip connections in unet++ 
-
-        Args:
-        ----------
-            prev_channels (int, default=None)
-                The number of channels in the tensor originating from 
-                the previous (deeper) layer of the encoder. If merge 
-                policy is "sum". The skip feature channel dim needs to
-                be pooled with 1x1 conv to match input size.
-            current_channels (int, default=None):
-                The number of channels in the tensor originating from
-                the current encoder level. If merge policy is "sum". 
-                The skip feature channel dim needs to be pooled with 
-                1x1 conv to match input size.
-            merge_policy (str, default="summation"):
-                Sum or concatenate the features together.
-                One of ("summation", "concatenate")
+        Cat merge block for all the skip connections in unet++ 
         """
-        super(MergeBlock, self).__init__()
-        assert merge_policy in ("concatenate", "summation")
-        self.merge_policy = merge_policy
-
-        # channel pooling for skip features if "summation"
-        # if self.merge_policy == "summation":
-        if prev_channels > current_channels:
-            self.add_module("ch_pool", nn.Conv2d(prev_channels, current_channels, kernel_size=1, padding=0, bias=False))
-        elif prev_channels < current_channels:
-            self.add_module("ch_pool", nn.Conv2d(current_channels, prev_channels, kernel_size=1, padding=0, bias=False))
+        super(CatBlock, self).__init__()
+       
 
     def forward(self, prev_feat: torch.Tensor, skips: List[torch.Tensor]) -> torch.Tensor:
         """
@@ -52,38 +25,13 @@ class MergeBlock(nn.ModuleDict):
             idx (int):
                 index for the for the feature from the encoder
         """
-        pooled_skips = []
-        print("prev feat shape in the beginning of merge block: ", prev_feat.shape)
-        for i, skip in enumerate(skips):
-            print(f"{i}th skip shape in merge block: ", skip.shape)
-            if skip.shape[1] < prev_feat.shape[1]:
-                print("prev feat gets pooled")
-                prev_feat = self.ch_pool(prev_feat)
-
-            if self.merge_policy == "summation":
-                if skip.shape[1] > prev_feat.shape[1]:
-                    print("skip gets pooled")
-                    skip = self.ch_pool(skip)
-                    print("skip shape: ", skip.shape)
-
-            print("prev_feat shape: ", prev_feat.shape)
-    
-            if self.merge_policy == "summation":
-                prev_feat += skip
-                print("prev feat += skip \n")
-            else:
-                pooled_skips.append(skip)
-
-        if self.merge_policy == "concatenate":
-            pooled_skips.append(prev_feat)
-            print("pooled skip shapes: ", [f.shape for f in pooled_skips])
-            prev_feat = torch.cat(pooled_skips, dim=1)
-            print("prev feat cat skip. Shape: ", prev_feat.shape, "\n")
-
+        pooled_skips = [skip for skip in skips]  
+        pooled_skips.append(prev_feat)
+        prev_feat = torch.cat(pooled_skips, dim=1)
         return prev_feat
 
 
-class UnetppSkipBlock(nn.Module):
+class UnetppCatSkipBlock(nn.Module):
     def __init__(self,
                  in_channels: int,
                  out_channel_list: List[int],
@@ -103,8 +51,8 @@ class UnetppSkipBlock(nn.Module):
         https://arxiv.org/abs/1807.10165
 
         Supports concatenation, summation merge policies
-        Parameter reduction similar to unet3+ also available
-        (This became a huge spaghetti kludge because of these but whatevs)
+        Set reduce_params = True if the original version (i.e. reduce_params = False)
+        takes too much memory. 
         
         Args:
         ---------
@@ -136,10 +84,9 @@ class UnetppSkipBlock(nn.Module):
                 multiconv block      
             reduce_params (bool, default=True):
                 If True, divides the channels from out_channel_list evenly to all
-                skip blocks similarly to unet3+
-            
+                skip blocks similarly to unet3+. Results in much less parameters
         """
-        super(UnetppSkipBlock, self).__init__()
+        super(UnetppCatSkipBlock, self).__init__()
         self.reduce_params = reduce_params
 
         # ignore last channels where skips are not applied
@@ -158,45 +105,47 @@ class UnetppSkipBlock(nn.Module):
             reminder = 0
             current_skip_chl = skip_channel_list[skip_index]
             if self.reduce_params:
+                cat_channels, reminder = divmod(out_channel_list[skip_index], (skip_index + 2))
 
-                current_skip_chl = out_channel_list[skip_index]
-                if merge_policy == "concatenate":
-                    current_skip_chl, reminder = divmod(out_channel_list[skip_index], (skip_index + 2))
-
-                # channel pool for the encoder skip
-                self.pre_chl_pool =  nn.Conv2d(
-                    skip_channel_list[skip_index], 
-                    current_skip_chl + reminder, 
-                    kernel_size=1, 
-                    padding=0, 
-                    bias=False
+                # pre conv for the encoder skip
+                self.pre_conv = MultiBlockBasic(
+                    in_channels=current_skip_chl,
+                    out_channels=cat_channels,
+                    n_blocks=n_conv_blocks,
+                    batch_norm=batch_norm, 
+                    activation=activation,
+                    weight_standardize=weight_standardize,
+                    preactivate=preactivate
                 )
 
-            # Create the sub blocks
-            conv_in_channels = current_skip_chl
-            for i in range(skip_index):
-                
-                prev_enc_channel = skip_channel_list[skip_index - 1]
-                if reduce_params and i != 0:
-                    prev_enc_channel = out_channel_list[skip_index - 1] // (skip_index + 1)
+                # post conv for the in decoder feat map
+                self.post_conv = MultiBlockBasic(
+                    in_channels=in_channels,
+                    out_channels=cat_channels + reminder,
+                    n_blocks=n_conv_blocks,
+                    batch_norm=batch_norm, 
+                    activation=activation,
+                    weight_standardize=weight_standardize,
+                    preactivate=preactivate
+                )
 
+            conv_in_chl = current_skip_chl if not reduce_params else out_channel_list[skip_index - 1] // (skip_index + 1)
+            for i in range(skip_index):
+                prev_enc_chl = skip_channel_list[skip_index - 1] if i == 0 else current_skip_chl
+                prev_enc_chl = prev_enc_chl if not reduce_params else cat_channels
+                
                 # up block for the deeper feature maps
                 self.ups[f"up{i}"] = FixedUnpool()
 
                 # merge blocks for the feature maps in the sub network
-                self.skips[f"sub_skip{i + 1}"] = MergeBlock(
-                    prev_channels=prev_enc_channel,
-                    current_channels=current_skip_chl,
-                    merge_policy=merge_policy 
-                )
+                self.skips[f"sub_skip{i + 1}"] = CatBlock()
                 
                 # conv blocks for the feature maps in the sub network
-                if merge_policy == "concatenate":
-                    conv_in_channels += (current_skip_chl + reminder*int(i == 0))
+                conv_in_chl += prev_enc_chl
                 
                 self.conv_blocks[f"x_{sub_block_idx0}_{i + 1}"] = MultiBlockBasic(
-                    in_channels=conv_in_channels,
-                    out_channels=current_skip_chl,
+                    in_channels=conv_in_chl,
+                    out_channels=current_skip_chl if not reduce_params else cat_channels,
                     n_blocks=n_conv_blocks,
                     batch_norm=batch_norm, 
                     activation=activation,
@@ -205,11 +154,7 @@ class UnetppSkipBlock(nn.Module):
                 )
 
             # Merge all the feature maps before the final conv in the decoder
-            self.final_merge = MergeBlock(
-                prev_channels=in_channels, 
-                current_channels=current_skip_chl, # + reminder, 
-                merge_policy=merge_policy
-            )
+            self.final_merge = CatBlock()
 
     def forward(self, 
                 x: torch.Tensor, 
@@ -239,34 +184,23 @@ class UnetppSkipBlock(nn.Module):
         """
         sub_network_tensors = None
         if idx < len(skips):
-            print("current skip shape: ", skips[idx].shape)
             current_skip = skips[idx]
-            prev_skip = skips[idx - 1]
+
             if self.reduce_params:
-                current_skip = self.pre_chl_pool(current_skip)
-                print("current_skip shape after chl pool: ", current_skip.shape)
+                current_skip = self.pre_conv(current_skip)
 
             all_skips = [current_skip]
             for i, (up, skip, conv) in enumerate(zip(self.ups.values(), self.skips.values(), self.conv_blocks.values())):
-                if i == 0:
-                    print("PREV ENCODER skip: ", prev_skip.shape)
-                    prev_feat = up(prev_skip)
-                else:
-                    print(f"PREV SUB skip {i} from the prev sub network")
-                    prev_feat = up(extra_skips[i - 1])
-
-                print("prev feat shape after up: ", prev_feat.shape)
+                prev_feat = up(extra_skips[i])
                 sub_block = skip(prev_feat, all_skips[::-1])
-                print("sub block shape after merge: ", sub_block.shape)
                 sub_block = conv(sub_block)
-                print("sub block shape after conv: ", sub_block.shape)
                 all_skips.append(sub_block)
-                print("\n")
 
-            print("the final merge:")
+            if self.reduce_params:
+                x = self.post_conv(x)
+
             x = self.final_merge(x, all_skips)
-            print("out shape after final merge: ", x.shape)
-            sub_network_tensors = all_skips[1:]
+            sub_network_tensors = all_skips
 
         return x, sub_network_tensors
                 

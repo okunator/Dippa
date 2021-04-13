@@ -2,14 +2,20 @@ import torch
 import torch.nn as nn
 from typing import List
 
-from .long_skips import Unet3pSkipBlock, UnetSkipBlock, UnetppSkipBlock
+from .long_skips import (
+    Unet3pSkipBlock, 
+    UnetSkipBlock, 
+    UnetppCatSkipBlock,
+    UnetppSumSkipBlock
+)
 from ..modules import FixedUnpool
 
 
 class BaseDecoderBlock(nn.Module):
     def __init__(self,
-                 decoder_channels: List[int],
-                 skip_channels: List[int],
+                 in_channels: int,
+                 out_channel_list: List[int],
+                 skip_channel_list: List[int],
                  up_sampling: str,
                  long_skip: str,
                  long_skip_merge_policy: str,
@@ -20,16 +26,19 @@ class BaseDecoderBlock(nn.Module):
                  activation: str="relu",
                  weight_standardize: bool=False,
                  n_blocks: int=2,
-                 preactivate: bool=False) -> None:
+                 preactivate: bool=False,
+                 reduce_params: bool=True) -> None:
         """
         Base class for all decoder blocks. Inits the upsampling and long skip
         connection that is the same for each decoder block. 
 
         Args:
         ---------
-            decoder_channels (List[int]):
-                List of the number of consecutive input channels in the decoder branch
-            skip_channels (List[int]):
+            in_channels (int):
+                the number of channels coming in from the previous head/decoder branch
+            out_channel_list (List[int]):
+                List of the number of output channels in the decoder output tensors 
+            skip_channel_list (List[int]):
                 List of the number of channels in each of the encoder skip tensors.
                 Ignored if long_skip is None.
             up_sampling (str):
@@ -42,7 +51,7 @@ class BaseDecoderBlock(nn.Module):
                 whether long skip is summed or concatenated
                 One of ("summation", "concatenate")
             skip_index (int, default=Nome):
-                the index of the skip_channels list. Used if long_skip="unet"
+                the index of the skip_channel_list list. Used if long_skip="unet"
             out_dims (List[int]):
                 List of the heights/widths of each encoder/decoder feature map
                 e.g. [256, 128, 64, 32, 16]. Assumption is that feature maps are
@@ -65,13 +74,19 @@ class BaseDecoderBlock(nn.Module):
                 multiconv block        
             preactivate (bool, default=False)
                 If True, normalization and activation are applied before convolution
+            reduce_params (bool, default=False):
+                If True, divides the channels from out_channel_list evenly to all
+                skip blocks similarly to unet3+ or uses the number of out_channels
+                in the skip blocks rather than the number of skip_channels
         """
 
         assert up_sampling in ("interp", "max_unpool", "transconv", "fixed_unpool")
         assert long_skip in ("unet", "unet++", "unet3+", None)
         assert long_skip_merge_policy in ("concatenate", "summation")
         super(BaseDecoderBlock, self).__init__()
-        self.in_channels = decoder_channels[skip_index]
+        self.in_channels = in_channels
+        self.long_skip = long_skip
+        self.out_channels = out_channel_list[skip_index]
 
         # set upsampling method
         if up_sampling == "fixed_unpool":
@@ -84,42 +99,64 @@ class BaseDecoderBlock(nn.Module):
             pass
         
         # Set skip long skip connection if not None
+        # Little kludgy for now...
         self.skip = None
-        if long_skip is not None:
+        if long_skip == "unet":
+            # adjust input channel dim if "concatenate"
+            if long_skip_merge_policy == "concatenate":
+                self.in_channels += skip# num channels for the final conv block_channel_list[skip_index]
 
-            if long_skip == "unet":
-                # adjust input channel dim if "concatenate"
-                if long_skip_merge_policy == "concatenate":
-                    self.in_channels += skip_channels[skip_index]
-
-                self.skip = UnetSkipBlock(
-                    enc_skip_channels=skip_channels[skip_index], 
-                    prev_dec_channels=self.in_channels,
-                    merge_policy=long_skip_merge_policy, 
-                )
-            elif long_skip == "unet3+":
-                self.skip = Unet3pSkipBlock(
-                    in_channels=self.in_channels,
-                    out_channels=decoder_channels[skip_index + 1],
-                    skip_channels=skip_channels[skip_index:],
-                    out_dims=out_dims[skip_index:],
-                    same_padding=same_padding,
-                    batch_norm=batch_norm,
-                    activation=activation,
-                    weight_standardize=weight_standardize,
-                    preactivate=preactivate,
-                    n_conv_blocks=n_blocks
+            self.skip = UnetSkipBlock(
+                in_channels=self.in_channels,
+                skip_channels=skip_channel_list[skip_index], 
+                merge_policy=long_skip_merge_policy, 
             )
-            elif long_skip == "unet++":
-                self.skip = UnetppSkipBlock(
-                    decoder_channels=decoder_channels,
-                    skip_channels=skip_channels,
-                    skip_index=skip_index,
-                    merge_policy=long_skip_merge_policy,
-                    same_padding=same_padding,
-                    batch_norm=batch_norm,
-                    activation=activation,
-                    weight_standardize=weight_standardize,
-                    preactivate=preactivate,
-                    n_conv_blocks=n_blocks
-                )
+            # num channels for the final conv block
+            self.conv_in_channels = self.in_channels
+        
+        elif long_skip == "unet3+":
+            self.skip = Unet3pSkipBlock(
+                in_channels=self.in_channels,
+                out_channels=self.out_channels,
+                skip_channel_list=skip_channel_list[skip_index:],
+                out_dims=out_dims[skip_index:],
+                same_padding=same_padding,
+                batch_norm=batch_norm,
+                activation=activation,
+                weight_standardize=weight_standardize,
+                preactivate=preactivate,
+                n_conv_blocks=n_blocks
+            )
+
+            # num channels for the final conv block
+            self.conv_in_channels = self.in_channels
+        
+        elif long_skip == "unet++":
+            UnetppBlock = UnetppSumSkipBlock if long_skip_merge_policy == "summation" else UnetppCatSkipBlock
+
+            self.skip = UnetppBlock(
+                in_channels=self.in_channels,
+                out_channel_list=out_channel_list,
+                skip_channel_list=skip_channel_list,
+                skip_index=skip_index,
+                merge_policy=long_skip_merge_policy,
+                same_padding=same_padding,
+                batch_norm=batch_norm,
+                activation=activation,
+                weight_standardize=weight_standardize,
+                preactivate=preactivate,
+                n_conv_blocks=n_blocks,
+                reduce_params=reduce_params
+            )
+
+            # set out and in channels for the next block..  This became kludgy.. TODO: unkludge
+            if long_skip_merge_policy == "summation":
+                self.conv_in_channels = skip_channel_list[skip_index] if skip_index == 0 else self.in_channels
+
+            elif long_skip_merge_policy == "concatenate":
+                self.in_channels += skip_channel_list[skip_index]*(skip_index+1)
+                self.conv_in_channels = self.in_channels
+            
+            if reduce_params:
+                self.conv_in_channels = self.out_channels if skip_index < len(skip_channel_list[1:]) else self.in_channels
+            
