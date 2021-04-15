@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 from typing import List, Tuple
 
-from ....modules import FixedUnpool
-from ... import MultiBlockBasic
+from .. import MultiBlockBasic
+from ...modules import FixedUnpool
 
 
 class CatBlock(nn.ModuleDict):

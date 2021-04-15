@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 from typing import Tuple, List
 
-from ....modules import FixedUnpool
-from ... import MultiBlockBasic
+from .. import MultiBlockBasic
+from ...modules import FixedUnpool
 
 
-class Unet3pCatSkipBlock(nn.Module):
+class Unet3pSumSkipBlock(nn.Module):
     def __init__(self,
                  in_channels: int,
                  out_channel_list: List[int],
@@ -23,6 +23,8 @@ class Unet3pCatSkipBlock(nn.Module):
         """
         U-net3+ like skip connection block.
         https://arxiv.org/abs/2004.08790
+
+        Instead of concatenating, this merges the blocks by summing
 
         Args:
         ----------
@@ -55,7 +57,7 @@ class Unet3pCatSkipBlock(nn.Module):
                 Number of basic (bn->relu->conv)-blocks inside one residual
                 multiconv block        
         """
-        super(Unet3pCatSkipBlock, self).__init__()
+        super(Unet3pSumSkipBlock, self).__init__()
         current_out_chl = out_channel_list[skip_index + 1]
         dense_channels = out_channel_list[:skip_index]
         prev_dims = out_dims[:skip_index]
@@ -65,18 +67,11 @@ class Unet3pCatSkipBlock(nn.Module):
         
         skip_channels = skip_channel_list[skip_index:-1] # no skip at the final block
         out_dims = out_dims[skip_index:] # no skip at the final block
-
-        # divide the number of out channels for conv blocks evenly and save the 
-        # remainder so that the final number of out channels can be set to out_channels
-        cat_channels, reminder = divmod(current_out_chl, len(skip_channel_list))
-       
-        # at the final deocder block out_channels need to be same as the input arg 
-        num_out_features = cat_channels + reminder if skip_channels else current_out_chl
         
         # TODO option for short skips
         self.decoder_feat_conv = MultiBlockBasic(
             in_channels=in_channels, 
-            out_channels=num_out_features,
+            out_channels=current_out_chl,
             n_blocks=n_conv_blocks,
             batch_norm=batch_norm, 
             activation=activation,
@@ -95,7 +90,7 @@ class Unet3pCatSkipBlock(nn.Module):
                 self.up_scales[f"up_scale{i}"] = up_scale
                 self.dense_convs[f"dec_skip_conv{i}"] = MultiBlockBasic(
                     in_channels=in_chl, 
-                    out_channels=cat_channels,
+                    out_channels=current_out_chl,
                     n_blocks=n_conv_blocks,
                     batch_norm=batch_norm, 
                     activation=activation,
@@ -110,7 +105,7 @@ class Unet3pCatSkipBlock(nn.Module):
                 self.down_scales[f"down_scale{i + 1}"] = down_scale
                 self.skip_convs[f"skip_conv{i + 1}"] = MultiBlockBasic(
                     in_channels=in_chl, 
-                    out_channels=cat_channels,
+                    out_channels=current_out_chl,
                     n_blocks=n_conv_blocks,
                     batch_norm=batch_norm, 
                     activation=activation,
@@ -183,26 +178,22 @@ class Unet3pCatSkipBlock(nn.Module):
                 for i, (scale, conv_block) in enumerate(zip(self.down_scales.values(), self.skip_convs.values())):
                     skip_feat = scale(skips[i])
                     skip_feat = conv_block(skip_feat)
-                    skip_features.append(skip_feat)
+                    x = x + skip_feat
 
             if extra_skips:
                 # loop over the decoder features
                 for i, (scale, conv_block) in enumerate(zip(self.up_scales.values(), self.dense_convs.values())):
                     dense_feat = scale(extra_skips[i])
                     dense_feat = conv_block(dense_feat)
-                    decoder_features.append(dense_feat)
+                    x = x + dense_feat
 
-            all_features = skip_features + decoder_features
-            all_features.append(x)
-            x = torch.cat(all_features, dim=1)
             decoder_out_features.append(x)
 
         return x, decoder_out_features
 
 
 
-
-class Unet3pCatSkipBlockLight(nn.Module):
+class Unet3pSumSkipBlockLight(nn.Module):
     def __init__(self,
                  in_channels: int,
                  out_channel_list: List[int],
@@ -220,8 +211,8 @@ class Unet3pCatSkipBlockLight(nn.Module):
         U-net3+ like skip connection block.
         https://arxiv.org/abs/2004.08790
 
-        This has no dense decoder to decoder skip connections
-        --> Lighter memory footprint. 
+        Instead of concatenating, this merges the blocks by summing.
+        This includes only the encoder to decoder skip connections.
 
         Args:
         ----------
@@ -254,23 +245,21 @@ class Unet3pCatSkipBlockLight(nn.Module):
                 Number of basic (bn->relu->conv)-blocks inside one residual
                 multiconv block        
         """
-        super(Unet3pCatSkipBlockLight, self).__init__()
-        current_out_chl = out_channel_list[skip_index + 1]        
+        super(Unet3pSumSkipBlockLight, self).__init__()
+        current_out_chl = out_channel_list[skip_index + 1]
+        dense_channels = out_channel_list[:skip_index]
+        prev_dims = out_dims[:skip_index]
+        
+        if prev_dims:
+            prev_dims.insert(0, prev_dims[0]) # insert head dims to pre dims
+        
         skip_channels = skip_channel_list[skip_index:-1] # no skip at the final block
         out_dims = out_dims[skip_index:] # no skip at the final block
-
-
-        # divide the number of out channels for conv blocks evenly and save the 
-        # remainder so that the final number of out channels can be set to out_channels
-        cat_channels, reminder = divmod(current_out_chl, len(skip_channels) + 1)#len(skip_channel_list))
-       
-        # at the final deocder block out_channels need to be same as the input arg 
-        num_out_features = cat_channels + reminder if skip_channels else current_out_chl
         
         # TODO option for short skips
         self.decoder_feat_conv = MultiBlockBasic(
             in_channels=in_channels, 
-            out_channels=num_out_features,
+            out_channels=current_out_chl,
             n_blocks=n_conv_blocks,
             batch_norm=batch_norm, 
             activation=activation,
@@ -287,7 +276,7 @@ class Unet3pCatSkipBlockLight(nn.Module):
                 self.down_scales[f"down_scale{i + 1}"] = down_scale
                 self.skip_convs[f"skip_conv{i + 1}"] = MultiBlockBasic(
                     in_channels=in_chl, 
-                    out_channels=cat_channels,
+                    out_channels=current_out_chl,
                     n_blocks=n_conv_blocks,
                     batch_norm=batch_norm, 
                     activation=activation,
@@ -339,21 +328,20 @@ class Unet3pCatSkipBlockLight(nn.Module):
         Returns:
         ------------
             Tuple of tensors. First return is the decoder branch output.
-            The second return value is None. Code doesnt align w/o it..
+            The second return value is None (Need to return a tuple so this fits to other parts..)
         """
         x = self.decoder_feat_conv(x)
 
         if idx < len(skips):
             skip_features = []
-            skips = skips[idx:]            
+            decoder_features = []
+            skips = skips[idx:]
+            
             if skips:
                 # loop over the encoder features
                 for i, (scale, conv_block) in enumerate(zip(self.down_scales.values(), self.skip_convs.values())):
                     skip_feat = scale(skips[i])
                     skip_feat = conv_block(skip_feat)
-                    skip_features.append(skip_feat)
-
-            skip_features.append(x)
-            x = torch.cat(skip_features, dim=1)
+                    x = x + skip_feat
 
         return x, None
