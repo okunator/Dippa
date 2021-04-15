@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 
+
 class EstBN(nn.Module):
     def __init__(self, num_features: int, eps: float = 1e-7) -> None:
         """

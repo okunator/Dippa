@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Tuple
+from typing import Tuple, List
 
 from .block import MultiBlockResidual
 from ..base_decoder_block import BaseDecoderBlock
@@ -9,8 +9,8 @@ from ..base_decoder_block import BaseDecoderBlock
 class ResidualDecoderBlock(BaseDecoderBlock):
     def __init__(self,
                  in_channels: int,
-                 skip_channels: int,
-                 out_channels: int,
+                 out_channel_list: List[int],
+                 skip_channel_list: List[int],
                  same_padding: bool=True,
                  batch_norm: str="bn",
                  activation: str="relu",
@@ -20,7 +20,9 @@ class ResidualDecoderBlock(BaseDecoderBlock):
                  long_skip_merge_policy: str="summation",
                  n_layers: int=1,
                  n_blocks: int=2,
-                 preactivate: bool=False) -> None:
+                 preactivate: bool=False,
+                 skip_index: int=None,
+                 out_dims: List[int]=None) -> None:
 
         """
         Basic decoder block. 
@@ -28,17 +30,18 @@ class ResidualDecoderBlock(BaseDecoderBlock):
         Operations:
         1. Upsample
         2. Long skip from encoder to decoder if specified.
-        3. Convolve + residual connection
+        3. Convolve + residual short skip connection
 
         Args:
         -----------
             in_channels (int):
                 Number of input channels
-            skip_channels (int):
-                Number of channels in the encoder skip tensor.
+            out_channel_list (List[int]):
+                List of the number of output channels in the decoder output tensors 
+                First index contains the number of head channels
+            skip_channel_list (List[int]):
+                List of the number of channels in the encoder skip tensors.
                 Ignored if long_skip == None.
-            out_channels (int):
-                Number of output channels
             same_padding (bool, default=True):
                 if True, performs same-covolution
             batch_norm (str, default="bn"): 
@@ -66,23 +69,42 @@ class ResidualDecoderBlock(BaseDecoderBlock):
                 multiconv block
             preactivate (bool, default=False)
                 If True, normalization and activation are applied before convolution
+            skip_index (int, default=None):
+                the index of the skip_channels list. Used if long_skip="unet"
+            out_dims (List[int], default=None):
+                List of the heights/widths of each encoder/decoder feature map
+                e.g. [256, 128, 64, 32, 16]. Assumption is that feature maps are
+                square. This is used for skip blocks unet3+
         """
         super(ResidualDecoderBlock, self).__init__(
             in_channels=in_channels,
-            skip_channels=skip_channels,
+            out_channel_list=out_channel_list,
+            skip_channel_list=skip_channel_list,
             up_sampling=up_sampling,
             long_skip=long_skip,
             long_skip_merge_policy=long_skip_merge_policy,
-            preactivate=preactivate
+            skip_index=skip_index,
+            out_dims=out_dims,
+            same_padding=same_padding,
+            batch_norm=batch_norm,
+            activation=activation,
+            weight_standardize=weight_standardize,
+            preactivate=preactivate,
+            n_blocks=1,
         )
 
         # multi residual conv blocks
         self.conv_modules = nn.ModuleDict()
         for i in range(n_layers):
-            num_in_features = self.in_channels if i == 0 else out_channels
+
+            num_in_features = self.out_channels
+            if i == 0:
+                num_in_features = self.conv_in_channels
+
+            # num_in_features = self.in_channels if i == 0 and long_skip == "unet" else out_channels[skip_index]
             layer = MultiBlockResidual(
                 in_channels=num_in_features, 
-                out_channels=out_channels,
+                out_channels=self.out_channels,
                 n_blocks=n_blocks,
                 batch_norm=batch_norm, 
                 activation=activation,
@@ -91,14 +113,38 @@ class ResidualDecoderBlock(BaseDecoderBlock):
             )
             self.conv_modules[f"multiconv_block{i + 1}"] = layer
         
-    def forward(self, x: torch.Tensor, skips: Tuple[torch.Tensor], **kwargs) -> torch.Tensor:
-        # upsample and long skip
+    def forward(self, 
+                x: torch.Tensor, 
+                idx: int,
+                skips: Tuple[torch.Tensor], 
+                extra_skips: List[torch.Tensor]=None) -> torch.Tensor:
+        """
+        Args:
+        ----------
+            x (torch.Tensor):
+                Input tensor. Shape (B, C, H, W).
+            idx (int):
+                runnning index used to get the right skip tensor(s) from the skips
+                Tuple for the skip connection.
+            skips (Tuple[torch.Tensor]):
+                Tuple of tensors generated from consecutive encoder blocks.
+                Shapes (B, C, H, W).
+            extra_skips (List[torch.Tensor], default=None):
+                extra skip connections, Used in unet3+ and unet++
+        """
+        # upsample
         x = self.upsample(x)
+
+        # Long skip
         if self.skip is not None:
-            x = self.skip(x, skips, **kwargs)
+            if self.long_skip == "unet":
+                x = self.skip(x, skips, idx=idx)
+            elif self.long_skip in ("unet++", "unet3+"):
+                x, extra = self.skip(x, idx=idx, skips=skips, extra_skips=extra_skips)
+                extra_skips = extra
         
-        # residual conv blocks
+        # final residual conv blocks
         for name, module in self.conv_modules.items():
             x = module(x)
 
-        return x
+        return x, extra_skips

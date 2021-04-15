@@ -25,3 +25,6 @@ class FixedUnpool(nn.Module):
         ret = ret.permute(0, 1, 2, 4, 3, 5)
         ret = ret.reshape((-1, in_shape[1], in_shape[2]*self.scale_factor, in_shape[3]*self.scale_factor))
         return ret
+
+    def __repr__(self):
+        return f"FixedUnpool(scale_factor={self.scale_factor})"

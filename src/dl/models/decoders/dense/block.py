@@ -2,9 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Tuple, List
 
-import src.dl.models.layers.activations as act
-import src.dl.models.layers.normalization as norm
-from src.dl.models.decoders.base_conv_block import BaseConvBlock
+from ..base_conv_block import BaseConvBlock
 
 
 class DenseConvBlockPreact(BaseConvBlock):
