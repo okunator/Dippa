@@ -49,10 +49,8 @@ class UnetppCatSkipBlock(nn.Module):
         Unet++ skip block for one level in the decoder
         https://arxiv.org/abs/1807.10165
 
-        Supports concatenation, summation merge policies
-        Set reduce_params = True if the original version (i.e. reduce_params = False)
-        takes too much memory. 
-        
+        Supports concatenation merge policy
+         
         Args:
         ---------
             in_channels (int):
@@ -187,9 +185,12 @@ class UnetppCatSkipBlockLight(nn.Module):
         Unet++ skip block for one level in the decoder
         https://arxiv.org/abs/1807.10165
 
-        Supports concatenation, summation merge policies
-        Set reduce_params = True if the original version (i.e. reduce_params = False)
-        takes too much memory. 
+        Supports concatenation merge policy
+        This is a light version which has lower memory footprint.
+        This is done similarly to the unet3+ by basically just outputting
+        a small number of feature maps at every conv block which at the end
+        sum together to the number of output channels of the decoder block 
+        (after concatenation)
         
         Args:
         ---------

@@ -91,8 +91,6 @@ class Unet3pCatSkipBlock(nn.Module):
             self.up_scales = nn.ModuleDict()
             self.dense_convs = nn.ModuleDict()
             for i, (in_chl, prev_dim) in enumerate(zip(dense_channels, prev_dims), 1):
-                # print("target_size: ", target_size)
-                # print("prev_dim: ", prev_dim)
                 up_scale = self.scale(prev_dim, target_size)
                 self.up_scales[f"up_scale{i}"] = up_scale
                 self.dense_convs[f"dec_skip_conv{i}"] = MultiBlockBasic(
@@ -105,8 +103,6 @@ class Unet3pCatSkipBlock(nn.Module):
                     preactivate=preactivate
                 )
 
-        
-        # if skip_channels:
             self.down_scales = nn.ModuleDict()
             self.skip_convs = nn.ModuleDict()
             for i, (in_chl, out_dim) in enumerate(zip(skip_channels, out_dims)):
@@ -209,8 +205,9 @@ class Unet3pCatSkipBlock(nn.Module):
 class Unet3pCatSkipBlockLight(nn.Module):
     def __init__(self,
                  in_channels: int,
-                 out_channels: int,
+                 out_channel_list: List[int],
                  skip_channel_list: List[int],
+                 skip_index: int,
                  out_dims: List[int],
                  same_padding: bool=True,
                  batch_norm: str="bn",
@@ -223,21 +220,24 @@ class Unet3pCatSkipBlockLight(nn.Module):
         U-net3+ like skip connection block.
         https://arxiv.org/abs/2004.08790
 
-        This includes only the skips from the encoder to decoder.
-        Not the decoder to decoder skips.
+        This has no dense decoder to decoder skip connections
+        --> Lighter memory footprint. 
 
         Args:
         ----------
             in_channels (int):
                 Number of channels in the upsampled decoder feature map
-            out_channels (int):
-                Number of output channels in the decoder block
+            out_channel_list (List[int]):
+                List of the number of output channels in decoder blocks.
+                First index contains the number of head channels
             skip_channel_list (List[int]):
                 List of the number of channels in each of the encoder skip tensors.
+            skip_index (int):
+                index of the current skip channel in skip_channels_list.
             out_dims (List[int]):
                 List of the heights/widths of each encoder/decoder feature map
-                e.g. [256, 128, 64, 32, 16]. Again, assumption is that feature maps are
-                square shapes like in the target_size argument.
+                e.g. [256, 128, 64, 32, 16]. Assumption is that feature maps are
+                square shaped.
             same_padding (bool, default=True):
                 if True, performs same-covolution
             batch_norm (str, default="bn"): 
@@ -255,17 +255,17 @@ class Unet3pCatSkipBlockLight(nn.Module):
                 multiconv block        
         """
         super(Unet3pCatSkipBlockLight, self).__init__()
+        current_out_chl = out_channel_list[skip_index + 1]        
+        skip_channels = skip_channel_list[skip_index:-1] # no skip at the final block
+        out_dims = out_dims[skip_index:] # no skip at the final block
 
-        # ignore the last elements, since no skips are applied at the final block
-        out_dims = out_dims[:-1]
-        skip_channel_list = skip_channel_list[:-1]
-        
+
         # divide the number of out channels for conv blocks evenly and save the 
         # remainder so that the final number of out channels can be set to out_channels
-        cat_channels, reminder = divmod(out_channels, (len(skip_channel_list) + 1))
+        cat_channels, reminder = divmod(current_out_chl, len(skip_channels) + 1)#len(skip_channel_list))
        
         # at the final deocder block out_channels need to be same as the input arg 
-        num_out_features = cat_channels + reminder if skip_channel_list else out_channels
+        num_out_features = cat_channels + reminder if skip_channels else current_out_chl
         
         # TODO option for short skips
         self.decoder_feat_conv = MultiBlockBasic(
@@ -277,14 +277,12 @@ class Unet3pCatSkipBlockLight(nn.Module):
             weight_standardize=weight_standardize,
             preactivate=preactivate
         )
-
-        # if there are skip channels, init the convs
-        if skip_channel_list:
+        
+        if skip_channels:
             target_size = out_dims[0]
-
             self.down_scales = nn.ModuleDict()
             self.skip_convs = nn.ModuleDict()
-            for i, (in_chl, out_dim) in enumerate(zip(skip_channel_list, out_dims)):
+            for i, (in_chl, out_dim) in enumerate(zip(skip_channels, out_dims)):
                 down_scale = self.scale(out_dim, target_size)
                 self.down_scales[f"down_scale{i + 1}"] = down_scale
                 self.skip_convs[f"skip_conv{i + 1}"] = MultiBlockBasic(
@@ -312,12 +310,12 @@ class Unet3pCatSkipBlockLight(nn.Module):
 
         Returns:
         ---------
-            nn.MaxPool2d or nn.identity if scaling not needed
+            nn.MaxPool2d, FixedUnpool or nn.identity if scaling not needed
         """
-        scale_factor = in_size // target_size
+        scale_factor = in_size / target_size
         
         if scale_factor > 1:
-            scale_op = nn.MaxPool2d(kernel_size=scale_factor, ceil_mode=True)
+            scale_op = nn.MaxPool2d(kernel_size=int(scale_factor), ceil_mode=True)
         else:
             scale_op = nn.Identity()
 
@@ -327,7 +325,6 @@ class Unet3pCatSkipBlockLight(nn.Module):
                 x: torch.Tensor, 
                 idx: int, 
                 skips: Tuple[torch.Tensor], 
-                extra_skips: List[torch.Tensor]=None, 
                 **kwargs) -> torch.Tensor:
         """
         Args:
@@ -338,27 +335,25 @@ class Unet3pCatSkipBlockLight(nn.Module):
                 index for the the feature from the encoder
             skips (Tuple[torch.Tensor]):
                 all the features from the encoder
-            extra_skips (List[torch.Tensor], default=None):
-                extra skip connections. Here, the dense deocder block 
-                to upper decoder block connections
 
         Returns:
+        ------------
             Tuple of tensors. First return is the decoder branch output.
-            The second return value is the output from the previous decoder branch
+            The second return value is None. Code doesnt align w/o it..
         """
-        prev_decoder_out = None
         x = self.decoder_feat_conv(x)
-        if idx < len(skips):
-            skips = skips[idx:]
 
-            # Down scale skip features and convolve
+        if idx < len(skips):
             skip_features = []
-            for i, (scale, conv_block) in enumerate(zip(self.down_scales.values(), self.skip_convs.values())):
-                skip_feat = scale(skips[i])
-                skip_feat = conv_block(skip_feat)
-                skip_features.append(skip_feat)
+            skips = skips[idx:]            
+            if skips:
+                # loop over the encoder features
+                for i, (scale, conv_block) in enumerate(zip(self.down_scales.values(), self.skip_convs.values())):
+                    skip_feat = scale(skips[i])
+                    skip_feat = conv_block(skip_feat)
+                    skip_features.append(skip_feat)
 
             skip_features.append(x)
             x = torch.cat(skip_features, dim=1)
 
-        return x, prev_decoder_out
+        return x, None

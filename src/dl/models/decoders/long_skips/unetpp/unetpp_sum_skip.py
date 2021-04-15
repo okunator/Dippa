@@ -75,8 +75,7 @@ class UnetppSumSkipBlock(nn.Module):
         https://arxiv.org/abs/1807.10165
 
         Supports only summation merge policy
-        Set reduce_params = True if the original version (i.e. reduce_params = False)
-        takes too much memory.
+        Follows the original implementation.
 
         Args:
         ---------
@@ -212,15 +211,17 @@ class UnetppSumSkipBlockLight(nn.Module):
                  weight_standardize: bool=False,
                  preactivate: bool=False,
                  n_conv_blocks: int=1,
-                #  reduce_params: bool=False,
                  **kwargs) -> None:
         """
         Unet++ skip block for one level in the decoder
         https://arxiv.org/abs/1807.10165
 
         Supports only summation merge policy
-        Set reduce_params = True if the original version (i.e. reduce_params = False)
-        takes too much memory.
+        This is a light version that has lower memory footprint than the original implementation.
+        Done so that the sub-blocks output the number of decoder block out channels instead of
+        the number of encoder/skip block out_channels. So if decoder blocks output less channels
+        than the encoder -> less parameters. Decoder output channels are controllable whereas the
+        encoder channels are not since the encoderr are pre-trained models.
 
         Args:
         ---------
