@@ -120,7 +120,7 @@ class Decoder(nn.ModuleDict):
         # Build decoder
         for i, (in_chl, _) in enumerate(zip(decoder_channels, skip_channels)):
             kwargs["skip_index"] = i
-            decoder_block = DecoderBlock(in_chl, decoder_channels[1:], skip_channels, **kwargs)
+            decoder_block = DecoderBlock(in_chl, decoder_channels, skip_channels, **kwargs)
             self.add_module(f"decoder_block{i + 1}", decoder_block)
 
     def forward(self, *features: Tuple[torch.Tensor]) -> torch.Tensor:

@@ -3,10 +3,15 @@ import torch.nn as nn
 from typing import List
 
 from .long_skips import (
-    Unet3pSkipBlock, 
     UnetSkipBlock, 
     UnetppCatSkipBlock,
-    UnetppSumSkipBlock
+    UnetppSumSkipBlock,
+    Unet3pCatSkipBlock,
+    Unet3pSumSkipBlock,
+    UnetppCatSkipBlockLight,
+    UnetppSumSkipBlockLight,
+    Unet3pCatSkipBlockLight,
+    Unet3pSumSkipBlockLight
 )
 from ..modules import FixedUnpool
 
@@ -37,7 +42,8 @@ class BaseDecoderBlock(nn.Module):
             in_channels (int):
                 the number of channels coming in from the previous head/decoder branch
             out_channel_list (List[int]):
-                List of the number of output channels in the decoder output tensors 
+                List of the number of output channels in the decoder output tensors.
+                First index contains the number of head channels
             skip_channel_list (List[int]):
                 List of the number of channels in each of the encoder skip tensors.
                 Ignored if long_skip is None.
@@ -86,7 +92,7 @@ class BaseDecoderBlock(nn.Module):
         super(BaseDecoderBlock, self).__init__()
         self.in_channels = in_channels
         self.long_skip = long_skip
-        self.out_channels = out_channel_list[skip_index]
+        self.out_channels = out_channel_list[skip_index + 1]
 
         # set upsampling method
         if up_sampling == "fixed_unpool":
@@ -104,7 +110,7 @@ class BaseDecoderBlock(nn.Module):
         if long_skip == "unet":
             # adjust input channel dim if "concatenate"
             if long_skip_merge_policy == "concatenate":
-                self.in_channels += skip# num channels for the final conv block_channel_list[skip_index]
+                self.in_channels += skip_channel_list[skip_index]
 
             self.skip = UnetSkipBlock(
                 in_channels=self.in_channels,
@@ -115,11 +121,17 @@ class BaseDecoderBlock(nn.Module):
             self.conv_in_channels = self.in_channels
         
         elif long_skip == "unet3+":
-            self.skip = Unet3pSkipBlock(
+            if reduce_params:
+                Unet3pBlock = Unet3pSumSkipBlockLight if long_skip_merge_policy == "summation" else Unet3pCatSkipBlockLight
+            else:
+                Unet3pBlock = Unet3pSumSkipBlock if long_skip_merge_policy == "summation" else Unet3pCatSkipBlock
+
+            self.skip = Unet3pBlock(
                 in_channels=self.in_channels,
-                out_channels=self.out_channels,
-                skip_channel_list=skip_channel_list[skip_index:],
-                out_dims=out_dims[skip_index:],
+                out_channel_list=out_channel_list,
+                skip_channel_list=skip_channel_list,
+                skip_index=skip_index,
+                out_dims=out_dims,
                 same_padding=same_padding,
                 batch_norm=batch_norm,
                 activation=activation,
@@ -129,14 +141,17 @@ class BaseDecoderBlock(nn.Module):
             )
 
             # num channels for the final conv block
-            self.conv_in_channels = self.in_channels
+            self.conv_in_channels = self.out_channels
         
         elif long_skip == "unet++":
-            UnetppBlock = UnetppSumSkipBlock if long_skip_merge_policy == "summation" else UnetppCatSkipBlock
+            if reduce_params:
+                UnetppBlock = UnetppSumSkipBlockLight if long_skip_merge_policy == "summation" else UnetppCatSkipBlockLight
+            else:
+                UnetppBlock = UnetppSumSkipBlock if long_skip_merge_policy == "summation" else UnetppCatSkipBlock
 
             self.skip = UnetppBlock(
                 in_channels=self.in_channels,
-                out_channel_list=out_channel_list,
+                out_channel_list=out_channel_list[1:],
                 skip_channel_list=skip_channel_list,
                 skip_index=skip_index,
                 merge_policy=long_skip_merge_policy,

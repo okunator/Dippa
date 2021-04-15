@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: long_skip_pannuke_tests
-  experiment_version: hover_unetpp_cat
+  experiment_version: hover_unet3p_cat
 
 dataset_args:
   train_dataset: pannuke         # One of (consep, pannuke, kumar, monusac)
@@ -22,8 +22,8 @@ model_args:
       n_blocks: 2               # Number of convolutions blocks in each multi conv block
       preactivate: False         # If True, BN & RELU applied before CONV
       short_skips: null      # One of (residual, dense, null) (for decoder branch only)
-      long_skips: unet++        # One of (unet, unet++, unet3+, null)
-      merge_policy: summation   # One of (sum, cat) (for long skips)
+      long_skips: unet3+        # One of (unet, unet++, unet3+, null)
+      merge_policy: concatenate   # One of (sum, cat) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
       decoder_channels:         # Number of out channels for every decoder layer
         - 256
@@ -67,7 +67,7 @@ runtime_args:
   resume_training: False
   num_epochs: 2
   num_gpus: 1
-  batch_size: 8
+  batch_size: 4
   num_workers: 8              # number workers for data loader
   model_input_size: 256       # size of the model input (input_size, input_size)
   db_type: hdf5             # The type of the input data db. One of (hdf5, zarr). 

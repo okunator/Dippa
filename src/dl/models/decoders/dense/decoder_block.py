@@ -9,8 +9,8 @@ from ..base_decoder_block import BaseDecoderBlock
 class DenseDecoderBlock(BaseDecoderBlock):
     def __init__(self,
                  in_channels: int,
-                 out_channels: List[int],
-                 skip_channels: List[int],
+                 out_channel_list: List[int],
+                 skip_channel_list: List[int],
                  same_padding: bool=True,
                  batch_norm: str="bn",
                  activation: str="relu",
@@ -36,9 +36,10 @@ class DenseDecoderBlock(BaseDecoderBlock):
         -----------
             in_channels (int):
                 Number of input channels
-            out_channels (List[int]):
-                List of the number of output channels in the decoder output tensors 
-            skip_channels (List[int]):
+            out_channel_list (List[int]):
+                List of the number of output channels in the decoder output tensors.
+                First index contains the number of head channels
+            skip_channel_list (List[int]):
                 List of the number of channels in the encoder skip tensors.
                 Ignored if long_skip == None.
             same_padding (bool, default=True):
@@ -67,7 +68,7 @@ class DenseDecoderBlock(BaseDecoderBlock):
             preactivate (bool, default=False)
                 If True, normalization and activation are applied before convolution
             skip_index (int, default=None):
-                the index of the skip_channels list. Used if long_skip="unet"
+                the index of the skip_channels list.
             out_dims (List[int]):
                 List of the heights/widths of each encoder/decoder feature map
                 e.g. [256, 128, 64, 32, 16]. Assumption is that feature maps are
@@ -75,8 +76,8 @@ class DenseDecoderBlock(BaseDecoderBlock):
         """
         super(DenseDecoderBlock, self).__init__(
             in_channels=in_channels,
-            out_channels=out_channels,
-            skip_channels=skip_channels,
+            out_channel_list=out_channel_list,
+            skip_channel_list=skip_channel_list,
             up_sampling=up_sampling,
             long_skip=long_skip,
             long_skip_merge_policy=long_skip_merge_policy,
@@ -92,9 +93,9 @@ class DenseDecoderBlock(BaseDecoderBlock):
 
        # layered multi conv blocks
         self.conv_modules = nn.ModuleDict()
-        num_in_features = self.in_channels if long_skip == "unet" else out_channels[skip_index]
+        num_in_features = self.conv_in_channels
         for i in range(n_layers):
-            num_out_features = out_channels[skip_index] # num_in_features // 2
+            num_out_features = self.out_channels
             layer = MultiBlockDense(
                 in_channels=num_in_features, 
                 out_channels=num_out_features,
@@ -111,30 +112,42 @@ class DenseDecoderBlock(BaseDecoderBlock):
         DenseBlock = DenseConvBlockPreact if preactivate else DenseConvBlock
         self.transition = DenseBlock(
             in_channels=num_in_features, 
-            out_channels=out_channels[skip_index], 
+            out_channels=self.out_channels, 
             same_padding=same_padding,
             batch_norm=batch_norm, 
             activation=activation, 
             weight_standardize=weight_standardize,
         )
         
-    def forward(self, x: torch.Tensor, skips: Tuple[torch.Tensor], idx: int=None) -> torch.Tensor:
+    def forward(self,
+                x: torch.Tensor, 
+                idx: int,
+                skips: Tuple[torch.Tensor], 
+                extra_skips: List[torch.Tensor]=None) -> torch.Tensor:
         """
         Args:
         -----------
             x (torch.Tensor):
                 Input tensor. Shape (B, C, H, W).
+            idx (int):
+                runnning index used to get the right skip tensor(s) from the skips
+                Tuple for the skip connection.
             skips (Tuple[torch.Tensor]):
                 Tuple of tensors generated from consecutive encoder blocks.
                 Shapes (B, C, H, W).
-            idx (int, default=None):
-                runnning index used to get the right skip tensor(s) from the skips
-                Tuple for the skip connection.
+            extra_skips (List[torch.Tensor], default=None):
+                extra skip connections, Used in unet3+ and unet++
         """
-        # upsample and long skip
+        # upsample
         x = self.upsample(x)
+        
+        # long skip
         if self.skip is not None:
-            x = self.skip(x, skips, idx=idx)
+            if self.long_skip == "unet":
+                x = self.skip(x, skips, idx=idx)
+            elif self.long_skip in ("unet++", "unet3+"):
+                x, extra = self.skip(x, idx=idx, skips=skips, extra_skips=extra_skips)
+                extra_skips = extra
 
         # dense blocks and append to feature list
         features = [x]
@@ -142,7 +155,8 @@ class DenseDecoderBlock(BaseDecoderBlock):
             new_features = module(features)
             features.append(new_features)
 
+        # final transition conv
         cat_features = torch.cat(features, dim=1)
         out = self.transition(cat_features)
 
-        return out
+        return out, extra_skips

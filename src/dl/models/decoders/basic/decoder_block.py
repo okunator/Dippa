@@ -37,7 +37,8 @@ class BasicDecoderBlock(BaseDecoderBlock):
             in_channels (int):
                 The number of channels coming in from the previous head/decoder branch
             out_channel_list (List[int]):
-                List of the number of decoder branch output channels  
+                List of the number of decoder branch output channels.
+                First index contains the number of head channels.
             skip_channel_list (List[int]):
                 List of the number of channels in the encoder skip tensors.
                 Ignored if long_skip == None.
@@ -101,7 +102,6 @@ class BasicDecoderBlock(BaseDecoderBlock):
             if i == 0:
                 num_in_features = self.conv_in_channels
 
-            # print("in channels for the final conv block: ", num_in_features)
             layer = MultiBlockBasic(
                 in_channels=num_in_features, 
                 out_channels=self.out_channels,
@@ -112,7 +112,6 @@ class BasicDecoderBlock(BaseDecoderBlock):
                 preactivate=preactivate
             )
             self.conv_modules[f"multiconv_block{i + 1}"] = layer
-            # print(layer)
         
     def forward(self, 
                 x: torch.Tensor, 
@@ -144,7 +143,7 @@ class BasicDecoderBlock(BaseDecoderBlock):
                 x, extra = self.skip(x, idx=idx, skips=skips, extra_skips=extra_skips)
                 extra_skips = extra
 
-        # basic conv blocks
+        # final basic conv blocks
         for name, module in self.conv_modules.items():
             x = module(x)
         
