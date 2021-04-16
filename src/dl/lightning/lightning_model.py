@@ -16,7 +16,10 @@ from src.dl.optimizers.optim_builder import OptimizerBuilder
 from src.dl.losses.loss_builder import LossBuilder
 from src.dl.models.model_builder import Model
 from src.dl.torch_utils import to_device
-from .metrics.functional import iou
+from .metrics import Accuracy, MeanIoU
+
+# tests
+import torch.nn.functional as F
 
 
 class SegModel(pl.LightningModule):
@@ -263,7 +266,23 @@ class SegModel(pl.LightningModule):
         self.criterion = self.configure_loss()
 
         # init pl metrics
-        self.accuracy = pl.metrics.Accuracy()
+        acc = Accuracy()
+        miou = MeanIoU()
+        self.train_acc = acc.clone()
+        self.test_acc = acc.clone()
+        self.valid_acc = acc.clone()
+        self.train_miou = miou.clone()
+        self.test_miou = miou.clone()
+        self.valid_miou = miou.clone()
+
+        self.metrics = {
+            "train_acc":self.train_acc,
+            "test_acc":self.test_acc,
+            "val_acc":self.valid_acc,
+            "train_iou":self.train_miou,
+            "test_iou":self.test_miou,
+            "val_iou":self.valid_miou,
+        }
 
     @classmethod
     def from_conf(cls, conf: DictConfig):
@@ -354,7 +373,7 @@ class SegModel(pl.LightningModule):
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         return self.model(x)
 
-    def step(self, batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
+    def step(self, batch: torch.Tensor, batch_idx: int, phase:str) -> Dict[str, torch.Tensor]:
         """
         General training step
         """
@@ -397,13 +416,13 @@ class SegModel(pl.LightningModule):
 
         # Compute metrics for monitoring
         key = "types" if self.decoder_type_branch else "instances" 
-        type_acc = self.accuracy(soft_mask[key], type_target)
-        type_iou = iou(soft_mask[key], type_target, "softmax")
+        type_iou = self.metrics[f"{phase}_iou"](soft_mask[key], type_target, "softmax")
+        type_acc = self.metrics[f"{phase}_acc"](soft_mask[key], type_target, "softmax")
 
         return {
             "loss":loss,
-            "accuracy":type_acc, # accuracy computation not working
-            "mean_iou":type_iou.mean()
+            "accuracy":type_acc,
+            "mean_iou":type_iou
         }
 
     def step_return_dict(self, z: torch.Tensor, phase: str) -> Dict[str, torch.Tensor]:
@@ -413,7 +432,7 @@ class SegModel(pl.LightningModule):
         logs = {
             f"{phase}_loss": z["loss"],
             f"{phase}_accuracy": z["accuracy"],
-            f"{phase}_mean_iou": z["mean_iou"]
+            f"{phase}_mean_iou": z["mean_iou"],
         }
 
         prog_bar = phase == "train"
@@ -422,7 +441,7 @@ class SegModel(pl.LightningModule):
         return {
             "loss": z["loss"],
             "accuracy": z["accuracy"],
-            "mean_iou": z["mean_iou"]
+            "mean_iou": z["mean_iou"],
         }
 
     def epoch_end(self, outputs: torch.Tensor, phase: str) -> Dict[str, torch.Tensor]:
@@ -440,21 +459,20 @@ class SegModel(pl.LightningModule):
         }
 
         self.log_dict(logs, on_step=False, on_epoch=True, prog_bar=False, logger=True)
-
         return {f"avg_{phase}_loss": loss}
     
     def training_step(self, train_batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
-        z = self.step(train_batch, batch_idx)
+        z = self.step(train_batch, batch_idx, "train")
         return_dict = self.step_return_dict(z, "train")
         return return_dict
 
     def validation_step(self, val_batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
-        z = self.step(val_batch, batch_idx)
+        z = self.step(val_batch, batch_idx, "val")
         return_dict = self.step_return_dict(z, "val")
         return return_dict
 
     def test_step(self, test_batch: torch.Tensor, batch_idx: int) -> Dict[str, torch.Tensor]:
-        z = self.step(test_batch, batch_idx)
+        z = self.step(test_batch, batch_idx, "test")
         return_dict = self.step_return_dict(z, "test")
         return return_dict
     

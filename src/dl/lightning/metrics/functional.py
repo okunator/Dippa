@@ -16,7 +16,7 @@ def confusion_mat(yhat: torch.Tensor,
             the soft mask from the network of shape (B, C, H, W)
         target (torch.Tensor): 
             the target matrix of shape (B, H, W)
-        activation (str, optional, default=1): 
+        activation (str, optional, default=None): 
             apply sigmoid or softmax activation before taking argmax
 
     Returns:
@@ -32,15 +32,14 @@ def confusion_mat(yhat: torch.Tensor,
         elif activation == "softmax":
             yhat_soft = F.softmax(yhat, dim=1)
             
-    
     n_classes = yhat_soft.shape[1]
     batch_size = yhat_soft.shape[0]
     bins = target + torch.argmax(yhat_soft, dim=1)*n_classes
     bins_vec = bins.view(batch_size, -1)
 
     confusion_list = []
-    for iter_id in range(batch_size):
-        pb = bins_vec[iter_id]
+    for i in range(batch_size):
+        pb = bins_vec[i]
         bin_count = torch.bincount(pb, minlength=n_classes**2)
         confusion_list.append(bin_count)
 
@@ -99,10 +98,10 @@ def accuracy(yhat: torch.Tensor,
 
     Returns:
     ------------
-        torch.Tensor of shape (B, num_classes, num_classes)
+        torch.Tensor of shape (1)
     """
     conf_mat = confusion_mat(yhat, target, activation)
     diag = torch.diagonal(conf_mat, dim1=-2, dim2=-1) # batch diagonal
     denom = conf_mat.sum()
-    accuracies = (eps + diag) / (eps + denom)
-    return accuracies
+    accuracies = (diag + eps) / (denom + eps)
+    return accuracies.sum()

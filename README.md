@@ -1,14 +1,14 @@
 # Dippa
 (Master's thesis) Work in progress...
 Benchmarking framework for nuclei segmentation models.
+Easy model building and training with single .yml file.
 Using encoders from: [segmentation_models_pytorch](https://github.com/qubvel/segmentation_models.pytorch). 
 
 ## Download scripts for datasets
 * [x] [Kumar](https://ieeexplore.ieee.org/document/7872382) (Kumar et al.)
 * [x] [CoNSep](https://arxiv.org/pdf/1812.06499) (Graham, Vu, et al.)
-* [x] [Pannuke](https://arxiv.org/abs/2003.10778) (Gamper et al.)
+* [x] [Pannuke](https://arxiv.org/abs/2003.10778) (Gamper et al. Note: [License](https://creativecommons.org/licenses/by-nc-sa/4.0/))
 * [ ] [MoNuSac](https://monusac-2020.grand-challenge.org/) (Not yet published) (coming)
-* [ ] [Dsb2018](https://www.kaggle.com/c/data-science-bowl-2018) (Caicedo et al.) (coming)
 
 ## Set Up
 1. Clone the repository
@@ -122,5 +122,6 @@ Borrowing functions and utilities from:
 - [1] N. Kumar, R. Verma, S. Sharma, S. Bhargava, A. Vahadane and A. Sethi, "A Dataset and a Technique for Generalized Nuclear Segmentation for Computational Pathology," in IEEE Transactions on Medical Imaging, vol. 36, no. 7, pp. 1550-1560, July 2017 
 - [2] S. Graham, Q. D. Vu, S. E. A. Raza, A. Azam, Y-W. Tsang, J. T. Kwak and N. Rajpoot. "HoVer-Net: Simultaneous Segmentation and Classification of Nuclei in Multi-Tissue Histology Images." Medical Image Analysis, Sept. 2019.
 - [3] Q D Vu, S Graham, T Kurc, M N N To, M Shaban, T Qaiser, N A Koohbanani, S A Khurram, J Kalpathy-Cramer, T Zhao, R Gupta, J T Kwak, N Rajpoot, J Saltz, K Farahani. Methods for Segmentation and Classification of Digital Microscopy Tissue Images. Frontiers in Bioengineering and Biotechnology 7, 53 (2019).  
-- [4] Gamper, J., Koohbanani, N., Graham, S., Jahanifar, M., Khurram, S., Azam, A., Hewitt, K., & Rajpoot, N. (2020). PanNuke Dataset Extension, Insights and Baselines arXiv preprint arXiv:2003.10778.
-- [5] Caicedo, J.C., Goodman, A., Karhohs, K.W. et al. Nucleus segmentation across imaging experiments: the 2018 Data Science Bowl. Nat Methods 16, 1247–1253 (2019)
+- [4] Gamper, Jevgenij, Navid Alemi, Koohbanani, Simon, Graham, Mostafa, Jahanifar, Syed Ali, Khurram, Ayesha, Azam, Katherine, Hewitt, and Nasir, Rajpoot. "PanNuke Dataset Extension, Insights and Baselines".arXiv preprint arXiv:2003.10778 (2020).
+- [5] Gamper, Jevgenij, Navid Alemi, Koohbanani, Ksenija, Benet, Ali, Khuram, and Nasir, Rajpoot. "PanNuke: an open pan-cancer histology dataset for nuclei instance segmentation and classification." . In European Congress on Digital Pathology (pp. 11–19).2019.
+- [6] Caicedo, J.C., Goodman, A., Karhohs, K.W. et al. Nucleus segmentation across imaging experiments: the 2018 Data Science Bowl. Nat Methods 16, 1247–1253 (2019)
