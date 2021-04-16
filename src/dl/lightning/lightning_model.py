@@ -4,7 +4,7 @@ import torch.optim as optim
 import pandas as pd
 import pytorch_lightning as pl
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pathlib import Path
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
@@ -17,9 +17,6 @@ from src.dl.losses.loss_builder import LossBuilder
 from src.dl.models.model_builder import Model
 from src.dl.torch_utils import to_device
 from .metrics import Accuracy, MeanIoU
-
-# tests
-import torch.nn.functional as F
 
 
 class SegModel(pl.LightningModule):
@@ -66,6 +63,10 @@ class SegModel(pl.LightningModule):
                  batch_size: int=8,
                  num_workers: int=8,
                  db_type: str="hdf5",
+                 train_db_path: Optional[str]=None,
+                 valid_db_path: Optional[str]=None,
+                 test_db_path: Optional[str]=None,
+                 n_classes: Optional[int]=None,
                  **kwargs) -> None:
         """
         Pytorch lightning model wrapper. Wraps everything needed for training the model
@@ -163,8 +164,23 @@ class SegModel(pl.LightningModule):
                 Number of workers for the dataloader
             db_type (str, default="hdf5"):
                 Training/testing patches are saved in either hdf5 or zarr db's.
-                One of ("hdf5", "zarr").  
-            
+                This flags the db type so that the filemanager knows to look for
+                the right db. One of ("hdf5", "zarr").  
+            train_db_path (str, default=None):
+                A path to a database where train patches are saved. Has to be .h5 or
+                .zarr db. This argument overrides the default behaviour of automatically
+                finding the train dataset db that is based on the 'dataset' and 'db_type'.
+            valid_db_path (str, default=None):
+                A path to a database where valid patches are saved. Has to be .h5 or
+                .zarr db. This argument overrides the default behaviour of automatically
+                finding the valid dataset db that is based on the 'dataset' and 'db_type'.
+            test_db_path (str, default=None):
+                A path to a database where test patches are saved. Has to be .h5 or
+                .zarr db. This argument overrides the default behaviour of automatically
+                finding the test dataset db that is based on the 'dataset' and 'db_type'.
+            n_classes (int, default=None):
+                The number of classes in the data. If the database is defined explicitly,
+                the number of classes need to be give nas well
         """
         super(SegModel, self).__init__()
         self.experiment_name = experiment_name
@@ -222,9 +238,6 @@ class SegModel(pl.LightningModule):
         self.num_workers = num_workers
         self.db_type = db_type
 
-        # save args to a file
-        self.save_hyperparameters()
-
         # init file manager
         self.fm = FileManager(
             experiment_name=self.experiment_name,
@@ -232,10 +245,27 @@ class SegModel(pl.LightningModule):
         )
 
         # database paths
-        self.db_dict = self.fm.get_databases(self.train_dataset, db_type=self.db_type)
-        self.train_data = self.db_dict['train']
-        self.valid_data = self.db_dict['valid']
-        self.test_data = self.db_dict['test']
+        if train_db_path is not None:
+            self.train_data = Path(train_db_path)
+            self.valid_data = Path(valid_db_path)
+            self.test_data = Path(test_db_path)
+            assert all([d.exists() for d in [self.train_data, self.valid_data, self.test_data]]), (
+                "All of the train, test, and valid db paths need to be explicitly defined.",
+                "All of the given paths do not exist."
+            )
+            assert n_classes is not None, "If db paths are defined explicitly, also the n_classes need to be defined."
+        else:
+            self.db_dict = self.fm.get_databases(self.train_dataset, db_type=self.db_type)
+            self.train_data = self.db_dict['train']
+            self.valid_data = self.db_dict['valid']
+            self.test_data = self.db_dict['test']
+
+        # Get the number of classes in the dataset
+        self.n_classes = len(self.fm.get_classes(self.train_dataset)) if train_db_path is None else n_classes
+        print("n_classes: ", self.n_classes)
+
+        # save args to a file
+        self.save_hyperparameters()
 
         # init model
         self.model = Model(
@@ -258,7 +288,7 @@ class SegModel(pl.LightningModule):
             activation=self.activation,
             normalization=self.normalization,
             weight_standardize=self.weight_standardize,
-            n_types=len(self.fm.get_classes(self.train_dataset)),
+            n_types=self.n_classes,
             model_input_size=self.model_input_size
         )
 
@@ -285,9 +315,31 @@ class SegModel(pl.LightningModule):
         }
 
     @classmethod
-    def from_conf(cls, conf: DictConfig):
+    def from_conf(cls, 
+                  conf: DictConfig, 
+                  train_db: Optional[str]=None, 
+                  valid_db: Optional[str]=None, 
+                  test_db: Optional[str]=None,
+                  n_classes: Optional[int]=None):
         """
         Construct SegModel from experiment.yml
+
+        Args:
+        ---------
+            conf (omegaconf.DictConfig):
+                The experiment.yml file. (File is read by omegaconf)
+            train_db (str, optional, default=None):
+                Path to the train data db. This is optional. If None,
+                the filemanager figures out the test data db
+            valid_db (str, optional, default=None):
+                Path to the valid data db. This is optional. If None,
+                the filemanager figures out the test data db
+            test_db (str, optional, default=None):
+                Path to the test data db. This is optional. If None,
+                the filemanager figures out the test data db
+            n_classes (int, default=None):
+                The number of classes in the data. If the database is defined explicitly,
+                the number of classes need to be give nas well
         """
         return cls(
             experiment_name=conf.experiment_args.experiment_name,
@@ -332,6 +384,10 @@ class SegModel(pl.LightningModule):
             batch_size=conf.runtime_args.batch_size,
             num_workers=conf.runtime_args.num_workers,
             db_type=conf.runtime_args.db_type,
+            train_db_path=train_db,
+            valid_db_path=valid_db,
+            test_db_path=test_db,
+            n_classes=n_classes,
         )
 
     @classmethod

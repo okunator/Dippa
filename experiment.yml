@@ -1,6 +1,6 @@
 experiment_args:
-  experiment_name: long_skip_consep_tests
-  experiment_version: metric_test
+  experiment_name: cli_test
+  experiment_version: test
 
 dataset_args:
   train_dataset: consep         # One of (consep, pannuke, kumar, monusac)
