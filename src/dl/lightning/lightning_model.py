@@ -262,7 +262,6 @@ class SegModel(pl.LightningModule):
 
         # Get the number of classes in the dataset
         self.n_classes = len(self.fm.get_classes(self.train_dataset)) if train_db_path is None else n_classes
-        print("n_classes: ", self.n_classes)
 
         # save args to a file
         self.save_hyperparameters()
