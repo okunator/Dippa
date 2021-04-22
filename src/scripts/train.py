@@ -6,7 +6,6 @@ from src.config import CONFIG
 
 
 def main(conf, extra_params):
-
     lightning_model = lightning.SegModel.from_conf(CONFIG, **vars(extra_params))
     trainer = lightning.SegTrainer.from_conf(CONFIG)
     

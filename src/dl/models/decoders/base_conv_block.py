@@ -42,7 +42,7 @@ class BaseConvBlock(nn.Module):
         """
         super(BaseConvBlock, self).__init__()
         assert batch_norm in ("bn", "bcn", None)
-        assert activation in ("relu", "mish", "swish")
+        assert activation in ("relu", "mish", "swish", "leaky-relu")
         
         self.batch_norm = batch_norm
         self.activation = activation

@@ -207,15 +207,21 @@ class Model(MultiTaskSegModel):
                 kernel_size=1
             )
 
-
         self.name = "custom-multi-task-model-{}".format(self.encoder_name)
         
         # init decoder weights
         self.initialize()
 
+        # set activations in the encoder if not relu
+        if self.activation != "relu":
+            self.convert_activation(self.encoder, self.activation)
+            
         # freeze encoder if specified
         if self.encoder_freeze:
             self.freeze_encoder()
+
+
+
 
 
 

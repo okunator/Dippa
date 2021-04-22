@@ -67,6 +67,7 @@ class SegModel(pl.LightningModule):
                  valid_db_path: Optional[str]=None,
                  test_db_path: Optional[str]=None,
                  n_classes: Optional[int]=None,
+                 inference_mode: bool=False,
                  **kwargs) -> None:
         """
         Pytorch lightning model wrapper. Wraps everything needed for training the model
@@ -181,6 +182,9 @@ class SegModel(pl.LightningModule):
             n_classes (int, default=None):
                 The number of classes in the data. If the database is defined explicitly,
                 the number of classes need to be give nas well
+            inference_mode (bool, default=False):
+                Flag to signal that model is initialized for inference. This is only used
+                in the Inferer class.
         """
         super(SegModel, self).__init__()
         self.experiment_name = experiment_name
@@ -245,7 +249,7 @@ class SegModel(pl.LightningModule):
         )
 
         # database paths
-        if train_db_path is not None:
+        if train_db_path is not None and not inference_mode:
             self.train_data = Path(train_db_path)
             self.valid_data = Path(valid_db_path)
             self.test_data = Path(test_db_path)
@@ -423,6 +427,7 @@ class SegModel(pl.LightningModule):
 
         kwargs["experiment_name"] = name
         kwargs["experiment_version"] = version
+        kwargs["inference_mode"] = True
         return cls(**kwargs)
 
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:

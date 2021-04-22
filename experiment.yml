@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: testi
-  experiment_version: dense_unet3p_sum_light
+  experiment_version: residual_unet_mish
 
 dataset_args:
   train_dataset: pannuke         # One of (consep, pannuke, kumar, monusac)
@@ -8,7 +8,7 @@ dataset_args:
 model_args:
   architecture_design:
     module_args:
-      activation: relu          # One of (relu, mish, swish)
+      activation: swish          # One of (relu, mish, swish, leaky-relu)
       normalization: bn         # One of (bn, bcn, nope)
       weight_standardize: False # Weight standardization
       weight_init: he           # One of (he, eoc, fixup) (only for decoder if pretrain)
@@ -21,8 +21,8 @@ model_args:
       n_layers: 1               # Number multi conv blocks inside one decoder level 
       n_blocks: 2               # Number of convolutions blocks in each multi conv block
       preactivate: True        # If True, BN & RELU applied before CONV
-      short_skips: dense         # One of (residual, dense, null) (for decoder branch only)
-      long_skips: unet3+          # One of (unet, unet++, unet3+, null)
+      short_skips: residual         # One of (residual, dense, null) (for decoder branch only)
+      long_skips: unet          # One of (unet, unet++, unet3+, null)
       merge_policy: summation   # One of (summation, concatenate) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
       decoder_channels:         # Number of out channels for every decoder layer
@@ -65,7 +65,7 @@ training_args:
 
 runtime_args:
   resume_training: False
-  num_epochs: 1
+  num_epochs: 2
   num_gpus: 1
   batch_size: 8
   num_workers: 8              # number workers for data loader

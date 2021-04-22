@@ -14,7 +14,7 @@ class DenseConvBlockPreact(BaseConvBlock):
                  activation: str="relu",
                  weight_standardize: bool=False) -> None:
         """
-        Basic conv block that can be used in decoders
+        Dense preact conv block that can be used in decoders
 
         Args:
         ----------
@@ -62,7 +62,7 @@ class DenseConvBlock(BaseConvBlock):
                  activation: str="relu",
                  weight_standardize: bool=False) -> None:
         """
-        Basic conv block that can be used in decoders
+        Dense conv block that can be used in decoders
 
         Args:
         ----------
@@ -112,10 +112,9 @@ class MultiBlockDense(nn.ModuleDict):
                  n_blocks: int=2,
                  preactivate: bool=False) -> None:
         """
-        Stack residual conv blocks in a ModuleDict. These are used in the
+        Stacks dense conv blocks in a ModuleDict. These are used in the
         full sized decoderblocks. The number of basic conv blocks can be 
-        adjusted. Default is 2. The residual connection is applied at the
-        final conv block, before the last activation.
+        adjusted. Default is 2.
 
         Args:
         ----------

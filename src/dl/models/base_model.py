@@ -1,5 +1,9 @@
+import torch
 import torch.nn as nn
+from typing import Dict
+
 import src.dl.models.initialization as init
+from src.dl.models.modules import Mish, Swish
 
 
 # Adapted from https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/base/model.py
@@ -8,7 +12,7 @@ class MultiTaskSegModel(nn.Module):
     Base class for models instance seg models that have also cell type cls branch
     and an optional aux branch
     """
-    def initialize(self):
+    def initialize(self) -> None:
         init.initialize_decoder(self.inst_decoder)
         init.initialize_head(self.inst_seg_head)
 
@@ -20,7 +24,7 @@ class MultiTaskSegModel(nn.Module):
             init.initialize_decoder(self.aux_decoder)
             init.initialize_head(self.aux_seg_head)
 
-    def forward(self, x):
+    def forward(self, x) -> Dict[str, torch.Tensor]:
         features = self.encoder(x)
         insts = self.inst_decoder(*features)
         insts = self.inst_seg_head(insts)
@@ -41,9 +45,22 @@ class MultiTaskSegModel(nn.Module):
             "aux": aux
         }
 
-    def freeze_encoder(self):
+    def freeze_encoder(self) -> None:
         for param in self.encoder.parameters():
             param.requires_grad = False
     
-    def preactivate_encoder(self):
-        pass
+    def convert_activation(self, model: nn.Module=None, act: str="relu") -> None:
+        assert act in ("swish", "mish", "leaky-relu")
+            
+        if act == "swish":
+            Act = Swish
+        elif act == "mish":
+            Act = Mish
+        elif act == "leaky-relu":
+            Act = nn.LeakyReLU
+
+        for child_name, child in model.named_children():
+            if isinstance(child, nn.ReLU):
+                setattr(model, child_name, Act(inplace=False))
+            else:
+                self.convert_activation(child, act)
