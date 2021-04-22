@@ -72,3 +72,5 @@ class BaseConvBlock(nn.Module):
             self.act = Mish()
         elif self.activation == "swish":
             self.act = Swish()
+        elif self.activation == "leaky-relu":
+            self.act = nn.LeakyReLU(inplace=True) # slope = 0.1

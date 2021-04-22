@@ -8,7 +8,7 @@ dataset_args:
 model_args:
   architecture_design:
     module_args:
-      activation: swish          # One of (relu, mish, swish, leaky-relu)
+      activation: leaky-relu          # One of (relu, mish, swish, leaky-relu)
       normalization: bn         # One of (bn, bcn, nope)
       weight_standardize: False # Weight standardization
       weight_init: he           # One of (he, eoc, fixup) (only for decoder if pretrain)

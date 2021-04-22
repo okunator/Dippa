@@ -54,13 +54,16 @@ class MultiTaskSegModel(nn.Module):
             
         if act == "swish":
             Act = Swish
+            inplace = False
         elif act == "mish":
             Act = Mish
+            inplace = False
         elif act == "leaky-relu":
             Act = nn.LeakyReLU
+            inplace = True
 
         for child_name, child in model.named_children():
             if isinstance(child, nn.ReLU):
-                setattr(model, child_name, Act(inplace=False))
+                setattr(model, child_name, Act(inplace=inplace))
             else:
                 self.convert_activation(child, act)
