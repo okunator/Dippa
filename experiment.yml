@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: testi
-  experiment_version: residual_unet_mish
+  experiment_version: dense_ws_bcn_full_preact
 
 dataset_args:
   train_dataset: pannuke         # One of (consep, pannuke, kumar, monusac)
@@ -8,9 +8,9 @@ dataset_args:
 model_args:
   architecture_design:
     module_args:
-      activation: leaky-relu          # One of (relu, mish, swish, leaky-relu)
-      normalization: bn         # One of (bn, bcn, nope)
-      weight_standardize: False # Weight standardization
+      activation: leaky-relu    # One of (relu, mish, swish, leaky-relu)
+      normalization: bcn        # One of (bn, bcn, nope)
+      weight_standardize: True  # Weight standardization
       weight_init: he           # One of (he, eoc, fixup) (only for decoder if pretrain)
     encoder_args:
       in_channels: 3            # RGB input images
@@ -20,8 +20,8 @@ model_args:
     decoder_args:
       n_layers: 1               # Number multi conv blocks inside one decoder level 
       n_blocks: 2               # Number of convolutions blocks in each multi conv block
-      preactivate: True        # If True, BN & RELU applied before CONV
-      short_skips: residual         # One of (residual, dense, null) (for decoder branch only)
+      preactivate: True         # If True, BN & RELU applied before CONV
+      short_skips: dense        # One of (residual, dense, null) (for decoder branch only)
       long_skips: unet          # One of (unet, unet++, unet3+, null)
       merge_policy: summation   # One of (summation, concatenate) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
@@ -67,7 +67,7 @@ runtime_args:
   resume_training: False
   num_epochs: 2
   num_gpus: 1
-  batch_size: 8
+  batch_size: 4
   num_workers: 8              # number workers for data loader
   model_input_size: 256       # size of the model input (input_size, input_size)
   db_type: hdf5             # The type of the input data db. One of (hdf5, zarr). 

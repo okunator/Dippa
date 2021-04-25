@@ -5,7 +5,7 @@ from torch.nn.parameter import Parameter
 
 
 class EstBN(nn.Module):
-    def __init__(self, num_features: int, eps: float = 1e-7) -> None:
+    def __init__(self, num_features: int, eps: float=1e-7) -> None:
         """
         Estimate of the batch statistics
         From: https://github.com/joe-siyuan-qiao/Batch-Channel-Normalization
@@ -51,9 +51,9 @@ class EstBN(nn.Module):
 class BCNorm(nn.Module):
     def __init__(self,
                  num_features: int, 
-                 num_groups: int = 32,
-                 eps: float = 1e-7,
-                 estimate: bool = False) -> None:
+                 num_groups: int=32,
+                 eps: float=1e-7,
+                 estimate: bool=False) -> None:
         """
         Batch channel normalization
         From: https://github.com/joe-siyuan-qiao/Batch-Channel-Normalization

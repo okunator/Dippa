@@ -68,6 +68,7 @@ class Inferer:
                  batch_size: int=8,
                  patch_size: Tuple[int]=(256, 256),
                  stride_size: int=128,
+                 model_batch_size: int=None,
                  thresh_method: str="naive",
                  thresh: float=0.5,
                  apply_weights: bool=False,
@@ -106,7 +107,7 @@ class Inferer:
             batch_size (int, default=8):
                 Number of images loaded from the input folder by the workers per dataloader
                 iteration. This is not the batch size that is used during the forward pass
-                of the model.
+                of the model but the DataLoader batch size.
             patch_size (Tuple[int], default=(256, 256)):
                 The size of the input patches.
             stride_size (int, default=128):
@@ -117,6 +118,11 @@ class Inferer:
                 stitched back to the input image size. On the other hand small stride_size means more
                 patches and larger number of patches -> slower inference time and larger memory 
                 consumption. stride_size needs to be less or equal than the input image size.
+            model_batch_size (int, default=None):
+                The batch size that is used when the input is fed to the model (actual model batch size).
+                If input images need patching, and the batch size for training batch size is too large
+                (cuda out of memmory error). This argument overrides the model batch size, so you can reduce
+                the memory footprint. 
             thresh_method (str, default="naive"):
                 Thresholding method for the soft masks from the instance branch.
                 One of ("naive", "argmax", "sauvola", "niblack")).
@@ -174,6 +180,7 @@ class Inferer:
         # Set dataset dataloader
         self.folderset = FolderDataset(self.in_data_dir, pattern=fn_pattern)
         self.dataloader = DataLoader(self.folderset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=num_workers)
+        self.model_batch_size = model_batch_size
 
         # set apply weights flag for aux branch and prdeictor helper class
         self.apply_weights = apply_weights
@@ -288,6 +295,9 @@ class Inferer:
                     batch_types = []
                     batch_aux = []
 
+                    # model batch size
+                    batch_size = self.model_batch_size if self.model_batch_size is not None else self.model.batch_size
+
                     # Loop through the B in batched patches (B, C, n_patches, patch_h, patch_w)
                     for j in range(patches.shape[0]):
 
@@ -296,7 +306,7 @@ class Inferer:
                         pred_aux = []
 
                         # Divide patches into batches that can be used as input to model
-                        for batch in self._get_batch(patches[j, ...], self.model.batch_size):
+                        for batch in self._get_batch(patches[j, ...], batch_size):
                             insts, types, aux = self._predict_batch(batch)
                             pred_inst.append(insts)
                             pred_type.append(types) if types is not None else None

@@ -3,7 +3,10 @@ import torch.nn as nn
 from typing import Dict
 
 import src.dl.models.initialization as init
-from src.dl.models.modules import Mish, Swish
+
+from src.dl.models.modules import (
+    Mish, Swish, BCNorm, WSConv2d
+)
 
 
 # Adapted from https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/base/model.py
@@ -67,3 +70,38 @@ class MultiTaskSegModel(nn.Module):
                 setattr(model, child_name, Act(inplace=inplace))
             else:
                 self.convert_activation(child, act)
+
+    def convert_norm(self, model: nn.Module, norm: str) -> None:
+        assert norm in ("bcn", "gn")
+            
+        if norm == "bcn":
+            Norm = BCNorm
+        elif norm == "gn":
+            Norm = nn.GroupNorm
+
+        for child_name, child in model.named_children():
+            if isinstance(child, nn.BatchNorm2d):
+                norm_fn = Norm(num_features=child.num_features, num_groups=32)
+                setattr(model, child_name, norm_fn)
+            else:
+                self.convert_norm(child, norm)
+
+
+    def convert_conv(self, model: nn.Module) -> None:
+        for child_name, child in model.named_children():
+            if isinstance(child, nn.Conv2d):
+                wsconv = WSConv2d(
+                    in_channels=child.in_channels, 
+                    out_channels=child.out_channels, 
+                    kernel_size=child.kernel_size,
+                    bias=child.bias,
+                    stride=child.stride,
+                    padding=child.padding,
+                    dilation=child.dilation,
+                    groups=child.groups
+                )
+                setattr(model, child_name, wsconv)
+            else:
+                self.convert_conv(child)
+    
+
