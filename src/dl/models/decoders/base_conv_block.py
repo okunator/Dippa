@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from ..modules import (
-    Mish, Swish, BCNorm, WSConv2d
+    Mish, Swish, BCNorm, WSConv2d, GroupNorm
 )
 
 
@@ -41,7 +41,7 @@ class BaseConvBlock(nn.Module):
                 applied before the convolution.
         """
         super(BaseConvBlock, self).__init__()
-        assert batch_norm in ("bn", "bcn", None)
+        assert batch_norm in ("bn", "bcn", "gn", None)
         assert activation in ("relu", "mish", "swish", "leaky-relu")
         
         self.batch_norm = batch_norm
@@ -62,6 +62,8 @@ class BaseConvBlock(nn.Module):
             self.bn = nn.BatchNorm2d(num_features=bn_channels)
         elif self.batch_norm == "bcn":
             self.bn = BCNorm(num_features=bn_channels, num_groups=32)
+        elif self.batch_norm == "gn":
+            self.bn = GroupNorm(num_features=bn_channels, num_groups=32)
         else:
             self.bn = nn.Identity()
             

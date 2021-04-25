@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: testi
-  experiment_version: dense_ws_bcn_full_preact
+  experiment_version: dense_ws_gn_full_preact
 
 dataset_args:
   train_dataset: pannuke         # One of (consep, pannuke, kumar, monusac)
@@ -9,7 +9,7 @@ model_args:
   architecture_design:
     module_args:
       activation: leaky-relu    # One of (relu, mish, swish, leaky-relu)
-      normalization: bcn        # One of (bn, bcn, nope)
+      normalization: gn         # One of (bn, bcn, nope)
       weight_standardize: True  # Weight standardization
       weight_init: he           # One of (he, eoc, fixup) (only for decoder if pretrain)
     encoder_args:
@@ -20,9 +20,9 @@ model_args:
     decoder_args:
       n_layers: 1               # Number multi conv blocks inside one decoder level 
       n_blocks: 2               # Number of convolutions blocks in each multi conv block
-      preactivate: True         # If True, BN & RELU applied before CONV
+      preactivate: False         # If True, BN & RELU applied before CONV
       short_skips: dense        # One of (residual, dense, null) (for decoder branch only)
-      long_skips: unet          # One of (unet, unet++, unet3+, null)
+      long_skips: unet3+          # One of (unet, unet++, unet3+, null)
       merge_policy: summation   # One of (summation, concatenate) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
       decoder_channels:         # Number of out channels for every decoder layer
@@ -30,7 +30,7 @@ model_args:
         - 128
         - 64
         - 32
-        - 16 
+        - 32 
 
   decoder_branches:
     type_branch: True

@@ -5,7 +5,7 @@ from typing import Dict
 import src.dl.models.initialization as init
 
 from src.dl.models.modules import (
-    Mish, Swish, BCNorm, WSConv2d
+    Mish, Swish, BCNorm, WSConv2d, GroupNorm
 )
 
 
@@ -77,7 +77,7 @@ class MultiTaskSegModel(nn.Module):
         if norm == "bcn":
             Norm = BCNorm
         elif norm == "gn":
-            Norm = nn.GroupNorm
+            Norm = GroupNorm
 
         for child_name, child in model.named_children():
             if isinstance(child, nn.BatchNorm2d):
