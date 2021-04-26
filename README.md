@@ -47,9 +47,9 @@ model_args:
   architecture_design:
     module_args:
       activation: relu          # One of (relu, mish, swish)
-      normalization: bn         # One of (bn, bcn, null)
+      normalization: bn         # One of (bn, bcn, gn, null)
       weight_standardize: False # Weight standardization
-      weight_init: he           # One of (he, eoc, fixup) (only for decoder if pretrain)
+      weight_init: he           # One of (he, TODO: eoc & others) (only for decoder if pretrain)
     encoder_args:
       in_channels: 3            # RGB input images
       encoder: resnet50         # One of encoders in https://github.com/qubvel/segmentation_models.pytorch

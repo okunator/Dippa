@@ -5,14 +5,14 @@ from typing import Dict
 import src.dl.models.initialization as init
 
 from src.dl.models.modules import (
-    Mish, Swish, BCNorm, WSConv2d, GroupNorm
+    Mish, Swish, BCNorm, GroupNorm,
+    WSConv2d,  WSConv2dStaticSamePadding
 )
 
 
-# Adapted from https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/base/model.py
 class MultiTaskSegModel(nn.Module):
     """
-    Base class for models instance seg models that have also cell type cls branch
+    Base class for instance seg models that have also cell type cls branch
     and an optional aux branch
     """
     def initialize(self) -> None:
@@ -66,7 +66,7 @@ class MultiTaskSegModel(nn.Module):
             inplace = True
 
         for child_name, child in model.named_children():
-            if isinstance(child, nn.ReLU):
+            if isinstance(child, nn.ReLU) or type(child).__name__ == "MemoryEfficientSwish": # the latter for efficientnets
                 setattr(model, child_name, Act(inplace=inplace))
             else:
                 self.convert_activation(child, act)
@@ -87,21 +87,26 @@ class MultiTaskSegModel(nn.Module):
                 self.convert_norm(child, norm)
 
 
-    def convert_conv(self, model: nn.Module) -> None:
+    def convert_conv(self, model: nn.Module, **kwargs) -> None:
+        WSConv = WSConv2d 
         for child_name, child in model.named_children():
-            if isinstance(child, nn.Conv2d):
-                wsconv = WSConv2d(
+            if isinstance(child, nn.Conv2d):  
+                if "image_size" in kwargs.keys(): # efficient-net hack
+                    WSConv = WSConv2dStaticSamePadding
+
+                wsconv = WSConv(
                     in_channels=child.in_channels, 
                     out_channels=child.out_channels, 
                     kernel_size=child.kernel_size,
-                    bias=child.bias,
+                    bias=child.bias is not None,
                     stride=child.stride,
                     padding=child.padding,
                     dilation=child.dilation,
-                    groups=child.groups
+                    groups=child.groups,
+                    **kwargs
                 )
                 setattr(model, child_name, wsconv)
             else:
-                self.convert_conv(child)
+                self.convert_conv(child, **kwargs)
     
 

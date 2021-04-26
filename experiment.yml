@@ -9,12 +9,12 @@ model_args:
   architecture_design:
     module_args:
       activation: leaky-relu    # One of (relu, mish, swish, leaky-relu)
-      normalization: gn         # One of (bn, bcn, nope)
+      normalization: bcn         # One of (bn, bcn, gn, nope)
       weight_standardize: True  # Weight standardization
-      weight_init: he           # One of (he, eoc, fixup) (only for decoder if pretrain)
+      weight_init: he           # One of (he, TODO: eoc) (only for decoder if pretrain)
     encoder_args:
       in_channels: 3            # RGB input images
-      encoder: resnet50         # https://github.com/qubvel/segmentation_models.pytorch
+      encoder: efficientnet-b5         # https://github.com/qubvel/segmentation_models.pytorch
       pretrain: True            # Use imagenet pre-trained encoder
       depth: 5                  # Number of layers in encoder
     decoder_args:
@@ -22,8 +22,8 @@ model_args:
       n_blocks: 2               # Number of convolutions blocks in each multi conv block
       preactivate: False         # If True, BN & RELU applied before CONV
       short_skips: dense        # One of (residual, dense, null) (for decoder branch only)
-      long_skips: unet3+          # One of (unet, unet++, unet3+, null)
-      merge_policy: summation   # One of (summation, concatenate) (for long skips)
+      long_skips: unet          # One of (unet, unet++, unet3+, null)
+      merge_policy: concatenate   # One of (summation, concatenate) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
       decoder_channels:         # Number of out channels for every decoder layer
         - 256

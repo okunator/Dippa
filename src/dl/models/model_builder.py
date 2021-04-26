@@ -218,7 +218,12 @@ class Model(MultiTaskSegModel):
 
         # set weight standardization if specified
         if self.weight_standardize:
-            self.convert_conv(self.encoder)
+            # HACK for handling efficientnets
+            if "efficientnet" in self.encoder_name:
+                kwargs = {}
+                kwargs.setdefault("image_size", self.encoder._global_params.image_size)
+
+            self.convert_conv(self.encoder, **kwargs)
 
         # set norm method in the encoder if not BN
         if self.normalization != "bn":
