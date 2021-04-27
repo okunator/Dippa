@@ -61,9 +61,9 @@ class BaseConvBlock(nn.Module):
         if self.batch_norm == "bn":
             self.bn = nn.BatchNorm2d(num_features=bn_channels)
         elif self.batch_norm == "bcn":
-            self.bn = BCNorm(num_features=bn_channels, num_groups=32)
+            self.bn = BCNorm(num_features=bn_channels)
         elif self.batch_norm == "gn":
-            self.bn = GroupNorm(num_features=bn_channels, num_groups=32)
+            self.bn = GroupNorm(num_features=bn_channels)
         else:
             self.bn = nn.Identity()
             

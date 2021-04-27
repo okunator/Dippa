@@ -51,22 +51,28 @@ class EstBN(nn.Module):
 class BCNorm(nn.Module):
     def __init__(self,
                  num_features: int, 
-                 num_groups: int=32,
+                 num_groups: int=None,
                  eps: float=1e-7,
                  estimate: bool=False) -> None:
         """
         Batch channel normalization
-        From: https://github.com/joe-siyuan-qiao/Batch-Channel-Normalization
+        Adapted From: https://github.com/joe-siyuan-qiao/Batch-Channel-Normalization
 
         https://arxiv.org/abs/1911.09738
+
+        Infers the num_groups from the num_features to avoid
+        errors. By default: uses 16 channels per group. 
+        If channels <= 16, squashes to batch layer norm
+
+        magic number 16 comes from the paper: https://arxiv.org/abs/1803.08494
 
         Args:
         ----------
             num_features (int):
                 Number of input channels/features
-            num_groups (int, default=32):
+            num_groups (int, default=None):
                 Number of groups to group the channels.
-                Typically n_features is a multiple of 32
+                Typically n_features is a multiple of 16
             eps (float, default=1e-7):
                 small constant for numerical stability
             estimate (bool, default=False):
@@ -74,11 +80,16 @@ class BCNorm(nn.Module):
                 Refer to the article
         """
         super(BCNorm, self).__init__()
+
+        # Infer number of groups
+        self.num_groups, remainder = divmod(num_features, 16)
+        if remainder:
+            self.num_groups = num_features // remainder
+        
         self.num_features = num_features
-        self.num_groups = num_groups 
         self.eps = eps
-        self.weight = Parameter(torch.ones(1, num_groups, 1))
-        self.bias = Parameter(torch.zeros(1, num_groups, 1))
+        self.weight = Parameter(torch.ones(1, self.num_groups, 1))
+        self.bias = Parameter(torch.zeros(1, self.num_groups, 1))
 
         if estimate:
             self.bn = EstBN(num_features=num_features)

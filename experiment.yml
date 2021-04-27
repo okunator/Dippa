@@ -9,8 +9,8 @@ model_args:
   architecture_design:
     module_args:
       activation: leaky-relu    # One of (relu, mish, swish, leaky-relu)
-      normalization: bcn         # One of (bn, bcn, gn, nope)
-      weight_standardize: True  # Weight standardization
+      normalization: gn        # One of (bn, bcn, gn, nope)
+      weight_standardize: False  # Weight standardization
       weight_init: he           # One of (he, TODO: eoc) (only for decoder if pretrain)
     encoder_args:
       in_channels: 3            # RGB input images
@@ -30,7 +30,7 @@ model_args:
         - 128
         - 64
         - 32
-        - 32 
+        - 16 
 
   decoder_branches:
     type_branch: True
