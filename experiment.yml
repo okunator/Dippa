@@ -1,29 +1,29 @@
 experiment_args:
   experiment_name: testi
-  experiment_version: dense_ws_gn_full_preact
+  experiment_version: adabelief
 
 dataset_args:
-  train_dataset: pannuke         # One of (consep, pannuke, kumar, monusac)
+  train_dataset: pannuke        # One of (consep, pannuke, kumar, monusac)
 
 model_args:
   architecture_design:
     module_args:
       activation: leaky-relu    # One of (relu, mish, swish, leaky-relu)
-      normalization: gn        # One of (bn, bcn, gn, nope)
-      weight_standardize: False  # Weight standardization
+      normalization: bn         # One of (bn, bcn, gn, nope)
+      weight_standardize: False # Weight standardization
       weight_init: he           # One of (he, TODO: eoc) (only for decoder if pretrain)
     encoder_args:
       in_channels: 3            # RGB input images
-      encoder: efficientnet-b5         # https://github.com/qubvel/segmentation_models.pytorch
+      encoder: efficientnet-b5  # https://github.com/qubvel/segmentation_models.pytorch
       pretrain: True            # Use imagenet pre-trained encoder
       depth: 5                  # Number of layers in encoder
     decoder_args:
       n_layers: 1               # Number multi conv blocks inside one decoder level 
       n_blocks: 2               # Number of convolutions blocks in each multi conv block
-      preactivate: False         # If True, BN & RELU applied before CONV
+      preactivate: False        # If True, BN & RELU applied before CONV
       short_skips: dense        # One of (residual, dense, null) (for decoder branch only)
       long_skips: unet          # One of (unet, unet++, unet3+, null)
-      merge_policy: concatenate   # One of (summation, concatenate) (for long skips)
+      merge_policy: concatenate # One of (summation, concatenate) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
       decoder_channels:         # Number of out channels for every decoder layer
         - 256
@@ -46,7 +46,7 @@ training_args:
     - blur
 
   optimizer_args:
-    optimizer: adam              # One of https://github.com/jettify/pytorch-optimizer 
+    optimizer: adabelief              # One of https://github.com/jettify/pytorch-optimizer 
     lr: 0.0005
     encoder_lr: 0.00005
     weight_decay: 0.0003

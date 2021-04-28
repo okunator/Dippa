@@ -28,7 +28,7 @@ def percentile_normalize(img: np.ndarray, channels: str="HWC") -> np.ndarray:
     if np.all(np.ptp(im, axis=axis) > 0.0):
         percentile1 = np.percentile(im, q=1, axis=axis)
         percentile99 = np.percentile(im, q=99, axis=axis)
-        im = (im - percentile1) / (percentile99 - percentile1)
+        im = (im - percentile1) / (percentile99 - percentile1 + 1e-7)
 
     if channels == "CHW":
         im = im.transpose(2, 0, 1)
@@ -58,7 +58,7 @@ def percentile_normalize_and_clamp(im: np.ndarray, a_min: float=-1, a_max: float
     percentile1 = np.percentile(im, q=1, axis=(0, 1))
     percentiles = np.stack([percentile99, percentile1])
     colmax = np.max(percentiles, axis=0)
-    normed = np.clip((im / colmax), a_min=a_min, a_max=a_max)
+    normed = np.clip((im / (colmax + 1e+7)), a_min=a_min, a_max=a_max)
     return normed
 
 

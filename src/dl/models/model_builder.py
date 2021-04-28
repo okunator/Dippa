@@ -213,21 +213,21 @@ class Model(MultiTaskSegModel):
         self.initialize()
 
         # set activations in the encoder if not relu
-        if self.activation != "relu":
-            self.convert_activation(self.encoder, self.activation)
+        # if self.activation != "relu":
+        #     self.convert_activation(self.encoder, self.activation)
 
-        # set weight standardization if specified
-        if self.weight_standardize:
-            # HACK for handling efficientnets
-            if "efficientnet" in self.encoder_name:
-                kwargs = {}
-                kwargs.setdefault("image_size", self.encoder._global_params.image_size)
+        # # set weight standardization if specified
+        # if self.weight_standardize:
+        #     # HACK for handling efficientnets
+        #     if "efficientnet" in self.encoder_name:
+        #         kwargs = {}
+        #         kwargs.setdefault("image_size", self.encoder._global_params.image_size)
 
-            self.convert_conv(self.encoder, **kwargs)
+        #     self.convert_conv(self.encoder, **kwargs)
 
-        # set norm method in the encoder if not BN
-        if self.normalization != "bn":
-            self.convert_norm(self.encoder, self.normalization)
+        # # set norm method in the encoder if not BN
+        # if self.normalization != "bn":
+        #     self.convert_norm(self.encoder, self.normalization)
             
         # freeze encoder if specified
         if self.encoder_freeze:
