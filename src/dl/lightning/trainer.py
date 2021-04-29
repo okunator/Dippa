@@ -74,7 +74,7 @@ class SegTrainer:
         self.logging_dir = fm.experiment_dir / "tf"
 
     @classmethod
-    def from_conf(cls, conf: DictConfig, extra_callbacks: List[pl.Callback] = None):
+    def from_conf(cls, conf: DictConfig, extra_callbacks: List[pl.Callback] = None, **kwargs):
         experiment_name = conf.experiment_args.experiment_name
         experiment_version = conf.experiment_args.experiment_version
         num_gpus = conf.runtime_args.num_gpus

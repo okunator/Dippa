@@ -46,12 +46,12 @@ training_args:
     - blur
 
   optimizer_args:
-    optimizer: adabelief              # One of https://github.com/jettify/pytorch-optimizer 
+    optimizer: radam              # One of https://github.com/jettify/pytorch-optimizer 
     lr: 0.0005
     encoder_lr: 0.00005
     weight_decay: 0.0003
     encoder_weight_decay: 0.00003
-    lookahead: False
+    lookahead: True
     bias_weight_decay: True
     scheduler_factor: 0.25
     scheduler_patience: 3

@@ -323,7 +323,8 @@ class SegModel(pl.LightningModule):
                   train_db: Optional[str]=None, 
                   valid_db: Optional[str]=None, 
                   test_db: Optional[str]=None,
-                  n_classes: Optional[int]=None):
+                  n_classes: Optional[int]=None,
+                  **kwargs):
         """
         Construct SegModel from experiment.yml
 
