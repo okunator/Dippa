@@ -57,7 +57,7 @@ class TilerStitcherTorch:
 
         Args:
         -------------
-            batch_im (torch.Tensor):
+            patches (torch.Tensor):
                 Batched input image. Shape (B, C, H, W)
 
         Returns:
@@ -85,7 +85,7 @@ class TilerStitcherTorch:
         Args:
         -------------
             patches (torch.Tensor):
-                input image in patches of shape (B, n_patches C, H, W).
+                input image in patches of shape (B, C, n_patches, H, W).
             n_channels (int, default=3):
                 Number of channels in the output. 
 
@@ -106,7 +106,7 @@ class TilerStitcherTorch:
 
         if self.padding:
             pad_x, pad_y = self.margins
-            output = output[:, :, pad_x:-pad_x, pad_y:-pad_y]
+            output = output[:, :, pad_y:-pad_y, pad_x:-pad_x]
         
         return output
 

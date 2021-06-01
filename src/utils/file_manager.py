@@ -147,8 +147,8 @@ class FileManager(FileHandler):
                              dataset: str,
                              train_imgs: List[str], 
                              train_masks: List[str],
-                             seed: int = 42,
-                             size: float = 0.2) -> Dict[str, List[str]]:
+                             seed: int=42,
+                             size: float=0.2) -> Dict[str, List[str]]:
         """
         Split training set into training and validation set. This might affect training 
         accuracy if training set is small. Pannuke is split by the folds specified in the pannuke.yml

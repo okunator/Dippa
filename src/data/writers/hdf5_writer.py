@@ -18,7 +18,7 @@ class HDF5Writer(BaseWriter):
                  patch_shape: Tuple[int]=(512, 512),
                  stride_size: int=80,
                  n_copies: int=None,
-                 rigid_augs_and_crop: bool = True,
+                 rigid_augs_and_crop: bool=True,
                  crop_shape: Tuple[int]=(256, 256),
                  chunk_size: int=1) -> None:
         """
@@ -170,6 +170,10 @@ class HDF5Writer(BaseWriter):
                 inst_map = self.read_mask(mask_path, key="inst_map")
                 type_map = self.read_mask(mask_path, key="type_map")
                 npixels[:] += self._pixels_per_classes(type_map)
+
+                im = im[:-1, :] if im.shape[0] > inst_map.shape[0] else im
+                im = im[:, :-1] if im.shape[1] > inst_map.shape[1] else im
+
                 full_data = np.concatenate((im, inst_map[..., None], type_map[..., None]), axis=-1)
                 
                 # Do patching or create copies of input images 

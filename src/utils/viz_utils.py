@@ -5,14 +5,14 @@ import random
 import colorsys
 from typing import List, Dict, Tuple, Optional
 from matplotlib import pyplot as plt
-from src.img_processing.process_utils import bounding_box
+from .mask_utils import bounding_box
 
 
 KEY_COLORS = {
     # consep classes:
     "background": (255., 255., 255.),
     "miscellanous": (0., 200., 100.),  # miscellanous
-    "inflammatory": (165., 0., 255.),
+    "inflammatory": (165., 255., 255.),
     "epithelial": (255., 255., 0.),
     "spindle": (255., 0., 0.),
     "healthy_epithelial": (255., 100., 0.),
@@ -93,7 +93,8 @@ def draw_contours(label: np.ndarray,
             inst_map_crop, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
         
-
+        # print(classes)
+        inst_color = None
         if classes is not None:
             #clumsy
             class_nums = np.unique(type_map[inst_map > 0].astype("uint8"))
@@ -101,8 +102,7 @@ def draw_contours(label: np.ndarray,
                 for num in class_nums:
                     if val == num:
                         inst_color = KEY_COLORS[key]
-        else:
-            inst_color = inst_colors[idx]
+            
 
         if fill_contours:
             contoured_rgb = cv2.drawContours(
