@@ -473,7 +473,6 @@ class Inferer:
         self.soft_types = OrderedDict(soft_types)
         self.aux_maps = OrderedDict(aux_maps)
 
-
     def _post_process(self):
         """
         Run the post processing pipeline
