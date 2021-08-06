@@ -1,15 +1,20 @@
+import re
 import torch
+import itertools
+import scipy.io
+import numpy as np
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, Dataset
-from typing import Tuple, List, Union, Optional
+from typing import Tuple, List, Dict, Iterable, Union, Optional, Iterable
 from collections import OrderedDict
 from pathlib import Path
 from tqdm import tqdm
 
 from src.utils.file_manager import FileHandler
+from src.utils.save_utils import mask2geojson, mask2mat
 from src.patching import TilerStitcherTorch
 from src.metrics.benchmarker import Benchmarker
-from src.dl.torch_utils import tensor_to_ndarray
+from src.dl.torch_utils import tensor_to_ndarray, ndarray_to_tensor
 
 from .post_processing.processor_builder import PostProcBuilder
 from .predictor import Predictor
@@ -73,6 +78,7 @@ class Inferer:
                  thresh: float=0.5,
                  apply_weights: bool=False,
                  post_proc_method: str=None,
+                 n_images: int=32,
                  **kwargs) -> None:
         """
         Class to perform inference and post-processing
@@ -139,6 +145,10 @@ class Inferer:
                 pipeline is defined by the aux_type of the model. If the aux_type of the model
                 is None, then the basic watershed post-processing pipeline is used. If the
                 aux_type == "hover", then the HoVer-Net and CellPose pipelines can be used.
+            n_images (int, default=32):
+                number of images inferred per dataloader iteration. Useful if there is a large number of
+                images in a folder. The segmentation results are saved after n_images are segmented and
+                memory cleared for a new set of images to be segmented.
         """
         assert isinstance(model, pl.LightningModule), "Input model needs to be a lightning model"
         assert dataset in ("kumar", "consep", "pannuke", "dsb2018", "monusac", None)
@@ -159,6 +169,7 @@ class Inferer:
 
         self.patch_size = patch_size
         self.stride_size = stride_size
+        self.n_images = n_images
 
         # Set input data folder and gt mask folder if there are gt masks
         self.dataset = dataset
@@ -178,6 +189,7 @@ class Inferer:
             self.gt_mask_paths = sorted(self.gt_mask_dir.glob(fn_pattern))
             
         # Set dataset dataloader
+        self.batch_size = batch_size
         self.folderset = FolderDataset(self.in_data_dir, pattern=fn_pattern)
         self.dataloader = DataLoader(self.folderset, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=num_workers)
         self.model_batch_size = model_batch_size
@@ -253,129 +265,221 @@ class Inferer:
         aux = self.predictor.classify(pred["aux"], act=None, apply_weights=self.apply_weights) if pred["aux"] is not None else None
         return insts, types, aux
 
-    # TODO: modularize
-    def run_inference(self) -> None:
+    def _infer_large_img_batch(self, 
+                               batch: torch.Tensor, 
+                               names: Tuple[str],
+                               batch_loader: Iterable=None) -> Tuple[Iterable[Tuple[str, np.ndarray]]]:
         """
-        Run inference on the images in the input folder. 
-        Results will be saved in OrderedDicts:
+        Run inference on large images that require tiling and back stitching. I.e. For images larger than
+        the model input size.
 
-        - self.res_insts: instance branch predicitons
-        - self.res_types: type branch predictions
-        - self.res_aux: aux branch predictions
+        Args:
+        --------
+            batch (torch.Tensor):
+                A batch of patches. Shape (B, C, patch_size, patch_size)
+            names (Tuple[str]):
+                filenames of the different images (without the suffices)
+            batch_loader (Iterable, default=None):
+                tqdm loader object
+
+        Returns:
+        --------
+            Tuple of Zip (iterable) objects containing (name, np.ndarray) pairs
         """
 
+        # Tile the image into patches
+        tilertorch = TilerStitcherTorch(batch.shape, self.patch_size, self.stride_size, padding=True)
+        patches = tilertorch.extract_patches_from_batched(batch)
+
+        # (for tqdm logging)
+        n_patches_total = patches.shape[2]*(len(batch_loader)*self.batch_size)
+        
+        batch_instances = []
+        batch_types = []
+        batch_aux = []
+
+        # model batch size
+        batch_size = self.model_batch_size if self.model_batch_size is not None else self.model.batch_size
+
+        # Loop through the B in batched patches (B, C, n_patches, patch_h, patch_w)
+        for j in range(patches.shape[0]):
+
+            pred_inst = []
+            pred_type = []
+            pred_aux = []
+
+            # Divide patches into batches that can be used as input to model
+            for batch in self._get_batch(patches[j, ...], batch_size):
+                insts, types, aux = self._predict_batch(batch)
+                pred_inst.append(insts)
+                pred_type.append(types) if types is not None else None
+                pred_aux.append(aux) if aux is not None else None
+
+                self.n_batches_inferred += batch.shape[0]
+                if batch_loader is not None:
+                    batch_loader.set_postfix(patches=f"{self.n_batches_inferred}/{n_patches_total}")
+                
+            pred_inst = torch.cat(pred_inst, dim=0)
+            pred_type = torch.cat(pred_type, dim=0) if pred_type else None
+            pred_aux = torch.cat(pred_aux, dim=0) if pred_aux else None
+            
+            batch_instances.append(pred_inst)
+            batch_types.append(pred_type)
+            batch_aux.append(pred_aux)
+
+        # Stitch the patches back to the orig img size
+        insts = torch.stack(batch_instances, dim=0).permute(0, 2, 1, 3, 4)
+        insts = tilertorch.stitch_batched_patches(insts)
+        insts = zip(names, tensor_to_ndarray(insts))
+
+        types = zip(names, [None]*len(names))
+        if all(e is not None for e in batch_types):
+            types = torch.stack(batch_types, dim=0).permute(0, 2, 1, 3, 4)
+            types = tilertorch.stitch_batched_patches(types)
+            types = zip(names, tensor_to_ndarray(types))
+
+        aux = zip(names, [None]*len(names))
+        if all(e is not None for e in batch_aux):
+            aux = torch.stack(batch_aux, dim=0).permute(0, 2, 1, 3, 4)
+            aux = tilertorch.stitch_batched_patches(aux)
+            aux = zip(names, tensor_to_ndarray(aux))
+
+        return insts, types, aux
+
+    def _infer_img_batch(self, 
+                         batch: Tuple[torch.Tensor], 
+                         names: Tuple[str],
+                         batch_loader: Iterable=None) -> Tuple[Iterable[Tuple[str, np.ndarray]]]:
+        """
+        Run inference on a batch of images that do not require tiling and stitching. I.e. For images of the same size
+        as the model input size (Pannuke).
+
+        Args:
+        --------
+            batch (torch.Tensor):
+                A batch of patches. Shape (B, C, patch_size, patch_size)
+            names (Tuple[str]):
+                filenames of the different images (without the suffices)
+            batch_loader (Iterable, default=None):
+                tqdm loader object
+
+        Returns:
+        --------
+            Tuple of Zip (iterable) objects containing (name, np.ndarray) pairs
+        """
+        batch_instances, batch_types, batch_aux = self._predict_batch(batch)
+        insts = zip(names, tensor_to_ndarray(batch_instances))
+
+        types = zip(names, [None]*len(names))
+        if batch_types is not None:
+            types = zip(names, tensor_to_ndarray(batch_types))
+
+        aux = zip(names, [None]*len(names))
+        if batch_aux is not None:
+            aux = zip(names, tensor_to_ndarray(batch_aux))
+        
+        self.n_batches_inferred += batch.shape[0]
+        if batch_loader is not None:
+            batch_loader.set_postfix(patches=f"{self.n_batches_inferred}/{len(self.folderset.fnames)}")
+
+        return insts, types, aux
+
+    def _post_proc(self, 
+                   inst_probs: Dict[str, np.ndarray],
+                   aux_maps: Dict[str, np.ndarray],
+                   type_probs: Dict[str, np.ndarray]) -> List[Tuple[str, np.ndarray, np.ndarray]]:
+        """
+        Takes in ordered dicts of name, mask pairs and runs post-processing
+
+        Args:
+        --------
+            inst_probs (Dict[str, np.ndarray]):
+                inst branch soft mask.
+            aux_maps (Dict[str, np.ndarray]):
+                aux branch mask
+            type_probs (Dict[str, np.ndarray]):
+                type branch soft mask 
+
+        Returns:
+        --------
+            List[Tuple[str, np.ndarray, np.ndarray]]. A list of tuples containing 
+            filename and masks per image e.g. ("filename1", inst_map: np.ndarray, type_map: np.ndarray) 
+        """ 
+        maps = self.post_processor.run_post_processing(
+            inst_probs=inst_probs, 
+            aux_maps=aux_maps, 
+            type_probs=type_probs
+        )
+
+        return maps
+
+    def _chunks(self, iterable: Iterable, size: int):
+        """
+        Generate adjacent chunks of an iterable 
+        
+        This is used to chunk the folder dataset for lower memory footprint
+        
+        Args:
+        ---------
+            iterable (Iterable):
+                Input iterable (FolderDataset)
+            size (int):
+                size of one chunk. 
+        """
+        it = iter(iterable)
+        return iter(lambda: tuple(itertools.islice(it, size)), ())
+
+    def _infer(self, chunked_dataloader: Iterable) -> None:
+        """
+        Run inference on input images. If save_dir not specified, all the results are
+        saved into memory. If save_dir is specified, the segmentation masks are saved into
+        .mat files and not into memory.
+
+        Args:
+        ---------
+            chunked_dataloader (Iterable, default=None):
+                If there is a lot of images in the folder, it's a good idea to chunk the folder dataloader
+                to not overflow the Inferer instances memory. This argument is used in the 
+        """
         # Start pipeline
+        self.n_batches_inferred = 0
         soft_instances = []
         soft_types = []
         aux_maps = []
-        
-        # running int for tqdm logging
-        running_int = 0
 
-        with tqdm(self.dataloader, unit="batch") as batch_loader:
-            for data in batch_loader:
-                batch_loader.set_description(f"Inference: {self.in_data_dir}")
-
+        with tqdm(chunked_dataloader, unit="batch") as batch_loader:
+            for j, data in enumerate(batch_loader):
+                
                 # Get data
                 batch = data["im"]
-                fnames = data["file"]
+                names = data["file"]
+
+                batch_loader.set_description(f"Running inference for {names}")
 
                 # Set patching flag (most datasets require patching), Assumes square patches
                 requires_patching = True if batch.shape[-1] > self.patch_size[0] else False
+
                 if requires_patching:
-
-                    # Do patching if images bigger than model input size
-                    tilertorch = TilerStitcherTorch(batch.shape, self.patch_size, self.stride_size, padding=True)
-                    patches = tilertorch.extract_patches_from_batched(batch)
-                    
-                    # tqdm logging
-                    n_patches_total = patches.shape[2]*len(self.folderset.fnames)
-
-                    batch_instances = []
-                    batch_types = []
-                    batch_aux = []
-
-                    # model batch size
-                    batch_size = self.model_batch_size if self.model_batch_size is not None else self.model.batch_size
-
-                    # Loop through the B in batched patches (B, C, n_patches, patch_h, patch_w)
-                    for j in range(patches.shape[0]):
-
-                        pred_inst = []
-                        pred_type = []
-                        pred_aux = []
-
-                        # Divide patches into batches that can be used as input to model
-                        for batch in self._get_batch(patches[j, ...], batch_size):
-                            insts, types, aux = self._predict_batch(batch)
-                            pred_inst.append(insts)
-                            pred_type.append(types) if types is not None else None
-                            pred_aux.append(aux) if aux is not None else None
-                            
-                            running_int += batch.shape[0]
-                            batch_loader.set_postfix(patches=f"{running_int}/{n_patches_total}")
-                        
-                        pred_inst = torch.cat(pred_inst, dim=0)
-                        pred_type = torch.cat(pred_type, dim=0) if pred_type else None
-                        pred_aux = torch.cat(pred_aux, dim=0) if pred_aux else None
-                        
-                        batch_instances.append(pred_inst)
-                        batch_types.append(pred_type)
-                        batch_aux.append(pred_aux)
+                    inst_probs, type_probs, aux = self._infer_large_img_batch(batch, names, batch_loader)
                 else:
-                    # Ǐf no patching required (pannuke) -> straight forward inference
-                    n_patches = batch.shape[0]
-                    batch_instances, batch_types, batch_aux = self._predict_batch(batch)
-                    insts = zip(fnames, tensor_to_ndarray(batch_instances))
+                    inst_probs, type_probs, aux = self._infer_img_batch(batch, names, batch_loader)
 
-                    types = zip(fnames, [None]*len(fnames))
-                    if batch_types is not None:
-                        types = zip(fnames, tensor_to_ndarray(batch_types))
+                soft_instances.extend(inst_probs)
+                soft_types.extend(type_probs)
+                aux_maps.extend(aux)
 
-                    aux = zip(fnames, [None]*len(fnames))
-                    if batch_aux is not None:
-                        aux = zip(fnames, tensor_to_ndarray(batch_aux))
-                    
-                    soft_instances.extend(insts)
-                    soft_types.extend(types)
-                    aux_maps.extend(aux)
-
-                    running_int += n_patches
-                    batch_loader.set_postfix(patches=f"{running_int}/{len(self.folderset.fnames)}")
-                    
-                # Stitch back to full size images if needed
-                if requires_patching:
-                    insts = torch.stack(batch_instances, dim=0).permute(0, 2, 1, 3, 4)
-                    insts = tilertorch.stitch_batched_patches(insts)
-                    insts = zip(fnames, tensor_to_ndarray(insts))
-
-                    types = zip(fnames, [None]*len(fnames))
-                    if all(e is not None for e in batch_types):
-                        types = torch.stack(batch_types, dim=0).permute(0, 2, 1, 3, 4)
-                        types = tilertorch.stitch_batched_patches(types)
-                        types = zip(fnames, tensor_to_ndarray(types))
-
-                    aux = zip(fnames, [None]*len(fnames))
-                    if all(e is not None for e in batch_aux):
-                        aux = torch.stack(batch_aux, dim=0).permute(0, 2, 1, 3, 4)
-                        aux = tilertorch.stitch_batched_patches(aux)
-                        aux = zip(fnames, tensor_to_ndarray(aux))
-
-                    soft_instances.extend(insts)
-                    soft_types.extend(types)
-                    aux_maps.extend(aux)
-
+        # save intermediate results to mem if save_dir not specified
         self.soft_insts = OrderedDict(soft_instances)
         self.soft_types = OrderedDict(soft_types)
         self.aux_maps = OrderedDict(aux_maps)
 
 
-    def post_process(self):
+    def _post_process(self):
         """
-        Run post processing pipeline
+        Run the post processing pipeline
         """
         assert "soft_insts" in self.__dict__.keys(), "No predictions found, run inference first."
-        maps = self.post_processor.run_post_processing(
+        maps = self._post_proc(
             inst_probs=self.soft_insts, 
             aux_maps=self.aux_maps, 
             type_probs=self.soft_types
@@ -388,6 +492,69 @@ class Inferer:
             name = res[0]
             self.inst_maps[name] = res[1].astype("int32")
             self.type_maps[name] = res[2].astype("int32")
+
+    def run_inference(self, 
+                      save_dir: Union[Path, str], 
+                      fformat: str="geojson",
+                      offsets: bool=False) -> None:
+        """
+        Run inference and post processing in chunks
+
+        self.n_images is the size of one chunk of image files. After the chunk is finished
+        the containers of the masks and intermediate arrays of the Inferer instance are cleared 
+        for lower memory footprint. (Enables inference for larger sets of images).
+
+        Args:
+        ---------
+            save_dir (Path or str, default=None):
+                directory where the .mat/geojson files are saved
+            fformat (str, default="geojson")
+                file format for the masks. One of (".mat, "geojson")
+            offsets (bool, default=False):
+                If True, geojson coordnates are shifted by the offsets that are
+                encoded in the file/samplenames (e.g. "x-1000_y-4000")
+        """
+        n_images_real = int(np.ceil(self.n_images / self.batch_size))
+        n_chunks = int(np.ceil(len(self.folderset.fnames) / self.n_images))
+        loader = self._chunks(iterable=self.dataloader, size=n_images_real)
+
+        with torch.no_grad():
+            for i in range(n_chunks):
+                self._infer(next(loader))
+                self._post_process()
+
+                # save results to files
+                for name, inst_map in self.inst_maps.items():
+                    if fformat == "geojson":
+                        
+                        # parse the offset coords from the name/key of the inst_map
+                        x_off, y_off = (int(c) for c in re.findall(r"\d+", name)) if offsets else (0, 0)
+
+                        mask2geojson(
+                            inst_map=inst_map, 
+                            type_map=self.type_maps[name], 
+                            fname=name,
+                            save_dir=save_dir,
+                            x_offset=x_off,
+                            y_offset=y_off
+                        )
+
+                    elif fformat == ".mat":
+                        mask2mat(
+                            inst_map=inst_map.astype("int32"),
+                            type_map=self.type_maps[name].astype("int32"),
+                            fname=name,
+                            save_dir=save_dir
+                        )
+
+                # clear memory
+                self.soft_insts.clear()
+                self.soft_types.clear()
+                self.aux_maps.clear()
+                self.inst_maps.clear()
+                self.type_maps.clear()
+                torch.cuda.empty_cache()
+
 
 
     def benchmark_insts(self, pattern_list: List[str]=None, file_prefix:str=""):
@@ -445,3 +612,52 @@ class Inferer:
         )
 
         return scores
+
+
+
+
+# def infer(self, save_dir: Union[Path, str]=None, fformat: str="geojson", offsets: bool=False):
+#     """
+#     Run inference on input images. If save_dir not specified, all the results are
+#     saved into memory. If save_dir is specified, the segmentation masks are saved into
+#     .mat files and not into memory.
+
+#     Args:
+#     ---------
+#         save_dir (Path or str, default=None):
+#             If not None, the masks are saved into .mat/geojson files in this directory
+#         fformat (str, default="geojson")
+#             The format of the outputfiles. One of ("mat", "geojson")
+#         offsets (bool, default=False):
+#             If True, geojson coordnates are shifted by the offsets that are
+#             encoded in the file/samplenames (e.g. "x-1000_y-4000")
+#     """
+# if save_dir is not None:
+#     assert fformat in (".mat", "geojson")
+#     maps = self._post_proc(OrderedDict(inst_probs), OrderedDict(aux), OrderedDict(type_probs))
+#     for res in maps:
+#         save_dir = Path(save_dir)
+
+#         if fformat == ".mat":
+#             fname = Path(save_dir / f"{res[0]}.mat")
+#             mask2mat(
+#                 inst_map=res[1].astype("int32"),
+#                 type_map=res[2].astype("int32"),
+#                 fname=res[0],
+#                 save_dir=save_dir
+#             )
+#         elif fformat == "geojson":
+#             # get the x and y offset from the filename
+#             if offsets:
+#                 x_off, y_off = (int(coord) for coord in re.findall(r"\d+", res[0])) if offsets else (0, 0)
+
+#             mask2geojson(
+#                 inst_map=res[1].astype("int32"),
+#                 type_map=res[2].astype("int32"),
+#                 fname=res[0],
+#                 classes=self.model.fm.get_classes(self.model.train_dataset),
+#                 save_dir=save_dir,
+#                 x_offset=x_off,
+#                 y_offset=y_off
+#             )
+#         # TODO: add to tqdm bar

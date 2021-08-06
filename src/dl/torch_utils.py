@@ -31,7 +31,6 @@ def ndarray_to_tensor(array: np.ndarray, dim_order: str="HWC", add_channel: bool
     if dim_order not in ("BHWC", "BCHW", "BHW"):
         array = array[None, ...]
     
-
     if dim_order in ("BHWC", "HWC"):
         array = array.transpose(0, 3, 1, 2)
 

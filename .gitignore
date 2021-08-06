@@ -20,6 +20,7 @@ datasets/data/pannuke/test/*
 datasets/data/pannuke/train/*
 datasets/data/pannuke/orig/*
 datasets/data/pannuke/original/*
+datasets/data/monusac/*
 results/tests/*
 results/*
 src/tests/

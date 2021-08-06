@@ -52,6 +52,7 @@ def percentile_normalize_and_clamp(im: np.ndarray, a_min: float=-1, a_max: float
             clamp max value
     
     Returns:
+    ----------
         np.ndarray normed input image of same shape as input.
     """
     percentile99 = np.percentile(im, q=99, axis=(0, 1))

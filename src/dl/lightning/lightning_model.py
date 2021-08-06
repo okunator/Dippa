@@ -181,7 +181,7 @@ class SegModel(pl.LightningModule):
                 finding the test dataset db that is based on the 'dataset' and 'db_type'.
             n_classes (int, default=None):
                 The number of classes in the data. If the database is defined explicitly,
-                the number of classes need to be give nas well
+                the number of classes need to be given as well
             inference_mode (bool, default=False):
                 Flag to signal that model is initialized for inference. This is only used
                 in the Inferer class.

@@ -44,14 +44,14 @@ class PostProcessor(ABC):
     def run_post_processing(self):
             raise NotImplementedError
 
-    def parallel_pipeline(self, maps: List[Tuple[np.ndarray]]) -> List[Tuple[np.ndarray]]:
+    def parallel_pipeline(self, maps: List[Tuple[np.ndarray]]) -> List[Tuple[str, np.ndarray, np.ndarray]]:
         """
         Run post proc pipeline in parallel for each set of predictions
 
         Args:
         -----------
             maps (List[Tuple[np.ndarray]]):
-                A list of tuples containing the inst_map, Optional[aux_map], Optional[type_map]
+                A list of tuples containing the fname, inst_map, Optional[aux_map], Optional[type_map]
                 to be post processed.
 
         Returns:
@@ -61,7 +61,7 @@ class PostProcessor(ABC):
         """
         seg_results = []
         with Pool() as pool:
-            for x in tqdm(pool.imap_unordered(self.post_proc_pipeline, maps), total=len(maps)):
+            for x in tqdm(pool.imap_unordered(self.post_proc_pipeline, maps), total=len(maps), desc=f"Post-processing"):
                 seg_results.append(x)
 
         return seg_results
