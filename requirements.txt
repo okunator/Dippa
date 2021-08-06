@@ -1,6 +1,6 @@
 pooch==1.3.0
 tables==3.6.1
-geopanda==0.9.0
+geopandas==0.9.0
 zarr==2.6.1
 geojson==2.5.0
 numpy==1.18.4
