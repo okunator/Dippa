@@ -101,7 +101,7 @@ class Inferer:
                 If data_dir is set this arg will be ignored.
             tta (bool, default=False):
                 If True, performs test time augmentation. Inference time goes up
-                with often marginal performance improvements.
+                with often marginal performance improvements. (Not yet implemented)
             model_weights (str, default="last"):
                 pytorch lightning saves the weights of the model for the last epoch
                 and best epoch (based on validation data). One of ("best", "last").
@@ -431,9 +431,7 @@ class Inferer:
 
     def _infer(self, chunked_dataloader: Iterable) -> None:
         """
-        Run inference on input images. If save_dir not specified, all the results are
-        saved into memory. If save_dir is specified, the segmentation masks are saved into
-        .mat files and not into memory.
+        Run inference on input images.
 
         Args:
         ---------
@@ -493,7 +491,7 @@ class Inferer:
             self.type_maps[name] = res[2].astype("int32")
 
     def run_inference(self, 
-                      save_dir: Union[Path, str], 
+                      save_dir: Union[Path, str]=None, 
                       fformat: str="geojson",
                       offsets: bool=False) -> None:
         """
@@ -523,38 +521,37 @@ class Inferer:
                 self._post_process()
 
                 # save results to files
-                for name, inst_map in self.inst_maps.items():
-                    if fformat == "geojson":
-                        
-                        # parse the offset coords from the name/key of the inst_map
-                        x_off, y_off = (int(c) for c in re.findall(r"\d+", name)) if offsets else (0, 0)
+                if save_dir is not None:
+                    for name, inst_map in self.inst_maps.items():
+                        if fformat == "geojson":
+                            
+                            # parse the offset coords from the name/key of the inst_map
+                            x_off, y_off = (int(c) for c in re.findall(r"\d+", name)) if offsets else (0, 0)
 
-                        mask2geojson(
-                            inst_map=inst_map, 
-                            type_map=self.type_maps[name], 
-                            fname=name,
-                            save_dir=save_dir,
-                            x_offset=x_off,
-                            y_offset=y_off
-                        )
+                            mask2geojson(
+                                inst_map=inst_map, 
+                                type_map=self.type_maps[name], 
+                                fname=name,
+                                save_dir=save_dir,
+                                x_offset=x_off,
+                                y_offset=y_off
+                            )
 
-                    elif fformat == ".mat":
-                        mask2mat(
-                            inst_map=inst_map.astype("int32"),
-                            type_map=self.type_maps[name].astype("int32"),
-                            fname=name,
-                            save_dir=save_dir
-                        )
+                        elif fformat == ".mat":
+                            mask2mat(
+                                inst_map=inst_map.astype("int32"),
+                                type_map=self.type_maps[name].astype("int32"),
+                                fname=name,
+                                save_dir=save_dir
+                            )
 
-                # clear memory
-                self.soft_insts.clear()
-                self.soft_types.clear()
-                self.aux_maps.clear()
-                self.inst_maps.clear()
-                self.type_maps.clear()
-                torch.cuda.empty_cache()
-
-
+                    # clear memory
+                    self.soft_insts.clear()
+                    self.soft_types.clear()
+                    self.aux_maps.clear()
+                    self.inst_maps.clear()
+                    self.type_maps.clear()
+                    torch.cuda.empty_cache()
 
     def benchmark_insts(self, pattern_list: List[str]=None, file_prefix:str=""):
         """

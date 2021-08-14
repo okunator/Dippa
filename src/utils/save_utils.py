@@ -1,5 +1,6 @@
 import scipy.io
 import shapely
+import re
 import geojson
 import cv2
 import pandas as pd
@@ -16,7 +17,7 @@ from typing import Dict, Tuple, Union
 from .mask_utils import fix_duplicates, get_inst_centroid, get_inst_types, bounding_box
 
 
-def poly2mask(contour: np.ndarray, shape: Tuple[int]) -> np.ndarray:
+def poly2mask(contour: np.ndarray, shape: Tuple[int], x_off: int=None, y_off: int=None) -> np.ndarray:
     """
     Convert shapely Polygons to np.ndarray mask
 
@@ -26,11 +27,20 @@ def poly2mask(contour: np.ndarray, shape: Tuple[int]) -> np.ndarray:
             Shapely xy coords for the polygon. Something like array(0 30, 5 50, ... , 90 500)
         shape (tuple):
             shape of the mask  
+        x_off (int, default=None):
+            the amount of translation/offset that is encoded into the x-coord in the geojson
+        y_off (int, default=None):
+            the amount of translation/offset that is encoded into the y-coord in the geojson
     """
     nuc = np.asarray(contour) # gdp contour = xy-coord. Need to flip
+
+    if x_off is not None:
+        nuc[..., 0] -= x_off
+    if y_off is not None:
+        nuc[..., 1] -= y_off
+
     inst = polygon2mask(shape, np.flip(nuc, axis=1))
     return inst
-
 
 def mask2mat(inst_map: np.ndarray, 
              type_map: np.ndarray, 
@@ -70,7 +80,12 @@ def mask2mat(inst_map: np.ndarray,
     )
 
 
-def geojson2mat(fname: Union[str, Path], classes: Dict[str, int], save_dir: Union[str, Path]=None) -> None:
+def geojson2mat(fname: Union[str, Path], 
+                target_shape: Tuple[int, int], 
+                classes: Dict[str, int]=None, 
+                save_dir: Union[str, Path]=None,
+                x_off: int=None, 
+                y_off: int=None) -> None:
     """
     Convert geojson annotation file to numpy arrays and save them
     to .mat files
@@ -83,6 +98,14 @@ def geojson2mat(fname: Union[str, Path], classes: Dict[str, int], save_dir: Unio
             class dict e.g. {"inflam":1, "epithelial":2, "connec":3}
         save_dir (str):
             directory where the .mat files are saved
+        target_shape (Tuple[int, int]):
+            Height and width of the numpy array that the geojson is converted into
+        classes (Dict[str, int], default=None):
+            class dict e.g. {"inflam":1, "epithelial":2, "connec":3}
+        x_off (int):
+            the amount of translation/offset that is encoded into the x-coord in the geojson
+        y_off (int):
+            the amount of translation/offset that is encoded into the y-coord in the geojson
     """
     # read files and init GeoDf
     anno = pd.read_json(fname)
@@ -90,9 +113,13 @@ def geojson2mat(fname: Union[str, Path], classes: Dict[str, int], save_dir: Unio
     annots = gpd.GeoDataFrame(anno).set_geometry('geometry')
 
     # inits
+    # use pannuke classes if no classes are given
+    if classes is None:
+        classes = {"background":0, "neoplastic":1, "inflammatory":2, "connective":3, "dead":4, "epithelial":5}
+
     cls_max = max([classes[t] for t in set([prop["classification"]["name"] for prop in annots["properties"]])])
     xmax, ymax = tuple(annots["geometry"].total_bounds[2:].astype("int"))
-    target_shape = (ymax+1, xmax+1) # total_bounds -1 smaller than the image
+    target_shape = target_shape
     inst_map = np.zeros(target_shape, np.int32)
     type_map = np.zeros(target_shape, np.int32)
 
@@ -103,13 +130,13 @@ def geojson2mat(fname: Union[str, Path], classes: Dict[str, int], save_dir: Unio
             class_num = classes[props["classification"]["name"]]
             if isinstance(poly, shapely.geometry.multipolygon.MultiPolygon):
                 for p in list(poly):
-                    inst = poly2mask(p.exterior.coords, target_shape)
+                    inst = poly2mask(p.exterior.coords, target_shape, x_off, y_off)
                     inst = remove_small_objects(inst, 10)
                     inst_map[inst > 0] += i
                     type_map[(inst > 0) & (type_map != class_num)] += class_num
 
             else:
-                inst = poly2mask(poly.exterior.coords, target_shape)
+                inst = poly2mask(poly.exterior.coords, target_shape, x_off, y_off)
                 inst = remove_small_objects(inst, 10)
                 inst_map[inst > 0] += i
                 type_map[(inst > 0) & (type_map != class_num)] += class_num
@@ -121,6 +148,8 @@ def geojson2mat(fname: Union[str, Path], classes: Dict[str, int], save_dir: Unio
 
         pbar.set_postfix(saving=f"Save results to file: {fname}.mat")
         mask2mat(inst_map, type_map, fname, save_dir)
+
+    # return inst_map, type_map
 
 
 def mask2geojson(inst_map: np.ndarray, 
@@ -166,7 +195,7 @@ def mask2geojson(inst_map: np.ndarray,
         # set up the annotation geojson obj
         geo_obj = {}
         geo_obj.setdefault("type", "Feature")
-        geo_obj.setdefault("id", "PathCellAnnotation")
+        geo_obj.setdefault("id", "PathCellDetection")
         geo_obj.setdefault("geometry", {"type": "Polygon", "coordinates": None})
         geo_obj.setdefault("properties", {"isLocked": "false", "measurements": [], "classification": {"name": None}})
 
@@ -194,7 +223,6 @@ def mask2geojson(inst_map: np.ndarray,
         poly.append(poly[0]) # close the polygon
         geo_obj["geometry"]["coordinates"] = [poly]
         geo_obj["properties"]["classification"]["name"] = inst_type
-        geo_obj["properties"]["classification"]["name"] = inst_type
         geo_objs.append(geo_obj)
 
     if fname is not None:
@@ -206,34 +234,3 @@ def mask2geojson(inst_map: np.ndarray,
         return
     
     return geo_objs
-
-
-def merge_geojson_dir(in_dir: Union[Path, str], 
-                      fname: Union[str, Path], 
-                      save_dir: Union[str, Path]) -> None:
-    """
-    Merge a directory containing geojson files into one big geojson file.
-
-    Args:
-    ---------
-        in_dir (Path or str):
-            in directory
-        fname (Path or str):
-            File name for the annotation json file. If None, no file is written.
-        save_dir (Path or str):
-            directory where the .mat files are saved
-
-    """
-    gsons = []
-    for f in Path(in_dir).iterdir():
-        if f.suffix == ".json" and f.is_file():
-            # print(f)
-            with open(f.as_posix()) as f:
-                gson = geojson.load(f)
-            gsons.extend(gson)
-
-    fname = Path(fname).with_suffix(".json").name
-    save_dir = Path(save_dir)
-    fn = Path(save_dir / fname)
-    with open(fn, 'w') as out:
-        geojson.dump(gsons, out)
