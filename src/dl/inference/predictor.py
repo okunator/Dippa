@@ -116,7 +116,7 @@ class Predictor:
                  patch: torch.Tensor, 
                  act: Union[str, None]="softmax", 
                  apply_weights: bool=False,
-                 return_type: str="torch") -> np.ndarray:
+                 to_cpu: bool=False) -> np.ndarray:
         """
         Take in a patch or a batch of patches of logits produced by the model and
         use sigmoid activation for instance logits and softmax for semantic logits
@@ -133,15 +133,15 @@ class Predictor:
                 apply a weight matrix that assigns bigger weight on pixels
                 in center and less weight to pixels on image boundary. helps dealing with
                 prediction artifacts on tile boundaries.
-            return_type (str, default="torch"):
-                One of ("torch", "numpy")
+            to_cpu (str, default=False):
+                Detach tensor from gpu to cpu. If batch_size is very large this can be used
+                to avoid memory errors during inference.
 
         Returns:
         -----------
             np.ndarray of the prediction
         """
         assert act in ("sigmoid", "softmax", None)
-        assert return_type in ("torch", "numpy")
         
         # apply classification activation
         if act == "sigmoid":
@@ -159,9 +159,7 @@ class Predictor:
             pred *= W
 
         # from gpu to cpu
-        if return_type == "numpy":
-            pred = util.tensor_to_ndarray(pred)
-        else:
+        if to_cpu:
             pred = pred.detach()
             if pred.is_cuda:
                 pred = pred.cpu()

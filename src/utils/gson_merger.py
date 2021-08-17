@@ -43,23 +43,26 @@ class GSONTile:
         Read a geojson/json file and convert it to geopandas df
         Adds bounding box-coords for the polygons
         """
-        df = pd.read_json(self.fname)
-        df["geometry"] = df["geometry"].apply(shapely.geometry.shape)
-        gdf = gpd.GeoDataFrame(df).set_geometry('geometry')
+        try:
+            df = pd.read_json(self.fname)
+            df["geometry"] = df["geometry"].apply(shapely.geometry.shape)
+            gdf = gpd.GeoDataFrame(df).set_geometry('geometry')
 
-        # add bounding box coords of the polygons to the gdfs
-        # and correct for the max coords
-        gdf["xmin"] = gdf.bounds["minx"].astype(int)
-        gdf["xmax"] = gdf.bounds["maxx"].astype(int) + 1
-        gdf["ymin"] = gdf.bounds["miny"].astype(int)
-        gdf["ymax"] = gdf.bounds["maxy"].astype(int) + 1
+            # add bounding box coords of the polygons to the gdfs
+            # and correct for the max coords
+            gdf["xmin"] = gdf.bounds["minx"].astype(int)
+            gdf["xmax"] = gdf.bounds["maxx"].astype(int) + 1
+            gdf["ymin"] = gdf.bounds["miny"].astype(int)
+            gdf["ymax"] = gdf.bounds["maxy"].astype(int) + 1
 
-        return gdf
+            return gdf
+        except:
+            pass
 
     @property
     def non_border_annots(self) -> gpd.GeoDataFrame:
         """
-        Get all the annotations/polygons that touch the right edge
+        Get all the annotations/polygons that do not touch any edges
         of the tile
         """
         not_right = self.gdf["xmax"] !=  self.xmax
@@ -166,7 +169,7 @@ class GSONMerger:
     def _gsonobj(self) -> Dict:
         geo_obj = {}
         geo_obj.setdefault("type", "Feature")
-        geo_obj.setdefault("id", "PathCellDetection")
+        geo_obj.setdefault("id", "PathCellDetection") # PathDetectionObject, PathCellDetection, PathCellAnnotation
         geo_obj.setdefault("geometry", {"type": "Polygon", "coordinates": None})
         geo_obj.setdefault("properties", {"isLocked": "false", "measurements": [], "classification": {"name": None}})
         return geo_obj
@@ -263,6 +266,15 @@ class GSONMerger:
                     geo_obj = self._gsonobj
                     cell_type = c["classification"]["name"]
                     geo_obj["properties"]["classification"]["name"] = cell_type
+
+                    if poly.geom_type == 'MultiPolygon':
+                        try:
+                            poly = shapely.ops.cascaded_union([
+                                shapely.geometry.Polygon(c.exterior).buffer(0.01).buffer(-0.01) for p in poly
+                            ])
+                        except:
+                            continue
+
                     geo_obj["geometry"]["coordinates"] = [[list(tup) for tup in poly.exterior.coords[:]]]
                     new_polys.append(geo_obj)
         
@@ -359,28 +371,30 @@ class GSONMerger:
             # Init GSONTile obj
             x1, y1 = self._get_xy_coords(f.name)
             gson_main = GSONTile(f, x1, y1)
-            
-            # add the non border polygons
-            if self.doned[f.name]["non_border"] is None:
-                non_border_polygons = self._get_non_border_polygons(gson_main)
-                annotations.extend(non_border_polygons)
-                self.doned[f.name]["non_border"] = f.name
 
-            # loop the adjascent tiles and add the border polygons
-            for i, (pos, f_adj) in enumerate(adj.items()):
-                if f_adj is not None:
-                    if self.doned[f.name][pos] is None:
-                        x2, y2 = self._get_xy_coords(f_adj.name)
-                        gson_adj = GSONTile(f_adj, x2, y2)
-                        
-                        border_polygons = self._merge_adj_ploygons(gson_main, gson_adj, pos)
-                        annotations.extend(border_polygons)
-                        
-                        # update lookup
-                        main_pos = self.neighbor_relations[pos]["main"]
-                        adj_pos = self.neighbor_relations[pos]["adj"]
-                        self.doned[f_adj.name][adj_pos] = f.name
-                        self.doned[f.name][main_pos] = f_adj.name
+            if gson_main.gdf is not None:
+                # add the non border polygons
+                if self.doned[f.name]["non_border"] is None:
+                    non_border_polygons = self._get_non_border_polygons(gson_main)
+                    annotations.extend(non_border_polygons)
+                    self.doned[f.name]["non_border"] = f.name
+
+                # loop the adjascent tiles and add the border polygons
+                for i, (pos, f_adj) in enumerate(adj.items()):
+                    if f_adj is not None:
+                        if self.doned[f.name][pos] is None:
+                            x2, y2 = self._get_xy_coords(f_adj.name)
+                            gson_adj = GSONTile(f_adj, x2, y2)
+                            
+                            if gson_adj.gdf is not None:
+                                border_polygons = self._merge_adj_ploygons(gson_main, gson_adj, pos)
+                                annotations.extend(border_polygons)
+                                
+                                # update lookup
+                                main_pos = self.neighbor_relations[pos]["main"]
+                                adj_pos = self.neighbor_relations[pos]["adj"]
+                                self.doned[f_adj.name][adj_pos] = f.name
+                                self.doned[f.name][main_pos] = f_adj.name
 
         # write to file
         fname = Path(fname).with_suffix(".json")
