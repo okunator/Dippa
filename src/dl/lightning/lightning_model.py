@@ -75,15 +75,16 @@ class SegModel(pl.LightningModule):
         Args:
         ------------
             experiment_name (str):
-                Name of the experiment
+                Name of the experiment. Example "Skip connection test"
             experiment_version (str):
-                Name of the experiment version
+                Name of the experiment version. Example: "dense"
             train_dataset (str):
-                Name of thre training dataset.
-                One of ("consep", "pannuke", "kumar")
+                Name of the training dataset. Overide this argument by passing
+                train_db_path, valid_db_path and test_db_path explicitly.
+                One of ("consep", "pannuke", "kumar", "monusac")
             model_input_size (int, default=256):
                 The input image size of the model. Assumes that input images are square
-                patches i.e. H == W.
+                patches i.e. H == W. 
             encoder_name (str, default="resnet50"):
                 Name of the encoder. Available encoders from:
                 https://github.com/qubvel/segmentation_models.pytorch
@@ -110,13 +111,14 @@ class SegModel(pl.LightningModule):
             decoder_upsampling (str, default="fixed_unpool"):
                 The upsampling method. One of ("interp", "max_unpool", transconv", "fixed_unpool")
             decoder_weight_init (str, default="he"):
-                weight initialization method One of ("he", "eoc", "fixup")
+                weight initialization method One of ("he", "eoc", "fixup") NOT IMPLEMENTED YET
             decoder_short_skips (str, default=None):
                 The short skip connection style of the decoder. One of 
                 ("residual", "dense", None)
             decoder_channels (List[int], default=None):
                 list of integers for the number of channels in each decoder block.
-                Length of the list has to be equal to encoder_depth.
+                Length of the list has to be equal to encoder_depth to ensure symmetric
+                encodedr-decoder architecture.
             activation (str, default="relu"):
                 Activation method. One of ("mish", "swish", "relu")
             normalization (str, default="bn"):
@@ -129,20 +131,30 @@ class SegModel(pl.LightningModule):
                 How to merge the features in long skips. One of ("summation", "concatenate")
             inst_branch_loss (str, defauult="cd_dice"):
                 A string specifying the loss funcs used in the binary segmentation branch
-                of the network. Loss names separated with underscores e.g. "ce_dice"
+                of the network. Loss names are separated with underscores e.g. "ce_dice"
+                One of: ("ce", "dice", "iou", "focal", "gmse", "mse", "sce", "tversky", "ssim")
             type_branch_loss (str), default="ce_dice":
                 A string specifying the loss funcs used in the semantic segmentation branch
-                of the network. Loss names separated with underscores e.g. "ce_dice"
+                of the network. Loss names are separated with underscores e.g. "ce_dice"
+                One of: ("ce", "dice", "iou", "focal", "gmse", "mse", "sce", "tversky", "ssim")
             aux_branch_loss (str, default="mse_ssim"):
                 A string specifying the loss funcs used in the auxiliary regression branch
-                of the network. Loss names separated with underscores e.g. "mse_ssim"
+                of the network. Loss names are separated with underscores e.g. "mse_ssim"
+                One of: ("ce", "gmse", "mse", "ssim")
             class_weights (bool, default=False): 
-                Flag to signal wheter class weights are applied in the loss functions
+                Flag to signal wether class weights are applied in the loss functions.
+                Class weights need to be pre-computed and stored in the training data dbs
+                if this param is set to True
             edge_weight (float, default=None): 
-                Weight given at the nuclei edges
+                The value of the weight given at the nuclei edges/borders (U-Net paper).
+                If this is None, no weighting at the borders is done. This also works only with
+                cross-entropy based losses.
             optimizer_name (str, default="adam"):
-                Name of the optimizer. In-built torch optims and torch_optimizer lib 
-                optimizers can be used.
+                Name of the optimizer. In-built optimizers from torch.optims and torch_optimizer
+                package can be used. One of: ("adam", "rmsprop","sgd", "adadelta", "apollo", "adabelief",
+                "adamp", "adagrad", "adamax", "adamw", "asdg", "accsgd", "adabound", "adamod", "diffgrad",
+                "lamb", "novograd", "pid", "qhadam", "qhm", "radam", "sgdw", "yogi", "ranger", "rangerqh",
+                "rangerva")
             lookahead (bool, default=False):
                 Flag whether the optimizer uses lookahead.
             decoder_learning_rate (float, default=0.0005):
@@ -154,37 +166,36 @@ class SegModel(pl.LightningModule):
             bias_weight_decay (bool):
                 Flag whether to apply weight decay for biases.
             augmentations (List[str], default=None): 
-                List of augmentations to be used for training
-                One of ("rigid", "non_rigid", "hue_sat", "blur", "non_spatial",
-                "random_crop", "center_crop", "resize")
+                List of augmentations to be used for training One of: 
+                ("rigid","non_rigid","hue_sat","blur","non_spatial","random_crop","center_crop","resize")
             normalize_input (bool, default=True):
-                If True, channel-wise normalization for the input images is applied.
+                If True, channel-wise min-max normalization for the input images is applied.
             batch_size (int, default=8):
-                Batch size for training
+                Batch size for the model at training time
             num_workers (int, default=8):
-                Number of workers for the dataloader
+                Number of workers for the dataloader at training time
             db_type (str, default="hdf5"):
                 Training/testing patches are saved in either hdf5 or zarr db's.
                 This flags the db type so that the filemanager knows to look for
                 the right db. One of ("hdf5", "zarr").  
-            train_db_path (str, default=None):
-                A path to a database where train patches are saved. Has to be .h5 or
-                .zarr db. This argument overrides the default behaviour of automatically
-                finding the train dataset db that is based on the 'dataset' and 'db_type'.
-            valid_db_path (str, default=None):
-                A path to a database where valid patches are saved. Has to be .h5 or
-                .zarr db. This argument overrides the default behaviour of automatically
-                finding the valid dataset db that is based on the 'dataset' and 'db_type'.
-            test_db_path (str, default=None):
-                A path to a database where test patches are saved. Has to be .h5 or
-                .zarr db. This argument overrides the default behaviour of automatically
-                finding the test dataset db that is based on the 'dataset' and 'db_type'.
-            n_classes (int, default=None):
+            train_db_path (str, optional, default=None):
+                A path to a database where train patches are saved. Has to be .h5 or .zarr db. This 
+                argument overrides the default behaviour of automatically finding the train dataset 
+                db that is based on the params 'dataset' and 'db_type'.
+            valid_db_path (str, optional, default=None):
+                A path to a database where valid patches are saved. Has to be .h5 or .zarr db. This 
+                argument overrides the default behaviour of automatically finding the valid dataset 
+                db that is based on the 'dataset' and 'db_type'.
+            test_db_path (str, optional, default=None):
+                A path to a database where test patches are saved. Has to be .h5 or .zarr db. This 
+                argument overrides the default behaviour of automatically finding the test dataset
+                db that is based on the 'dataset' and 'db_type'.
+            n_classes (int, optional, default=None):
                 The number of classes in the data. If the database is defined explicitly,
                 the number of classes need to be given as well
             inference_mode (bool, default=False):
                 Flag to signal that model is initialized for inference. This is only used
-                in the Inferer class.
+                in the Inferer class so no need to touch this argument.
         """
         super(SegModel, self).__init__()
         self.experiment_name = experiment_name

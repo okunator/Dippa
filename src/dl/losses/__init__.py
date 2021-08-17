@@ -50,16 +50,28 @@ JOINT_SEG_LOSSES = [
 ]
 
 JOINT_AUX_LOSSES = [
+    "ce",
     "mse",
     "gmse",
     "ssim",
     "msssim",
+    "ce_ssim",
+    "ce_mssim",
+    "ce_mse",
+    "ce_gmse",
+    "mse_ce",
     "mse_ssim",
     "mse_gmse",
     "mse_msssim",
+    "gmse_mse",
+    "gmse_ce",
     "gmse_ssim",
     "gmse_msssim",
+    "ssim_ce",
+    "ssim_mse",
+    "ssim_gmse",
     "ssim_msssim",
+    "mse_ce_ssim",
     "mse_gmse_ssim",
     "mse_gmse_msssim"
 ]

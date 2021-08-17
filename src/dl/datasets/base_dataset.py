@@ -30,6 +30,7 @@ class BaseDataset(Dataset, FileHandler):
         """
         self.fname = fname
         self.suffix = Path(self.fname).suffix 
+        assert self.suffix in (".h5", ".zarr"), "the input data needs to be in either hdf5 or zarr db"
 
         # Get the numeber of patches in dataset
         if self.suffix == ".zarr":

@@ -12,7 +12,8 @@ class ContourDataset(BaseDataset):
                  transforms: List,
                  normalize_input: bool=False) -> None:
         """
-        Dataset where masks are pre-processed similarly to the Micro-Net paper
+        Dataset where masks are pre-processed similarly to the DCAN paper
+        https://arxiv.org/abs/1604.02677
 
         Args:
         ----------
@@ -30,7 +31,7 @@ class ContourDataset(BaseDataset):
 
     def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
         """
-        1. read data from hdf5 file
+        1. read data from hdf5/zarr file
         2. fix duplicated instances due to mirror padding
         3. remove overlaps in occluded nuclei and generate the weight map for the borders of overlapping nuclei
         4. Compute contours 

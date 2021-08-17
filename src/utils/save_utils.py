@@ -195,7 +195,7 @@ def mask2geojson(inst_map: np.ndarray,
         # set up the annotation geojson obj
         geo_obj = {}
         geo_obj.setdefault("type", "Feature")
-        geo_obj.setdefault("id", "PathCellDetection")
+        geo_obj.setdefault("id", "PathCellDetection") # PathCellAnnotation, PathCellDetection, PathDetectionObject
         geo_obj.setdefault("geometry", {"type": "Polygon", "coordinates": None})
         geo_obj.setdefault("properties", {"isLocked": "false", "measurements": [], "classification": {"name": None}})
 
@@ -228,6 +228,10 @@ def mask2geojson(inst_map: np.ndarray,
     if fname is not None:
         fname = Path(fname).with_suffix(".json").name
         save_dir = Path(save_dir)
+
+        if not save_dir.exists():
+            save_dir.mkdir(exist_ok=True)
+
         fn = Path(save_dir / fname)
         with open(fn, 'w') as out:
             geojson.dump(geo_objs, out)

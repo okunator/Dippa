@@ -31,7 +31,7 @@ class DistDataset(BaseDataset):
 
     def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
         """
-        1. read data from hdf5 file
+        1. read data from hdf5/zarr file
         2. fix duplicated instances due to mirror padding
         3. remove overlaps in occluded nuclei and generate the weight map for the borders of overlapping nuclei
         4. create distance maps
