@@ -50,9 +50,8 @@ from src.config import CONFIG
 from src.dl.lightning import PannukeDataModule
 
 config = CONFIG
-pannuke_module = PannukeDataModule.from_conf(config) # Download Pannuke
-pannuke_module.prepare_data()
-pannuke_module.setup(stage="fit")
+pannuke_module = PannukeDataModule.from_conf(config)
+pannuke_module.prepare_data() # Download Pannuke dataset
 ```
 
 ### Training Script 
@@ -157,8 +156,8 @@ import src.dl.lightning as lightning
 from src.config import CONFIG
 
 in_dir = "my_input_dir" # input directory for the image files
-exp_name = "ovca" # name of the experiment (directory)
-exp_version = "full" # name of the experiment version (sub directory inside the experiment dir)
+exp_name = "my_experiment" # name of the experiment (directory)
+exp_version = "dense_skip_test" # name of the experiment version (sub directory inside the experiment dir)
 lightning_model = lightning.SegModel.from_experiment(name=exp_name, version=exp_version)
 
 inferer = Inferer(
