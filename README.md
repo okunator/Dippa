@@ -15,7 +15,7 @@ Borrowing functions and utilities from [HoVer-Net repository](https://github.com
 * [x] [Kumar](https://ieeexplore.ieee.org/document/7872382) (Kumar et al.)
 * [x] [CoNSep](https://arxiv.org/pdf/1812.06499) (Graham, Vu, et al.)
 * [x] [Pannuke](https://arxiv.org/abs/2003.10778) (Gamper et al. Note: [License](https://creativecommons.org/licenses/by-nc-sa/4.0/))
-* [ ] [MoNuSac](https://monusac-2020.grand-challenge.org/) (Not yet published) (coming)
+* [ ] [MoNuSac](https://monusac-2020.grand-challenge.org/) (coming)
 
 ## Set Up
 1. Clone the repository
