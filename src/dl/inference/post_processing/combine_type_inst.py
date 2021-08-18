@@ -43,6 +43,10 @@ def combine_inst_semantic(inst_map: np.ndarray,
             the model. Shape (H, W).
         type_map (np.ndarray): 
             output from the type segmentation head of the model. Shape (H, W).
+
+    Returns:
+    -----------
+        np.ndarray. Resulting type map with nuclei separated. Shape (H, W)
     """
     inst_ids = {}
     pred_id_list = list(np.unique(inst_map))[1:]

@@ -76,7 +76,7 @@ class PannukeDataModule(pl.LightningDataModule):
 
 
     @classmethod
-    def from_conf(cls, conf: DictConfig, download_dir: str=None, database_dir: str=None):
+    def from_conf(cls, conf: DictConfig, download_dir: str=None, database_dir: str=None) -> PannukeDataModule:
         download_dir = download_dir
         database_dir = database_dir
         db_type = conf.runtime_args.db_type
@@ -104,7 +104,7 @@ class PannukeDataModule(pl.LightningDataModule):
         )
 
         
-    def prepare_data(self, write_new_dbs: bool=False):
+    def prepare_data(self, write_new_dbs: bool=False) -> None:
         """
         1. Download pannuke folds from: "https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke/" and re-format
         2. Write images/masks to to zarr or hdf5 files
@@ -120,7 +120,7 @@ class PannukeDataModule(pl.LightningDataModule):
 
         Args:
         ----------
-            write_new_dbs (bool, default=True):
+            write_new_dbs (bool, default=False):
                 If True, a new database is written to database_dir.
         """
         # Download folds and re-format. If data is downloaded and processed
@@ -173,8 +173,8 @@ class PannukeDataModule(pl.LightningDataModule):
         self.train_pannuke = trainwriter.write2db(skip=skip)
         self.test_pannuke = testwriter.write2db(skip=skip)
         
-
-    def setup(self, stage: Optional[str] = None):
+    # Rest is pytorch lightning boilerplate
+    def setup(self, stage: Optional[str] = None) -> None:
         self.trainset = DatasetBuilder.set_train_dataset(
             aux_branch=self.aux_branch,
             augmentations=self.augs,
@@ -192,7 +192,7 @@ class PannukeDataModule(pl.LightningDataModule):
             norm=self.norm
         )
 
-    def train_dataloader(self):
+    def train_dataloader(self) -> DataLoader:
         return DataLoader(
             self.trainset, 
             batch_size=self.batch_size, 
@@ -201,7 +201,7 @@ class PannukeDataModule(pl.LightningDataModule):
             num_workers=self.num_workers,
         )
 
-    def val_dataloader(self):
+    def val_dataloader(self) -> DataLoader:
         return DataLoader(
             self.validset, 
             batch_size=self.batch_size,
@@ -210,7 +210,7 @@ class PannukeDataModule(pl.LightningDataModule):
             num_workers=self.num_workers
         )
     
-    def test_dataloader(self):
+    def test_dataloader(self) -> DataLoader:
         return DataLoader(
             self.testset,
             batch_size=self.batch_size, 

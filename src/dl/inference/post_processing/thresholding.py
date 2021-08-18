@@ -6,7 +6,7 @@ from skimage.exposure import histogram
 from src.utils.mask_utils import to_inst_map, cv2_opening
 
 
-def naive_thresh_prob(prob_map: np.ndarray, threshold: float = 0.5, **kwargs) -> np.ndarray:
+def naive_thresh_prob(prob_map: np.ndarray, threshold: float=0.5, **kwargs) -> np.ndarray:
     """
     Threshold a sigmoid/softmax activated soft mask.
 
@@ -16,6 +16,10 @@ def naive_thresh_prob(prob_map: np.ndarray, threshold: float = 0.5, **kwargs) ->
             Soft mask to be thresholded. Shape (H, W)
         threshold (float, default=0.5): 
             Thresholding cutoff between [0, 1]
+
+    Returns:
+    -----------
+        np.ndarray. Thresholded soft mask. Shape (H, W).
     """
     assert 0 <= threshold <= 1, f"thresh = {threshold}. given threshold not between [0,1]"
     seg = prob_map.copy()
@@ -24,7 +28,7 @@ def naive_thresh_prob(prob_map: np.ndarray, threshold: float = 0.5, **kwargs) ->
     return inst_map
 
 
-def naive_thresh(prob_map: np.ndarray, threshold: int = 2, **kwargs) -> np.ndarray:
+def naive_thresh(prob_map: np.ndarray, threshold: int=2, **kwargs) -> np.ndarray:
     """
     Threshold a soft mask. Values can be logits or probabilites
 
@@ -34,6 +38,10 @@ def naive_thresh(prob_map: np.ndarray, threshold: int = 2, **kwargs) -> np.ndarr
             Soft mask to be thresholded. Shape (H, W)
         threshold (int, default=2): 
             Value used to divide the max value of the mask
+
+    Returns:
+    -----------
+        np.ndarray. Thresholded soft mask. Shape (H, W).
     """
     seg = prob_map.copy()
     seg[seg < np.amax(prob_map)/threshold] = 0
@@ -42,7 +50,7 @@ def naive_thresh(prob_map: np.ndarray, threshold: int = 2, **kwargs) -> np.ndarr
     return inst_map
 
 
-def niblack_thresh(prob_map: np.ndarray, win_size: int = 13, **kwargs) -> np.ndarray:
+def niblack_thresh(prob_map: np.ndarray, win_size: int=13, **kwargs) -> np.ndarray:
     """
     Wrapper for skimage niblack thresholding method
     https://scikit-image.org/docs/stable/auto_examples/segmentation/plot_niblack_sauvola.html
@@ -53,6 +61,10 @@ def niblack_thresh(prob_map: np.ndarray, win_size: int = 13, **kwargs) -> np.nda
             Soft mask to be thresholded. Shape (H, W)
         win_size (int, default=13): 
             Size of the window used in the thresholding algorithm
+
+    Returns:
+    -----------
+        np.ndarray. Thresholded soft mask. Shape (H, W).
     """
     thresh = filters.threshold_niblack(prob_map, window_size=win_size)
     mask = prob_map > thresh
@@ -72,6 +84,10 @@ def sauvola_thresh(prob_map: np.ndarray, win_size: int=33, **kwargs) -> np.ndarr
             Soft mask to be thresholded. Shape (H, W)
         win_size (int, default=33):
             Size of the window used in the thresholding algorithm
+
+    Returns:
+    -----------
+        np.ndarray. Thresholded soft mask. Shape (H, W).
     """
     thresh = filters.threshold_sauvola(prob_map, window_size=win_size)
     mask = prob_map > thresh
@@ -89,6 +105,10 @@ def morph_chan_vese_thresh(prob_map: np.ndarray, **kwargs) -> np.ndarray:
     -----------
         prob_map (np.ndarray): 
             soft mask to be thresholded. Shape (H, W)
+
+    Returns:
+    -----------
+        np.ndarray. Thresholded soft mask. Shape (H, W).
     """
     init_ls = segm.checkerboard_level_set(prob_map.shape, 2)
     ls = segm.morphological_chan_vese(prob_map, 35, smoothing=1, init_level_set=init_ls)
@@ -111,12 +131,13 @@ def argmax(prob_map: np.ndarray, **kwargs) -> np.ndarray:
             The probability map of shape (H, W, C)
 
     Returns:
-        a mask of indices shaped (H, W)
+    -----------
+        a mask of argmax indices. Shape (H, W)
     """
     return to_inst_map(np.argmax(prob_map, axis=2))
 
 
-def smoothed_thresh(prob_map: np.ndarray, eps: float = 0.01, **kwargs) -> np.ndarray:
+def smoothed_thresh(prob_map: np.ndarray, eps: float=0.01, **kwargs) -> np.ndarray:
     """
     Thresholding probability map after it has been smoothed with gaussian differences
     After dog the prob_map histogram has a notable discontinuity which can be found by
@@ -127,9 +148,13 @@ def smoothed_thresh(prob_map: np.ndarray, eps: float = 0.01, **kwargs) -> np.nda
     -----------
         prob_map (np.ndarray): 
             Soft mask to be thresholded. Shape (H, W)
-        eps (int): 
+        eps (float, default=0.01): 
             Small increase the threshold, since the hist center
             often not optimal
+
+    Returns:
+    -----------
+        np.ndarray. Thresholded soft mask. Shape (H, W).
     """
     # Find the steepest drop in the histogram
     hist, hist_centers = histogram(prob_map)

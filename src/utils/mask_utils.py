@@ -235,6 +235,10 @@ def bounding_box(inst_map: np.ndarray) -> List[int]:
     ----------
         inst_map (np.ndarray): 
             Instance labels
+
+    Returns:
+    ----------
+        List of the origin- and end-point coordinates of the bbox
     """
     rows = np.any(inst_map, axis=1)
     cols = np.any(inst_map, axis=0)
@@ -358,7 +362,11 @@ def get_type_instances(inst_map: np.ndarray, type_map: np.ndarray, class_num: in
         type_map (np.ndarray): 
             Type map of shape (H, W). Labels are indices.
         class_num (int): 
-            Class label  
+            Class label
+    
+    Returns:
+    ----------
+        np.ndarray of shape (H, W) where the values equalling 'class_num' are dropped
     """
     t = type_map.astype("uint8") == class_num
     imap = np.copy(inst_map)
@@ -376,6 +384,10 @@ def one_hot(type_map: np.ndarray, num_classes: int) -> np.ndarray:
             Type map of shape (H, W). Labels are indices.
         num_classes (int): 
             Number of classes in the dataset
+
+    Returns:
+    -----------
+        np.ndarray of the input array (H, W) in one hot format (H, W, num_classes).
     """
     return np.eye(num_classes+1)[type_map]
 
@@ -389,6 +401,10 @@ def type_map_flatten(type_map: np.ndarray) -> np.ndarray:
     -----------
         type_map (np.ndarray): 
             Type map to be flattened
+
+    Returns
+    -----------
+        Flattened one hot np.ndarray. I.e. (H, W, C) --> (H, W)
     """
     type_out = np.zeros([type_map.shape[0], type_map.shape[1]])
     for t in np.unique(type_map):
@@ -425,7 +441,6 @@ def to_inst_map(binary_mask: np.ndarray) -> np.ndarray:
 def cv2_opening(inst_map: np.ndarray, iterations: int = 2) -> np.ndarray:
     """
     Takes in an inst_map -> binarize -> apply morphological opening (2 iterations) -> label
-    Seems to increase segmentation metrics
 
     Args:
     -----------
@@ -433,6 +448,10 @@ def cv2_opening(inst_map: np.ndarray, iterations: int = 2) -> np.ndarray:
             Instance map to be opened. Shape (H, W)
         iterations (int, default=2):
             Number of iterations for the operation
+
+    Returns:
+    -----------
+        Morphologically opened np.ndarray of shape (H, W)
     """
     inst_map = binarize(inst_map)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5))
@@ -452,6 +471,10 @@ def cv2_closing(inst_map: np.ndarray, iterations: int = 2) -> np.ndarray:
             Instance map to be opened. Shape (H, W)
         iterations (int, default=2): 
             Number of iterations for the operation
+
+    Returns:
+    -----------
+        Morphologically closed np.ndarray of shape (H, W)
     """
     inst_map = binarize(inst_map)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5,5))
@@ -463,7 +486,7 @@ def cv2_closing(inst_map: np.ndarray, iterations: int = 2) -> np.ndarray:
 
 def remove_debris(inst_map: np.ndarray, min_size: int = 10):
     """
-    Remove small objects from an inst map
+    (Actually) Remove small objects from an inst map
 
     Args:
     ------------
@@ -471,6 +494,10 @@ def remove_debris(inst_map: np.ndarray, min_size: int = 10):
             Instance map
         min_size (int, default=10): 
             Min size for the objects that are left untouched
+
+    Returns:
+    -----------
+        Cleaned np.ndarray of shape (H, W)
     """
     res = np.zeros(inst_map.shape, np.int32)
     for ix in np.unique(inst_map)[1:]:

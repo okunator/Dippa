@@ -35,6 +35,10 @@ class WeightedBaseLoss(nn.Module):
                 Pixelwise losses tensor of shape (B, H, W)
             Target (torch.Tensor): 
                 target mask. Shape (B, H, W)
+
+        Returns:
+        ----------
+            torch.Tensor. The loss matrix scaled with the weight matrix. Shape (B, H, W).
         """
         # add weights
         weight_mat = self.class_weights[target].to(target.device)
@@ -46,8 +50,7 @@ class WeightedBaseLoss(nn.Module):
                            loss_matrix: torch.Tensor,
                            weight_map: torch.Tensor) -> torch.Tensor:
         """
-        Create edge weights by computing edge_weight**weight_map and add those weights to the
-        loss _matrix
+        Apply weights to the nuclear boundaries by computing edge_weight**weight_map 
 
         Args:
         ----------
@@ -55,5 +58,9 @@ class WeightedBaseLoss(nn.Module):
                 Pixelwise losses tensor of shape (B, C, H, W)
             weight_map (torch.Tensor):
                 Map that points to the pixels that will be weighted. Shape (B, H, W)
+
+        Returns:
+        ----------
+            torch.Tensor. The loss matrix scaled with the nuclear boundary weights. Shape (B, H, W).
         """
         return loss_matrix*self.edge_weight**weight_map

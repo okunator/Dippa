@@ -31,9 +31,23 @@ pip install -U pip
 pip install -r requirements.txt
 ```
 
-Intructions to run coming later...
+## Training Example
 
-## experiment.yml
+ 1. modify the experiment.yml file
+ 2. Train the model. (See the notebooks)
+
+```python
+import src.dl.lightning as lightning
+from src.config import CONFIG
+
+config = CONFIG
+lightning_model = lightning.SegModel.from_conf(config)
+trainer = lightning.SegTrainer.from_conf(config)
+
+trainer.fit(lightning_model)
+```
+
+### experiment.yml
 
 ```yaml
 experiment_args:
@@ -110,6 +124,43 @@ runtime_args:
   model_input_size: 256           # size of the model input (input_size, input_size)
   db_type: hdf5                   # The type of the input data db. One of (hdf5, zarr). 
 
+```
+
+## Inference Example
+
+1. Run inference script. (See notebooks)
+
+```python
+from src.dl.inference.inferer import Inferer
+import src.dl.lightning as lightning
+from src.config import CONFIG
+
+in_dir = "my_input_dir" # input directory for the image files
+exp_name = "ovca" # name of the experiment (directory)
+exp_version = "full" # name of the experiment version (sub directory inside the experiment dir)
+lightning_model = lightning.SegModel.from_experiment(name=exp_name, version=exp_version)
+
+inferer = Inferer(
+    lightning_model,
+    in_data_dir=in_dir,
+    patch_size=(256, 256),
+    stride_size=80,
+    fn_pattern="*",
+    model_weights="last",
+    apply_weights=True,
+    post_proc_method="cellpose",
+    loader_batch_size=1,
+    loader_num_workers=1,
+    model_batch_size=16,
+    n_images=32,
+    auto_range=True
+)
+
+inferer.run_inference(
+    save_dir=".../geojson",
+    fformat="geojson",
+    offsets=True
+)
 ```
 
 Borrowing functions and utilities from:

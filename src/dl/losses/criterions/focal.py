@@ -53,7 +53,7 @@ class WeightedFocalLoss(WeightedBaseLoss):
 
         Returns:
         ----------
-            torch.Tensor: computed focal loss (scalar)
+            torch.Tensor. Computed focal loss (scalar)
         """
 
         input_soft = F.softmax(yhat, dim=1) + self.eps

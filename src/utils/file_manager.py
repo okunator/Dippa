@@ -112,6 +112,7 @@ class FileHandler:
         return sorted([x.as_posix() for x in path.glob(f"*{file_suffix}")])
 
 
+# TODO: REWRITE
 class FileManager(FileHandler):
     def __init__(self,
                  experiment_name: str,

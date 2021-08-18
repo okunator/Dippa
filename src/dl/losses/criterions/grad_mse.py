@@ -14,7 +14,12 @@ def grad_mse(yhat: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         yhat (torch.Tensor): 
             Input tensor of size (B, 2, H, W). Regressed HoVer map 
         target (torch.Tensor): 
-            Target tensor of shape (B, 2, H, W). Contains GT HoVer-maps 
+            Target tensor of shape (B, 2, H, W). Contains GT HoVer-maps
+
+    Returns:
+    ----------
+        torch.Tensor. Computed gradient mse loss matrix. Shape (B, H, W)
+
     """
     kernel = sobel_hv(window_size = 5, device=yhat.device)
     grad_yhat = filter2D(yhat, kernel)
@@ -50,6 +55,10 @@ class GradMSE(nn.Module):
             target_inst (torch.Tensor): 
                 Target for instance segmentation used to focus loss to the
                 correct nucleis. Shape (B, H, W)
+
+        Returns:
+        ----------
+            torch.Tensor. Computed gradient mse loss (scalar)
         """
         focus = torch.stack([target_inst, target_inst], dim=1)
         loss = focus*grad_mse(yhat, target)

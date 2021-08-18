@@ -3,6 +3,7 @@ import torch
 import itertools
 import scipy.io
 import numpy as np
+import pandas as pd
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, Dataset
 from typing import Tuple, List, Dict, Iterable, Union, Optional, Iterable
@@ -31,7 +32,7 @@ class FolderDataset(Dataset, FileHandler):
                  xmax: Optional[int]=None,
                  ymax: Optional[int]=None,
                  auto_range: bool=False,
-                 tile_size: Optional[Tuple[int, int]]=(1000, 1000)):
+                 tile_size: Optional[Tuple[int, int]]=(1000, 1000)) -> None:
         """
         Simple pytorch folder dataset. Assumes that
         folder_path contains only image files which are readable
@@ -117,7 +118,7 @@ class FolderDataset(Dataset, FileHandler):
 
         Returns:
         --------
-            The start and end point of the tissue section in the specified direction
+            Tuple[int, int]. The start and end point of the tissue section in the specified direction
         """
         ix = 1 if coord == "y" else 0
         coords = sorted(set([self._get_xy_coords(f.name)[ix] for f in self.fnames]))
@@ -161,7 +162,7 @@ class Inferer:
                  model_weights: str="last",
                  loader_batch_size: int=8,
                  loader_num_workers: int=8,
-                 patch_size: Tuple[int]=(256, 256),
+                 patch_size: Tuple[int, int]=(256, 256),
                  stride_size: int=128,
                  model_batch_size: int=None,
                  thresh_method: str="naive",
@@ -205,7 +206,7 @@ class Inferer:
                 during the forward pass of the model.
             loader_num_workers (int, default=8):
                 Number of threads/workers for torch dataloader
-            patch_size (Tuple[int], default=(256, 256)):
+            patch_size (Tuple[int, int], default=(256, 256)):
                 The size of the input patches that are fed to the segmentation model.
             stride_size (int, default=128):
                 If input images are larger than the model input image size (patch_size), the images 
@@ -524,7 +525,7 @@ class Inferer:
 
         return maps
 
-    def _chunks(self, iterable: Iterable, size: int):
+    def _chunks(self, iterable: Iterable, size: int) -> Iterable:
         """
         Generate adjacent chunks of an iterable 
         
@@ -535,7 +536,11 @@ class Inferer:
             iterable (Iterable):
                 Input iterable (FolderDataset)
             size (int):
-                size of one chunk. 
+                size of one chunk.
+
+        Returns:
+        ---------
+            Iterable chunk of filenames
         """
         it = iter(iterable)
         return iter(lambda: tuple(itertools.islice(it, size)), ())
@@ -664,9 +669,21 @@ class Inferer:
                     self.type_maps.clear()
                     torch.cuda.empty_cache()
 
-    def benchmark_insts(self, pattern_list: List[str]=None, file_prefix:str=""):
+    def benchmark_insts(self, pattern_list: Optional[List[str]]=None, file_prefix: Optional[str]="") -> pd.DataFrame:
         """
-        Run benchmarikng metrics for only instance maps 
+        Run benchmarikng metrics for only instance maps and save them into a csv file.
+        The file is written into the "results" directory of the repositoy.
+
+        Args:
+        ---------
+            pattern_list (List[str], optional, default=None):
+                A list of string patterns used for filtering files in the input data folder
+            file_prefix (str, optional, default=""):
+                prefix to give to the csv filename that contains the benchmarking results
+
+        Returns:
+        ----------
+            pd.DataFrame containing the benchmarking results
         """
         assert "inst_maps" in self.__dict__.keys(), "No instance maps found, run inference and post proc first."
         assert self.gt_mask_dir is not None, f"gt_mask_dir is None. Benchmarking only with consep, kumar, pannuke"
@@ -686,9 +703,21 @@ class Inferer:
         return scores
 
 
-    def benchmark_types(self, pattern_list: List[str]=None, file_prefix:str=""):
+    def benchmark_types(self, pattern_list: Optional[List[str]]=None, file_prefix: Optional[str]="") -> pd.DataFrame:
         """
-        Run benchmarking for type maps
+        Run benchmarking for inst_maps & type maps and save them into a csv file.
+        The file is written into the "results" directory of the repositoy.
+
+        Args:
+        ---------
+            pattern_list (List[str], optional, default=None):
+                A list of string patterns used for filtering files in the input data folder
+            file_prefix (str, optional, default=""):
+                prefix to give to the csv filename that contains the benchmarking results
+
+        Returns:
+        ----------
+            pd.DataFrame containing the benchmarking results
         """
         assert "inst_maps" in self.__dict__.keys(), "No instance maps found, run inference and post proc first."
         assert "type_maps" in self.__dict__.keys(), "No type maps found, run inference and post proc first."

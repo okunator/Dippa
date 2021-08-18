@@ -1,3 +1,4 @@
+import albumentations as A
 from typing import List, Optional
 from torch.utils.data import Dataset
 
@@ -20,14 +21,19 @@ class DatasetBuilder:
         self.ds_name = decoder_aux_branch if decoder_aux_branch is not None else "unet"
         assert self.ds_name in ("hover", "dist", "contour", "unet", "basic")
 
-    def get_augs(self, augs_list: Optional[List[str]] = None):
+    def get_augs(self, augs_list: Optional[List[str]]=None) -> A.Compose:
         """
         Compose the augmentations in config.py to a augmentation pipeline
 
         Args:
         -----------
-            augs_list (List[str], optional): 
-                List of augmentations specified in config.py
+            augs_list (List[str], optional, default=None): 
+                List of augmentations specified in config.py. 
+                If None, then no augmentations are used
+
+        Returns:
+        -----------
+            A.Compose object containing the albumentations augmentations.
         """
         kwargs={"height":256, "width":256}
         aug_list = [ds.__dict__[ds.AUGS_LOOKUP[aug_name]](**kwargs) for aug_name in augs_list] if augs_list else []
@@ -56,6 +62,10 @@ class DatasetBuilder:
                 is used in the dataloader.
             normalize_input (bool, default=True):
                 If True, channel-wise normalization for the input images is applied.
+
+        Returns:
+        ------------
+            torch.utils.data.Dataset. Initialized torch Dataset object 
         """
         c = cls(decoder_aux_branch)
         aug = c.get_augs(augmentations)
@@ -78,6 +88,10 @@ class DatasetBuilder:
                 is used in the dataloader.
             normalize_input (bool, default=True):
                 If True, channel-wise normalization for the input images is applied.
+
+        Returns:
+        ------------
+            torch.utils.data.Dataset. Initialized torch Dataset object 
         """
         c = cls(decoder_aux_branch)
         aug = c.get_augs()

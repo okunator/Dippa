@@ -46,8 +46,7 @@ class WeightedCELoss(WeightedBaseLoss):
 
         Returns:
         ----------
-            torch.Tensor:
-                computed CE loss (scalar)
+            torch.Tensor. computed CE loss (scalar)
         """
         loss = self.loss(yhat, target)
 

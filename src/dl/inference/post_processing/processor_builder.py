@@ -1,4 +1,5 @@
 import src.dl.inference.post_processing as post_proc
+from .base_processor import PostProcessor
 
 
 class PostProcBuilder:
@@ -9,7 +10,7 @@ class PostProcBuilder:
     def set_postprocessor(cls, 
                           post_proc_method: str,
                           thresh_method: str="naive",
-                          thresh: float=0.5):
+                          thresh: float=0.5) -> PostProcessor:
         """
         Init the post-processor
 
@@ -22,7 +23,11 @@ class PostProcBuilder:
                 Thresholding method for the soft masks from the instance branch.
                 One of ("naive", "argmax", "sauvola", "niblack")).
             thresh (float, default = 0.5): 
-                threshold probability value. Only used if method == "naive"  
+                threshold probability value. Only used if method == "naive"
+
+        Returns:
+        ----------
+            Initialized PostProcessor instance.
         """
         assert post_proc_method in ("drfns", "dcan", "dran", "cellpose", "hover", "basic")
         c = cls()

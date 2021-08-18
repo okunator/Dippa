@@ -6,7 +6,7 @@ from typing import Optional
 
 def confusion_mat(yhat: torch.Tensor, 
                   target: torch.Tensor, 
-                  activation: Optional[str] = None) -> torch.Tensor:
+                  activation: Optional[str]=None) -> torch.Tensor:
     """
     Computes confusion matrix from the soft mask and target tensor
 
@@ -51,8 +51,8 @@ def confusion_mat(yhat: torch.Tensor,
 
 def iou(yhat: torch.Tensor, 
         target: torch.Tensor,
-        activation: Optional[str] = None,
-        eps: Optional[float] = 1e-7) -> torch.Tensor:
+        activation: Optional[str]=None,
+        eps: Optional[float]=1e-7) -> torch.Tensor:
     """
     Compute the per class intersection over union for dense predictions
 
@@ -82,8 +82,8 @@ def iou(yhat: torch.Tensor,
 
 def accuracy(yhat: torch.Tensor,
              target: torch.Tensor,
-             activation: Optional[str] = None,
-             eps: float = 1e-7) -> torch.Tensor:
+             activation: Optional[str]=None,
+             eps: float=1e-7) -> torch.Tensor:
     """
     Compute the per class accuracy for dense predictions
 

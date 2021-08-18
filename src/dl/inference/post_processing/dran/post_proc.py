@@ -26,7 +26,7 @@ def post_proc_dran(prob_map: np.ndarray, contour_map: np.ndarray) -> np.ndarray:
 
     Returns:
     ----------
-        np.ndarray: post-processed inst map
+        np.ndarray: post-processed inst map. Shape (H, W)
     """
     # Thresh the contour map and dilate
     contour = percentile_normalize_and_clamp(contour_map, a_min=0, a_max=1)

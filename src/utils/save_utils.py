@@ -31,6 +31,10 @@ def poly2mask(contour: np.ndarray, shape: Tuple[int], x_off: int=None, y_off: in
             the amount of translation/offset that is encoded into the x-coord in the geojson
         y_off (int, default=None):
             the amount of translation/offset that is encoded into the y-coord in the geojson
+
+    Returns:
+    ---------
+        np.ndarray of shape (H, W)
     """
     nuc = np.asarray(contour) # gdp contour = xy-coord. Need to flip
 
@@ -48,6 +52,9 @@ def mask2mat(inst_map: np.ndarray,
              save_dir: Union[str, Path]=None) -> None:
     """
     Convert one set of NN output masks into a .mat file
+    that contain (key, value) pairs. 
+    
+    Keys: "inst_map", "type_map", "inst_type", "inst_centroid", "inst_bbox" 
 
     Args:
     ---------

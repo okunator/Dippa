@@ -9,9 +9,8 @@ from .mask_utils import bounding_box
 
 
 KEY_COLORS = {
-    # consep classes:
     "background": (255., 255., 255.),
-    "miscellanous": (0., 200., 100.),  # miscellanous
+    "miscellanous": (0., 200., 100.),
     "inflammatory": (165., 255., 255.),
     "epithelial": (255., 255., 0.),
     "spindle": (255., 0., 0.),
@@ -20,77 +19,62 @@ KEY_COLORS = {
     "fibroblast": (0., 255., 0.),
     "muscle": (0., 255., 255.),
     "endothelial": (200., 30., 20.),
-    # pannuke classes
     "neoplastic": (0., 200., 100.),
     "connective": (255., 0., 0.),
     "dead": (255., 0., 255.),
     "nuclei":(255., 0., 0.)
 }
 
-# ported from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
-def random_colors(N: int, bright: bool = True) -> List[Tuple[float]]:
-    """
-    Generate random colors.
-    To get visually distinct colors, generate them in HSV space then
-    convert to RGB.
-    Args:
-        N (int): number of unique instances in the inst map
-        bright (bool): If True brightness is higher
-    Returns:
-        List of rgb color tuples
-    """
-    brightness = 1.0 if bright else 0.7
-    hsv = [(i / N, 1, brightness) for i in range(N)]
-    colors = list(map(lambda c: colorsys.hsv_to_rgb(*c), hsv))
-    random.shuffle(colors)
 
-    return colors
-
-# ported from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
-# minor mods
-def draw_contours(label: np.ndarray, 
+# Adapted from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
+def draw_contours(inst_map: np.ndarray, 
                   image: np.ndarray,
-                  type_map: Optional[np.ndarray] = None,
-                  fill_contours: Optional[bool] = False,
-                  thickness: Optional[int] = 2,
-                  classes: Optional[Dict[str, int]] = None) -> Tuple[np.ndarray]:
+                  type_map: Optional[np.ndarray]=None,
+                  fill_contours: Optional[bool]=False,
+                  thickness: int=2,
+                  classes: Optional[Dict[str, int]]=None) -> np.ndarray:
     """
     Find coloured contours for a mask and superimpose it on the original image
-    mask needs to be instance labelled.
+    mask needs to be instance inst_mapled.
 
-    Args: 
-        label (np.ndarray): inst_map
-        image (np.ndarray): image
-        type_map (np.ndarray): type_map
-        fill_contours (bool): If True, contours are filled
-        thickness (int): thickness ofthe contour line,
-        classes (Dict[str, int]): classes dict e.g. {background:0, epithelial:1, ...}
+    Args:
+    ---------
+        inst_map (np.ndarray): 
+            Instance segmentation map. Shape (H, W).
+        image (np.ndarray): 
+            Original image
+        type_map (np.ndarray, optional, default=None): 
+            Semantic segmentation map. Shape (H, W)
+        fill_contours (bool, optional, default=False): 
+            If True, contours are filled
+        thickness (int, default=2): 
+            Thickness of the contour lines
+        classes (Dict[str, int], optional, default=None): c
+            lasses dict e.g. {background:0, epithelial:1, ...}
+    
     Returns:
-        The contours overlaid on top of original image.
+    ---------
+        np.ndarray. The contours overlaid on top of original image. Shape (H, W)
     """
     bg = np.copy(image)
     
-    shape = label.shape[:2]
-    nuc_list = list(np.unique(label))
+    shape = inst_map.shape[:2]
+    nuc_list = list(np.unique(inst_map))
     nuc_list.remove(0) # 0 is background
     
-    if type_map is None or classes is None:
-        inst_colors = random_colors(len(nuc_list))
-        inst_colors = np.array(inst_colors)
-
     for idx, nuc_id in enumerate(nuc_list): 
-        inst_map = np.array(label == nuc_id, np.uint8)
+        inst = np.array(inst_map == nuc_id, np.uint8)
         
-        y1, y2, x1, x2  = bounding_box(inst_map)
+        y1, y2, x1, x2  = bounding_box(inst)
         y1 = y1 - 2 if y1 - 2 >= 0 else y1 
         x1 = x1 - 2 if x1 - 2 >= 0 else x1 
         x2 = x2 + 2 if x2 + 2 <= shape[1] - 1 else x2 
         y2 = y2 + 2 if y2 + 2 <= shape[0] - 1 else y2
         
-        inst_map_crop = inst_map[y1:y2, x1:x2]
+        inst_crop = inst[y1:y2, x1:x2]
         inst_bg_crop = bg[y1:y2, x1:x2]
         contours, hierarchy = cv2.findContours(
-            inst_map_crop, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+            inst_crop, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
         
         # print(classes)
@@ -127,10 +111,13 @@ def viz_patches(patches: np.ndarray) -> Tuple[int]:
     or everything willl crash.
 
     Args:
-        patches (np.ndarray): numpy array of stacked image patches
+    ----------
+        patches (np.ndarray): 
+            numpy array of stacked image patches. Shape (n_patches, H, W, C)
 
     Returns:
-        Shape of the patches array (just for shit and giggles)
+    ----------
+        Shape of the patches array
     """
     fignum = 200
     low=0
@@ -154,10 +141,14 @@ def viz_instance(inst_map: np.ndarray, ix: int = 1) -> Tuple[int]:
     This function will visualize a single instance with id 'ix' from the 'inst_map'
 
     Args:
-        inst_map (np.ndarray): the instance map
-        ix (int): the index/id of an instance
+    ----------
+        inst_map (np.ndarray): 
+            the instance map
+        ix (int): 
+            the index/id of an instance
 
     Returns:
+    -----------
         Shape of the patches array
     """
 

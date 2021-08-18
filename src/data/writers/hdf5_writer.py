@@ -34,8 +34,7 @@ class HDF5Writer(BaseWriter):
             mask_dir (str or Path obj):
                 directory of the corresponding masks for the images. (Make sure the mask filenames
                 are the same or at least contain a part of the corresponding image file names. 
-                (Suffix of the mask file name can be different). Masks need to be stored in .mat files
-                that contain at least the key: "inst_map". Also the "type_map".
+                Masks need to be stored in .mat files that contain at least the key: "inst_map".
             save_dir (str, Path):
                 The directory, where the h5 array is written/saved.
             file_name (str):
@@ -61,8 +60,8 @@ class HDF5Writer(BaseWriter):
             crop_shape (Tuple[int], default=(256, 256)):
                 If rigid_augs_and_crop is True, this is the crop shape for the center crop. 
             chunk_size (int, default=1):
-                The chunk size of the zarr array. i.e. How many patches are included in
-                one read of the array.
+                The chunk size of the h5 array of shape: (num_patches, H, W, C). This param defines
+                the num_patches i.e. How many patches are included in one read of the array.
         """
         super(HDF5Writer, self).__init__()
         self.img_dir = Path(img_dir)
@@ -74,7 +73,7 @@ class HDF5Writer(BaseWriter):
         self.file_name = file_name
         self.chunk_size = chunk_size
         self.classes = classes
-        self.rac = rigid_augs_and_crop
+        self.rigid_augs_and_crop = rigid_augs_and_crop
         self.crop_shape = crop_shape
 
         if self.patch_shape is not None:
@@ -105,7 +104,7 @@ class HDF5Writer(BaseWriter):
         root._v_attrs.mask_dir = self.mask_dir.as_posix()
         root._v_attrs.classes = self.classes
 
-        ph, pw = self.patch_shape if not self.rac and self.patch_shape is not None else self.crop_shape
+        ph, pw = self.patch_shape if not self.rigid_augs_and_crop and self.patch_shape is not None else self.crop_shape
         imgs = h5.create_earray(
             where=root, 
             name="imgs", 
@@ -186,7 +185,7 @@ class HDF5Writer(BaseWriter):
                 else:
                     patches = full_data[None, ...]
 
-                if self.rac:
+                if self.self.rigid_augs_and_crop:
                     patches = self._augment_patches(
                         patches_im=patches[..., :3], 
                         patches_mask=patches[..., 3:],

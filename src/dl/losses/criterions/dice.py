@@ -30,7 +30,7 @@ class DiceLoss(nn.Module):
 
         Returns:
         ---------
-            torch.Tensor: computed DICE loss (scalar)
+            torch.Tensor. computed DICE loss (scalar)
         """
         
         # activation

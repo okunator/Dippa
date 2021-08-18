@@ -15,6 +15,10 @@ def ndarray_to_tensor(array: np.ndarray, dim_order: str="HWC", add_channel: bool
             numpy matrix of shape (H, W) or (H, W, C)
         dim_order (str, default="HWC"):
             The order of the dimensions in the tensor
+
+    Returns:
+    -----------
+        torch.Tensor. Shape (B, C, H, W).
     """
     assert isinstance(array, np.ndarray), f"Input type: {type(array)} is not np.ndarray"
     assert 1 < len(array.shape) <= 4, f"ndarray.shape {array.shape}, rank needs to be bw [2, 4]" 
@@ -38,8 +42,8 @@ def ndarray_to_tensor(array: np.ndarray, dim_order: str="HWC", add_channel: bool
 
 
 def tensor_to_ndarray(tensor: torch.Tensor, 
-                      channel: Optional[int] = None,
-                      squeeze: Optional[bool] = False) -> np.ndarray:
+                      channel: Optional[int]=None,
+                      squeeze: Optional[bool]=False) -> np.ndarray:
     """
     Convert img or network output tensor (B, C, H, W) or (B, H, W) to ndarray 
     of shape (B, H, W, C)|(B, H, W)|(H, W, C)|(H, W)
@@ -47,12 +51,16 @@ def tensor_to_ndarray(tensor: torch.Tensor,
     Args:
     ------------
         tensor (torch.Tensor): 
-            tensor of size (B, C, H, W)
+            tensor of shapes (B, C, H, W)
         channel (int, optional, default=None): 
             index of the channel dimension. If applied returns
             an array of shape (H, W)|(B, H, W)
         squeeze (bool, optional, default=False): 
             if batch size == 1. Squeeze it out. 
+    
+    Returns:
+    -----------
+        np.ndarray. Shape (B, H, W, C)|(B, H, W)|(H, W, C)|(H, W)
     """
     assert isinstance(tensor, torch.Tensor), f"Input type: {type(tensor)} is not torch.Tensor"
     assert 3 <= tensor.dim() <= 4, f"tensor needs to have shape (B, H, W) or (B, C, H, W). Shape {tensor.shape}"
@@ -75,7 +83,7 @@ def tensor_to_ndarray(tensor: torch.Tensor,
     return res_tensor
 
 
-def argmax_and_flatten(yhat: torch.Tensor, activation: Optional[str] = None) -> torch.Tensor:
+def argmax_and_flatten(yhat: torch.Tensor, activation: Optional[str]=None) -> torch.Tensor:
     """
     Get an output from a prediction by argmaxing a yhat of shape (B, C, H, W)
     and flatten the result to tensor of shape (1, n_pixels). Where each value represents
@@ -90,7 +98,8 @@ def argmax_and_flatten(yhat: torch.Tensor, activation: Optional[str] = None) -> 
 
     Returns:
     -----------
-         a tensor that can be inputted to different classification metrics. Shape (H, W)
+         torch.Tensor. Tensor that can be used as input to different classification metrics. 
+         Shape (H, W)
     """
     if activation is not None:
         assert activation in ("sigmoid", "softmax"), f"activation: {activation} sigmoid and softmax allowed."
@@ -110,6 +119,10 @@ def to_device(tensor: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
     -----------
         tensor (torch.Tensor or np.ndarray): 
             multi dim array to be pushed to gpu
+
+    Returns:
+    -----------
+        torch.Tensor. Same shape as input.
     """
     # TODO: implement other types too
     if isinstance(tensor, np.ndarray):
@@ -136,7 +149,7 @@ def one_hot(type_map: torch.Tensor, n_classes: int) -> torch.Tensor:
 
     Returns:
     -----------
-        torch.Tensor onet hot tensor from the type map of shape (B, C, H, W)
+        torch.Tensor one hot tensor from the type map of shape (B, C, H, W)
     """
     assert type_map.dtype == torch.int64, f"Wrong type_map dtype: {type_map.dtype}. Should be torch.int64"
     one_hot = torch.zeros(type_map.shape[0], n_classes, *type_map.shape[1:], device=type_map.device, dtype=type_map.dtype)

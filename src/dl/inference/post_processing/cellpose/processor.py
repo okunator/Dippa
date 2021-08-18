@@ -29,7 +29,7 @@ class CellposePostProcessor(PostProcessor):
         super(CellposePostProcessor, self).__init__(thresh_method, thresh)
         self.flows = OrderedDict()
 
-    def post_proc_pipeline(self, maps: List[np.ndarray]) -> Tuple[np.ndarray]:
+    def post_proc_pipeline(self, maps: List[np.ndarray]) -> Tuple[str, np.ndarray, np.ndarray]:
         """
         1. Threshold
         2. Post process instance map
@@ -39,6 +39,10 @@ class CellposePostProcessor(PostProcessor):
         -----------
             maps (List[np.ndarray]):
                 A list of the name of the file, soft masks, and hover maps from the network
+
+        Returns:
+        ----------
+            The filename (str), instance segmentation mask (H, W), semantic segmentation mask (H, W).
         """
         name = maps[0]
         prob_map = maps[1]
@@ -62,7 +66,7 @@ class CellposePostProcessor(PostProcessor):
     def run_post_processing(self,
                             inst_probs: Dict[str, np.ndarray],
                             aux_maps: Dict[str, np.ndarray],
-                            type_probs: Dict[str, np.ndarray]):
+                            type_probs: Dict[str, np.ndarray]) -> List[Tuple[str, np.ndarray, np.ndarray]]:
         """
         Run post processing for all predictions
 
@@ -78,6 +82,11 @@ class CellposePostProcessor(PostProcessor):
             type_probs (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, type map) pairs.
                 type maps are in one hot format (H, W, n_classes).
+
+        Returns:
+        -----------
+            A list of tuples containing filename, post-processed inst map and type map
+            e.g. ("filename1", inst_map: np.ndarray, type_map: np.ndarray)
         """
         # Set arguments for threading pool
         maps = list(zip(inst_probs.keys(), inst_probs.values(), aux_maps.values(), type_probs.values()))

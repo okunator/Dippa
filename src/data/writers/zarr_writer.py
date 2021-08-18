@@ -59,8 +59,8 @@ class ZarrWriter(BaseWriter):
             crop_shape (Tuple[int], default=(256, 256)):
                 If rigid_augs_and_crop is True, this is the crop shape for the center crop. 
             chunk_size (int, default=1):
-                The chunk size of the zarr array. i.e. How many patches are included in
-                one read of the array.
+                The chunk size of the zarr array of shape: (num_patches, H, W, C). This param defines
+                the num_patches i.e. How many patches are included in one read of the array.
             chunk_synchronization (bool: default=True):
                 Make chunks thread safe. No concurrent writes and reads to the same chunk.
         """
@@ -75,7 +75,7 @@ class ZarrWriter(BaseWriter):
         self.chunk_sync = chunk_synchronization
         self.chunk_size = chunk_size
         self.classes = classes
-        self.rac = rigid_augs_and_crop
+        self.rigid_augs_and_crop = rigid_augs_and_crop
         self.crop_shape = crop_shape
         
         if self.patch_shape is not None:
@@ -106,7 +106,7 @@ class ZarrWriter(BaseWriter):
         root.attrs["classes"] = self.classes
 
         # init zarrays for data
-        ph, pw = self.patch_shape if not self.rac and self.patch_shape is not None else self.crop_shape
+        ph, pw = self.patch_shape if not self.rigid_augs_and_crop and self.patch_shape is not None else self.crop_shape
         imgs = root.zeros(
             "imgs", 
             mode="w", 
@@ -186,7 +186,7 @@ class ZarrWriter(BaseWriter):
                 else:
                     patches = full_data[None, ...]
 
-                if self.rac:
+                if self.rigid_augs_and_crop:
                     patches = self._augment_patches(
                         patches_im=patches[..., :3], 
                         patches_mask=patches[..., 3:],

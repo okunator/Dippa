@@ -1,6 +1,7 @@
 
 import torch.nn as nn
 from torch.optim.optimizer import Optimizer
+from typing import List, Dict
 
 import src.dl.optimizers as optims
 
@@ -42,7 +43,7 @@ class OptimizerBuilder:
         self.bias_wd = bias_weight_decay
 
 
-    def adjust_optim_params(self):
+    def adjust_optim_params(self) -> List[Dict[str, Dict]]:
         """
         Adjust model parameters for optimizer. 
 
@@ -52,6 +53,10 @@ class OptimizerBuilder:
 
         "Bag of Tricks for Image Classification with Convolutional Neural Networks"
         https://arxiv.org/pdf/1812.01187
+
+        Returns:
+        ----------
+            A List containg kwargs (str, Dict pairs) for different optimizer related parameters 
         """
         
         params = list(self.model.named_parameters())
@@ -107,6 +112,10 @@ class OptimizerBuilder:
                 encoder weight decay
             bias_weight_decay (bool):
                 Flag whether to apply weight decay for biases.
+
+        Returns:
+        ----------
+            Optimizer. Initialized torch optimizer instance.
         """
         c = cls(
             model=model,

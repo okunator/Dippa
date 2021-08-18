@@ -23,7 +23,7 @@ def normalize(img: torch.Tensor, mean: np.ndarray, std: np.ndarray, to_uint8: bo
 
     Returns:
     ----------
-        Tensor: Normalized Tensor image.
+        Tensor: Normalized Tensor image. Same shape as input.
     """
     assert isinstance(img, torch.Tensor), f"input img needs to be a  tensor. Got {img.dtype}."
     assert img.ndim >= 3, f"img tensor shae should be either (C, H, W)|(B, C, H, W)"
@@ -81,7 +81,7 @@ def percentile_normalize_torch(img: torch.Tensor) -> torch.Tensor:
     
     Returns:
     -----------
-        torch.Tensor=Normalized image
+        torch.Tensor. Normalized image. Shape (C, H, W).
     """
     C, _, _ = img.shape
     img = img.float()
@@ -103,6 +103,10 @@ def minmax_normalize_torch(img: torch.Tensor) -> torch.Tensor:
     -----------
         img (torch.Tensor):
             input image tensor. shape (C, H, W).
+
+    Returns:
+    -----------
+        torch.Tensor. Minmax normalized image tensor. Shape (C, H, W).
     """
     C, _, _ = img.shape
     img = img.float()
@@ -124,6 +128,10 @@ def normalize_torch(img: torch.Tensor) -> torch.Tensor:
     -----------
         img (torch.Tensor):
             input image tensor. shape (C, H, W).
+
+    Returns:
+    -----------
+        torch.Tensor. Standardized image tensor. Shape (C, H, W).
     """
     img = img.float()
     chl_means = torch.mean(img.float(), dim=(1, 2))

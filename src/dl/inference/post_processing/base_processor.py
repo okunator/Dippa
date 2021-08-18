@@ -78,7 +78,7 @@ class PostProcessor(ABC):
             
         Returns:
         ----------
-            Thresholded integer valued mask (np.ndarray)
+            np.ndarray. Thresholded integer valued mask. Shape (H, W) 
         """
         kwargs = {}
         kwargs["prob_map"] = prob_map
@@ -108,7 +108,7 @@ class PostProcessor(ABC):
 
         Returns:
         -----------
-            The final combined prediction.
+            np.ndarray. The final combined inst_map+type_map prediction. Shape (H, W) 
         """
         types = np.argmax(type_map, axis=2)
         return combine_inst_semantic(inst_map, types)
@@ -126,7 +126,7 @@ class PostProcessor(ABC):
 
         Returns:
         ---------
-            np.ndarray cleaned up inst map. Same shape as input
+            np.ndarray cleaned up inst map. Shape (H, W)
         """
         return remove_debris(inst_map, min_size)
 

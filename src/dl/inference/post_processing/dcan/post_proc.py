@@ -20,6 +20,10 @@ def post_proc_dcan(prob_map: np.ndarray, contour_map: np.ndarray) -> np.ndarray:
             Probablilty map of the nuclei. Shape (H, W)
         contour_map (np.ndarray):
             Prediction from the contour branch of the network. Shape (H, W)
+
+    Returns:
+    ----------
+        np.ndarray post-processed labelled inst_map. Shape (H, W)
     """
     contour_map = percentile_normalize_and_clamp(contour_map)
     sub = prob_map - contour_map

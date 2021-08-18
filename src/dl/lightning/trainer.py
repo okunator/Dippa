@@ -14,7 +14,7 @@ class SegTrainer:
                  num_gpus: int,
                  num_epochs: int,
                  resume_training: bool,
-                 extra_callbacks: List[pl.Callback] = None) -> None:
+                 extra_callbacks: List[pl.Callback]=None) -> None:
         """
         Initializes lightning trainer based on the experiment.yml
 
@@ -74,7 +74,21 @@ class SegTrainer:
         self.logging_dir = fm.experiment_dir / "tf"
 
     @classmethod
-    def from_conf(cls, conf: DictConfig, extra_callbacks: List[pl.Callback] = None, **kwargs):
+    def from_conf(cls, conf: DictConfig, extra_callbacks: List[pl.Callback]=None, **kwargs) -> SegTrainer:
+        """
+        Class method to initialize the class from experiment.yml config file
+
+        Args:
+        --------
+            conf (omegaconf.DictConfig):
+                The experiment.yml file (converted into DictConfig).
+            extra_callback (List[pl.Callback], default=None):
+                List of extra callbacks to add to the Trainer
+        
+        Returns:
+        --------
+            The SegTrainer instance.
+        """
         experiment_name = conf.experiment_args.experiment_name
         experiment_version = conf.experiment_args.experiment_version
         num_gpus = conf.runtime_args.num_gpus

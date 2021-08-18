@@ -282,14 +282,14 @@ def inv_dist_watershed(inst_map: np.ndarray, win_size: int = 13, **kwargs) -> np
     Args:
     ----------
         inst_map (np.ndarray): 
-            The instance map to be segmented
+            The instance map to be segmented. Shape (H, W)
         win_size (int, default=13): 
             window size used in niblack thresholding the 
             distance maps to find markers for watershed
 
     Returns:
     ----------
-        np.ndarray: post-processed labelled inst_map
+        np.ndarray: post-processed labelled inst_map. Shape (H, W)
     """
     
     seg = np.copy(inst_map)

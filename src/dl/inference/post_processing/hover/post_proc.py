@@ -42,8 +42,7 @@ from src.utils.mask_utils import (
 )
 
 
-# ported from: https: // github.com/vqdang/hover_net/blob/master/src/postproc/hover.py 
-# Very slightly modified 
+# Adapted from: https: // github.com/vqdang/hover_net/blob/master/src/postproc/hover.py 
 def post_proc_hover(inst_map: np.ndarray, 
                     aux_map: np.ndarray,
                     enhance: bool=True,
@@ -63,7 +62,7 @@ def post_proc_hover(inst_map: np.ndarray,
 
     Returns:
     -----------
-        np.ndarray that is processed in the same way as in 
+        np.ndarray post-processed inst map. Shape (H, W)
     """
 
     inst_map = binarize(inst_map)
@@ -107,7 +106,7 @@ def post_proc_hover(inst_map: np.ndarray,
     return inst_map 
 
 
-# Treid to do some mods to the original. Not as quite good...
+# Not worth it!
 def post_proc_hover2(aux_map: np.ndarray, inst_map: np.ndarray, sigma: float = 2.0, **kwargs):
     """
     Post processing pipeline to combine hover branch output and instance segmentation branch output.
@@ -120,9 +119,8 @@ def post_proc_hover2(aux_map: np.ndarray, inst_map: np.ndarray, sigma: float = 2
             Shape: (H, W, 2). hover_maps[..., 0] = xmap, hover_maps[..., 1] = ymap
 
     Returns:
-    ----------
-        np.ndarray that is processed similarly as in github.com/vqdang/hover_net/blob/master/src/postproc/hover.py
-        and then a little further
+    -----------
+        np.ndarray: post-processed inst map. Shape (H, W)
     """
 
     hdir = cv2.normalize(aux_map[..., 0], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)

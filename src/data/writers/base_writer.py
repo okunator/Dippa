@@ -51,8 +51,9 @@ class BaseWriter(ABC, FileHandler):
                          crop_shape: Tuple[int]=(256, 256)) -> Tuple[np.ndarray]:
         """
         Rotations, flips and other rigid augmentations followed by a center crop.
-        Big images can kill the datalaoding performance, so it's worth to apply rigid 
-        augs and crop already in here rather than in the dataset class. 
+        Rigid augmentations on large images can kill the datalaoding performance, 
+        so it's worth to apply rigid augmentations and crop beforehand rather when
+        loading data with the dataloader. 
 
         Args:
         ---------

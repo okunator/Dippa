@@ -15,7 +15,7 @@ class TilerStitcherTorch:
                  padding: bool=True) -> None:
         """
         Patch extractor and stitcher class. Operates on batched torch tensors.
-        Input images can be given as DataLoader batches.
+        I.e tensors of shape: (B, C, H, W)
         
         Follows this discussion:
         https://discuss.pytorch.org/t/how-to-split-tensors-with-overlap-and-then-reconstruct-the-original-tensor/70261/12

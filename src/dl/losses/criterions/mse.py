@@ -6,7 +6,7 @@ import torch.nn.functional as F
 # Quick MSE wrapper
 
 class MSE(nn.Module):
-    def __init__(self, reduction: str = "mean", **kwargs):
+    def __init__(self, reduction: str="mean", **kwargs):
         """
         Quick wrapper class for torch MSE
 
@@ -27,5 +27,9 @@ class MSE(nn.Module):
             target (torch.Tensor): 
                 Target tensor of size (B, H, W), where values 
                 of a vector correspond to class index
+
+        Returns:
+        ----------
+            torch.Tensor. Computed mse loss (scalar or pixelwise matrix)
         """
         return F.mse_loss(yhat, target, reduction=self.reduction)
