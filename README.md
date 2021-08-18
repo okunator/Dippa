@@ -1,8 +1,15 @@
 # Dippa
-(Master's thesis) Work in progress...
+[Master's thesis](https://aaltodoc.aalto.fi/handle/123456789/108225) code repository (Aalto University)
+
 Benchmarking framework for nuclei segmentation models.
-Easy model building and training with single .yml file.
-Using encoders from: [segmentation_models_pytorch](https://github.com/qubvel/segmentation_models.pytorch). 
+Using encoders from: [segmentation_models_pytorch](https://github.com/qubvel/segmentation_models.pytorch)
+Borrowing functions and utilities from [HoVer-Net repository](https://github.com/vqdang/hover_net)
+
+## Contains
+ - Easy model building and training with single .yml file.
+ - Image patching
+ - Inference
+ - Benchmarking  
 
 ## Download scripts for datasets
 * [x] [Kumar](https://ieeexplore.ieee.org/document/7872382) (Kumar et al.)
@@ -32,9 +39,23 @@ pip install -r requirements.txt
 ```
 
 ## Training Example
+ 
+ 1. Download a dataset
+ 2. modify the **experiment.yml** file
+ 3. Train the model. (See the notebooks)
 
- 1. modify the experiment.yml file
- 2. Train the model. (See the notebooks)
+### Download script
+```python
+from src.config import CONFIG
+from src.dl.lightning import PannukeDataModule
+
+config = CONFIG
+pannuke_module = PannukeDataModule.from_conf(config) # Download Pannuke
+pannuke_module.prepare_data()
+pannuke_module.setup(stage="fit")
+```
+
+### Training Script 
 
 ```python
 import src.dl.lightning as lightning
@@ -162,11 +183,6 @@ inferer.run_inference(
     offsets=True
 )
 ```
-
-Borrowing functions and utilities from:
-
-- HoVer-Net [repository](https://github.com/vqdang/hover_net)
-
 
 ## References
 
