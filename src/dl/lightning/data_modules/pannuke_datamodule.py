@@ -5,6 +5,7 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader, Dataset
 
 from src.data import PANNUKE, HDF5Writer, ZarrWriter
+from src.dl.datasets import AUGS_LOOKUP
 from src.dl.datasets.dataset_builder import DatasetBuilder
 from src.settings import DATA_DIR, PATCH_DIR
 
@@ -12,11 +13,11 @@ from src.settings import DATA_DIR, PATCH_DIR
 class PannukeDataModule(pl.LightningDataModule):
     def __init__(self, 
                  database_type: str,
-                 augmentations: List[str],
-                 normalize: bool,
-                 aux_branch: str,
-                 batch_size: int,
-                 num_workers: int,
+                 augmentations: List[str]=["hue_sat", "non_rigid", "blur"],
+                 normalize: bool=False,
+                 aux_branch: str=True,
+                 batch_size: int=8,
+                 num_workers: int=8,
                  download_dir: Union[str, Path]=None, 
                  database_dir: Union[str, Path]=None) -> None:
         """
@@ -35,7 +36,7 @@ class PannukeDataModule(pl.LightningDataModule):
         Args:
         -----------
             database_type (str):
-                One of ("zarr", "hdf5") .The files are written in either
+                One of ("zarr", "hdf5"). The files are written in either
                 zarr or hdf5 files that is used by the torch dataloader 
                 during training.
             augmentations (List[str]):
@@ -46,10 +47,9 @@ class PannukeDataModule(pl.LightningDataModule):
                 in the dataloading process
             aux_branch (str):
                 Signals that the dataset needs to prepare an input for an auxiliary branch in
-                the __getitem__ method. One of ("hover", "dist", "contour", None). 
-                If None, assumes that the network does not contain auxiliary branch and
-                the unet style dataset (edge weights and no overlapping cells) is used as
-                the dataset. 
+                the __getitem__ method. One of ("hover", "dist", "contour", None). If None, 
+                assumes that the network does not contain auxiliary branch and the unet style 
+                dataset (edge weights and no overlapping cells) is used as the dataset. 
             batch_size (int):
                 Batch size for the dataloader
             num_workers (int):
@@ -63,46 +63,23 @@ class PannukeDataModule(pl.LightningDataModule):
             
         """
         assert database_type in ("zarr", "hdf5")
+        assert any(aug in list(AUGS_LOOKUP.keys()) for aug in augmentations), "Illegal augmentation."
         super(PannukeDataModule, self).__init__()
 
-        self.download_dir = Path(download_dir)
-        self.database_dir = Path(database_dir)
+        self.database_dir = database_dir if database_dir is not None else Path(PATCH_DIR  / f"{database_type}" / "pannuke")
+        self.download_dir = download_dir if download_dir is not None else Path(DATA_DIR)
+        
+        # Create the folders if it does not exist
+        self.database_dir.mkdir(exist_ok=True)
+        self.download_dir.mkdir(exist_ok=True) 
+        
+        # Variables for torch DataLoader
         self.database_type = database_type
         self.augs = augmentations
         self.norm = normalize
         self.aux_branch = aux_branch
         self.batch_size = batch_size
         self.num_workers = num_workers
-
-
-    @classmethod
-    def from_conf(cls, conf: DictConfig, download_dir: str=None, database_dir: str=None) -> PannukeDataModule:
-        download_dir = download_dir
-        database_dir = database_dir
-        db_type = conf.runtime_args.db_type
-        
-        #  If no download dir give, download to /data/pannuke
-        download_dir = database_dir if database_dir is not None else Path(DATA_DIR)
-        # If no database dir given write to /patches
-        database_dir = database_dir if database_dir is not None else Path(PATCH_DIR / f"{db_type}" / "pannuke")
-
-        augs = conf.training_args.augs
-        norm = conf.training_args.normalize_input
-        aux_branch = conf.model_args.decoder_branches.aux_branch
-        batch_size = conf.runtime_args.batch_size
-        num_workers = conf.runtime_args.num_workers
-
-        return cls(
-            download_dir=download_dir,
-            database_dir=database_dir,
-            database_type=db_type,
-            augmentations=augs,
-            normalize=norm,
-            aux_branch=aux_branch,
-            batch_size=batch_size,
-            num_workers=num_workers,
-        )
-
         
     def prepare_data(self, write_new_dbs: bool=False) -> None:
         """

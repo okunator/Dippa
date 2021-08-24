@@ -8,7 +8,6 @@ import numpy as np
 import geopandas as gpd
 
 from pathlib import Path
-from shapely.geometry import shape
 from tqdm import tqdm
 from skimage.draw import polygon2mask
 from skimage.morphology import remove_small_objects, remove_small_holes
@@ -17,7 +16,7 @@ from typing import Dict, Tuple, Union
 from .mask_utils import fix_duplicates, get_inst_centroid, get_inst_types, bounding_box
 
 
-def poly2mask(contour: np.ndarray, shape: Tuple[int], x_off: int=None, y_off: int=None) -> np.ndarray:
+def poly2mask(contour: np.ndarray, shape: Tuple[int, int], x_off: int=None, y_off: int=None) -> np.ndarray:
     """
     Convert shapely Polygons to np.ndarray mask
 
@@ -25,7 +24,7 @@ def poly2mask(contour: np.ndarray, shape: Tuple[int], x_off: int=None, y_off: in
     ---------
         contour (Polygon.exterior.coords):
             Shapely xy coords for the polygon. Something like array(0 30, 5 50, ... , 90 500)
-        shape (tuple):
+        shape (Tuple[int, int]):
             shape of the mask  
         x_off (int, default=None):
             the amount of translation/offset that is encoded into the x-coord in the geojson
@@ -45,6 +44,7 @@ def poly2mask(contour: np.ndarray, shape: Tuple[int], x_off: int=None, y_off: in
 
     inst = polygon2mask(shape, np.flip(nuc, axis=1))
     return inst
+
 
 def mask2mat(inst_map: np.ndarray, 
              type_map: np.ndarray, 
@@ -92,10 +92,10 @@ def geojson2mat(fname: Union[str, Path],
                 classes: Dict[str, int]=None, 
                 save_dir: Union[str, Path]=None,
                 x_off: int=None, 
-                y_off: int=None) -> None:
+                y_off: int=None) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Convert geojson annotation file to numpy arrays and save them
-    to .mat files
+    Converts geojson annotation file to numpy arrays and saves them
+    to .mat files if save_dir is specified.
 
     Args:
     -----------
@@ -113,11 +113,19 @@ def geojson2mat(fname: Union[str, Path],
             the amount of translation/offset that is encoded into the x-coord in the geojson
         y_off (int):
             the amount of translation/offset that is encoded into the y-coord in the geojson
+
+    Retrurns:
+    ------------
+        Tuple on np.ndarrays. The instance segmentation map and the semantic segmentation map
     """
     # read files and init GeoDf
     anno = pd.read_json(fname)
-    anno["geometry"] = anno["geometry"].apply(shape)
+    anno["geometry"] = anno["geometry"].apply(shapely.geometry.shape)
     annots = gpd.GeoDataFrame(anno).set_geometry('geometry')
+
+    # Drop rectangle objects
+    drop_ixs = [i for i, row in annots.iterrows() if np.isclose(row.geometry.minimum_rotated_rectangle.area, row.geometry.area)]
+    annots = annots.drop(drop_ixs)
 
     # inits
     # use pannuke classes if no classes are given
@@ -139,24 +147,26 @@ def geojson2mat(fname: Union[str, Path],
                 for p in list(poly):
                     inst = poly2mask(p.exterior.coords, target_shape, x_off, y_off)
                     inst = remove_small_objects(inst, 10)
-                    inst_map[inst > 0] += i
+                    inst_map[inst > 0] += (i + 1)
                     type_map[(inst > 0) & (type_map != class_num)] += class_num
 
             else:
                 inst = poly2mask(poly.exterior.coords, target_shape, x_off, y_off)
                 inst = remove_small_objects(inst, 10)
-                inst_map[inst > 0] += i
+                inst_map[inst > 0] += (i + 1)
                 type_map[(inst > 0) & (type_map != class_num)] += class_num
 
             # fix overlaps
-            inst_map[inst_map > i] = i
+            inst_map[inst_map > (i + 1)] = i + 1
             type_map[type_map > cls_max] = cls_max
             pbar.update(1)
 
         pbar.set_postfix(saving=f"Save results to file: {fname}.mat")
-        mask2mat(inst_map, type_map, fname, save_dir)
 
-    # return inst_map, type_map
+        if save_dir is not None:
+            mask2mat(inst_map, type_map, fname, save_dir)
+
+    return inst_map, type_map
 
 
 def mask2geojson(inst_map: np.ndarray, 
@@ -197,7 +207,9 @@ def mask2geojson(inst_map: np.ndarray,
     if classes is None:
         classes = {"background":0, "neoplastic":1, "inflammatory":2, "connective":3, "dead":4, "epithelial":5}
 
+    # with tqdm(total=len(inst_list)) as pbar:
     for idx, inst_id in enumerate(inst_list):
+        # pbar.set_description("processing nuclear annotations")
 
         # set up the annotation geojson obj
         geo_obj = {}
@@ -240,8 +252,10 @@ def mask2geojson(inst_map: np.ndarray,
             save_dir.mkdir(exist_ok=True)
 
         fn = Path(save_dir / fname)
-        with open(fn, 'w') as out:
+        with fn.open('w') as out:
             geojson.dump(geo_objs, out)
         return
-    
+
+            # pbar.update(1)
+        
     return geo_objs

@@ -74,7 +74,7 @@ class SegTrainer:
         self.logging_dir = fm.experiment_dir / "tf"
 
     @classmethod
-    def from_conf(cls, conf: DictConfig, extra_callbacks: List[pl.Callback]=None, **kwargs) -> SegTrainer:
+    def from_conf(cls, conf: DictConfig, extra_callbacks: List[pl.Callback]=None, **kwargs) -> pl.Trainer:
         """
         Class method to initialize the class from experiment.yml config file
 

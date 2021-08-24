@@ -46,12 +46,10 @@ pip install -r requirements.txt
 
 ### Download script
 ```python
-from src.config import CONFIG
 from src.dl.lightning import PannukeDataModule
 
-config = CONFIG
-pannuke_module = PannukeDataModule.from_conf(config)
-pannuke_module.prepare_data() # Download Pannuke dataset
+pannuke_module = PannukeDataModule(database_type="hdf5")
+pannuke_module.prepare_data() # Download Pannuke dataset and write patches to h5 db
 ```
 
 ### Training Script 

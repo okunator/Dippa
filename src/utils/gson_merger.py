@@ -174,12 +174,36 @@ class GSONMerger:
         geo_obj.setdefault("properties", {"isLocked": "false", "measurements": [], "classification": {"name": None}})
         return geo_obj
 
+    @staticmethod
+    def drop_rectangles(self, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+        """
+        Drop rectangular objects from a gpd.GeoDataFrame.
+
+        Args:
+        --------
+            gdf (gpd.GeoDataFrame):
+                The input GeoDataFrame.
+        
+        Returns:
+        --------
+            gpd.GeoDataFrame without rectangular objects
+        """
+        ixs = [i for i, row in gdf.iterrows() if np.isclose(row.geometry.minimum_rotated_rectangle.area, row.geometry.area)]
+        return gdf.drop(ixs)
 
     def _get_xy_coords(self, fname: str) -> Tuple[int, int]:
-        x, y = (int(c) for c in re.findall(r"\d+", fname))
+        """
+        fname needs to contain x & y-coordinates in "x-[coord1]_y-[coord2]"-format
+        """
+        assert re.findall(r"(x-\d+_y-\d+)", fname), "fname not in 'x-[coord1]_y-[coord2]'-format"
+        xy_str = re.findall(r"(x-\d+_y-\d+)", fname)
+        x, y = (int(c) for c in re.findall(r"\d+", xy_str[0]))
         return x, y
 
     def _get_file_from_coords(self, x: int, y: int) -> str:
+        """
+        fname needs to contain x & y-coordinates in "x-[coord1]_y-[coord2]"-format
+        """
         f = [f for f in self.files if f"x-{x}_y-{y}" in f.name]
         ret = f[0] if f else None
         return ret
@@ -398,7 +422,7 @@ class GSONMerger:
 
         # write to file
         fname = Path(fname).with_suffix(".json")
-        with open(fname, 'w') as out:
+        with fname.open('w') as out:
             geojson.dump(annotations, out)
 
 

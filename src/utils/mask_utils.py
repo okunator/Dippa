@@ -103,6 +103,10 @@ def binarize(inst_map: np.ndarray) -> np.ndarray:
     ----------
         inst_map (np.ndarray): 
             Instance map to be binarized
+
+    Returns:
+    -----------
+        np.ndarray. Binary mask. Shape (H, W).
     """
     inst_map[inst_map > 0] = 1
     return inst_map.astype("uint8")
@@ -117,6 +121,10 @@ def fix_duplicates(inst_map: np.ndarray) -> np.ndarray:
     Args:
     -----------
         inst_map (np.ndarray): Inst map
+
+    Returns:
+    -----------
+        np.ndarray. The instance segmentation map without duplicated indices. Shape (H, W). 
     """
     current_max_id = np.amax(inst_map)
     inst_list = list(np.unique(inst_map))
@@ -139,6 +147,11 @@ def remove_1px_boundary(inst_map: np.ndarray) -> np.ndarray:
     Args: 
     ----------
         inst_map (np.ndarray): inst map
+
+    Returns:
+    -----------
+        np.ndarray. The instance segmentation map with 1px of instance boundaries 
+        removed. Shape (H, W).
     """
     new_inst_map = np.zeros(inst_map.shape[:2], np.int32)
     inst_list = list(np.unique(inst_map))
@@ -165,6 +178,10 @@ def get_weight_map(inst_map: np.ndarray, sigma: float = 5.0, w0: float = 10.0):
             Factor multiplied to the for the distance maps
         w0 (float): 
             Weight multiplied to the penalty map 
+
+    Returns:
+    -----------
+        np.ndarray. Nuclei boundary weight map. Shape (H, W).
     """
     inst_list = list(np.unique(inst_map))
     inst_list.remove(0) # 0 is background
@@ -212,6 +229,10 @@ def center_crop(img: np.ndarray, ch: int, cw: int) -> np.ndarray:
             Crop height
         cw (int):
             crop width
+
+    Returns:
+    ----------
+        np.ndarray. Center cropped image. Shape (ch, cw).
     """
     if len(img.shape) == 3:
         H, W, _ = img.shape

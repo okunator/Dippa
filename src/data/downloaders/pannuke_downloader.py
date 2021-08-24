@@ -36,7 +36,6 @@ class PANNUKE(FileHandler):
                 the pannuke fold number
             phase (int):
                 One of ("train", "test")
-
         """
         assert phase in ("train", "test", "valid")
         assert save_dir.exists(), f"save_dir: {save_dir} does not exists"
@@ -46,7 +45,6 @@ class PANNUKE(FileHandler):
         self.fold = fold
         self.phase = phase
         
-
         # Create pooch and set downloader
         self.downloader = pooch.HTTPDownloader(progressbar=True)
         self.POOCH = pooch.create(
@@ -89,6 +87,10 @@ class PANNUKE(FileHandler):
         anns_test_dir = Path(f"{self.save_dir.as_posix()}/pannuke/test/labels")
         imgs_train_dir = Path(f"{self.save_dir.as_posix()}/pannuke/train/images")
         anns_train_dir = Path(f"{self.save_dir.as_posix()}/pannuke/train/labels")
+        imgs_test_dir.mkdir(exist_ok=True)
+        anns_test_dir.mkdir(exist_ok=True)
+        imgs_train_dir.mkdir(exist_ok=True)
+        anns_train_dir.mkdir(exist_ok=True)
 
         # Don't do anything train & test dir are already populated
         if imgs_test_dir.exists() and imgs_train_dir.exists():
