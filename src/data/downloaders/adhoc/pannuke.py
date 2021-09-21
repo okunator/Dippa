@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 import scipy.io
 from pathlib import Path 
-from distutils import dir_util, file_util
 from typing import Dict
 from tqdm import tqdm
 
@@ -77,8 +76,8 @@ def handle_pannuke(orig_dir: Path,
                    anns_train_dir: Path, 
                    imgs_test_dir: Path, 
                    anns_test_dir: Path,
-                   fold_num: int,
-                   fold_phase: str) -> None:
+                   fold: int,
+                   phase: str) -> None:
     """
     Pannuke fold patches are saved in a numpy .npy file. This converts them to the same
     .mat (consep) format and saves each fold to a specific directory in the parent dir
@@ -89,7 +88,7 @@ def handle_pannuke(orig_dir: Path,
     Args:
     ----------
         orig_dir (Path): 
-            The path where the extracted .zip files are located
+            The path where the foldX.zip file were extracted
         imgs_train_dir (Path): 
             Path to the directory where the training images are saved
         anns_train_dir (Path): 
@@ -98,13 +97,11 @@ def handle_pannuke(orig_dir: Path,
             Path to the directory where the testing images are saved
         anns_test_dir (Path): 
             Path to the directory where the testing gt annotations are saved
-        fold_num (int): 
+        fold (int): 
             the fold number
-        fold_phase (str):
+        phase (str):
             One of ("train", "test")
     """
-    assert fold_phase in ("train", "test")
-
     # Create directories for the files
     FileHandler.create_dir(anns_train_dir)
     FileHandler.create_dir(imgs_train_dir)
@@ -132,9 +129,9 @@ def handle_pannuke(orig_dir: Path,
     }
      
     # load data
-    masks = np.load(fold_files[f"fold{fold_num}_masks"]).astype("int32")
-    imgs = np.load(fold_files[f"fold{fold_num}_images"]).astype("uint8")
-    types = np.load(fold_files[f"fold{fold_num}_types"])
+    masks = np.load(fold_files[f"fold{fold}_masks"]).astype("int32")
+    imgs = np.load(fold_files[f"fold{fold}_images"]).astype("uint8")
+    types = np.load(fold_files[f"fold{fold}_types"])
         
     with tqdm(total=len(types)) as pbar: # number of patches in the whole dataset 7901
         # loop by tissue
@@ -142,15 +139,15 @@ def handle_pannuke(orig_dir: Path,
 
             # tqdm logs
             pbar.set_postfix(
-                info=f"Converting {tissue_type} patches from fold_{fold_num} .npy file to .png/.mat files"
+                info=f"Converting {tissue_type} patches from fold_{fold} .npy file to .png/.mat files"
             ) 
 
             imgs_by_type = imgs[types == tissue_type]
             masks_by_type = masks[types == tissue_type]
             for j in range(imgs_by_type.shape[0]):
-                name = f"{tissue_type}_fold{fold_num}_{j}"
-                img_dir = fold_phases[fold_phase]["img"]
-                mask_dir = fold_phases[fold_phase]["mask"]
+                name = f"{tissue_type}_fold{fold}_{j}"
+                img_dir = fold_phases[phase]["img"]
+                mask_dir = fold_phases[phase]["mask"]
 
                 fn_im = Path(img_dir / name).with_suffix(".png")
                 cv2.imwrite(str(fn_im), cv2.cvtColor(imgs_by_type[j, ...], cv2.COLOR_RGB2BGR))

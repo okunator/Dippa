@@ -1,6 +1,5 @@
 import scipy.io
 import shapely
-import re
 import geojson
 import cv2
 import pandas as pd
@@ -10,10 +9,10 @@ import geopandas as gpd
 from pathlib import Path
 from tqdm import tqdm
 from skimage.draw import polygon2mask
-from skimage.morphology import remove_small_objects, remove_small_holes
+from skimage.morphology import remove_small_objects
 from typing import Dict, Tuple, Union
 
-from .mask_utils import fix_duplicates, get_inst_centroid, get_inst_types, bounding_box
+from .mask_utils import get_inst_centroid, get_inst_types, bounding_box
 
 
 def poly2mask(contour: np.ndarray, shape: Tuple[int, int], x_off: int=None, y_off: int=None) -> np.ndarray:
@@ -133,7 +132,6 @@ def geojson2mat(fname: Union[str, Path],
         classes = {"background":0, "neoplastic":1, "inflammatory":2, "connective":3, "dead":4, "epithelial":5}
 
     cls_max = max([classes[t] for t in set([prop["classification"]["name"] for prop in annots["properties"]])])
-    xmax, ymax = tuple(annots["geometry"].total_bounds[2:].astype("int"))
     target_shape = target_shape
     inst_map = np.zeros(target_shape, np.int32)
     type_map = np.zeros(target_shape, np.int32)
@@ -148,17 +146,17 @@ def geojson2mat(fname: Union[str, Path],
                     inst = poly2mask(p.exterior.coords, target_shape, x_off, y_off)
                     inst = remove_small_objects(inst, 10)
                     inst_map[inst > 0] += (i + 1)
-                    type_map[(inst > 0) & (type_map != class_num)] += class_num
+                    type_map[(inst > 0) & (type_map != class_num)] = class_num
 
             else:
                 inst = poly2mask(poly.exterior.coords, target_shape, x_off, y_off)
                 inst = remove_small_objects(inst, 10)
                 inst_map[inst > 0] += (i + 1)
-                type_map[(inst > 0) & (type_map != class_num)] += class_num
+                type_map[(inst > 0) & (type_map != class_num)] = class_num
 
             # fix overlaps
             inst_map[inst_map > (i + 1)] = i + 1
-            type_map[type_map > cls_max] = cls_max
+            type_map[type_map > cls_max] = class_num
             pbar.update(1)
 
         pbar.set_postfix(saving=f"Save results to file: {fname}.mat")

@@ -2,12 +2,12 @@ import torch
 import torch.nn as nn
 from typing import Dict
 
-import src.dl.models.initialization as init
-
-from src.dl.models.modules import (
+from .modules import (
     Mish, Swish, BCNorm, GroupNorm,
-    WSConv2d,  WSConv2dStaticSamePadding
+    WSConv2d, WSConv2dStaticSamePadding
 )
+
+from .initialization import initialize_decoder, initialize_head
 
 
 class MultiTaskSegModel(nn.Module):
@@ -16,16 +16,16 @@ class MultiTaskSegModel(nn.Module):
     and an optional aux branch
     """
     def initialize(self) -> None:
-        init.initialize_decoder(self.inst_decoder)
-        init.initialize_head(self.inst_seg_head)
+        initialize_decoder(self.inst_decoder)
+        initialize_head(self.inst_seg_head)
 
         if self.decoder_type_branch:
-            init.initialize_decoder(self.type_decoder)
-            init.initialize_head(self.type_seg_head)
+            initialize_decoder(self.type_decoder)
+            initialize_head(self.type_seg_head)
 
         if self.decoder_aux_branch:
-            init.initialize_decoder(self.aux_decoder)
-            init.initialize_head(self.aux_seg_head)
+            initialize_decoder(self.aux_decoder)
+            initialize_head(self.aux_seg_head)
 
     def forward(self, x) -> Dict[str, torch.Tensor]:
         features = self.encoder(x)

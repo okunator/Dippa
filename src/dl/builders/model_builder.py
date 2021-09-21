@@ -1,12 +1,7 @@
-import torch
-import torch.nn as nn
 import segmentation_models_pytorch as smp
-from omegaconf import DictConfig
-from typing import Optional, List
+from typing import List
 
-from .decoders import Decoder
-from .base_model import MultiTaskSegModel
-from .heads import SegHead
+from src.dl.models import Decoder, MultiTaskSegModel, SegHead
 
 
 class Model(MultiTaskSegModel):
@@ -130,7 +125,7 @@ class Model(MultiTaskSegModel):
             depth=self.encoder_depth,
             weights=self.encoder_weights
         )
-        
+
         self.inst_decoder = Decoder(
             encoder_channels=list(self.encoder.out_channels),
             decoder_channels=self.decoder_channels,

@@ -2,9 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Optional
-from src.dl.torch_utils import one_hot
-from src.dl.filters.kernels import gaussian, gaussian_kernel2d
-from src.dl.filters.filter import filter2D
+
+from src.dl.utils import one_hot, gaussian_kernel2d, filter2D
 
 
 # Adapted from https://github.com/ZJUGiveLab/UNet-Version/blob/master/loss/msssimLoss.py

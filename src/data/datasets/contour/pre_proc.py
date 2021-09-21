@@ -27,7 +27,7 @@ import numpy as np
 import skimage.morphology as morph
 from typing import Tuple
 
-from src.utils.mask_utils import center_crop
+from src.utils import center_crop
 
 # Adapted from  https://github.com/vqdang/hover_net/blob/195ed9b6cc67b12f908285492796fb5c6c15a000/src/loader/augs.py#L21
 def contours(inst_map: np.ndarray, crop_shape: Tuple[int]=(256, 256), thickness: int=1) -> np.ndarray:

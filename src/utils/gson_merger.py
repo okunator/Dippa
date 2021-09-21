@@ -149,7 +149,7 @@ class GSONMerger:
         self.xmax = xmax
         self.ymax = ymax
         self.xmin = xmin
-        self.ymax = ymax
+        self.ymin = ymin
         self.tile_size = tile_size
         self.files = sorted(Path(in_dir).glob("*"))
         

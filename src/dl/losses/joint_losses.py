@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import List, Dict, Optional
+from typing import List, Optional
 
 
 class JointLoss(nn.ModuleDict):

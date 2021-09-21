@@ -1,8 +1,10 @@
+import importlib
 import albumentations as A
 from typing import List, Optional
 from torch.utils.data import Dataset
 
-import src.dl.datasets as ds
+
+ds = importlib.import_module("src.data.datasets")
 
 
 class DatasetBuilder:

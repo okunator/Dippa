@@ -3,8 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-# Quick MSE wrapper
-
 class MSE(nn.Module):
     def __init__(self, reduction: str="mean", **kwargs):
         """

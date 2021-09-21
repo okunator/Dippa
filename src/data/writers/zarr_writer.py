@@ -2,7 +2,7 @@ import zarr
 import numpy as np
 from tqdm import tqdm
 from pathlib import Path
-from typing import Tuple, Union, Optional, Dict
+from typing import Tuple, Union, Dict
 
 from src.patching import TilerStitcher
 from .base_writer import BaseWriter

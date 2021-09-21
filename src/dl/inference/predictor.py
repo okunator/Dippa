@@ -4,8 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 from typing import Dict, Union, Tuple
 
-import src.dl.torch_utils as util
-from src.dl.torch_img_utils import minmax_normalize_torch
+import src.dl.utils as util
 # import src.dl.inference.tta as tta
 
 
@@ -107,7 +106,7 @@ class Predictor:
 
         if norm:
             for i in range(patch.shape[0]):
-                patch[i] = minmax_normalize_torch(patch[i])
+                patch[i] = util.minmax_normalize_torch(patch[i])
             
         input_tensor = util.to_device(patch) # to cpu|gpu
         return self.model(input_tensor)  # Dict[(B, 2, H, W), (B, C, H, W)]

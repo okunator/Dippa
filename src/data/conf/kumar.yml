@@ -1,7 +1,0 @@
-class_types:
-    binary: 
-        background: 0
-        nuclei: 1
-    type:
-        background: 0
-        nuclei: 1

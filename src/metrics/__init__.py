@@ -1,2 +1,2 @@
 from .metrics import *
-from .benchmarker import *
+from .benchmarker import Benchmarker

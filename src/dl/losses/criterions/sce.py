@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import List, Optional
-from src.dl.torch_utils import one_hot
-from src.dl.losses.weighted_base_loss import WeightedBaseLoss
+from typing import Optional
+
+from src.dl.utils import one_hot
+from ..weighted_base_loss import WeightedBaseLoss
 
 
 # This is adapted from: https://catalyst-team.github.io/catalyst/_modules/catalyst/contrib/nn/criterion/ce.html#SymmetricCrossEntropyLoss

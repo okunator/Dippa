@@ -1,3 +1,6 @@
+from .decoders import Decoder
+from .base_model import MultiTaskSegModel
+from .heads import SegHead
 
 
 MODEL_LOOKUP = {

@@ -1,9 +1,8 @@
 import pytorch_lightning as pl
-from pathlib import Path
 from typing import List
 from omegaconf import DictConfig
 
-from src.utils.file_manager import FileManager
+from src.utils.file_manager import FileHandler
 
 
 # Inheriting Trainer does not work so init w/ class method only
@@ -33,20 +32,21 @@ class SegTrainer:
             extra_callbacks (List[pl.CallBack], default=None):
                 List of extra callbacks to add to the Trainer
         """
-        # init file manager
-        fm = FileManager(
-            experiment_name=experiment_name,
-            experiment_version=experiment_version,
+        # init paths
+        exp_dir = FileHandler.get_experiment_dir(
+            experiment=experiment_name,
+            version=experiment_version
         )
+
         # set test tube logger
         self.tt_logger = pl.loggers.TestTubeLogger(
-            save_dir=fm.result_folder,
+            save_dir=FileHandler.result_dir(),
             name=experiment_name,
             version=experiment_version
         )
 
         # set save dir to results/{experiment_name}/version_{experiment_version}
-        self.ckpt_dir = fm.experiment_dir
+        self.ckpt_dir = exp_dir
 
         # set checkpoint callback
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
@@ -68,13 +68,23 @@ class SegTrainer:
         self.gpus = num_gpus
         self.epochs = num_epochs
         self.resume_training = resume_training
-        self.last_ckpt = fm.get_model_checkpoint("last") if self.resume_training else None
+
+        self.last_ckpt = None
+        if self.resume_training:
+            self.last_ckpt = FileHandler.get_model_checkpoint(
+                experiment=experiment_name,
+                version=experiment_version,
+                which="last"
+            )
     
         # set logging dir
-        self.logging_dir = fm.experiment_dir / "tf"
+        self.logging_dir = exp_dir / "tf"
 
     @classmethod
-    def from_conf(cls, conf: DictConfig, extra_callbacks: List[pl.Callback]=None, **kwargs) -> pl.Trainer:
+    def from_conf(cls, 
+                  conf: DictConfig, 
+                  extra_callbacks: List[pl.Callback]=None, 
+                  **kwargs) -> pl.Trainer:
         """
         Class method to initialize the class from experiment.yml config file
 

@@ -1,4 +1,6 @@
 from .criterions import *
+from .joint_losses import MultiTaskLoss, JointLoss
+
 
 LOSS_LOOKUP = {
     "iou": "IoULoss",

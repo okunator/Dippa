@@ -2,8 +2,8 @@ import pooch
 from pathlib import Path
 from typing import Union, Dict
 
-from src.utils import FileHandler
 from .adhoc import handle_pannuke
+from .base_downloader import BaseDownloader
 
 
 HASHES = {
@@ -13,7 +13,7 @@ HASHES = {
 }
 
 
-class PANNUKE(FileHandler):
+class PANNUKE(BaseDownloader):
     def __init__(self, save_dir: Union[str, Path], fold: int, phase: str) -> None:
         """
         Fetches a single fold of the pannuke dataset from https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke.
@@ -37,109 +37,30 @@ class PANNUKE(FileHandler):
             phase (int):
                 One of ("train", "test")
         """
-        assert phase in ("train", "test", "valid")
-        assert save_dir.exists(), f"save_dir: {save_dir} does not exists"
+        assert phase in ("train", "test")
         assert 1 <= fold <= 3, f"fold {fold}. Only three folds in the data"
+        super(PANNUKE, self).__init__(
+            save_dir=save_dir,
+            dataset_name="pannuke",
+            handler_func=handle_pannuke,
+            fold=fold,
+            phase=phase
+        )
 
-        self.save_dir = Path(save_dir)
-        self.fold = fold
-        self.phase = phase
-        
         # Create pooch and set downloader
         self.downloader = pooch.HTTPDownloader(progressbar=True)
         self.POOCH = pooch.create(
             path=pooch.os_cache(f"{self.save_dir.as_posix()}/pannuke/original/"),
             base_url="https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke/",
-            version=None,
-            version_dev="master",
             retry_if_failed=2,
             registry={
-                f"fold_{self.fold}.zip": HASHES[f"fold_{self.fold}"],
+                f"fold_{fold}.zip": HASHES[f"fold_{fold}"],
             }
         )
 
-    def processor(self, fname: Union[str, Path], action: str, pooch: pooch.Pooch) -> Dict[str, Path]:
-        """
-        Post-processing hook to unzip a file and convert format from .npy to .png/.mat
-        The mask .mat files contain "type_map", "inst_map", "inst_centroid", "inst_type",
-        and "inst_bbox" keys for every patch similarly to the the CoNSeP-dataset.
-
-        Args:
-        ----------
-            fname (str):
-                Full path of the zipped file in local storage
-            action (str):
-                One of "download" (file doesn't exist and will download),
-                "update" (file is outdated and will download), and
-                "fetch" (file exists and is updated so no download).
-            pooch (pooch.Pooch)
-                The instance of Pooch that called the processor function.
-
-        Returns:
-        ----------
-            a list of Path objs to the train and test directories
-        """
-        fname = Path(fname)
-
-        # Create folders for the test & train data in the 'pannuke' folder
-        # If dirs exists already, skips them
-        imgs_test_dir = Path(f"{self.save_dir.as_posix()}/pannuke/test/images")
-        anns_test_dir = Path(f"{self.save_dir.as_posix()}/pannuke/test/labels")
-        imgs_train_dir = Path(f"{self.save_dir.as_posix()}/pannuke/train/images")
-        anns_train_dir = Path(f"{self.save_dir.as_posix()}/pannuke/train/labels")
-        imgs_test_dir.mkdir(exist_ok=True)
-        anns_test_dir.mkdir(exist_ok=True)
-        imgs_train_dir.mkdir(exist_ok=True)
-        anns_train_dir.mkdir(exist_ok=True)
-
-        # Don't do anything train & test dir are already populated
-        if imgs_test_dir.exists() and imgs_train_dir.exists():
-            is_populated = [False]*4
-            if any(imgs_test_dir.iterdir()):
-                is_populated[0] = True
-            if any(imgs_train_dir.iterdir()):
-                is_populated[1] = True
-            if any(anns_test_dir.iterdir()):
-                is_populated[2] = True
-            if any(anns_train_dir.iterdir()):
-                is_populated[3] = True
-
-            if all(is_populated):
-                # print(f"Files found in train and test dir. If need for re-downloading, remove 'pannuke' dir")
-                return {
-                    "img_test": imgs_test_dir, 
-                    "mask_test": anns_test_dir, 
-                    "img_train": imgs_train_dir, 
-                    "mask_train": anns_train_dir
-                }
-
-
-        # file does not exist --> download.
-        if action in ("update", "download") or not fname.exists():
-            self.extract_zips(fname.parent, rm=False)
-        
-            # Convert .npy files to .mat files and add data to them
-            handle_pannuke(
-                fname.parent, 
-                imgs_train_dir,
-                anns_train_dir, 
-                imgs_test_dir, 
-                anns_test_dir,
-                self.fold,
-                self.phase
-            )
-
-        return {
-            "img_test": imgs_test_dir, 
-            "mask_test": anns_test_dir, 
-            "img_train": imgs_train_dir, 
-            "mask_train": anns_train_dir
-        }
-
-
-    def __call__(self) -> None:
+    def download(self) -> None:
         return self.POOCH.fetch(
-            f"fold_{self.fold}.zip", 
+            fname=f"fold_{self.kwargs['fold']}.zip", 
             processor=self.processor, 
             downloader=self.downloader
         )

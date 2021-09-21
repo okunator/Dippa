@@ -4,13 +4,12 @@ import zarr
 import tables as tb
 from pathlib import Path
 from torch.utils.data import Dataset
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Callable
 from segmentation_models_pytorch.encoders import get_preprocessing_fn
 
-from src.utils.file_manager import FileHandler
-from ..torch_img_utils import minmax_normalize_torch
-
+from src.dl.utils import minmax_normalize_torch
 from src.utils import (
+    FileHandler,
     get_weight_map, 
     remove_1px_boundary, 
     fix_duplicates,
@@ -47,13 +46,13 @@ class BaseDataset(Dataset, FileHandler):
         return self.n_items
 
     @property
-    def read_patch(self) -> np.ndarray:
+    def read_patch(self) -> Callable:
         """
         Read an image patch from h5 or zarr db
 
         Returns:
         ---------
-            np.ndarray. Shape (H, W, C)
+            Callable. Either h5 or zarr read method 
         """
         read_func = self.read_h5_patch if self.suffix == ".h5" else self.read_zarr_patch
         return read_func

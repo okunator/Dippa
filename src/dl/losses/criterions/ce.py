@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
-from typing import List, Optional
-from src.dl.losses.weighted_base_loss import WeightedBaseLoss
+from typing import Optional
+
+from ..weighted_base_loss import WeightedBaseLoss
 
 
 class WeightedCELoss(WeightedBaseLoss):

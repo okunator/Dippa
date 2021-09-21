@@ -1,7 +1,6 @@
 pooch==1.3.0
 tables==3.6.1
 geopandas==0.9.0
-Rtree==0.9.7
 zarr==2.6.1
 geojson==2.5.0
 numpy==1.18.4
@@ -12,7 +11,6 @@ scipy==1.4.1
 opencv-python==4.2.0.32
 matplotlib==3.2.1
 scikit-image==0.17.2
-scikit-learn==0.24.1
 omegaconf==2.0.6
 torch_optimizer==0.1.0
 segmentation-models-pytorch==0.1.3

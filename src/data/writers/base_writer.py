@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from albumentations import Compose
 
 from src.utils import FileHandler
-from src.dl.datasets.augs import rigid_augs_and_crop
+from ..datasets import rigid_augs_and_crop
 
 
 class BaseWriter(ABC, FileHandler):

@@ -26,7 +26,7 @@ import numpy as np
 from typing import Tuple
 from scipy.ndimage.morphology import distance_transform_cdt
 
-from src.utils.mask_utils import center_crop, bounding_box
+from src.utils import center_crop, bounding_box
 
 
 # Ported from https://github.com/vqdang/hover_net/blob/195ed9b6cc67b12f908285492796fb5c6c15a000/src/loader/augs.py#L21

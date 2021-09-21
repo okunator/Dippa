@@ -80,20 +80,12 @@ class HDF5Writer(BaseWriter):
             assert self.stride_size <= self.patch_shape[0]
 
 
-    def write2db(self, skip: bool=False) -> Path:
+    def write2db(self) -> Path:
         """
         Write the the images and masks to zarr group. Mimics HDF5 file
-
-        Args:
-        ---------
-            skip (bool, default=False):
-                If True, skips the db writing and just returns the filename of the db
         """
         self.create_dir(self.save_dir)
         fname = Path(self.save_dir / f"{self.file_name}.h5")
-
-        if skip:
-            return fname
 
         h5 = tb.open_file(fname.as_posix(), mode="w")
         root = h5.root
@@ -185,7 +177,7 @@ class HDF5Writer(BaseWriter):
                 else:
                     patches = full_data[None, ...]
 
-                if self.self.rigid_augs_and_crop:
+                if self.rigid_augs_and_crop:
                     patches = self._augment_patches(
                         patches_im=patches[..., :3], 
                         patches_mask=patches[..., 3:],

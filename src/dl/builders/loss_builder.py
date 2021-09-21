@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-from typing import List, Dict, Optional
+from typing import List, Optional
 
 import src.dl.losses as losses
-from .joint_losses import JointLoss, MultiTaskLoss
+# from losses.joint_losses import JointLoss, MultiTaskLoss
 
 
 class LossBuilder:
@@ -74,7 +74,7 @@ class LossBuilder:
         loss_keys_inst = c.solve_loss_key(inst_branch_loss, losses.JOINT_SEG_LOSSES)
         loss_names_inst = [losses.LOSS_LOOKUP[key] for key in loss_keys_inst]
         loss_list = [losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_inst]
-        loss_inst = JointLoss(loss_list)
+        loss_inst = losses.JointLoss(loss_list)
         
         # set auxilliary branch loss
         loss_aux = None
@@ -83,7 +83,7 @@ class LossBuilder:
             loss_keys_aux = c.solve_loss_key(aux_branch_loss, losses.JOINT_AUX_LOSSES)
             loss_names_aux = [losses.LOSS_LOOKUP[key] for key in loss_keys_aux]
             loss_list = [losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_aux]
-            loss_aux = JointLoss(loss_list)
+            loss_aux = losses.JointLoss(loss_list)
     
         # set type branch loss
         loss_type = None
@@ -94,8 +94,8 @@ class LossBuilder:
             loss_keys_type = c.solve_loss_key(type_branch_loss, losses.JOINT_SEG_LOSSES)
             loss_names_type = [losses.LOSS_LOOKUP[key] for key in loss_keys_type]
             loss_list = [losses.__dict__[cl_key](**kwargs) for cl_key in loss_names_type]
-            loss_type = JointLoss(loss_list)
+            loss_type = losses.JointLoss(loss_list)
 
-        loss = MultiTaskLoss(loss_inst, loss_type, loss_aux, loss_weights)
+        loss = losses.MultiTaskLoss(loss_inst, loss_type, loss_aux, loss_weights)
         return loss
 

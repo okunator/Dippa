@@ -1,8 +1,8 @@
 import torch
 import numpy as np
 from typing import List, Dict
-from src.dl.datasets.base_dataset import BaseDataset 
 
+from ..base_dataset import BaseDataset 
 from .pre_proc import contours
 
 

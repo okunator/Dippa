@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from src.dl.filters.kernels import sobel_hv
-from src.dl.filters.filter import filter2D
+
+from src.dl.utils import sobel_hv, filter2D
 
 
 def grad_mse(yhat: torch.Tensor, target: torch.Tensor) -> torch.Tensor:

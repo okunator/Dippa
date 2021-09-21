@@ -1,5 +1,8 @@
-import src.dl.inference.post_processing as post_proc
+import importlib
 from .base_processor import PostProcessor
+
+
+post_proc = importlib.import_module("src.dl.inference.post_processing")
 
 
 class PostProcBuilder:
@@ -20,7 +23,7 @@ class PostProcBuilder:
                 The post processing pipeline to use.
                 One of ("hover", "dist", "contour", "cellpose", "basic")
             thresh_method (str, default="naive"):
-                Thresholding method for the soft masks from the instance branch.
+                Thresholding method for the soft masks from the instance branch
                 One of ("naive", "argmax", "sauvola", "niblack")).
             thresh (float, default = 0.5): 
                 threshold probability value. Only used if method == "naive"

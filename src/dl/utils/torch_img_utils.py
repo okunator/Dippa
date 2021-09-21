@@ -4,7 +4,6 @@ from typing import Union
 
 
 # Dataset level normalization
-# adapted from https://github.com/pytorch/vision/blob/master/torchvision/transforms/functional.py
 def normalize(img: torch.Tensor, mean: np.ndarray, std: np.ndarray, to_uint8: bool=True) -> torch.Tensor:
     """
     Normalize a tensor with mean and standard deviation of the dataset.

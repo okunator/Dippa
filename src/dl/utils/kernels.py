@@ -1,5 +1,6 @@
 import torch
 
+
 def gaussian(window_size: int, sigma: float, device: torch.device = None) -> torch.Tensor:
     """
     Create a gaussian 1D tensor

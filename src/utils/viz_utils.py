@@ -1,10 +1,8 @@
 import cv2
 import numpy as np
-import math
-import random
-import colorsys
 from typing import List, Dict, Tuple, Optional
 from matplotlib import pyplot as plt
+
 from .mask_utils import bounding_box
 
 

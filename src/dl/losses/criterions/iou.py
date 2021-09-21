@@ -1,7 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from src.dl.torch_utils import one_hot
+
+from src.dl.utils import one_hot
+
 
 class IoULoss(nn.Module):
     def __init__(self, **kwargs) -> None:
