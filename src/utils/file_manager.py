@@ -5,9 +5,9 @@ import scipy.io
 import numpy as np
 import tables as tb
 from pathlib import Path
-from typing import Dict, Tuple, Union
+from typing import Tuple, Union
 
-from src.settings import DATA_DIR, RESULT_DIR
+from src.settings import RESULT_DIR
 
 
 class FileHandler:
