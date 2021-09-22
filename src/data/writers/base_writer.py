@@ -1,7 +1,6 @@
 import numpy as np
 from typing import Tuple
 from abc import ABC, abstractmethod
-from albumentations import Compose
 
 from src.utils import FileHandler
 from ..datasets import rigid_augs_and_crop
@@ -18,10 +17,12 @@ class BaseWriter(ABC, FileHandler):
     def write2db(self):
         raise NotImplementedError
 
-    def _patch_stats(self, patches_im: np.ndarray, num_channels: int=3) -> np.ndarray:
+    def _patch_stats(self, 
+                     patches_im: np.ndarray, 
+                     num_channels: int=3) -> np.ndarray:
         """
-        Compute the number of pixels. Channel-wise sum and channel-wise squared sum
-        for dataset mean & std computations.
+        Compute the number of pixels. Channel-wise sum and channel-wise squared
+        sum for dataset mean & std computations.
 
         Args:
         ----------
@@ -32,14 +33,15 @@ class BaseWriter(ABC, FileHandler):
 
         Returns: 
         ----------
-            Tuple[Union[int, np.ndarray]] : The computed statistics. np.ndarrays have shape (3, ).
+            Tuple[Union[int, np.ndarray]] : The computed statistics. 
+            np.ndarrays have shape (3, ).
         """
         pixel_num = 0 
         channel_sum = np.zeros(num_channels)
         channel_sum_sq = np.zeros(num_channels)
         for i in range(patches_im.shape[0]):
             img = patches_im[i] / 255
-            pixel_num += (img.size/num_channels)
+            pixel_num += (img.size / num_channels)
             channel_sum += np.sum(img, axis=(0, 1))
             channel_sum_sq += np.sum(np.square(img), axis=(0, 1))
         
@@ -50,10 +52,10 @@ class BaseWriter(ABC, FileHandler):
                          patches_mask: np.ndarray, 
                          crop_shape: Tuple[int]=(256, 256)) -> Tuple[np.ndarray]:
         """
-        Rotations, flips and other rigid augmentations followed by a center crop.
-        Rigid augmentations on large images can kill the datalaoding performance, 
-        so it's worth to apply rigid augmentations and crop beforehand rather when
-        loading data with the dataloader. 
+        Rotations, flips and other rigid augmentations followed by a center 
+        crop. Rigid augmentations on large images can kill the datalaoding 
+        performance, so it's worth to apply rigid augmentations and crop 
+        beforehand rather when loading data with the dataloader. 
 
         Args:
         ---------
@@ -70,7 +72,7 @@ class BaseWriter(ABC, FileHandler):
             A tuple of nd.arrays of the transformed patches.
         """
         
-        imgs, inst_maps, type_maps, overlays = [], [], [], []
+        imgs, inst_maps, type_maps = [], [], []
 
         patches_im = patches_im.astype("uint8")
         for i in range(patches_im.shape[0]):
@@ -99,7 +101,8 @@ class BaseWriter(ABC, FileHandler):
         
         Returns:
         ---------
-            np.ndarray of shape (C, ). indices are classes, values teh number of pixels per cls
+            np.ndarray of shape (C, ). indices are classes, values teh number 
+            of pixels per cls
         """
         pixels = np.zeros(len(self.classes))
         for j, val in enumerate(self.classes.values()):

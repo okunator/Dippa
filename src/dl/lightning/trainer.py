@@ -45,7 +45,7 @@ class SegTrainer:
             version=experiment_version
         )
 
-        # set save dir to results/{experiment_name}/version_{experiment_version}
+        # save dir = results/{experiment_name}/version_{experiment_version}
         self.ckpt_dir = exp_dir
 
         # set checkpoint callback

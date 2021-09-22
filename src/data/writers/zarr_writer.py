@@ -8,6 +8,7 @@ from src.patching import TilerStitcher
 from .base_writer import BaseWriter
 
 
+# TODO: update to match the HDF%writer
 class ZarrWriter(BaseWriter):
     def __init__(self,
                  img_dir: Union[str, Path],
@@ -23,19 +24,19 @@ class ZarrWriter(BaseWriter):
                  chunk_size: int=1,
                  chunk_synchronization: bool=True) -> None:
         """
-        Iterates image and mask folders, patches them, and appends the patches to a zarr dataset.
-        Thread locking can be applied by specifying chunk_synchronization = True.  
+        Iterates image and mask folders, patches them, and appends the patches 
+        to a zarr dataset.  
         
         Args:
         ------------
             img_dir (str, or Path obj):
-                Path to the image directory. Image reading is performed with cv2, so image format
-                needs to be cv2 readable.
+                Path to the image dir. Image reading is performed with cv2, so 
+                image format needs to be cv2 readable.
             mask_dir (str or Path obj):
-                directory of the corresponding masks for the images. (Make sure the mask filenames
-                are the same or at least contain a part of the corresponding image file names. 
-                (Suffix of the mask file name can be different). Masks need to be stored in .mat files
-                that contain at least the key: "inst_map". Also the "type_map".
+                directory of the corresponding masks for the images. (Make sure
+                the mask filenames are the same or at least contain a part of 
+                the corresponding image file names. Masks need to be stored in 
+                .mat files that contain at least the key: "inst_map".
             save_dir (str, Path):
                 The directory, where the zarr array is written/saved.
             file_name (str):
@@ -44,25 +45,31 @@ class ZarrWriter(BaseWriter):
                 Dictionary of class integer key-value pairs
                 e.g. {"background":0, "inflammatory":1, "epithel":2}
             patch_shape (Tuple[int], default=(512, 512)):
-                specifies the height and width of the patches that are stored in zarr-arrays.
+                specifies the height and width of the patches that are stored 
+                in zarr-arrays.
             stride_size (int, default=80):
-                Stride size for the sliding window patcher. Needs to be <= patch_shape.
-                If < patch_shape, patches are created with overlap.
+                Stride size for the sliding window patcher. Needs to be less or
+                equal to patch_shape. If < patch_shape, patches are created 
+                with overlap.
             n_copies (int, default=None):
-                Number of copies created per one input image & corresponding mask.
-                Used for already patched data such as Pannuke data. If patch_shape
-                and n_copies are None, no additional data is created but transforms 
-                may still be applied to the patches.
+                Number of copies created per one input image & corresponding 
+                mask. This argument is ignored if patch_shape is provided. 
+                This is used for already patched data such as Pannuke data. If 
+                patch_shape and n_copies are None, no additional data is 
+                created but transforms may still be applied to the patches.
             rigid_augs_and_crop (bool, default=True):
-                If True, rotations, flips etc are applied to the patches which is followed by a
-                center cropping to smaller patch. (rigid_augs_and_crop)
+                If True, rotations, flips etc are applied to the patches which 
+                is followed by a center cropping. 
             crop_shape (Tuple[int], default=(256, 256)):
-                If rigid_augs_and_crop is True, this is the crop shape for the center crop. 
+                If rigid_augs_and_crop is True, this is the crop shape for the
+                center crop. 
             chunk_size (int, default=1):
-                The chunk size of the zarr array of shape: (num_patches, H, W, C). This param defines
-                the num_patches i.e. How many patches are included in one read of the array.
+                The chunk size of the zarr array of shape: (npatches, H, W, C).
+                This param defines the num_patches i.e. How many patches are 
+                included in one read of the array.
             chunk_synchronization (bool: default=True):
-                Make chunks thread safe. No concurrent writes and reads to the same chunk.
+                Make chunks thread safe. No concurrent writes and reads to the
+                same chunk.
         """
         super(ZarrWriter, self).__init__()
         self.img_dir = Path(img_dir)
@@ -92,9 +99,6 @@ class ZarrWriter(BaseWriter):
                 If True, skips the db writing and just returns the filename of the db
         """
         fname = Path(self.save_dir / f"{self.file_name}.zarr")
-
-        if skip:
-            return fname
 
         # Open zarr group
         root = zarr.open(fname.as_posix(), mode="w")
@@ -159,22 +163,25 @@ class ZarrWriter(BaseWriter):
         )
 
         # Iterate imgs and masks -> patch -> save to zarr
-        img_files = self.get_files(self.img_dir)
-        mask_files = self.get_files(self.mask_dir)
+        imgs = self.get_files(self.img_dir)
+        masks = self.get_files(self.mask_dir)
 
         # For dataset stats computations
         channel_sum = np.zeros(3)
         channel_sum_sq = np.zeros(3)
         pixel_num = 0
         
-        with tqdm(total=len(img_files), unit="file") as pbar:
-            for i, (img_path, mask_path) in enumerate(zip(img_files, mask_files), 1):
+        with tqdm(total=len(imgs), unit="file") as pbar:
+            for img_path, mask_path in zip(imgs, masks):
                 im = self.read_img(img_path)
                 inst_map = self.read_mask(mask_path, key="inst_map")
                 type_map = self.read_mask(mask_path, key="type_map")
                 npixels[:] += self._pixels_per_classes(type_map)
 
-                full_data = np.concatenate((im, inst_map[..., None], type_map[..., None]), axis=-1)
+                full_data = np.concatenate(
+                    (im, inst_map[..., None], type_map[..., None]), 
+                    axis=-1
+                )
                 
                 # Do patching or create copies of input images 
                 if self.patch_shape is not None:
