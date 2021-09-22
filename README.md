@@ -44,14 +44,6 @@ pip install -r requirements.txt
  2. modify the **experiment.yml** file
  3. Train the model. (See the notebooks)
 
-### Download script
-```python
-from src.dl.lightning import PannukeDataModule
-
-pannuke_module = PannukeDataModule(database_type="hdf5")
-pannuke_module.prepare_data() # Download Pannuke dataset and write patches to h5 db
-```
-
 ### Training Script 
 
 ```python
@@ -62,39 +54,48 @@ config = CONFIG
 lightning_model = lightning.SegModel.from_conf(config)
 trainer = lightning.SegTrainer.from_conf(config)
 
-trainer.fit(lightning_model)
+# use pannuke dataset
+pannuke = PannukeDataModule(
+    database_type="hdf5",
+    augmentations=["hue_sat", "non_rigid", "blur"],
+    normalize=False,
+)
+
+# Train the model. the dataset will be downloaded at first run
+trainer.fit(model=lightning_model, datamodule=pannuke)
 ```
+
 
 ### experiment.yml
 
 ```yaml
 experiment_args:
-  experiment_name: my_experiment
-  experiment_version: dense_skip_test
+  experiment_name: testi2
+  experiment_version: radam
 
 dataset_args:
-  train_dataset: pannuke        # One of (consep, pannuke, kumar)
+  n_classes: 6
 
 model_args:
   architecture_design:
     module_args:
-      activation: relu          # One of (relu, mish, swish)
-      normalization: bn         # One of (bn, bcn, gn, null)
+      activation: leaky-relu    # One of (relu, mish, swish, leaky-relu)
+      normalization: bn         # One of (bn, bcn, gn, nope)
       weight_standardize: False # Weight standardization
-      weight_init: he           # One of (he, TODO: eoc & others) (only for decoder if pretrain)
+      weight_init: he           # One of (he, TODO: eoc) (only for decoder if pretrain)
     encoder_args:
       in_channels: 3            # RGB input images
-      encoder: resnet50         # One of encoders in https://github.com/qubvel/segmentation_models.pytorch
+      encoder: efficientnet-b5  # https://github.com/qubvel/segmentation_models.pytorch
       pretrain: True            # Use imagenet pre-trained encoder
       depth: 5                  # Number of layers in encoder
     decoder_args:
-      n_layers: 1               # Number of multi conv blocks inside one decoder level 
+      n_layers: 1               # Number multi conv blocks inside one decoder level 
       n_blocks: 2               # Number of convolutions blocks in each multi conv block
       preactivate: False        # If True, BN & RELU applied before CONV
-      short_skips: dense        # One of (residual, dense, null) (for decoder branch only)
+      short_skips: null        # One of (residual, dense, null) (for decoder branch only)
       long_skips: unet          # One of (unet, unet++, unet3+, null)
-      merge_policy: summation   # One of (summation, concatenate) (for long skips only)
-      upsampling: fixed_unpool  # One of (fixed_unpool). TODO: (interp, max_unpool, transconv)
+      merge_policy: concatenate # One of (summation, concatenate) (for long skips)
+      upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
       decoder_channels:         # Number of out channels for every decoder layer
         - 256
         - 128
@@ -104,24 +105,20 @@ model_args:
 
   decoder_branches:
     type_branch: True
-    aux_branch: hover           # One of (hover, dist, contour, null)
+    aux_branch: hover        # One of (hover, dist, contour, null)
 
 training_args:
-  normalize_input: False        # Minmax normalize input images after augs
-  freeze_encoder: False         # Freeze the weights in the encoder
-  weight_balancing: null        # TODO: One of (gradnorm, uncertainty, null) 
-  augmentations:                
-    - hue_sat
-    - non_rigid
-    - blur
+  normalize_input: False          # minmax normalize input images after augs
+  freeze_encoder: False          # freeze the weights in the encoder (for fine tuning)
+  weight_balancing: null         # One of (gradnorm, uncertainty, null)
 
   optimizer_args:
-    optimizer: adam             # One of optims in https://github.com/jettify/pytorch-optimizer or torch.optim 
+    optimizer: radam              # One of https://github.com/jettify/pytorch-optimizer 
     lr: 0.0005
     encoder_lr: 0.00005
     weight_decay: 0.0003
     encoder_weight_decay: 0.00003
-    lookahead: False
+    lookahead: True
     bias_weight_decay: True
     scheduler_factor: 0.25
     scheduler_patience: 3
@@ -130,18 +127,16 @@ training_args:
     inst_branch_loss: dice_ce
     type_branch_loss: dice_ce
     aux_branch_loss: mse_ssim
-    edge_weight: null             # (float|null) Give penalty to nuclei borders in cross-entropy based losses
-    class_weights: False          # Weight classes by the # of class pixels in the data
+    edge_weight: null         # (float|null) Give penalty to nuclei borders in cross-entropy based losses
 
 runtime_args:
   resume_training: False
-  num_epochs: 3
+  num_epochs: 2
   num_gpus: 1
-  batch_size: 8
-  num_workers: 8                  # number workers for data loader
-  model_input_size: 256           # size of the model input (input_size, input_size)
-  db_type: hdf5                   # The type of the input data db. One of (hdf5, zarr). 
-
+  batch_size: 4
+  num_workers: 8              # number workers for data loader
+  model_input_size: 256       # size of the model input (input_size, input_size)
+  db_type: hdf5               # The type of the input data db. One of (hdf5, zarr). 
 ```
 
 ## Inference Example
@@ -171,7 +166,6 @@ inferer = Inferer(
     loader_num_workers=1,
     model_batch_size=16,
     n_images=32,
-    auto_range=True
 )
 
 inferer.run_inference(
