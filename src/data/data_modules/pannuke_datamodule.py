@@ -1,4 +1,3 @@
-import logging
 import torch
 import pytorch_lightning as pl
 from pathlib import Path
@@ -28,11 +27,14 @@ class PannukeDataModule(pl.LightningDataModule, FileHandler):
 
         Pannuke dataset papers:
         ---------------
-        Gamper, J., Koohbanani, N., Benet, K., Khuram, A., & Rajpoot, N. (2019). PanNuke: an open pan-cancer histology dataset         
-        for nuclei instance segmentation and classification. In European Congress on Digital Pathology (pp. 11–19).
+        Gamper, J., Koohbanani, N., Benet, K., Khuram, A., & Rajpoot, N. (2019)
+        PanNuke: an open pan-cancer histology dataset for nuclei instance 
+        segmentation and classification. In European Congress on Digital 
+        Pathology (pp. 11–19).
 
-        Gamper, J., Koohbanani, N., Graham, S., Jahanifar, M., Khurram, S., Azam, A., Hewitt, K., & Rajpoot, N. (2020). 
-        PanNuke Dataset Extension, Insights and Baselines. arXiv preprint arXiv:2003.10778.
+        Gamper, J., Koohbanani, N., Graham, S., Jahanifar, M., Khurram, S., 
+        Azam, A., Hewitt, K., & Rajpoot, N. (2020). PanNuke Dataset Extension, 
+        Insights and Baselines. arXiv preprint arXiv:2003.10778.
 
         Licensed under: https://creativecommons.org/licenses/by-nc-sa/4.0/
 
@@ -42,33 +44,42 @@ class PannukeDataModule(pl.LightningDataModule, FileHandler):
                 One of ("zarr", "hdf5"). The files are written in either
                 zarr or hdf5 files that is used by the torch dataloader 
                 during training.
-            augmentations (List[str], default=["hue_sat", "non_rigid", "blur"]):
+            augmentations (List[str], default=["hue_sat", "non_rigid", "blur"])
                 List of augmentations. e.g. ["hue_sat", "non_rigid", "blur"]...
-                allowed augs: ("hue_sat", "rigid", "non_rigid", "blur", "non_spatial", "normalize")
+                allowed augs: ("hue_sat", "rigid", "non_rigid", "blur", 
+                "non_spatial", "normalize")
             normalize (bool, default=False):
-                If True, channel-wise min-max normalization is applied to input imgs 
-                in the dataloading process
+                If True, channel-wise min-max normalization is applied to input
+                imgs in the dataloading process
             aux_branch (str, default="hover"):
-                Signals that the dataset needs to prepare an input for an auxiliary branch in
-                the __getitem__ method. One of ("hover", "dist", "contour", None). If None, 
-                assumes that the network does not contain auxiliary branch and the unet style 
-                dataset (edge weights and no overlapping cells) is used as the dataset. 
+                Signals that the dataset needs to prepare an input for an 
+                auxiliary branch in the __getitem__ method. One of ("hover", 
+                "dist", "contour", None). If None, assumes that the network 
+                does not contain auxiliary branch and the unet style dataset 
+                (edge weights and no overlapping cells) is used as the dataset. 
             batch_size (int, batch_size=8):
                 Batch size for the dataloader
             num_workers (int, default=8):
                 number of cpu cores/threads used in the dataloading process.
             download_dir (str, or Path, default=None):
-                directory where the downloaded data is located or saved to. If None, and downloading
-                is required, will be downloaded in Dippa/data/pannuke/ folders.
+                directory where the downloaded data is located or saved to. If 
+                None, and downloading is required, will be downloaded in 
+                Dippa/data/pannuke/ folders.
             database_dir (str or Path, default=None):
-                The directory where the db is located or saved to. If None, and writing is required,
-                will be downloaded in Dippa/patches/pannuke/ folders
+                The directory where the db is located or saved to. If None, and
+                writing is required, will be downloaded in 
+                Dippa/patches/pannuke/ folders
             
         """
         super(PannukeDataModule, self).__init__()
 
-        self.database_dir = Path(database_dir) if database_dir is not None else Path(PATCH_DIR  / f"{database_type}" / "pannuke")
-        self.download_dir = Path(download_dir) if download_dir is not None else Path(DATA_DIR)
+        self.database_dir = Path(PATCH_DIR  / f"{database_type}" / "pannuke")
+        if database_dir is not None:
+            self.database_dir = Path(database_dir)
+
+        self.download_dir = Path(DATA_DIR)
+        if download_dir is not None:
+            self.download_dir = Path(download_dir)
         
         # Create the folders if it does not exist
         self.database_dir.mkdir(exist_ok=True)
@@ -84,19 +95,31 @@ class PannukeDataModule(pl.LightningDataModule, FileHandler):
         self.suffix = ".h5" if self.database_type == "hdf5" else ".zarr"
 
         # set up generic db names
-        self.db_fname_train = Path(self.database_dir / f"train_pannuke").with_suffix(self.suffix)
-        self.db_fname_test = Path(self.database_dir / f"test_pannuke").with_suffix(self.suffix)
+        self.db_fname_train = Path(
+            self.database_dir / f"train_pannuke"
+        ).with_suffix(self.suffix)
+
+        self.db_fname_test = Path(
+            self.database_dir / f"test_pannuke"
+        ).with_suffix(self.suffix)
 
     @staticmethod
     def get_classes() -> Dict[str, int]:
-        return {"bg":0, "neoplastic":1, "inflammatory":2, "connective":3, "dead":4, "epithelial":5}
+        return {
+            "bg": 0, 
+            "neoplastic": 1,
+            "inflammatory": 2,
+            "connective": 3, 
+            "dead": 4,
+            "epithelial": 5}
     
     @staticmethod
     def download(download_dir: Union[Path, str], fold: int, phase: str) -> Dict[str, Path]:
         """
-        Download pannuke folds from: "https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke/"
-        and convert the mask .npy files to .mat files containing "inst_map", "type_map",
-        "inst_centroid", "inst_type" and "inst_bbox" slots.
+        Download pannuke folds from: 
+        "https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke/"
+        and convert the mask .npy files to .mat files containing "inst_map", 
+        "type_map", "inst_centroid", "inst_type" and "inst_bbox" slots.
 
         Args:
         -----------
@@ -105,12 +128,22 @@ class PannukeDataModule(pl.LightningDataModule, FileHandler):
             fold (int):
                 Pannuke contains three data folds. One of (1, 2, 3).
             phase (str):
-                Defines the phase that the fold will be used. One of ("test", "train").
-                In practice, this arg sets the directory name where the files are downloaded.
+                Defines the phase that the fold will be used. One of ("test", 
+                "train"). In practice, this arg sets the directory name where 
+                the files are downloaded.
         
         Returns:
         -----------
-            Dictionary {"img_train": Path, "img_test":Path, "mask_train":Path, "mask_test":Path}
+            Dict: 
+            
+            example:
+
+            {
+                "img_train": Path, 
+                "img_test":Path, 
+                "mask_train":Path, 
+                "mask_test":Path
+            }
         """
         pannuke = PANNUKE(save_dir=download_dir, fold=fold, phase=phase)
         return pannuke.download()
@@ -140,11 +173,13 @@ class PannukeDataModule(pl.LightningDataModule, FileHandler):
             database_type (str):
                 One of ("zarr", "hdf5")
             classes (Dict[str, int]):
-                classes dictionary e.g. {"bg":0, "neoplastic":1, "inflammatory":2}
+                classes dictionary e.g. {"bg":0, "neoplastic":1, "inflamma":2}
             augment (bool, default=True):
-                If True, rigid augmentations are applied to the (img, mask) pairs
+                If True, rigid augmentations are applied to the (img, mask) 
+                pairs
             n_copies (int, default=3):
-                Number of copies taken for every (img, mask) pairs for augmentations
+                Number of copies taken for every (img, mask) pairs for 
+                augmentations
         """
         assert database_type in ("zarr", "hdf5")
         writerobj = HDF5Writer if database_type == "hdf5" else ZarrWriter 
@@ -169,19 +204,18 @@ class PannukeDataModule(pl.LightningDataModule, FileHandler):
         Get the proportion of pixels of diffenrent classes in the train dataset
         """
         weights = self.get_class_weights(self.db_fname_train.as_posix())
-        weights_bin = self.get_class_weights(self.db_fname_train.as_posix(), binary=True)
+        weights_bin = self.get_class_weights(
+            self.db_fname_train.as_posix(), binary=True
+        )
         return to_device(weights), to_device(weights_bin)
 
 
     # DataModule boilerplate
     def prepare_data(self) -> None:
         """
-        1. Download pannuke folds from: "https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke/" and re-format
+        1. Download pannuke folds from: 
+            "https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke/"
         2. Write images/masks to to zarr or hdf5 files
-
-        Zarr files can be thread/file-locked easily (if needed) but generally zarr files are slower
-        than hdf5 in dataloading, especially in HPC environments: 
-        https://sc19.supercomputing.org/proceedings/tech_poster/poster_files/rpost191s2-file3.pdf 
 
         Folds are saved to save_dir, unpacked, converted to singular
         .png/.mat files (CoNSeP-format) that are then moved to train
@@ -196,7 +230,6 @@ class PannukeDataModule(pl.LightningDataModule, FileHandler):
 
         # Write dbs if they dont yet exist
         if not self.db_fname_train.exists():
-            logging.info(f"Writing new {self.database_type} train DB to {self.database_dir.as_posix()}")
             self.write_db(
                 img_dir=fold1["img_train"],
                 mask_dir=fold1["mask_train"],
@@ -207,14 +240,8 @@ class PannukeDataModule(pl.LightningDataModule, FileHandler):
                 augment=True,
                 n_copies=3
             )
-        else:
-            logging.info(
-                (f"Using existing {self.database_type} train db: {self.db_fname_train.as_posix()}",
-                "If you want to write new train databases, remove the old one first")
-            )
 
         if not self.db_fname_test.exists():
-            logging.info(f"Writing new {self.database_type} train DB to {self.database_dir.as_posix()}")
             self.write_db(
                 img_dir=fold1["img_test"],
                 mask_dir=fold1["mask_test"],
@@ -225,11 +252,7 @@ class PannukeDataModule(pl.LightningDataModule, FileHandler):
                 augment=False,
                 n_copies=None,
             )
-        else:
-            logging.info(
-                (f"Using existing {self.database_type} test db: {self.db_fname_test.as_posix()}",
-                "If you want to write new test database, remove the old one first")
-            )
+
         
     def setup(self, stage: Optional[str]=None) -> None:
         self.trainset = DatasetBuilder.set_train_dataset(

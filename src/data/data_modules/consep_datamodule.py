@@ -1,5 +1,4 @@
 import torch
-import logging
 import pytorch_lightning as pl
 from pathlib import Path
 from typing import Union, List, Optional, Dict, Tuple
@@ -30,9 +29,10 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
 
         CoNSeP dataset paper:
         --------------
-        S. Graham, Q. D. Vu, S. E. A. Raza, A. Azam, Y-W. Tsang, J. T. Kwak and N. Rajpoot. 
-        "HoVer-Net: Simultaneous Segmentation and Classification of Nuclei in Multi-Tissue Histology Images." 
-        Medical Image Analysis, Sept. 2019. 
+        S. Graham, Q. D. Vu, S. E. A. Raza, A. Azam, Y-W. Tsang, J. T. Kwak and
+        N. Rajpoot. "HoVer-Net: Simultaneous Segmentation and Classification of
+        Nuclei in Multi-Tissue Histology Images." Medical Image Analysis, 
+        Sept. 2019. 
 
         Args:
         -----------
@@ -40,27 +40,31 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
                 One of ("zarr", "hdf5"). The files are written in either
                 zarr or hdf5 files that is used by the torch dataloader 
                 during training.
-            augmentations (List[str], default=["hue_sat", "non_rigid", "blur"]):
+            augmentations (List[str], default=["hue_sat", "non_rigid", "blur"])
                 List of augmentations. e.g. ["hue_sat", "non_rigid", "blur"]...
-                allowed augs: ("hue_sat", "rigid", "non_rigid", "blur", "non_spatial", "normalize")
+                allowed augs: ("hue_sat", "rigid", "non_rigid", "blur", 
+                "non_spatial", "normalize")
             normalize (bool, default=False):
-                If True, channel-wise min-max normalization is applied to input imgs 
-                in the dataloading process
+                If True, channel-wise min-max normalization is applied to input
+                imgs in the dataloading process
             aux_branch (str, default="hover"):
-                Signals that the dataset needs to prepare an input for an auxiliary branch in
-                the __getitem__ method. One of ("hover", "dist", "contour", None). If None, 
-                assumes that the network does not contain auxiliary branch and the unet style 
-                dataset (edge weights and no overlapping cells) is used as the dataset. 
+                Signals that the dataset needs to prepare an input for an 
+                auxiliary branch in the __getitem__ method. One of ("hover", 
+                "dist", "contour", None). If None, assumes that the network 
+                does not contain auxiliary branch and the unet style dataset 
+                (edge weights and no overlapping cells) is used as the dataset. 
             batch_size (int, default=8):
                 Batch size for the dataloader
             num_workers (int, default=8):
                 number of cpu cores/threads used in the dataloading process.
             download_dir (str, or Path obj, default=None):
-                directory where the downloaded data is located or saved to. If None, and downloading
-                is required, will be downloaded in Dippa/data/pannuke/ folders.
+                directory where the downloaded data is located or saved to. If
+                None, and downloading is required, will be downloaded in 
+                Dippa/data/pannuke/ folders.
             database_dir (str or Path, default=None):
-                The directory where the db is located or saved to. If None, and writing is required,
-                will be downloaded in Dippa/patches/pannuke/ folders
+                The directory where the db is located or saved to. If None, and
+                writing is required, will be downloaded in 
+                Dippa/patches/pannuke/ folders
             convert_classes (bool, default=True):
                 Convert the original classes to the reduced set of classes
                 See the paper.
@@ -68,8 +72,13 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
         """
         super(ConsepDataModule, self).__init__()
 
-        self.database_dir = Path(database_dir) if database_dir is not None else Path(PATCH_DIR  / f"{database_type}" / "consep")
-        self.download_dir = Path(download_dir) if download_dir is not None else Path(DATA_DIR)
+        self.database_dir = Path(PATCH_DIR  / f"{database_type}" / "consep")
+        if database_dir is not None:
+            self.database_dir = Path(database_dir)
+
+        self.download_dir = Path(DATA_DIR)
+        if download_dir is not None:
+            self.download_dir = Path(download_dir)
         
         # Create the folders if it does not exist
         self.database_dir.mkdir(exist_ok=True)
@@ -86,26 +95,42 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
         self.suffix = ".h5" if self.database_type == "hdf5" else ".zarr"
 
         # set up generic db names
-        self.db_fname_train = Path(self.database_dir / f"train_consep").with_suffix(self.suffix)
-        self.db_fname_test = Path(self.database_dir / f"test_consep").with_suffix(self.suffix)
+        self.db_fname_train = Path(
+            self.database_dir / f"train_consep"
+        ).with_suffix(self.suffix)
+
+        self.db_fname_test = Path(
+            self.database_dir / f"test_consep"
+        ).with_suffix(self.suffix)
 
     @staticmethod
     def get_classes() -> Dict[str, int]:
         return {
-            "bg":0, "miscellanous":1, "inflammatory":2, "epithelial":3, "spindle":4
+            "bg":0, 
+            "miscellanous":1, 
+            "inflammatory":2, 
+            "epithelial":3, 
+            "spindle":4
         } 
 
     @staticmethod
     def get_orig_classes() -> Dict[str, int]:
         return {
-            "bg":0, "miscellanous": 1, "inflammatory": 2, "healty_epithelial": 3,
-            "malignant_epithelial": 4, "fibroblast": 5, "muscle": 6, "endothelial": 7
+            "bg":0, 
+            "miscellanous": 1, 
+            "inflammatory": 2, 
+            "healty_epithelial": 3,
+            "malignant_epithelial": 4, 
+            "fibroblast": 5,
+            "muscle": 6, 
+            "endothelial": 7
         }
 
     @staticmethod
     def download(download_dir: Union[Path, str], convert_classes: bool=True) -> Dict[str, Path]:
         """
-        Download CoNSeP dataset from: https://warwick.ac.uk/fac/cross_fac/tia/data/hovernet/.
+        Download CoNSeP dataset from: 
+        https://warwick.ac.uk/fac/cross_fac/tia/data/hovernet/.
         and optionally creduce the classes from 8 to 5. See their README..
 
         Args:
@@ -118,7 +143,16 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
         
         Returns:
         -----------
-            Dictionary {"img_train": Path, "img_test":Path, "mask_train":Path, "mask_test":Path}
+            Dict: 
+            
+            example:
+            
+            {
+                "img_train": Path, 
+                "img_test":Path, 
+                "mask_train":Path, 
+                "mask_test":Path
+            }
         """
         consep = CONSEP(save_dir=download_dir, convert_classes=convert_classes)
         return consep.download()
@@ -135,7 +169,8 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
                  patch_shape: Tuple[int, int]=(512, 512),
                  crop_shape: Tuple[int, int]=(256,256)) -> None:
         """
-        Write overlapping (img [.png], mask [.mat]) pairs to either Zarr or HDF5 db
+        Write overlapping (img [.png], mask [.mat]) pairs to either Zarr or 
+        HDF5 db
 
         Args:
         ---------
@@ -150,16 +185,17 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
             database_type (str):
                 One of ("zarr", "hdf5")
             classes (Dict[str, int]):
-                classes dictionary e.g. {"bg":0, "neoplastic":1, "inflammatory":2}
+                classes dictionary e.g. {"bg":0, "neoplastic":1, "inflamma":2}
             augment (bool, default=True):
-                If True, rigid augmentations are applied to the (img, mask) pairs
+                If True, rigid augmentations are applied to the (img, mask) 
+                pairs
             patch_shape (Tuple[int, int], default=(512, 512)):
                 Specifies the height and width of the patches. If this is None,
                 no patching is applied.
             stride_size (int, default=80):
-                Stride size for the sliding window patcher. Needs to be <= patch_shape.
-                If < patch_shape, patches are created with overlap. Ignored if patch_shape
-                is None.
+                Stride size for the sliding window patcher. Needs to be less or
+                equal to patch_shape. If less than patch_shape, patches are 
+                created with overlap. Ignored if patch_shape is None.
             crop_shape (Tuple[int, int], default=(256, 256)):
                 If augment is True, this is the crop shape for the center crop.
         """
@@ -186,13 +222,16 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
         Get the proportion of pixels of diffenrent classes in the train dataset
         """
         weights = self.get_class_weights(self.db_fname_train.as_posix())
-        weights_bin = self.get_class_weights(self.db_fname_train.as_posix(), binary=True)
+        weights_bin = self.get_class_weights(
+            self.db_fname_train.as_posix(), binary=True
+        )
         return to_device(weights), to_device(weights_bin)
 
     # DataModule boilerplate
     def prepare_data(self) -> None:
         """
-        1. Download CoNSeP dataset from: https://warwick.ac.uk/fac/cross_fac/tia/data/hovernet/
+        1. Download CoNSeP dataset from: 
+            https://warwick.ac.uk/fac/cross_fac/tia/data/hovernet/
         2. Write images/masks to to zarr or hdf5 files
 
         Folds are saved to save_dir, unpacked, converted to singular
@@ -206,7 +245,6 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
 
         # Write dbs if they dont yet exist
         if self.db_fname_train.exists():
-            logging.info(f"Writing new {self.database_type} train DB to {self.database_dir.as_posix()}")
             self.write_db(
                 img_dir=fold1["img_train"],
                 mask_dir=fold1["mask_train"],
@@ -216,14 +254,8 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
                 classes=self.get_classes(),
                 augment=True,
             )
-        else:
-            logging.info(
-                (f"Using existing {self.database_type} train db:  {self.db_fname_train.as_posix()}",
-                "If you want to write new train databases, remove the old one first")
-            )
 
         if not self.db_fname_test.exists():
-            logging.info(f"Writing new {self.database_type} train DB to {self.database_dir.as_posix()}")
             self.write_db(
                 img_dir=fold1["img_test"],
                 mask_dir=fold1["mask_test"],
@@ -234,11 +266,6 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
                 augment=False,
                 patch_shape=(256, 256),
                 stride_size=256,
-            )
-        else:
-            logging.info(
-                (f"Using existing {self.database_type} test db: {self.db_fname_test.as_posix()}",
-                "If you want to write new test database, remove the old one first")
             )
     
     def setup(self, stage: Optional[str] = None) -> None:

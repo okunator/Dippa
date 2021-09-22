@@ -29,8 +29,9 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
         Kumar dataset paper:
         --------------
         N. Kumar, R. Verma, S. Sharma, S. Bhargava, A. Vahadane and A. Sethi, 
-        "A Dataset and a Technique for Generalized Nuclear Segmentation for Computational Pathology,"
-        in IEEE Transactions on Medical Imaging, vol. 36, no. 7, pp. 1550-1560, July 2017
+        "A Dataset and a Technique for Generalized Nuclear Segmentation for 
+        Computational Pathology," in IEEE Transactions on Medical Imaging, vol.
+        36, no. 7, pp. 1550-1560, July 2017
 
         Args:
         -----------
@@ -40,32 +41,41 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
                 during training.
             augmentations (List[str]):
                 List of augmentations. e.g. ["hue_sat", "non_rigid", "blur"]...
-                allowed augs: ("hue_sat", "rigid", "non_rigid", "blur", "non_spatial", "normalize")
+                allowed augs: ("hue_sat", "rigid", "non_rigid", "blur", 
+                "non_spatial", "normalize")
             normalize (bool):
-                If True, channel-wise min-max normalization is applied to input imgs 
-                in the dataloading process
+                If True, channel-wise min-max normalization is applied to input
+                imgs in the dataloading process
             aux_branch (str):
-                Signals that the dataset needs to prepare an input for an auxiliary branch in
-                the __getitem__ method. One of ("hover", "dist", "contour", None). If None, 
-                assumes that the network does not contain auxiliary branch and the unet style 
-                dataset (edge weights and no overlapping cells) is used as the dataset. 
+                Signals that the dataset needs to prepare an input for an 
+                auxiliary branch in the __getitem__ method. One of ("hover", 
+                "dist", "contour", None). If None, assumes that the network 
+                does not contain auxiliary branch and the unet style dataset 
+                (edge weights and no overlapping cells) is used as the dataset. 
             batch_size (int):
                 Batch size for the dataloader
             num_workers (int):
                 number of cpu cores/threads used in the dataloading process.
             download_dir (str, or Path obj):
-                directory where the downloaded data is located or saved to. If None, and downloading
-                is required, will be downloaded in Dippa/data/pannuke/ folders.
+                directory where the downloaded data is located or saved to. 
+                If None, and downloading is required, will be downloaded in 
+                Dippa/data/pannuke/ folders.
             database_dir (str or Path):
-                The directory where the db is located or saved to. If None, and writing is required,
-                will be downloaded in Dippa/patches/pannuke/ folders
+                The directory where the db is located or saved to. If None, and
+                writing is required, will be downloaded in 
+                Dippa/patches/pannuke/ folders
             
         """
         super(KumarDataModule, self).__init__()
 
-        self.database_dir = Path(database_dir) if database_dir is not None else Path(PATCH_DIR  / f"{database_type}" / "kumar")
-        self.download_dir = Path(download_dir) if download_dir is not None else Path(DATA_DIR)
-        
+        self.database_dir = Path(PATCH_DIR  / f"{database_type}" / "kumar")
+        if database_dir is not None:
+            self.database_dir = Path(database_dir)
+
+        self.download_dir = Path(DATA_DIR)
+        if download_dir is not None:
+            self.download_dir = Path(download_dir)
+
         # Create the folders if it does not exist
         self.database_dir.mkdir(exist_ok=True)
         self.download_dir.mkdir(exist_ok=True)
@@ -81,8 +91,13 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
         self.suffix = ".h5" if self.database_type == "hdf5" else ".zarr"
 
         # set up generic db names
-        self.db_fname_train = Path(self.database_dir / f"train_kumar").with_suffix(self.suffix)
-        self.db_fname_test = Path(self.database_dir / f"test_kumar").with_suffix(self.suffix)
+        self.db_fname_train = Path(
+            self.database_dir / f"train_kumar"
+        ).with_suffix(self.suffix)
+
+        self.db_fname_test = Path(
+            self.database_dir / f"test_kumar"
+        ).with_suffix(self.suffix)
 
     @staticmethod
     def get_classes() -> Dict[str, int]:
@@ -92,11 +107,14 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
     def download(download_dir: Union[Path, str]) -> Dict[str, Path]:
         """
         Download Kumar train & test folds from: 
-        1. Train: https://drive.google.com/file/d/1ZgqFJomqQGNnsx7w7QBzQQMVA16lbVCA/view
-        2. Test: https://drive.google.com/file/d/1NKkSQ5T0ZNQ8aUhh0a8Dt2YKYCQXIViw/view
+        1. Train: 
+        https://drive.google.com/file/d/1ZgqFJomqQGNnsx7w7QBzQQMVA16lbVCA/view
 
-        and convert the mask xml files to .mat files containing "inst_map", "type_map",
-        "inst_centroid", "inst_type" and "inst_bbox" slots.
+        2. Test: 
+        https://drive.google.com/file/d/1NKkSQ5T0ZNQ8aUhh0a8Dt2YKYCQXIViw/view
+
+        and convert the mask xml files to .mat files containing "inst_map", 
+        "type_map", "inst_centroid", "inst_type" and "inst_bbox" slots.
 
         Args:
         -----------
@@ -105,7 +123,16 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
         
         Returns:
         -----------
-            Dictionary {"img_train": Path, "img_test":Path, "mask_train":Path, "mask_test":Path}
+            Dict:
+
+            example:
+            
+            {
+                "img_train": Path,
+                "img_test": Path, 
+                "mask_train": Path, 
+                "mask_test": Path
+            }
         """
         return KUMAR()
 
@@ -134,9 +161,10 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
             database_type (str):
                 One of ("zarr", "hdf5")
             classes (Dict[str, int]):
-                classes dictionary e.g. {"bg":0, "neoplastic":1, "inflammatory":2}
+                classes dictionary e.g. {"bg":0, "neoplastic":1, "inflamma":2}
             augment (bool, default=True):
-                If True, rigid augmentations are applied to the (img, mask) pairs
+                If True, rigid augmentations are applied to the (img, mask) 
+                pairs
         """
         assert database_type in ("zarr", "hdf5")
         writerobj = HDF5Writer if database_type == "hdf5" else ZarrWriter 
@@ -161,7 +189,9 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
         Get the proportion of pixels of diffenrent classes in the train dataset
         """
         weights = self.get_class_weights(self.db_fname_train.as_posix())
-        weights_bin = self.get_class_weights(self.db_fname_train.as_posix(), binary=True)
+        weights_bin = self.get_class_weights(
+            self.db_fname_train.as_posix(), binary=True
+        )
         return to_device(weights), to_device(weights_bin)
 
     def prepare_data(self) -> None:
