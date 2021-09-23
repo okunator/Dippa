@@ -23,14 +23,16 @@ SUFFIXES = (".jpeg", ".jpg", ".tif", ".tiff", ".png")
 
 
 class FolderDataset(Dataset, FileHandler):
-    def __init__(self, 
-                 folder_path: Union[str, Path],
-                 pattern: Optional[str]="*", 
-                 sort_by_y: Optional[bool]=False,
-                 xmax: Optional[int]=None,
-                 ymax: Optional[int]=None,
-                 auto_range: bool=False,
-                 tile_size: Optional[Tuple[int, int]]=(1000, 1000)) -> None:
+    def __init__(
+        self, 
+        folder_path: Union[str, Path],
+        pattern: Optional[str]="*", 
+        sort_by_y: Optional[bool]=False,
+        xmax: Optional[int]=None,
+        ymax: Optional[int]=None,
+        auto_range: bool=False,
+        tile_size: Optional[Tuple[int, int]]=(1000, 1000)
+    ) -> None:
         """
         Simple pytorch folder dataset. Assumes that
         folder_path contains only image files which are readable
@@ -41,23 +43,25 @@ class FolderDataset(Dataset, FileHandler):
             folder_path (Union[str, Path]):
                 path to the folder containig tile/image files
             pattern (str, optional, default="*"):
-                file pattern for filtering only the files that contain the 
-                pattern.
+                file pattern for filtering only the files that contain 
+                the pattern.
             sort_by_y (bool, optional, default=False):
                 sorts a folder (containing tiles extracted by histoprep 
-                package) by the y-coordinate rather than the x-coordinate
+                package) by the y-coord rather than the x-coord
             xmax (int, optional, default=None):
-                filters all the tile-files that contain x-coordinate <= than 
-                this param in their filename. (works with tiles extracted with
-                histoprep). See https://github.com/jopo666/HistoPrep 
+                filters all the tile-files that contain x-coord less 
+                or equal to this param in their filename. Works with 
+                tiles extracted with histoprep. 
+                See https://github.com/jopo666/HistoPrep 
             ymax (int, optional, default=None):
-                filters all the tile-files that contain y-coordinate <= than 
-                this param in their filename. (works with tiles extracted with
-                histoprep). See https://github.com/jopo666/HistoPrep.
+                filters all the tile-files that contain y-coord less 
+                or equal to this param in their filename. Works with 
+                tiles extracted with histoprep. 
+                See https://github.com/jopo666/HistoPrep 
             auto_range (bool, default=False):
-                Automatically filter tiles that contain ONE tissue section
-                rather than every redundant tissue section in the wsi. 
-                (Less redundant segmentation work).
+                Automatically filter tiles that contain ONE tissue 
+                section rather than every redundant tissue section in 
+                the wsi.
             tile_size (Tuple[int, int], optional, default=(1000, 1000)):
                 size of the input tiles in the folder. Optional.
         """
@@ -101,9 +105,9 @@ class FolderDataset(Dataset, FileHandler):
     def _get_xy_coords(self, fname: str) -> Tuple[int, int]:
         """
         Extract xy-coords from files named with x- and y- coordinates 
-        in their file name (see histoprep) https://github.com/jopo666/HistoPrep 
+        in their file name.
         
-        example filename: "sumthing4955_x-47000_y-25000.png 
+        example filename: "sumthing_4955_x-47000_y-25000.png 
         """
         assert re.findall(r"(x-\d+_y-\d+)", fname), (
             "fname not in 'sumthing_x-[coord1]_y-[coord2]'-format",
@@ -115,10 +119,12 @@ class FolderDataset(Dataset, FileHandler):
 
         return xy
 
-    def _get_auto_range(self, 
-                        coord: str="y", 
-                        section_ix: int=0, 
-                        section_length: int=6000) -> Tuple[int, int]:
+    def _get_auto_range(
+            self, 
+            coord: str="y", 
+            section_ix: int=0, 
+            section_length: int=6000
+        ) -> Tuple[int, int]:
         """
         Automatically extract a range of tiles that contain a section
         of tissue in a whole slide image. This is pretty ad hoc
@@ -130,16 +136,16 @@ class FolderDataset(Dataset, FileHandler):
             coord (str, default="y"):
                 specify the range in either x- or y direction
             section_ix (int, default=0):
-                the nth tissue section in the wsi in the direction of the
-                coord param.
+                the nth tissue section in the wsi in the direction of 
+                the coord param.
             section_length (int, default=6000):
-                Threshold to concentrate only on tissue sections that are 
-                larger than 6000 pixels
+                Threshold to concentrate only on tissue sections that
+                are larger than 6000 pixels
 
         Returns:
         --------
-            Tuple[int, int]. The start and end point of the tissue section
-            in the specified direction
+            Tuple[int, int]: The start and end point of the tissue 
+            section in the specified direction
         """
         ix = 1 if coord == "y" else 0
         coords = sorted(
@@ -165,7 +171,7 @@ class FolderDataset(Dataset, FileHandler):
             ret_split = ret_splits[section_ix]
             return ret_split[0], ret_split[-1]
         except:
-            # if there is only one tissue section, return the min and max
+            # if there is only one tissue section, return min and max
             start = min(coords, key=lambda x: x[ix])[ix]
             end = max(coords, key=lambda x: x[ix])[ix]
             return start, end
@@ -185,27 +191,29 @@ class FolderDataset(Dataset, FileHandler):
 
 
 class Inferer(FileHandler):
-    def __init__(self,
-                 model: pl.LightningModule,
-                 in_data_dir: str,
-                 gt_mask_dir: str=None,
-                 tta: bool=False,
-                 model_weights: str="last",
-                 loader_batch_size: int=8,
-                 loader_num_workers: int=8,
-                 patch_size: Tuple[int, int]=(256, 256),
-                 stride_size: int=128,
-                 model_batch_size: int=None,
-                 thresh_method: str="naive",
-                 thresh: float=0.5,
-                 apply_weights: bool=False,
-                 post_proc_method: str=None,
-                 n_images: int=32,
-                 fn_pattern: str="*",
-                 xmax: Optional[int]=None,
-                 ymax: Optional[int]=None,
-                 auto_range: Optional[bool]=False,
-                 **kwargs) -> None:
+    def __init__(
+        self,
+        model: pl.LightningModule,
+        in_data_dir: str,
+        gt_mask_dir: str=None,
+        tta: bool=False,
+        model_weights: str="last",
+        loader_batch_size: int=8,
+        loader_num_workers: int=8,
+        patch_size: Tuple[int, int]=(256, 256),
+        stride_size: int=128,
+        model_batch_size: int=None,
+        thresh_method: str="naive",
+        thresh: float=0.5,
+        apply_weights: bool=False,
+        post_proc_method: str=None,
+        n_images: int=32,
+        fn_pattern: str="*",
+        xmax: Optional[int]=None,
+        ymax: Optional[int]=None,
+        auto_range: Optional[bool]=False,
+        **kwargs
+    ) -> None:
         """
         Class to perform inference and post-processing
 
@@ -215,96 +223,94 @@ class Inferer(FileHandler):
                 Input SegModel (lightning model)
             in_data_dir (str):
                 This directory will be used as the input data directory. 
-                Assumes that the directory contains only cv2 readable image 
-                files: .png, .tif, etc
+                Assumes that the directory contains only cv2 readable 
+                image files: .png, .tif, etc
             gt_mask_dir (str, default=None):
                 The directory of the test ground truth masks. Needed for 
                 benchmarking only.
             tta (bool, default=False):
-                If True, performs test time augmentation. Inference time goes 
-                up with often marginal performance improvements. TODO
+                If True, performs test time augmentation. Inference time
+                goes up with often marginal performance improvements.
             model_weights (str, default="last"):
-                pytorch lightning saves the weights of the model for the last
-                epoch and best epoch (based on validation data). One of 
-                ("best", "last").
+                pytorch lightning saves the weights of the model for the
+                last epoch and best epoch (based on validation data). 
+                One of ("best", "last").
             loader_batch_size (int, default=8):
-                Number of images loaded from the input folder by the workers 
-                per dataloader iteration. This is the DataLoader batch size, 
-                NOT the batch size that is used during the forward pass of the
-                model.
+                Number of images loaded from the input folder by the 
+                workers per dataloader iteration. This is the DataLoader
+                batch size, NOT the batch size that is used during the 
+                forward pass of the model.
             loader_num_workers (int, default=8):
                 Number of threads/workers for torch dataloader
             patch_size (Tuple[int, int], default=(256, 256)):
-                The size of the input patches that are fed to the segmentation 
-                model.
+                The size of the input patches that are fed to the 
+                segmentation model.
             stride_size (int, default=128):
-                If input images are larger than the model input image size 
-                (patch_size), the images are tiled with a sliding window into 
-                small patches with overlap. This param is the stride size used 
-                in the sliding window operation. Small stride for the sliding 
-                window results in less artefacts and checkerboard effect in the
-                resulting prediction when the patches are stitched back to the 
-                input image size. On the other hand small stride_size means 
-                more patches and larger number of patches leads to slower 
-                inference time and larger memory consumption. stride_size needs
-                to be less or equal than the input patch_size.
+                If input images are larger than the model input image 
+                size (patch_size), the images are tiled with a sliding 
+                window into small patches with overlap. This param is 
+                the stride size used in the sliding window operation. 
+                Small stride for the sliding window results in less 
+                artefacts and checkerboard effect in the resulting 
+                prediction when the patches are stitched back to the 
+                input image size. On the other hand small stride_size 
+                means more patches and larger number of patches leads to
+                slower inference time and larger memory consumption. 
             model_batch_size (int, default=None):
-                The batch size that is used when the input is fed to the model 
-                (actual model batch size). If input images need patching, and 
-                the batch size for training batch size is too large (cuda out 
-                of memmory error). This argument overrides the model batch 
-                size, so you can reduce the memory footprint. 
+                The batch size that is used when the input is fed to the
+                model (actual model batch size). Use if the input images
+                need patching and the batch size for training batch size
+                is too large i.e. you get (cuda out of memmory error).
             thresh_method (str, default="naive"):
-                Thresholding method for the soft masks from the instance branch.
-                One of ("naive", "argmax", "sauvola", "niblack")).
+                Thresholding method for the soft masks from the instance
+                branch.One of ("naive", "argmax", "sauvola", "niblack").
             thresh (float, default = 0.5): 
-                threshold probability value. Only used if method == "naive"
+                threshold probability value. Only used if method="naive"
             apply_weights (bool, default=True):
-                After a prediction, apply a weight matrix that assigns bigger 
-                weight on pixels in center and less weight to pixels on 
-                prediction boundaries. helps dealing with prediction artefacts 
-                on tile/patch boundaries. NOTE: This is only applied at the
-                auxiliary branch prediction since there tiling effect has the 
-                most impact. (Especially, in HoVer-maps)
+                After a prediction, apply a weight matrix that assigns 
+                bigger weight on pixels in center and less weight to 
+                pixels on prediction boundaries. helps dealing with 
+                prediction artefacts on tile/patch boundaries. NOTE: 
+                This is only applied at the auxiliary branch prediction 
+                since there tiling effect has the most impact. 
+                (Especially, in HoVer-maps)
             post_proc_method (str, default=None):
-                Defines the post-processing pipeline. If this is None, then the
-                post-processing pipeline is defined by the aux_type of the 
-                model. If the aux_type of the model is None, then the basic 
-                watershed post-processing pipeline is used. The post-processing
-                method is always specific to the auxiliary maps that the model 
-                outputs so if the aux_type == "hover", then the HoVer-Net and 
-                CellPose pipelines can be used. One of 
-                (None, "hover", "cellpose", "drfns", "dcan", "dran"). 
+                Defines the post-processing pipeline. If this is None, 
+                then the post-processing pipeline is defined by the 
+                aux_type of the model. If the aux_type of the model is 
+                None, then the basic watershed post-processing pipeline
+                is used. The post-processing method is always specific 
+                to the auxiliary maps that the model outputs so if the 
+                aux_type == "hover", then the HoVer-Net and CellPose 
+                pipelines can be used. One of: None, "hover","cellpose",
+                "drfns", "dcan", "dran". 
             n_images (int, default=32):
-                Number of images inferred before clearing the memory. Useful if
-                there is a large number of images in a folder. The segmentation
-                results are saved after n_images are segmented and memory 
-                cleared for a new set of images to be segmented.
+                Number of images inferred before clearing the memory. 
+                Useful if there is a large number of images in a folder.
+                The segmentation results are saved after n_images are 
+                segmented and memory cleared for a new set of images.
             fn_pattern (str, default="**):
-                A pattern in file names in the in_data_dir. For example, for 
-                pannuke dataset you can run inference for only images of 
-                specific tissue e.g. pattern = *_Adrenal_*.
+                A pattern in file names in the in_data_dir. For example,
+                for pannuke dataset you can run inference for only 
+                images of specific tissue e.g. pattern = *_Adrenal_*.
             xmax (int, optional, default=None):
-                Filters all the file names in the input directory that contain
-                x-coordinate less than this param in their filename. I.e. the 
-                tiles in the folder need to contain the x- and y- coordinates 
-                (in xy- order) in the filename. Example tile filename: 
-                "x-45000_y-50000.png". Works with tiles extracted with 
-                histoprep package. See: https://github.com/jopo666/HistoPrep.
+                Filters all the file names in the input directory that 
+                contain x-coordinate less than this param in their 
+                filename. I.e. the tiles in the folder need to contain 
+                the x- and y- coordinates (in xy- order) in the filename
+                Example tile filename: "x-45000_y-50000.png".
             ymax (int, optional, default=None):
-                Filters all the file names in the input directory that contain 
-                y-coordinate less than this param in their filename. I.e. the 
-                tiles in the folder need to contain the x- and y- coordinates 
-                (in xy- order) in the filename. Example tile filename: 
-                "x-45000_y-50000.png". Works with tiles extracted with 
-                histoprep package. See: https://github.com/jopo666/HistoPrep.
+                Filters all the file names in the input directory that 
+                contain y-coord less than this param in their filename. 
+                I.e. the tiles in the folder need to contain the x- and 
+                y- coords (in xy- order) in the filename. Example tile 
+                filename: "x-45000_y-50000.png".
             auto_range (bool, optional, default=False):
-                Automatically filter tiles from a folder that contain only ONE 
-                tissue section rather than every redundant tissue section in 
-                the wsi. The tiles in the folder need to contain the x- and y-
-                coordinates (in xy- order) in the filename. Example tile 
-                filename: "x-45000_y-50000.png". (Works with tiles extracted 
-                with histoprep package.
+                Automatically filter tiles from a folder that contain 
+                only ONE tissue section rather than every redundant 
+                tissue section in the wsi. The tiles in the folder need 
+                to contain the x- and y-coords (in xy- order) in the 
+                filename. Example tile filename: "x-45000_y-50000.png".
         """
         assert isinstance(model, pl.LightningModule), (
             "Input model needs to be a lightning model"
@@ -329,17 +335,26 @@ class Inferer(FileHandler):
             which=model_weights
         )
         checkpoint = torch.load(
-            ckpt_path, map_location = lambda storage, loc : storage
+            ckpt_path, map_location = lambda storage, loc: storage
         )
-        self.model.load_state_dict(checkpoint['state_dict'], strict=False)
+        self.model.load_state_dict(
+            checkpoint['state_dict'], 
+            strict=False
+        )
 
         self.patch_size = patch_size
         self.stride_size = stride_size
         self.n_images = n_images
 
-        # Set input data folder and gt mask folder if there are gt masks
+        # Set input data folder
         self.in_data_dir = in_data_dir
-        self.gt_mask_dir = sorted(Path(gt_mask_dir).glob(fn_pattern)) if gt_mask_dir else None
+        
+        # set gt mask folder
+        self.gt_mask_dir = None
+        if gt_mask_dir:
+            self.gt_mask_dir = sorted(
+                Path(gt_mask_dir).glob(fn_pattern)
+            )
 
         # Batch sizes
         self.model_batch_size = model_batch_size
@@ -361,7 +376,7 @@ class Inferer(FileHandler):
             num_workers=loader_num_workers
         )
 
-        # set apply weights flag for aux branch and prdeictor helper class
+        # set apply weights flag for aux branch and prdeictor class
         self.apply_weights = apply_weights
         self.predictor = Predictor(self.model, self.patch_size)
 
@@ -369,21 +384,26 @@ class Inferer(FileHandler):
         # model.aux_type if model has an auxiliary branch
         self.post_proc_method = post_proc_method
         if self.post_proc_method is None:
-            self.post_proc_method = self.model.aux_type if self.model.aux_branch else "basic"
+            self.post_proc_method = "basic"
+            if self.model.aux_branch:
+                self.post_proc_method = self.model.aux_type
 
         # Quick checks that a valid post-proc-method is used
         msg = (
-            f"post_proc_method does not match to model config. set to: {self.post_proc_method}", 
-            f"while the model decoder_aux_branch is: {self.model.decoder_aux_branch}"
+            "post_proc_method does not match to model config. ", 
+            f"set to: {self.post_proc_method} while the model ",
+            f"decoder_aux_branch is: {self.model.decoder_aux_branch}"
         )
 
         if self.model.decoder_aux_branch:
             if self.model.decoder_aux_branch == "hover":
-                assert self.post_proc_method in ("hover", "cellpose", "basic"), msg
+                allowed = ("hover", "cellpose", "basic")
             elif self.model.decoder_aux_branch == "dist":
-                assert self.post_proc_method in ("drfns", "basic"), msg
+                allowed = ("drfns", "basic")
             elif self.model.decoder_aux_branch == "contour":
-                assert self.post_proc_method in ("dcan", "dran", "basic"), msg
+                allowed = ("dcan", "dran", "basic")
+
+            assert self.post_proc_method in allowed, msg
         
         # init the post-processor
         self.post_processor = PostProcBuilder.set_postprocessor(
@@ -394,9 +414,15 @@ class Inferer(FileHandler):
 
         # input norm flag and train data stats
         self.norm = self.model.normalize_input
-        # self.stats = self.get_dataset_stats(self.model.train_data.as_posix())
+        # self.stats = self.get_dataset_stats(
+        #   self.model.train_data.as_posix()
+        # )
 
-    def _get_batch(self, patches: torch.Tensor, batch_size: int) -> torch.Tensor:
+    def _get_batch(
+            self, 
+            patches: torch.Tensor, 
+            batch_size: int
+        ) -> torch.Tensor:
         """
         Divide a set of patches into batches of patches
 
@@ -412,10 +438,13 @@ class Inferer(FileHandler):
             torch.Tensor of shape (batch_size, C, H, W)
         """
         for i in range(0, patches.shape[1], batch_size):
-            batch = patches[:, i:i+batch_size, ...].permute(1, 0, 2, 3) # to shape (B, C, pH, pW)
+            batch = patches[:, i:i+batch_size, ...].permute(1, 0, 2, 3)
             yield batch 
 
-    def _predict_batch(self, batch: torch.Tensor) -> Tuple[Union[torch.Tensor, None]]:
+    def _predict_batch(
+            self, 
+            batch: torch.Tensor
+        ) -> Tuple[Union[torch.Tensor, None]]:
         """
         Forward pass + classify. Handles missing branches in the model.
 
@@ -426,24 +455,35 @@ class Inferer(FileHandler):
 
         Returns:
         ---------
-            A tuple of tensors containing the predictions. If network does not
-            contain aux or type branch the predictions are None
+            A tuple of tensors containing the predictions. If network 
+            does no contain aux or type branch the predictions are None
         """
         # TODO: tta
         # pred = self.predictor.forward_pass(batch, norm=self.norm, mean=self.stats[0], std=self.stats[1])
         pred = self.predictor.forward_pass(batch, norm=self.norm)
         insts = self.predictor.classify(pred["instances"], act="softmax")
-        types = self.predictor.classify(pred["types"], act="softmax") if pred["types"] is not None else None
-        aux = self.predictor.classify(pred["aux"], act=None, apply_weights=self.apply_weights) if pred["aux"] is not None else None
+
+        types = None
+        if pred["types"] is not None:
+            types = self.predictor.classify(pred["types"], act="softmax")
+
+        aux = None
+        if pred["aux"] is not None:
+            aux = self.predictor.classify(
+                pred["aux"], act=None, apply_weights=self.apply_weights
+            )
+
         return insts, types, aux
 
-    def _infer_large_img_batch(self, 
-                               batch: torch.Tensor, 
-                               names: Tuple[str],
-                               batch_loader: Iterable=None) -> Tuple[Iterable[Tuple[str, np.ndarray]]]:
+    def _infer_large_img_batch(
+            self, 
+            batch: torch.Tensor, 
+            names: Tuple[str],
+            batch_loader: Iterable=None,
+        ) -> Tuple[Iterable[Tuple[str, np.ndarray]]]:
         """
-        Run inference on large images that require tiling and back stitching. 
-        I.e. For images larger than the model input size.
+        Run inference on large images that require tiling and back 
+        stitching. I.e. For images larger than the model input size.
 
         Args:
         --------
@@ -456,11 +496,16 @@ class Inferer(FileHandler):
 
         Returns:
         --------
-            Tuple of Zip (iterable) objects containing (name, np.ndarray) pairs
+            Tuple: of Zip objects containing (name, np.ndarray) pairs
         """
 
         # Tile the image into patches
-        tilertorch = TilerStitcherTorch(batch.shape, self.patch_size, self.stride_size, padding=True)
+        tilertorch = TilerStitcherTorch(
+            batch.shape,
+            self.patch_size,
+            self.stride_size,
+            padding=True
+        )
         patches = tilertorch.extract_patches_from_batched(batch)
 
         # (for tqdm logging)
@@ -471,9 +516,11 @@ class Inferer(FileHandler):
         batch_aux = []
 
         # model batch size
-        batch_size = self.model_batch_size if self.model_batch_size is not None else self.model.batch_size
+        batch_size = self.model.batch_size
+        if self.model_batch_size is not None:
+            batch_size = self.model_batch_size 
 
-        # Loop through the B in batched patches (B, C, n_patches, patch_h, patch_w)
+        # Loop the B in batched patches (B, C, n_patches, patch_h, patch_w)
         for j in range(patches.shape[0]):
 
             pred_inst = []
@@ -520,13 +567,16 @@ class Inferer(FileHandler):
 
         return insts, types, aux
 
-    def _infer_img_batch(self, 
-                         batch: Tuple[torch.Tensor], 
-                         names: Tuple[str],
-                         batch_loader: Iterable=None) -> Tuple[Iterable[Tuple[str, np.ndarray]]]:
+    def _infer_img_batch(
+            self, 
+            batch: Tuple[torch.Tensor], 
+            names: Tuple[str],
+            batch_loader: Iterable=None
+        ) -> Tuple[Iterable[Tuple[str, np.ndarray]]]:
         """
-        Run inference on a batch of images that do not require tiling and 
-        stitching. I.e. For images of the same size as the model input size.
+        Run inference on a batch of images that do not require tiling 
+        and stitching. I.e. For images of the same size as the model 
+        input size.
 
         Args:
         --------
@@ -539,7 +589,7 @@ class Inferer(FileHandler):
 
         Returns:
         --------
-            Tuple of Zip (iterable) objects containing (name, np.ndarray) pairs
+            Tuple: of Zip objects containing (name, np.ndarray) pairs
         """
         batch_instances, batch_types, batch_aux = self._predict_batch(batch)
         insts = zip(names, tensor_to_ndarray(batch_instances))
@@ -554,7 +604,9 @@ class Inferer(FileHandler):
         
         self.n_batches_inferred += batch.shape[0]
         if batch_loader is not None:
-            batch_loader.set_postfix(patches=f"{self.n_batches_inferred}/{len(self.folderset.fnames)}")
+            batch_loader.set_postfix(
+                patches=f"{self.n_batches_inferred}/{len(self.folderset.fnames)}"
+            )
 
         return insts, types, aux
 
@@ -562,7 +614,7 @@ class Inferer(FileHandler):
         """
         Generate adjacent chunks of an iterable 
         
-        This is used to chunk the folder dataset for lower memory footprint
+        This is used to chunk the folder dataset for lower mem footprint
         
         Args:
         ---------
@@ -585,9 +637,7 @@ class Inferer(FileHandler):
         Args:
         ---------
             chunked_dataloader (Iterable, default=None):
-                If there is a lot of images in the folder, it's a good idea to 
-                chunk the folder dataloader to not overflow the Inferer 
-                instances memory.
+                A chunked dataloader object
         """
         # Start pipeline
         self.n_batches_inferred = 0
@@ -604,13 +654,20 @@ class Inferer(FileHandler):
 
                 batch_loader.set_description(f"Running inference for {names}")
 
-                # Set patching flag (most datasets require patching), Assumes square patches
-                requires_patching = True if batch.shape[-1] > self.patch_size[0] else False
+                # Set patching flag (most datasets require patching), 
+                # Assumes square patches
+                requires_patching = False
+                if batch.shape[-1] > self.patch_size[0]:
+                    requires_patching = True
 
                 if requires_patching:
-                    inst_probs, type_probs, aux = self._infer_large_img_batch(batch, names, batch_loader)
+                    inst_probs, type_probs, aux = self._infer_large_img_batch(
+                        batch, names, batch_loader
+                    )
                 else:
-                    inst_probs, type_probs, aux = self._infer_img_batch(batch, names, batch_loader)
+                    inst_probs, type_probs, aux = self._infer_img_batch(
+                        batch, names, batch_loader
+                    )
 
                 soft_instances.extend(inst_probs)
                 soft_types.extend(type_probs)
@@ -643,27 +700,24 @@ class Inferer(FileHandler):
             self.inst_maps[name] = res[1].astype("int32")
             self.type_maps[name] = res[2].astype("int32")
 
-    def run_inference(self, 
-                      save_dir: Union[Path, str]=None, 
-                      fformat: str="geojson",
-                      offsets: bool=False) -> None:
+    def run_inference(
+            self, 
+            save_dir: Union[Path, str]=None, 
+            fformat: str="geojson",
+            offsets: bool=False
+        ) -> None:
         """
         Run inference and post processing in chunks
-
-        self.n_images is the size of one chunk of image files. After the chunk
-        is finished the containers of the masks and intermediate arrays of the
-        Inferer instance are cleared for lower memory footprint. (Enables 
-        inference for larger sets of images).
 
         Args:
         ---------
             save_dir (Path or str, default=None):
                 directory where the .mat/geojson files are saved
             fformat (str, default="geojson")
-                file format for the masks. One of (".mat, "geojson")
+                file format for the masks. One of ".mat, "geojson"
             offsets (bool, default=False):
-                If True, geojson coordnates are shifted by the offsets that are
-                encoded in the file/samplenames (e.g. "x-1000_y-4000")
+                If True, geojson coords are shifted by the offsets that 
+                are encoded in the filenames (e.g. "x-1000_y-4000.png")
         """
         n_images_real = int(np.ceil(self.n_images / self.loader_batch_size))
         n_chunks = int(np.ceil(len(self.folderset.fnames) / self.n_images))
@@ -679,7 +733,7 @@ class Inferer(FileHandler):
                     for name, inst_map in self.inst_maps.items():
                         if fformat == "geojson":
                             
-                            # parse the offset coords from the inst_map key
+                            # parse the offset coords from the inst key
                             x_off, y_off = (
                                 int(c) for c in re.findall(r"\d+", name)
                             ) if offsets else (0, 0)
@@ -709,33 +763,38 @@ class Inferer(FileHandler):
                     self.type_maps.clear()
                     torch.cuda.empty_cache()
 
-    def benchmark_insts(self, 
-                        pattern_list: Optional[List[str]]=None, 
-                        file_prefix: Optional[str]="") -> pd.DataFrame:
+    def benchmark_insts(
+            self, 
+            pattern_list: Optional[List[str]]=None, 
+            file_prefix: Optional[str]=""
+        ) -> pd.DataFrame:
         """
-        Run benchmarikng metrics for only instance maps and save them into a 
-        csv file. The file is written into the "results" directory of the 
-        repositoy.
+        Run benchmarikng metrics for only instance maps and save them 
+        into a csv file. The file is written into the "results"
+        directory of the repositoy.
 
         Args:
         ---------
             pattern_list (List[str], optional, default=None):
-                A list of string patterns used for filtering files in the input
-                data folder
+                A list of string patterns used for filtering files in 
+                the input data folder
             file_prefix (str, optional, default=""):
                 prefix to give to the csv filename that contains the 
                 benchmarking results
 
         Returns:
         ----------
-            pd.DataFrame containing the benchmarking results
+            pd.DataFrame: a df containing the benchmarking results
         """
         assert "inst_maps" in self.__dict__.keys(), (
             "No instance maps found, run inference first."
         )
 
         gt_masks = OrderedDict(
-            [(f.name[:-4], self.read_mask(f, "inst_map")) for f in self.gt_mask_dir]
+            [
+                (f.name[:-4], self.read_mask(f, "inst_map")) 
+                for f in self.gt_mask_dir
+            ]
         )
 
         exp_dir = self.get_experiment_dir(self.exp_name, self.exp_version)
@@ -750,29 +809,32 @@ class Inferer(FileHandler):
         return scores
 
 
-    def benchmark_types(self,
-                        classes: Dict[str, int],
-                        pattern_list: Optional[List[str]]=None,
-                        file_prefix: Optional[str]="") -> pd.DataFrame:
+    def benchmark_types(
+            self,
+            classes: Dict[str, int],
+            pattern_list: Optional[List[str]]=None,
+            file_prefix: Optional[str]=""
+        ) -> pd.DataFrame:
         """
-        Run benchmarking for inst_maps & type maps and save them into a csv 
-        file. The file is written into the "results" directory of the repositoy
+        Run benchmarking for inst_maps & type maps and save them into a 
+        csv file. The file is written into the "results" directory of 
+        the repositoy
 
         Args:
         ---------
             classes (Dict[str, int]):
-                The class dict e.g. {bg: 0, immune: 1, epithel: 2} background 
-                must be the 0 class
+                The class dict e.g. {bg: 0, immune: 1, epithel: 2}. 
+                background must be the 0 class
             pattern_list (List[str], optional, default=None):
-                A list of string patterns used for filtering files in the input
-                data folder
+                A list of string patterns used for filtering files in 
+                the input data folder
             file_prefix (str, optional, default=""):
                 prefix to give to the csv filename that contains the 
                 benchmarking results
 
         Returns:
         ----------
-            pd.DataFrame containing the benchmarking results
+            pd.DataFrame: A df containing the benchmarking results
         """
         assert "inst_maps" in self.__dict__.keys(), (
             "No instance maps found, run inference first"
@@ -785,10 +847,16 @@ class Inferer(FileHandler):
         )
 
         gt_mask_insts = OrderedDict(
-            [(f.name[:-4], FileHandler.read_mask(f, "inst_map")) for f in self.gt_mask_dir]
+            [
+                (f.name[:-4], FileHandler.read_mask(f, "inst_map")) 
+                for f in self.gt_mask_dir
+            ]
         )
         gt_mask_types = OrderedDict(
-            [(f.name[:-4], FileHandler.read_mask(f, "type_map")) for f in self.gt_mask_dir]
+            [
+                (f.name[:-4], FileHandler.read_mask(f, "type_map")) 
+                for f in self.gt_mask_dir
+            ]
         )
 
         exp_dir = self.get_experiment_dir(self.exp_name, self.exp_version)

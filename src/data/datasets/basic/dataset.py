@@ -1,6 +1,5 @@
 import torch
-import numpy as np
-from typing import List, Optional, Dict
+from typing import List, Dict
 
 from ..base_dataset import BaseDataset 
 
@@ -22,7 +21,9 @@ class BasicDataset(BaseDataset):
             normalize_input (bool, default=False):
                 apply percentile normalization to inmut images after transforms
         """
-        assert transforms is not None, "No augmentations given. Give at least epmty albu.Compose"
+        assert transforms is not None, (
+            "No augmentations given. Give at least epmty albu.Compose"
+        )
         super(BasicDataset, self).__init__(fname)
         self.transforms = transforms
         self.normalize_input = normalize_input
@@ -42,8 +43,12 @@ class BasicDataset(BaseDataset):
         # binarize inst branch mask
         inst_patch = self.binary(inst_patch)
 
-        # augment (albumentations)
-        augmented_data = self.transforms(image=im_patch, masks=[inst_patch, type_patch, weight_map])
+        # augment
+        augmented_data = self.transforms(
+            image=im_patch, 
+            masks=[inst_patch, type_patch, weight_map]
+        )
+        
         img = augmented_data["image"]
         masks = augmented_data["masks"]
 

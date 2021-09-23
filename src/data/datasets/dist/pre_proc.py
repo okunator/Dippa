@@ -29,18 +29,25 @@ from scipy.ndimage.morphology import distance_transform_cdt
 from src.utils import center_crop, bounding_box
 
 
-# Ported from https://github.com/vqdang/hover_net/blob/195ed9b6cc67b12f908285492796fb5c6c15a000/src/loader/augs.py#L21
-def gen_dist_maps(inst_map: np.ndarray, crop_shape: Tuple[int]=(256, 256), norm: bool=True) -> np.ndarray:
+# Ported from 
+# https://github.com/vqdang/hover_net/blob/195ed9b6cc67b12f908285492796fb5c6c15a000/src/loader/augs.py#L21
+def gen_dist_maps(inst_map: np.ndarray,
+                  crop_shape: Tuple[int]=(256, 256), 
+                  normalize: bool=True) -> np.ndarray:
     """
     Compute distance transforms for every distinct nuclear object
 
     Args:
+    ----------
         inst_map (np.ndarray): 
             inst map
         crop_shape (Tuple[int]): 
             crop shape if network output smaller dims than the input
+        normalize (bool, default=True):
+            Normalize the distance maps to [0, 1]
 
     Returns:
+    ----------
         np.ndarray: distance maps of nuclei
     """
 
@@ -69,7 +76,7 @@ def gen_dist_maps(inst_map: np.ndarray, crop_shape: Tuple[int]=(256, 256), norm:
         inst_dist = distance_transform_cdt(inst)
         inst_dist = inst_dist.astype('float32')
 
-        if norm:
+        if normalize:
             max_value = np.amax(inst_dist)
             if max_value <= 0: 
                 continue

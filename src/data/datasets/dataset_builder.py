@@ -20,7 +20,11 @@ class DatasetBuilder:
                 The type of the auxiliary branch. If None, the unet dataset
                 is used in the dataloader.
         """
-        self.ds_name = decoder_aux_branch if decoder_aux_branch is not None else "unet"
+
+        self.ds_name = "unet"
+        if decoder_aux_branch is not None:
+            self.ds_name = decoder_aux_branch
+
         assert self.ds_name in ("hover", "dist", "contour", "unet", "basic")
 
     def get_augs(self, augs_list: Optional[List[str]]=None) -> A.Compose:
@@ -63,7 +67,8 @@ class DatasetBuilder:
                 The type of the auxiliary branch. If None, the unet dataset
                 is used in the dataloader.
             normalize_input (bool, default=True):
-                If True, channel-wise normalization for the input images is applied.
+                If True, channel-wise normalization for the input images is
+                applied.
 
         Returns:
         ------------
@@ -79,7 +84,8 @@ class DatasetBuilder:
                          decoder_aux_branch: str=None,
                          normalize_input: bool=True) -> Dataset:
         """
-        Init the test dataset. No augmentations used. Only ndarray to tensor conversion.
+        Init the test dataset. No augmentations used. Only ndarray to tensor 
+        conversion.
 
         Args:
         ------------
@@ -89,7 +95,8 @@ class DatasetBuilder:
                 The type of the auxiliary branch. If None, the unet dataset
                 is used in the dataloader.
             normalize_input (bool, default=True):
-                If True, channel-wise normalization for the input images is applied.
+                If True, channel-wise normalization for the input images is 
+                applied.
 
         Returns:
         ------------

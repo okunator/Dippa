@@ -61,8 +61,8 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
                 If None, and downloading is required, will be downloaded in 
                 Dippa/data/pannuke/ folders.
             database_dir (str or Path):
-                The directory where the db is located or saved to. If None, and
-                writing is required, will be downloaded in 
+                The directory where the db is located or saved to. If None, 
+                and writing is required, will be downloaded in 
                 Dippa/patches/pannuke/ folders
             
         """

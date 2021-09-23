@@ -31,7 +31,8 @@ def rigid_transforms(**kwargs) -> List[BasicTransform]:
 
 def non_rigid_transforms(**kwargs) -> List[BasicTransform]:
     """
-    Wrapper for non rigid albumentations augmentations. For every patch, either:
+    Wrapper for non rigid albumentations augmentations. For every patch, 
+    either:
     - elastic transformation
     - grid distortion
     - optical distortion
@@ -43,7 +44,7 @@ def non_rigid_transforms(**kwargs) -> List[BasicTransform]:
     """
     return [
         A.OneOf([
-            A.ElasticTransform(alpha=120, sigma=120*0.05, alpha_affine=120*0.03, p=0.5),
+            A.ElasticTransform(alpha=120, sigma=120*.05, alpha_affine=120*.03),
             A.GridDistortion(p=0.5),
             A.OpticalDistortion(distort_limit=2, shift_limit=0.5, p=0.5)
         ], p=0.3)
@@ -52,7 +53,8 @@ def non_rigid_transforms(**kwargs) -> List[BasicTransform]:
 
 def hue_saturation_transforms(**kwargs) -> List[BasicTransform]:
     """
-    Wrapper for non hue saturation albumentations augmentations. For every patch, either:
+    Wrapper for non hue saturation albumentations augmentations. For every 
+    patch, either:
     - hue saturation value shift
     is applied with a probability of 0.5
 
@@ -60,7 +62,14 @@ def hue_saturation_transforms(**kwargs) -> List[BasicTransform]:
     ----------
         A List of possible data augmentations
     """
-    return [A.HueSaturationValue(hue_shift_limit=(0,15), sat_shift_limit=0, val_shift_limit=0, p=0.25)]
+    return [
+        A.HueSaturationValue(
+            hue_shift_limit=(0,15), 
+            sat_shift_limit=0, 
+            val_shift_limit=0, 
+            p=0.25
+        )
+    ]
 
 
 def blur_transforms(**kwargs) -> List[BasicTransform]:
@@ -86,7 +95,8 @@ def blur_transforms(**kwargs) -> List[BasicTransform]:
 
 def non_spatial_transforms(**kwargs) -> List[BasicTransform]:
     """
-    Wrapper for non spatial albumentations augmentations. For every patch, either:
+    Wrapper for non spatial albumentations augmentations. For every patch, 
+    either:
     - CLAHE
     - brightness contrast
     - random gamma
@@ -180,7 +190,9 @@ def compose(transforms_to_compose: List[BasicTransform]) -> A.Compose:
     ----------
         A composed pipeline of albumentation transforms
     """
-    result = A.Compose([item for sublist in transforms_to_compose for item in sublist])
+    result = A.Compose(
+        [item for sublist in transforms_to_compose for item in sublist]
+    )
     return result
 
 
@@ -188,7 +200,9 @@ def compose(transforms_to_compose: List[BasicTransform]) -> A.Compose:
 ###################################
 
 
-def rigid_augs_and_crop(image: np.ndarray, masks: np.ndarray, crop_shape: Tuple[int]) -> A.Compose:
+def rigid_augs_and_crop(image: np.ndarray,
+                        masks: np.ndarray, 
+                        crop_shape: Tuple[int]) -> A.Compose:
     """
     Do rigid augmentations and crop the patch to the size of the input_size.
     These are used after before patches are saved to hdf5 databases.

@@ -31,7 +31,8 @@ class UnetDataset(BaseDataset):
         """
         1. read data from hdf5/zarr file
         2. fix duplicated instances due to mirror padding
-        3. remove overlaps in occluded nuclei and generate the weight map for the borders of overlapping nuclei
+        3. remove overlaps in occluded nuclei and generate the weight map for 
+           the borders of overlapping nuclei
         4. binarize input for the branch predicting foreground vs. background
         5. augment
         """
@@ -44,7 +45,11 @@ class UnetDataset(BaseDataset):
         inst_patch = self.binary(inst_patch)
 
         # augment
-        augmented_data = self.transforms(image=im_patch, masks=[inst_patch, type_patch, weight_map])
+        augmented_data = self.transforms(
+            image=im_patch, 
+            masks=[inst_patch, type_patch, weight_map]
+        )
+        
         img = augmented_data["image"]
         masks = augmented_data["masks"]
 

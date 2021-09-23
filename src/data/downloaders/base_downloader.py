@@ -1,4 +1,3 @@
-import logging
 import pooch
 from pathlib import Path
 from typing import Union, Dict, Callable
@@ -25,15 +24,18 @@ class BaseDownloader(FileHandler):
                 A function that executes the processing & converting & moving
                 of the downloaded data files. 
         """
-        # assert Path(save_dir).exists(), f"save_dir: {Path(save_dir).as_posix()} does not exists"
         self.save_dir = Path(save_dir)
         self.dataset_name = dataset_name
         self.handler_func = handler_func
         self.kwargs = kwargs
 
-    def processor(self, fname: Union[str, Path], action: str, pooch: pooch.Pooch) -> Dict[str, Path]:
+    def processor(self, 
+                 fname: Union[str, Path], 
+                 action: str, 
+                 pooch: pooch.Pooch) -> Dict[str, Path]:
         """
-        Post-processing hook to unzip a file and convert file formats after downloading 
+        Post-processing hook to unzip a file and convert file formats after 
+        downloading 
 
         Args:
         ----------
@@ -54,10 +56,18 @@ class BaseDownloader(FileHandler):
 
         # Create folders for the test & train data in the 'pannuke' folder
         # If dirs exists already, skips them
-        imgs_test_dir = Path(f"{self.save_dir.as_posix()}/{self.dataset_name}/test/images")
-        anns_test_dir = Path(f"{self.save_dir.as_posix()}/{self.dataset_name}/test/labels")
-        imgs_train_dir = Path(f"{self.save_dir.as_posix()}/{self.dataset_name}/train/images")
-        anns_train_dir = Path(f"{self.save_dir.as_posix()}/{self.dataset_name}/train/labels")
+        imgs_test_dir = Path(
+            f"{self.save_dir.as_posix()}/{self.dataset_name}/test/images"
+        )
+        anns_test_dir = Path(
+            f"{self.save_dir.as_posix()}/{self.dataset_name}/test/labels"
+        )
+        imgs_train_dir = Path(
+            f"{self.save_dir.as_posix()}/{self.dataset_name}/train/images"
+        )
+        anns_train_dir = Path(
+            f"{self.save_dir.as_posix()}/{self.dataset_name}/train/labels"
+        )
 
         # Don't do anything train & test dir are already populated
         if imgs_test_dir.exists() and imgs_train_dir.exists():
@@ -72,10 +82,6 @@ class BaseDownloader(FileHandler):
                 is_populated[3] = True
 
             if all(is_populated):
-                logging.info(
-                    (f"{self.dataset_name} already downloaded and processed at {self.save_dir}/{self.dataset_name}/",
-                    "Skipping downloading...")
-                )
                 return {
                     "img_test": imgs_test_dir, 
                     "mask_test": anns_test_dir, 

@@ -12,54 +12,56 @@ from .metrics import Accuracy, MeanIoU
 
 
 class SegModel(pl.LightningModule):
-    def __init__(self,
-                 experiment_name: str,
-                 experiment_version: str,
-                 model_input_size: int=256,
-                 encoder_in_channels: int=3,
-                 encoder_name: str="resnet50",
-                 encoder_pretrain: bool=True,
-                 encoder_depth: int=5,
-                 encoder_freeze: bool=False,
-                 decoder_type_branch: bool=True,
-                 decoder_aux_branch: str="hover",
-                 decoder_n_layers: int=1,
-                 decoder_n_blocks: int=2,
-                 decoder_preactivate: bool=False,
-                 decoder_weight_init: str="he",
-                 decoder_short_skips: str=None,
-                 decoder_upsampling: str="fixed_unpool",
-                 decoder_channels: List[int]=None,
-                 activation: str="relu",
-                 normalization: str="bn",
-                 weight_standardize: bool=False,
-                 long_skips: str="unet",
-                 long_skip_merge_policy: str="summation",
-                 inst_branch_loss: str="ce_dice",
-                 type_branch_loss: str="cd_dice",
-                 aux_branch_loss: str="mse_ssim",
-                 edge_weight: float=None,
-                 optimizer_name: str="adam",
-                 decoder_learning_rate: float=0.0005,
-                 encoder_learning_rate: float=0.00005, 
-                 decoder_weight_decay: float=0.0003, 
-                 encoder_weight_decay: float=0.00003,
-                 scheduler_factor: float=0.25,
-                 scheduler_patience: int=3,
-                 lookahead: bool=False,
-                 bias_weight_decay: bool=True,
-                 augmentations: List[str]=None,
-                 normalize_input: bool=True,
-                 batch_size: int=8,
-                 num_workers: int=8,
-                 n_classes: int=2,
-                 class_weights: torch.Tensor=None,
-                 binary_weights: torch.Tensor=None,
-                 inference_mode: bool=False,
-                 **kwargs) -> None:
+    def __init__(
+            self,
+            experiment_name: str,
+            experiment_version: str,
+            model_input_size: int=256,
+            encoder_in_channels: int=3,
+            encoder_name: str="resnet50",
+            encoder_pretrain: bool=True,
+            encoder_depth: int=5,
+            encoder_freeze: bool=False,
+            decoder_type_branch: bool=True,
+            decoder_aux_branch: str="hover",
+            decoder_n_layers: int=1,
+            decoder_n_blocks: int=2,
+            decoder_preactivate: bool=False,
+            decoder_weight_init: str="he",
+            decoder_short_skips: str=None,
+            decoder_upsampling: str="fixed_unpool",
+            decoder_channels: List[int]=None,
+            activation: str="relu",
+            normalization: str="bn",
+            weight_standardize: bool=False,
+            long_skips: str="unet",
+            long_skip_merge_policy: str="summation",
+            inst_branch_loss: str="ce_dice",
+            type_branch_loss: str="cd_dice",
+            aux_branch_loss: str="mse_ssim",
+            edge_weight: float=None,
+            optimizer_name: str="adam",
+            decoder_learning_rate: float=0.0005,
+            encoder_learning_rate: float=0.00005, 
+            decoder_weight_decay: float=0.0003, 
+            encoder_weight_decay: float=0.00003,
+            scheduler_factor: float=0.25,
+            scheduler_patience: int=3,
+            lookahead: bool=False,
+            bias_weight_decay: bool=True,
+            augmentations: List[str]=None,
+            normalize_input: bool=True,
+            batch_size: int=8,
+            num_workers: int=8,
+            n_classes: int=2,
+            class_weights: torch.Tensor=None,
+            binary_weights: torch.Tensor=None,
+            inference_mode: bool=False,
+            **kwargs
+        ) -> None:
         """
-        Pytorch lightning model wrapper. Wraps everything needed for training 
-        the model
+        Pytorch lightning model wrapper. Wraps everything needed for 
+        training the model
 
         Args:
         ------------
@@ -68,14 +70,14 @@ class SegModel(pl.LightningModule):
             experiment_version (str):
                 Name of the experiment version. Example: "dense"
             model_input_size (int, default=256):
-                The input image size of the model. Assumes that input images 
-                are square patches i.e. H == W. 
+                The input image size of the model. Assumes that input 
+                images are square patches i.e. H == W. 
             encoder_name (str, default="resnet50"):
                 Name of the encoder. Available encoders from:
                 https://github.com/qubvel/segmentation_models.pytorch
             encoder_in_channels (int, default=3):
-                Number of input channels in the encoder. Default set for RGB 
-                images
+                Number of input channels in the encoder. Default set for
+                RGB images
             encoder_pretrain (bool, default=True):
                 imagenet pretrained encoder weights.
             encoder_depth (int, default=5):
@@ -83,32 +85,35 @@ class SegModel(pl.LightningModule):
             encoder_freeze (bool, default=False):
                 freeze the encoder for training
             decoder_type_branch (bool, default=True):
-                Flag whether to include a type semantic segmentation branch to 
-                the network.
+                Flag whether to include a type semantic segmentation 
+                branch to the network.
             decoder_aux_branch (str, default=True):
-                The auxiliary branch type. One of ("hover", "dist", "contour", 
-                None). If None, no auxiliary branch is included in the network.
+                The auxiliary branch type. One of "hover", "dist", 
+                "contour", None. If None, no auxiliary branch is 
+                included in the network.
             decoder_n_layers (int, default=1):
-                Number of multi-conv blocks inside each level of the decoder
+                Number of multi-conv blocks inside each level of the 
+                decoder
             decoder_n_blocks (int, default=2):
-                Number of conv blocks inside each multiconv block at every 
-                level in the decoder.
+                Number of conv blocks inside each multiconv block at 
+                every level in the decoder.
             decoder_preactivate (bool, default=False):
                 If True, normalization and activation are applied before 
                 convolution
             decoder_upsampling (str, default="fixed_unpool"):
-                The upsampling method. One of ("interp", "max_unpool", 
-                transconv", "fixed_unpool")
+                The upsampling method. One of "interp", "max_unpool", 
+                transconv", "fixed_unpool"
             decoder_weight_init (str, default="he"):
-                weight initialization method One of ("he", "eoc", "fixup") 
+                weight initialization method One of "he", "eoc", "fixup"
                 NOT IMPLEMENTED YET
             decoder_short_skips (str, default=None):
                 The short skip connection style of the decoder. One of 
                 ("residual", "dense", None)
             decoder_channels (List[int], default=None):
-                list of integers for the number of channels in each decoder 
-                block. Length of the list has to be equal to encoder_depth to 
-                ensure symmetric encodedr-decoder architecture.
+                list of integers for the number of channels in each 
+                decoder block. Length of the list has to be equal to 
+                encoder_depth to ensure symmetric encodedr-decoder 
+                architecture.
             activation (str, default="relu"):
                 Activation method. One of ("mish", "swish", "relu")
             normalization (str, default="bn"):
@@ -116,39 +121,44 @@ class SegModel(pl.LightningModule):
             weight_standardize (bool, default=False):
                 Apply weight standardization in conv layers
             long_skips (str, default="unet"):
-                The long skip connection style. One of (unet, unet++, unet3+).
+                The long skip connection. One of unet, unet++, unet3+.
             long_skip_merge_policy (str, default="summation"):
-                How to merge the features in long skips. One of ("summation", 
-                "concatenate")
+                merge policy of the features in long skips. One of: 
+                "summation", "concatenate"
             inst_branch_loss (str, defauult="cd_dice"):
                 A string specifying the loss funcs used in the binary 
-                segmentation branch of the network. Loss names are separated 
-                with underscores e.g. "ce_dice" One of: ("ce", "dice", "iou", 
-                "focal", "gmse", "mse", "sce", "tversky", "ssim")
+                segmentation branch of the network. Loss names are 
+                separated with underscores e.g. "ce_dice" One of: "ce", 
+                "dice", "iou", "focal", "gmse", "mse", "sce", "tversky",
+                "ssim"
             type_branch_loss (str), default="ce_dice":
                 A string specifying the loss funcs used in the semantic 
-                segmentation branch of the network. Loss names are separated 
-                with underscores e.g. "ce_dice" One of: ("ce", "dice", "iou", 
-                "focal", "gmse", "mse", "sce", "tversky", "ssim")
+                segmentation branch of the network. Loss names are 
+                separated with underscores e.g. "ce_dice" One of: "ce", 
+                "dice", "iou", "focal", "gmse", "mse", "sce", "tversky",
+                "ssim"
             aux_branch_loss (str, default="mse_ssim"):
                 A string specifying the loss funcs used in the auxiliary 
-                regression branch of the network. Loss names are separated with
-                underscores e.g. "mse_ssim" One of: ("ce","gmse","mse","ssim")
+                regression branch of the network. Loss names are 
+                separated with underscores e.g. "mse_ssim" One of: "ce",
+                "gmse", "mse", "ssim"
             class_weights (bool, default=False): 
-                Flag to signal wether class weights are applied in the loss 
-                functions. Class weights need to be pre-computed and stored in 
-                the training data dbs if this param is set to True
+                Flag to signal wether class weights are applied in the 
+                loss functions. Class weights need to be pre-computed 
+                and stored in the training data dbs if this param is set
+                to True
             edge_weight (float, default=None): 
-                The value of the weight given at the nuclei edges/borders 
-                (U-Net paper). If this is None, no weighting at the borders is 
-                done. This also works only with cross-entropy based losses.
+                The value of the weight given at the nuclei edges. If 
+                this is None, no weighting at the borders is done. Works
+                only with cross-entropy based losses.
             optimizer_name (str, default="adam"):
-                Name of the optimizer. In-built optimizers from torch.optims 
-                and torch_optimizer package can be used. One of: ("adam", 
-                "rmsprop","sgd", "adadelta", "apollo", "adabelief", "adamp", 
-                "adagrad", "adamax", "adamw", "asdg", "accsgd", "adabound", 
-                "adamod", "diffgrad", "lamb", "novograd", "pid", "qhadam", 
-                "qhm", "radam", "sgdw", "yogi", "ranger","rangerqh","rangerva")
+                Name of the optimizer. In-built optimizers from torch 
+                and torch_optimizer package can be used. One of: "adam", 
+                "rmsprop","sgd", "adadelta", "apollo", "adabelief", 
+                "adamp", "adagrad", "adamax", "adamw", "asdg", "accsgd",
+                "adabound", "adamod", "diffgrad", "lamb", "novograd", 
+                "pid", "qhadam", "qhm", "radam", "sgdw", "yogi", 
+                "ranger","rangerqh","rangerva"
             lookahead (bool, default=False):
                 Flag whether the optimizer uses lookahead.
             decoder_learning_rate (float, default=0.0005):
@@ -160,29 +170,30 @@ class SegModel(pl.LightningModule):
             bias_weight_decay (bool):
                 Flag whether to apply weight decay for biases.
             augmentations (List[str], default=None): 
-                List of augmentations to be used for training One of: ("rigid",
-                "non_rigid","hue_sat","blur","non_spatial","random_crop",
-                "center_crop","resize")
+                List of augmentations to be used for training One of: 
+                "rigid", "non_rigid", "hue_sat", "blur", "non_spatial",
+                "random_crop", "center_crop","resize"
             normalize_input (bool, default=True):
-                If True, channel-wise min-max normalization for the input 
-                images is applied.
+                If True, channel-wise min-max normalization for the 
+                input images is applied.
             batch_size (int, default=8):
                 Batch size for the model at training time
             num_workers (int, default=8):
                 Number of workers for the dataloader at training time
             n_classes (int, default=2):
-                The number of classes in the data. If the database is defined 
-                explicitly, the number of classes need to be given as well
+                The number of classes in the data. If the database is 
+                defined explicitly, the number of classes need to be 
+                given as well
             class_weights (torch.Tensor, default=None):
-                A tensor defining the weights (0 < w < 1) for the different
-                classes in the loss function
+                A tensor defining the weights (0 < w < 1) for the 
+                different classes in the loss function
             binary_weights (torch.Tensor, default=None):
-                A tensor defining the weights (0 < w < 1) for the back and 
-                foreground in the loss function
+                A tensor defining the weights (0 < w < 1) for the back 
+                and foreground in the loss function
             inference_mode (bool, default=False):
                 Flag to signal that model is initialized for inference. 
-                This is only used in the Inferer class so no need to touch this
-                argument.
+                This is only used in the Inferer class so no need to 
+                touch this argument.
         """
         super(SegModel, self).__init__()
         self.experiment_name = experiment_name
@@ -387,10 +398,12 @@ class SegModel(pl.LightningModule):
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         return self.model(x)
 
-    def step(self, 
-             batch: torch.Tensor,
-             batch_idx: int,
-             phase:str) -> Dict[str, torch.Tensor]:
+    def step(
+            self, 
+            batch: torch.Tensor,
+            batch_idx: int,
+            phase:str
+        ) -> Dict[str, torch.Tensor]:
         """
         General training step
         """
@@ -446,9 +459,11 @@ class SegModel(pl.LightningModule):
             "mean_iou":type_iou
         }
 
-    def step_return_dict(self, 
-                         z: torch.Tensor, 
-                         phase: str) -> Dict[str, torch.Tensor]:
+    def step_return_dict(
+            self, 
+            z: torch.Tensor, 
+            phase: str
+        ) -> Dict[str, torch.Tensor]:
         """
         Batch level metrics
         """
@@ -469,9 +484,11 @@ class SegModel(pl.LightningModule):
             "mean_iou": z["mean_iou"],
         }
 
-    def epoch_end(self, 
-                  outputs: torch.Tensor, 
-                  phase: str) -> Dict[str, torch.Tensor]:
+    def epoch_end(
+            self, 
+            outputs: torch.Tensor, 
+            phase: str
+        ) -> Dict[str, torch.Tensor]:
         """
         Full train data metrics
         """
@@ -490,26 +507,32 @@ class SegModel(pl.LightningModule):
         )
         return {f"avg_{phase}_loss": loss}
     
-    def training_step(self, 
-                      train_batch: torch.Tensor, 
-                      batch_idx: int) -> Dict[str, torch.Tensor]:
-
+    def training_step(
+            self, 
+            train_batch: torch.Tensor, 
+            batch_idx: int
+        ) -> Dict[str, torch.Tensor]:
+        """Training step"""
         z = self.step(train_batch, batch_idx, "train")
         return_dict = self.step_return_dict(z, "train")
         return return_dict
 
-    def validation_step(self, 
-                        val_batch: torch.Tensor, 
-                        batch_idx: int) -> Dict[str, torch.Tensor]:
-
+    def validation_step(
+            self, 
+            val_batch: torch.Tensor, 
+            batch_idx: int
+        ) -> Dict[str, torch.Tensor]:
+        """Validation step"""
         z = self.step(val_batch, batch_idx, "val")
         return_dict = self.step_return_dict(z, "val")
         return return_dict
 
-    def test_step(self, 
-                  test_batch: torch.Tensor, 
-                  batch_idx: int) -> Dict[str, torch.Tensor]:
-
+    def test_step(
+            self, 
+            test_batch: torch.Tensor, 
+            batch_idx: int
+        ) -> Dict[str, torch.Tensor]:
+        """Test step"""
         z = self.step(test_batch, batch_idx, "test")
         return_dict = self.step_return_dict(z, "test")
         return return_dict
@@ -560,3 +583,4 @@ class SegModel(pl.LightningModule):
             edge_weight=self.edge_weight
         )
         return loss
+        

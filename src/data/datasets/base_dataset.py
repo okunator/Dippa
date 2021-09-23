@@ -4,8 +4,7 @@ import zarr
 import tables as tb
 from pathlib import Path
 from torch.utils.data import Dataset
-from typing import List, Dict, Optional, Callable
-from segmentation_models_pytorch.encoders import get_preprocessing_fn
+from typing import Callable
 
 from src.dl.utils import minmax_normalize_torch
 from src.utils import (
@@ -29,7 +28,9 @@ class BaseDataset(Dataset, FileHandler):
         """
         self.fname = fname
         self.suffix = Path(self.fname).suffix 
-        assert self.suffix in (".h5", ".zarr"), "the input data needs to be in either hdf5 or zarr db"
+        assert self.suffix in (".h5", ".zarr"), (
+            "the input data needs to be in either hdf5 or zarr db"
+        )
 
         # Get the numeber of patches in dataset
         if self.suffix == ".zarr":
@@ -54,7 +55,11 @@ class BaseDataset(Dataset, FileHandler):
         ---------
             Callable. Either h5 or zarr read method 
         """
-        read_func = self.read_h5_patch if self.suffix == ".h5" else self.read_zarr_patch
+
+        read_func = self.read_zarr_patch
+        if self.suffix == ".h5":
+            read_func = self.read_h5_patch
+
         return read_func
 
     def generate_weight_map(self, inst_map: np.ndarray) -> np.ndarray:

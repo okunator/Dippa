@@ -17,12 +17,14 @@ class BaseWriter(ABC, FileHandler):
     def write2db(self):
         raise NotImplementedError
 
-    def _patch_stats(self, 
-                     patches_im: np.ndarray, 
-                     num_channels: int=3) -> np.ndarray:
+    def _patch_stats(
+            self, 
+            patches_im: np.ndarray, 
+            num_channels: int=3
+        ) -> np.ndarray:
         """
-        Compute the number of pixels. Channel-wise sum and channel-wise squared
-        sum for dataset mean & std computations.
+        Compute the number of pixels. Channel-wise sum and channel-wise 
+        squared sum for dataset mean & std computations.
 
         Args:
         ----------
@@ -47,23 +49,25 @@ class BaseWriter(ABC, FileHandler):
         
         return pixel_num, channel_sum.astype("f4"), channel_sum_sq.astype("f4")
 
-    def _augment_patches(self, 
-                         patches_im: np.ndarray, 
-                         patches_mask: np.ndarray, 
-                         crop_shape: Tuple[int]=(256, 256)) -> Tuple[np.ndarray]:
+    def _augment_patches(
+            self, 
+            patches_im: np.ndarray, 
+            patches_mask: np.ndarray, 
+            crop_shape: Tuple[int]=(256, 256)
+        ) -> Tuple[np.ndarray]:
         """
-        Rotations, flips and other rigid augmentations followed by a center 
-        crop. Rigid augmentations on large images can kill the datalaoding 
-        performance, so it's worth to apply rigid augmentations and crop 
-        beforehand rather when loading data with the dataloader. 
+        Rotations, flips and other rigid augmentations followed by a 
+        center crop. Rigid augmentations on large images can kill the 
+        datalaoding performance, so it's worth to apply rigid 
+        augmentations and crop beforehand rather when loading data with
+        the dataloader. 
 
         Args:
         ---------
             patches_im (np.ndarray):
                 Image patches. Shape (n_patches, pH, pW, 3)
             patches_mask (np.ndarray):
-                Patches of the masks. Shape (n_patches, pH, pW, n_masks).
-                inst_maps in patches_mask[0], type_maps in patches_mask[1]
+                Mask patches. Shape: (n_patches, pH, pW, n_masks).
             crop_shape (Tuple[int], default=(256, 256)):
                 Shape of the center crop.
 
@@ -72,7 +76,7 @@ class BaseWriter(ABC, FileHandler):
             A tuple of nd.arrays of the transformed patches.
         """
         
-        imgs, inst_maps, type_maps = [], [], []
+        imgs, inst_maps, type_maps, sem_maps = [], [], [], []
 
         patches_im = patches_im.astype("uint8")
         for i in range(patches_im.shape[0]):
@@ -84,9 +88,18 @@ class BaseWriter(ABC, FileHandler):
             imgs.append(cropped_patches["image"])
             inst_maps.append(cropped_patches["masks"][0][..., 0])
             type_maps.append(cropped_patches["masks"][0][..., 1])
+            sem_maps.append(cropped_patches["masks"][0][..., 2])
 
-        imgs, insts, types = np.array(imgs), np.array(inst_maps), np.array(type_maps)
-        full_data = np.concatenate((imgs, insts[..., None], types[..., None]), axis=-1)
+        imgs = np.array(imgs)
+        insts = np.array(inst_maps)
+        types = np.array(type_maps)
+        areas = np.array(sem_maps)
+
+        # concat to one ndarray
+        full_data = np.concatenate(
+            (imgs, insts[..., None], types[..., None], areas[..., None]),
+             axis=-1
+        )
         return full_data
         
 
@@ -101,8 +114,8 @@ class BaseWriter(ABC, FileHandler):
         
         Returns:
         ---------
-            np.ndarray of shape (C, ). indices are classes, values teh number 
-            of pixels per cls
+            np.ndarray of shape (C, ). indices are classes, values the 
+            number of pixels per class
         """
         pixels = np.zeros(len(self.classes))
         for j, val in enumerate(self.classes.values()):

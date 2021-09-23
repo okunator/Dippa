@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from typing import List, Dict
 
 from ..base_dataset import BaseDataset 
@@ -24,7 +23,9 @@ class ContourDataset(BaseDataset):
             normalize_input (bool, default=False):
                 apply percentile normalization to inmut images after transforms
         """
-        assert transforms is not None, "No augmentations given. Give at least epmty albu.Compose"
+        assert transforms is not None, (
+            "No augmentations given. Give at least epmty albu.Compose"
+        )
         super(ContourDataset, self).__init__(fname)
         self.transforms = transforms
         self.normalize_input = normalize_input
@@ -33,7 +34,8 @@ class ContourDataset(BaseDataset):
         """
         1. read data from hdf5/zarr file
         2. fix duplicated instances due to mirror padding
-        3. remove overlaps in occluded nuclei and generate the weight map for the borders of overlapping nuclei
+        3. remove overlaps in occluded nuclei and generate the weight map for 
+           the borders of overlapping nuclei
         4. Compute contours 
         5. binarize input for the branch predicting foreground vs. background
         6. augment
@@ -49,7 +51,12 @@ class ContourDataset(BaseDataset):
         # binarize inst branch input
         inst_patch = self.binary(inst_patch)
 
-        augmented_data = self.transforms(image=im_patch, masks=[inst_patch, type_patch, weight_map, contour])
+        # augment
+        augmented_data = self.transforms(
+            image=im_patch, 
+            masks=[inst_patch, type_patch, weight_map, contour]
+        )
+
         img = augmented_data["image"]
         masks = augmented_data["masks"]
 

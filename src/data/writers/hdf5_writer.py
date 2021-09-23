@@ -9,32 +9,34 @@ from src.data.writers.base_writer import BaseWriter
 
 
 class HDF5Writer(BaseWriter):
-    def __init__(self,
-                 img_dir: Union[str, Path],
-                 mask_dir: Union[str, Path],
-                 save_dir: Union[str, Path],
-                 file_name: str,
-                 classes: Dict[str, int],
-                 patch_shape: Tuple[int]=(512, 512),
-                 stride_size: int=80,
-                 n_copies: int=None,
-                 rigid_augs_and_crop: bool=True,
-                 crop_shape: Tuple[int]=(256, 256),
-                 chunk_size: int=1) -> None:
+    def __init__(
+            self,
+            img_dir: Union[str, Path],
+            mask_dir: Union[str, Path],
+            save_dir: Union[str, Path],
+            file_name: str,
+            classes: Dict[str, int],
+            patch_shape: Tuple[int]=(512, 512),
+            stride_size: int=80,
+            n_copies: int=None,
+            rigid_augs_and_crop: bool=True,
+            crop_shape: Tuple[int]=(256, 256),
+            chunk_size: int=1
+        ) -> None:
         """
-        Iterates image and mask folders, patches them (if specified), and 
-        appends the patches to a hdf5 dataset. 
+        Iterates image and mask folders, patches them (if specified), 
+        and appends the patches to a hdf5 dataset. 
         
         Args:
         ------------
             img_dir (str, or Path obj):
-                Path to the image directory. Image reading is performed with 
-                cv2, so image format needs to be cv2 readable.
+                Path to the image directory. Image reading is performed 
+                with cv2, so image format needs to be cv2 readable.
             mask_dir (str or Path obj):
-                directory of the corresponding masks for the images. Make sure 
-                the mask filenames are the same or at least contain a part of 
-                the corresponding image file names. Masks need to be stored in 
-                .mat files that contain at least the key: "inst_map".
+                directory of the corresponding masks for the images. 
+                Make sure the mask filenames correspond to image file 
+                names. Masks need to be stored in .mat files that 
+                contain at least the key: "inst_map".
             save_dir (str, Path):
                 The directory, where the h5 array is written.
             file_name (str):
@@ -43,28 +45,26 @@ class HDF5Writer(BaseWriter):
                 Dictionary of class integer key-value pairs
                 e.g. {"background":0, "inflammatory":1, "epithel":2}
             patch_shape (Tuple[int], default=(512, 512)):
-                Specifies the height and width of the patches. If this is None, 
-                no patching is applied. 
+                Specifies the height and width of the patches. If this 
+                is None, no patching is applied. 
             stride_size (int, default=80):
-                Stride size for the sliding window patcher. Needs to be less 
-                than the patch_shape. If < patch_shape, patches are created 
-                with overlap. Ignored if patch_shape is None.
+                Stride size for the sliding window patcher. Needs to be 
+                less or equal to the patch_shape. If less than 
+                patch_shape, patches are created with overlap. This arg
+                is ignored if patch_shape is None.
             n_copies (int, default=None):
-                Number of copies created per one input image & corresponding 
-                mask. This argument is ignored if patch_shape is provided. 
-                This is used for already patched data such as Pannuke data. If 
-                patch_shape and n_copies are None, no additional data is 
-                created but transforms may still be applied to the patches.
+                Number of copies created per one input image and the 
+                corresponding mask. This argument is ignored if 
+                patch_shape is provided. This arg is used for already 
+                patched data such as Pannuke to multiply the # of imgs.
             rigid_augs_and_crop (bool, default=True):
-                If True, rotations, flips etc are applied to the patches which 
-                is followed by a center cropping. 
+                If True, rotations, flips etc are applied to the patches
+                which is followed by a center cropping. 
             crop_shape (Tuple[int], default=(256, 256)):
-                If rigid_augs_and_crop is True, this is the crop shape for the
-                center crop. 
+                If rigid_augs_and_crop is True, this is the crop shape 
+                for the center crop. 
             chunk_size (int, default=1):
-                The chunk size of the h5 array of shape: (num_patches, H, W, C)
-                This param defines the num_patches i.e. How many patches are 
-                included in one read of the array.
+                The chunk size of the h5 arrays. 
         """
         super(HDF5Writer, self).__init__()
         self.img_dir = Path(img_dir)
@@ -116,20 +116,29 @@ class HDF5Writer(BaseWriter):
 
         with tqdm(total=len(imgs), unit="file") as pbar:
             for img_path, mask_path in zip(imgs, masks):
-                # get data
                 im = self.read_img(img_path)
-                inst_map = self.read_mask(mask_path, key="inst_map")
-                type_map = self.read_mask(mask_path, key="type_map")
-                root.npixels[:] += self._pixels_per_classes(type_map)
+                insts = self.read_mask(mask_path, key="inst_map")
+                types = self.read_mask(mask_path, key="type_map")
 
-                im = im[:-1, :] if im.shape[0] > inst_map.shape[0] else im
-                im = im[:, :-1] if im.shape[1] > inst_map.shape[1] else im
+                # most of the time there are no semantic maps
+                try:
+                    areas = self.read_mask(mask_path, key="sem_map")
+                except:
+                    areas = np.zeros_like(insts)
 
-                full_data = np.concatenate(
-                    (im, inst_map[..., None], type_map[..., None]), axis=-1
-                )
+                # add # of pixels per class to db for class weighting
+                root.npixels[:] += self._pixels_per_classes(types)
+
+                # workout shape inconsistencies that occur 
+                im = im[:-1, :] if im.shape[0] > insts.shape[0] else im
+                im = im[:, :-1] if im.shape[1] > insts.shape[1] else im
                 
-                # Do patching or create copies of input images 
+                full_data = np.concatenate(
+                    (im, insts[..., None], types[..., None], areas[..., None]), 
+                    axis=-1
+                )
+
+                # Do patching or create copies of input images
                 if self.patch_shape is not None:
                     tiler = TilerStitcher(
                         full_data.shape, 
@@ -142,6 +151,7 @@ class HDF5Writer(BaseWriter):
                 else:
                     patches = full_data[None, ...]
 
+                # apply rigid augmentations and center cropping
                 if self.rigid_augs_and_crop:
                     patches = self._augment_patches(
                         patches_im=patches[..., :3], 
@@ -158,12 +168,13 @@ class HDF5Writer(BaseWriter):
                 im_p = patches[..., :3].astype("uint8")
                 inst_p = patches[..., 3].astype("int32")
                 type_p = patches[..., 4].astype("int32")
+                sem_p = patches[..., 5].astype("int32")
 
                 root.imgs.append(im_p)
                 root.insts.append(inst_p)
                 root.types.append(type_p)
+                root.areas.append(sem_p)
 
-                # Update tqdm pbar
                 pbar.set_postfix(
                     info=(
                         f"Writing mask and image patches to hdf5 file", 
@@ -174,10 +185,11 @@ class HDF5Writer(BaseWriter):
 
         # Compute dataset level mean & std 
         # TODO: This is failing when add2db is used
-        # root.dataset_mean[:] += root.channel_sum[:] / root.pixel_num[:]
-        # root.dataset_std[:] += np.sqrt(
-        #     root.channel_sum_sq[:] / root.pixel_num[:] - np.square(root.dataset_mean[:])
-        # )
+        root.dataset_mean[:] = root.channel_sum[:] / root.pixel_num[:]
+        root.dataset_std[:] = np.sqrt(
+            (root.channel_sum_sq[:] / root.pixel_num[:])
+            - np.square(root.dataset_mean[:])
+        )
 
         # Add the number of patches to the metadata
         root._v_attrs.n_items = root.imgs.shape[0]
@@ -191,9 +203,10 @@ class HDF5Writer(BaseWriter):
                mask_dir: str,
                **kwargs) -> Path:
         """
-        Add data to a previously created hdf5 database. This uses the metadata 
-        of the existing h5 db to sort out the required params for writing the
-        file. kwargs can be used to modify the params for the data writing
+        Add data to a previously created hdf5 database. This uses the 
+        metadata of the existing h5 db to sort out the required params 
+        for writing the file. kwargs can be used to modify the params 
+        for the data writing
 
         Args:
         ---------
@@ -203,6 +216,10 @@ class HDF5Writer(BaseWriter):
                 Directory of the images
             mask_dir (str):
                 Directory of the masks
+
+        Returns:
+        ---------
+            Path: path to the HDF5 database
         """
         fname = Path(fname)
         h5 = tb.open_file(fname.as_posix(), mode="a")
@@ -237,7 +254,7 @@ class HDF5Writer(BaseWriter):
  
     def write2db(self) -> Path:
         """
-        Creates a HDF5 db and writes the images, masks and metadata into it.
+        Creates a HDF5 db and writes the images, masks and metadata
 
         Returns:
         ----------
@@ -288,6 +305,15 @@ class HDF5Writer(BaseWriter):
         h5.create_earray(
             where=root, 
             name="types", 
+            atom=tb.Int32Atom(),  
+            shape=np.append([0], (ph, pw)), 
+            chunkshape=np.append([self.chunk_size], (ph, pw)),
+            filters=tb.Filters(complevel=5, complib="blosc:lz4")
+        )
+
+        h5.create_earray(
+            where=root, 
+            name="areas", 
             atom=tb.Int32Atom(),  
             shape=np.append([0], (ph, pw)), 
             chunkshape=np.append([self.chunk_size], (ph, pw)),

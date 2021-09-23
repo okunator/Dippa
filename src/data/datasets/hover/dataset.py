@@ -1,8 +1,5 @@
 import torch
-import zarr
-import numpy as np
-import tables as tb
-from typing import List, Optional, Dict
+from typing import List, Dict
 
 from .pre_proc import gen_hv_maps
 from ..base_dataset import BaseDataset 
@@ -26,7 +23,9 @@ class HoverDataset(BaseDataset):
             normalize_input (bool, default=False):
                 apply percentile normalization to inmut images after transforms
         """
-        assert transforms is not None, "No augmentations given. Give at least epmty albu.Compose"
+        assert transforms is not None, (
+            "No augmentations given. Give at least epmty albu.Compose"
+        )
         super(HoverDataset, self).__init__(fname)
         self.transforms = transforms
         self.normalize_input = normalize_input
@@ -35,8 +34,10 @@ class HoverDataset(BaseDataset):
         """
         1. read data from hdf5/zarr file
         2. fix duplicated instances due to mirror padding
-        3. remove overlaps in occluded nuclei and generate the weight map for the borders of overlapping nuclei
-        4. create horizontal and vertical maps as in https://arxiv.org/abs/1812.06499
+        3. remove overlaps in occluded nuclei and generate the weight map for 
+           the borders of overlapping nuclei
+        4. create horizontal and vertical maps as in 
+           https://arxiv.org/abs/1812.06499
         5. binarize input for the branch predicting foreground vs. background
         6. augment
         """
@@ -54,7 +55,11 @@ class HoverDataset(BaseDataset):
         inst_patch = self.binary(inst_patch)
 
         # augment
-        augmented_data = self.transforms(image=im_patch, masks=[inst_patch, type_patch, weight_map, xmap, ymap])
+        augmented_data = self.transforms(
+            image=im_patch, 
+            masks=[inst_patch, type_patch, weight_map, xmap, ymap]
+        )
+        
         img = augmented_data["image"]
         masks = augmented_data["masks"]
 

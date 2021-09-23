@@ -40,9 +40,8 @@ pip install -r requirements.txt
 
 ## Training Example
  
- 1. Download a dataset
- 2. modify the **experiment.yml** file
- 3. Train the model. (See the notebooks)
+ 1. modify the **experiment.yml** file
+ 2. Train the model. (See the notebooks)
 
 ### Training Script 
 
@@ -82,38 +81,38 @@ model_args:
       activation: leaky-relu    # One of (relu, mish, swish, leaky-relu)
       normalization: bn         # One of (bn, bcn, gn, nope)
       weight_standardize: False # Weight standardization
-      weight_init: he           # One of (he, TODO: eoc) (only for decoder if pretrain)
+      weight_init: he           # One of (he, TODO: eoc)
     encoder_args:
       in_channels: 3            # RGB input images
       encoder: efficientnet-b5  # https://github.com/qubvel/segmentation_models.pytorch
       pretrain: True            # Use imagenet pre-trained encoder
       depth: 5                  # Number of layers in encoder
     decoder_args:
-      n_layers: 1               # Number multi conv blocks inside one decoder level 
-      n_blocks: 2               # Number of convolutions blocks in each multi conv block
+      n_layers: 1               # Num multi conv blocks in one decoder level 
+      n_blocks: 2               # Num of conv blocks inside a multi conv block
       preactivate: False        # If True, BN & RELU applied before CONV
-      short_skips: null        # One of (residual, dense, null) (for decoder branch only)
+      short_skips: null         # One of (residual, dense, null) (decoder)
       long_skips: unet          # One of (unet, unet++, unet3+, null)
-      merge_policy: concatenate # One of (summation, concatenate) (for long skips)
-      upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
-      decoder_channels:         # Number of out channels for every decoder layer
+      merge_policy: concatenate # One of (summation, concatenate) (long skips)
+      upsampling: fixed_unpool  # One of (fixed_unpool) TODO: interp, transconv
+      decoder_channels:         # Num of out channels for the decoder layers
         - 256
         - 128
         - 64
         - 32
-        - 16 
+        - 16
 
   decoder_branches:
     type_branch: True
-    aux_branch: hover        # One of (hover, dist, contour, null)
+    aux_branch: hover            # One of (hover, dist, contour, null)
 
 training_args:
-  normalize_input: False          # minmax normalize input images after augs
-  freeze_encoder: False          # freeze the weights in the encoder (for fine tuning)
-  weight_balancing: null         # One of (gradnorm, uncertainty, null)
+  normalize_input: False         # minmax normalize input images after augs
+  freeze_encoder: False          # freeze the weights in the encoder
+  weight_balancing: null         # TODO: One of (gradnorm, uncertainty, null)
 
   optimizer_args:
-    optimizer: radam              # One of https://github.com/jettify/pytorch-optimizer 
+    optimizer: radam             # https://github.com/jettify/pytorch-optimizer 
     lr: 0.0005
     encoder_lr: 0.00005
     weight_decay: 0.0003
@@ -127,16 +126,16 @@ training_args:
     inst_branch_loss: dice_ce
     type_branch_loss: dice_ce
     aux_branch_loss: mse_ssim
-    edge_weight: null         # (float|null) Give penalty to nuclei borders in cross-entropy based losses
+    edge_weight: null            # penalize nuclei edges in ce-based losses
 
 runtime_args:
   resume_training: False
   num_epochs: 2
   num_gpus: 1
   batch_size: 4
-  num_workers: 8              # number workers for data loader
-  model_input_size: 256       # size of the model input (input_size, input_size)
-  db_type: hdf5               # The type of the input data db. One of (hdf5, zarr). 
+  num_workers: 8                 # number workers for data loader
+  model_input_size: 256          # size of the model input
+  db_type: hdf5                  # One of (hdf5, zarr). 
 ```
 
 ## Inference Example

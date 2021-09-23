@@ -1,7 +1,7 @@
 import zipfile
 import zarr
 import cv2
-import scipy.io
+import scipy.io as sio
 import numpy as np
 import tables as tb
 from pathlib import Path
@@ -21,17 +21,20 @@ class FileHandler:
 
     @staticmethod
     def read_mask(path: Union[str, Path], key: str="inst_map") -> np.ndarray:
-        assert key in ("inst_map", "type_map", "inst_centroid", "inst_type")
+        assert key in (
+            "inst_map", "type_map", "inst_centroid", "inst_type", "sem_map"
+        )
 
         dtypes = {
             "inst_map":"int32", 
             "type_map":"int32", 
+            "sem_map":"int32",
             "inst_centroid":"float64", 
             "inst_type":"int32"
         }
 
         path = Path(path)
-        return scipy.io.loadmat(path.as_posix())[key].astype(dtypes[key])
+        return sio.loadmat(path.as_posix())[key].astype(dtypes[key])
     
     @staticmethod
     def remove_existing_files(directory: Union[str, Path]) -> None:
@@ -42,23 +45,22 @@ class FileHandler:
                 item.unlink()
 
     @staticmethod
-    def read_zarr_patch(path: str, index: int):
+    def read_zarr_patch(path: str, ix: int):
         d = zarr.open(path, mode="r")
-        im_patch = d["imgs"][index, ...]
-        inst_patch = d["insts"][index, ...]
-        type_patch = d["types"][index, ...]
+        im_patch = d["imgs"][ix, ...]
+        inst_patch = d["insts"][ix, ...]
+        type_patch = d["types"][ix, ...]
         return im_patch, inst_patch, type_patch 
 
     @staticmethod
-    def read_h5_patch(path: str, index: int):
+    def read_h5_patch(path: str, ix: int):
         with tb.open_file(path, "r") as h5:
-            img = h5.root.imgs
-            inst_map = h5.root.insts
-            type_map = h5.root.types
-            im_patch = img[index, ...]
-            inst_patch = inst_map[index, ...]
-            type_patch = type_map[index, ...]
-        return im_patch, inst_patch, type_patch
+            im_patch = h5.root.imgs[ix, ...]
+            inst_patch = h5.root.insts[ix, ...]
+            type_patch = h5.root.types[ix, ...]
+            sem_patch = h5.root.areas[ix, ...]
+        
+        return im_patch, inst_patch, type_patch, sem_patch
 
     @staticmethod
     def get_class_weights(path: Union[str, Path], 

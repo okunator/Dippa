@@ -96,7 +96,8 @@ class ZarrWriter(BaseWriter):
         Args:
         ---------
             skip (bool, default=False):
-                If True, skips the db writing and just returns the filename of the db
+                If True, skips the db writing and just returns the filename of 
+                the db
         """
         fname = Path(self.save_dir / f"{self.file_name}.zarr")
 
@@ -186,7 +187,11 @@ class ZarrWriter(BaseWriter):
                 # Do patching or create copies of input images 
                 if self.patch_shape is not None:
                     H, W, C = full_data.shape
-                    tiler = TilerStitcher((H, W, C), self.patch_shape, self.stride_size)
+                    tiler = TilerStitcher(
+                        (H, W, C), 
+                        self.patch_shape, 
+                        self.stride_size
+                    )
                     patches = tiler.extract_patches_quick(full_data)
                 elif self.n_copies is not None:
                     patches = np.stack([full_data]*self.n_copies)
