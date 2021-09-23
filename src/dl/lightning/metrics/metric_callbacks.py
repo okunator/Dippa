@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import pytorch_lightning as pl
 from typing import Optional
 
@@ -19,10 +18,24 @@ class Accuracy(pl.metrics.Metric):
                 Synchronize computed values in distributed setting
         """
         super().__init__(dist_sync_on_step=dist_sync_on_step)
-        self.add_state("batch_accuracies", default=torch.tensor(0.), dist_reduce_fx="sum")
-        self.add_state("n_batches", default=torch.tensor(0), dist_reduce_fx="sum")
+        self.add_state(
+            "batch_accuracies", 
+            default=torch.tensor(0.), 
+            dist_reduce_fx="sum"
+        )
 
-    def update(self, pred: torch.Tensor, target: torch.Tensor, activation: Optional[str]="sofmax") -> None:
+        self.add_state(
+            "n_batches", 
+            default=torch.tensor(0), 
+            dist_reduce_fx="sum"
+        )
+
+    def update(
+            self,
+            pred: torch.Tensor,
+            target: torch.Tensor,
+            activation: Optional[str]="sofmax"
+        ) -> None:
         """
         Update the batch accuracy list with one batch accuracy value
 
@@ -33,7 +46,8 @@ class Accuracy(pl.metrics.Metric):
             target (torch.Tensor):
                 The ground truth segmentation tensor. Shape (B, H, W).
             activation (str, optional, default="softmax"):
-                The activation function. One of ("softmax", "sigmoid", None)
+                The activation function. One of: "softmax", "sigmoid" or
+                None
         """
         batch_acc = accuracy(pred, target, activation)
         self.batch_accuracies += batch_acc
@@ -45,7 +59,7 @@ class Accuracy(pl.metrics.Metric):
 
         Returns:
         ---------
-            torch.Tensor. The accuracy value. Shape (1).
+            torch.Tensor: The accuracy value. Shape (1).
         """
         return self.batch_accuracies / self.n_batches
 
@@ -63,10 +77,24 @@ class MeanIoU(pl.metrics.Metric):
                 Synchronize computed values in distributed setting
         """
         super().__init__(dist_sync_on_step=dist_sync_on_step)
-        self.add_state("batch_ious", default=torch.tensor(0.), dist_reduce_fx="sum")
-        self.add_state("n_batches", default=torch.tensor(0), dist_reduce_fx="sum")
+        self.add_state(
+            "batch_ious",
+            default=torch.tensor(0.),
+            dist_reduce_fx="sum"
+        )
 
-    def update(self, pred: torch.Tensor, target: torch.Tensor, activation: Optional[str]="sofmax") -> None:
+        self.add_state(
+            "n_batches",
+            default=torch.tensor(0),
+            dist_reduce_fx="sum"
+        )
+
+    def update(
+            self, 
+            pred: torch.Tensor, 
+            target: torch.Tensor, 
+            activation: Optional[str]="sofmax"
+        ) -> None:
         """
         Update the batch IoU list with one batch IoU matrix
 
@@ -77,7 +105,8 @@ class MeanIoU(pl.metrics.Metric):
             target (torch.Tensor):
                 The ground truth segmentation tensor. Shape (B, H, W).
             activation (str, optional, default="softmax"):
-                The activation function. One of ("softmax", "sigmoid", None)
+                The activation function. One of: "softmax", "sigmoid" or
+                None
         """
         batch_iou = iou(pred, target, activation)
         self.batch_ious += batch_iou.mean()
@@ -89,6 +118,6 @@ class MeanIoU(pl.metrics.Metric):
 
         Returns:
         ---------
-            torch.Tensor. The IoU matrix. Shape (B, num_classes, num_classes).
+            torch.Tensor: The IoU mat. Shape (B, n_classes, n_classes).
         """
         return self.batch_ious / self.n_batches

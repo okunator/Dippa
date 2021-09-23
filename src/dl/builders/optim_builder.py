@@ -7,25 +7,27 @@ import src.dl.optimizers as optims
 
 
 class OptimizerBuilder:
-    def __init__(self, 
-                 model: nn.Module,
-                 decoder_learning_rate: float,
-                 encoder_learning_rate: float,
-                 decoder_weight_decay: float,
-                 encoder_weight_decay: float,
-                 bias_weight_decay: bool) -> None:
+    def __init__(
+            self, 
+            model: nn.Module,
+            decoder_learning_rate: float,
+            encoder_learning_rate: float,
+            decoder_weight_decay: float,
+            encoder_weight_decay: float,
+            bias_weight_decay: bool
+        ) -> None:
         """
         Class used to initialize the optimizer from the given args
-        Any optimizer from torch.optim or https://github.com/jettify/pytorch-optimizer
-        are allowed.
+        Any optimizer from torch.optim or 
+        https://github.com/jettify/pytorch-optimizer are allowed.
 
         Args:
         -----------
             model (nn.Module):
                 pytorch model specification
             optimizer_name (str):
-                Name of the optimize. In-built torch optims and torch_optimizer lib 
-                optimizers can be used.
+                Name of the optimize. In-built torch optims and 
+                torch_optimizer library optimizers can be used.
             decoder_learning_rate (float):
                 Decoder learning rate.
             decoder_weight_decay (float):
@@ -47,20 +49,27 @@ class OptimizerBuilder:
         """
         Adjust model parameters for optimizer. 
 
-        1. Adjust learning rate and weight decay in the pre-trained encoder.
-           Lower lr in encoder assumes that the encoder is already close to an optimum.
+        1. Adjust learning rate and weight decay in the pre-trained 
+           encoder. Lower lr in encoder assumes that the encoder is 
+           already close to an optimum.
         2. Remove weight decay from bias terms to reduce overfitting
 
-        "Bag of Tricks for Image Classification with Convolutional Neural Networks"
-        https://arxiv.org/pdf/1812.01187
+        "Bag of Tricks for Image Classification with Convolutional 
+        Neural Networks" https://arxiv.org/pdf/1812.01187
 
         Returns:
         ----------
-            A List containg kwargs (str, Dict pairs) for different optimizer related parameters 
+            A List containg kwargs (str, Dict pairs) for different 
+            optimizer related parameters 
         """
         
         params = list(self.model.named_parameters())
-        encoder_params = {"encoder": dict(lr=self.encoder_lr, weight_decay=self.encoder_wd)}
+        encoder_params = {
+            "encoder": dict(
+                lr=self.encoder_lr, 
+                weight_decay=self.encoder_wd
+            )
+        }
 
         adjust_params = []
         for name, parameters in params:
@@ -80,24 +89,26 @@ class OptimizerBuilder:
 
 
     @classmethod
-    def set_optimizer(cls,
-                      optimizer_name: str,
-                      lookahead: bool,
-                      model: nn.Module,
-                      decoder_learning_rate: float,
-                      encoder_learning_rate: float,
-                      decoder_weight_decay: float,
-                      encoder_weight_decay: float,
-                      bias_weight_decay: bool,
-                      **kwargs) -> Optimizer:
+    def set_optimizer(
+            cls,
+            optimizer_name: str,
+            lookahead: bool,
+            model: nn.Module,
+            decoder_learning_rate: float,
+            encoder_learning_rate: float,
+            decoder_weight_decay: float,
+            encoder_weight_decay: float,
+            bias_weight_decay: bool,
+            **kwargs
+        ) -> Optimizer:
         """
         Initialize the optimizer
 
         Args:
         ----------
             optimizer_name (str):
-                Name of the optimizer. In-built torch optims and torch_optimizer lib 
-                optimizers can be used.
+                Name of the optimizer. In-built torch optims and 
+                torch_optimizer library optimizers can be used.
             lookahead (bool):
                 Flag whether the optimizer uses lookahead.
             model (nn.Module):
@@ -127,7 +138,10 @@ class OptimizerBuilder:
         )
 
         optimz = list(optims.OPTIM_LOOKUP.keys())
-        assert optimizer_name in optimz, f"optimizer: {optimizer_name} not one of {optimz}"
+        
+        assert optimizer_name in optimz, (
+            f"optimizer: {optimizer_name} not one of {optimz}"
+        )
 
         kwargs = kwargs.copy()
         kwargs["lr"] = decoder_learning_rate

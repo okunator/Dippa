@@ -113,7 +113,7 @@ class GSONTile:
         return b_border_anns
 
     @property
-    def t_border_anns(self) -> gpd.GeoDataFrame:
+    def top_border_annots(self) -> gpd.GeoDataFrame:
         """
         Get all the annotations/polygons that touch the top edge
         of the tile. (Origin in the top-left corner of the image/tile)
@@ -386,9 +386,9 @@ class GSONMerger:
             border_annots_adj = gson_adj.right_border_annots
         elif adj_pos == "bottom":
             border_annots_main = gson.bottom_border_annots
-            border_annots_adj = gson_adj.t_border_anns
+            border_annots_adj = gson_adj.top_border_annots
         elif adj_pos == "top":
-            border_annots_main = gson.t_border_anns
+            border_annots_main = gson.top_border_annots
             border_annots_adj = gson_adj.bottom_border_annots
         
         # combine polygons that intersect/touch between two image tiles

@@ -5,30 +5,34 @@ from src.dl.models import Decoder, MultiTaskSegModel, SegHead
 
 
 class Model(MultiTaskSegModel):
-    def __init__(self,
-                 encoder_name: str="resnet50",
-                 encoder_in_channels: int=3,
-                 encoder_pretrain: bool=True,
-                 encoder_depth: int=5,
-                 encoder_freeze: bool=False,
-                 decoder_type_branch: bool=True,
-                 decoder_aux_branch: str=True,
-                 decoder_n_layers: int=1,
-                 decoder_n_blocks: int=2,
-                 decoder_preactivate: bool=False,
-                 decoder_upsampling: str="fixed_unpool",
-                 decoder_weight_init: str="he",
-                 decoder_short_skips: str=None,
-                 decoder_channels: List[int]=None,
-                 activation: str="relu",
-                 normalization: str="bn",
-                 weight_standardize: bool=False,
-                 long_skips: str="unet",
-                 long_skip_merge_policy: str="sum",
-                 n_types: int=2,
-                 model_input_size: int=256) -> None: 
+    def __init__(
+            self,
+            encoder_name: str="resnet50",
+            encoder_in_channels: int=3,
+            encoder_pretrain: bool=True,
+            encoder_depth: int=5,
+            encoder_freeze: bool=False,
+            decoder_type_branch: bool=True,
+            decoder_aux_branch: str=True,
+            decoder_n_layers: int=1,
+            decoder_n_blocks: int=2,
+            decoder_preactivate: bool=False,
+            decoder_upsampling: str="fixed_unpool",
+            decoder_weight_init: str="he",
+            decoder_short_skips: str=None,
+            decoder_channels: List[int]=None,
+            activation: str="relu",
+            normalization: str="bn",
+            weight_standardize: bool=False,
+            long_skips: str="unet",
+            long_skip_merge_policy: str="sum",
+            n_types: int=2,
+            model_input_size: int=256
+        ) -> None: 
         """
-        Class which builds the model from the architectural desing choices 
+        Class which builds the model from the architectural design 
+        choices. 
+        
         Encoders are from the segmentation_models_pytorch library.
         
         Args:
@@ -37,7 +41,8 @@ class Model(MultiTaskSegModel):
                 Name of the encoder. Available encoders from:
                 https://github.com/qubvel/segmentation_models.pytorch
             encoder_in_channels (int, default=3):
-                Number of input channels in the encoder. Default set for RGB images
+                Number of input channels in the encoder. Default set for
+                RGB images
             encoder_pretrain (bool, default=True):
                 imagenet pretrained encoder weights.
             encoder_depth (int, default=5):
@@ -45,47 +50,58 @@ class Model(MultiTaskSegModel):
             encoder_freeze (bool, default=False):
                 freeze the encoder for training
             decoder_type_branch (bool, default=True):
-                Flag whether to include a type semantic segmentation branch to the network.
+                Flag whether to include a type semantic segmentation 
+                branch to the network.
             decoder_aux_branch (str, default=True):
-                The auxiliary branch type. One of ("hover", "dist", "contour", None). If None, no
+                The auxiliary branch type. One of: "hover", "dist", 
+                "contour", None. If False, no aux branch is used.
                 auxiliary branch is included in the network.
             decoder_n_layers (int, default=1):
-                Number of multi-conv blocks inside each level of the decoder
+                Number of multi-conv blocks inside each level of the
+                decoder
             decoder_n_blocks (int, default=2):
-                Number of conv blocks inside each multiconv block at every level
-                in the decoder.
+                Number of conv blocks inside each multiconv block at 
+                every level in the decoder.
             decoder_preactivate (bool, default=False):
-                If True, normalization and activation are applied before convolution
+                If True, normalization and activation are applied before
+                convolution
             decoder_upsampling (str, default="fixed_unpool"):
-                The upsampling method. One of ("interp", "max_unpool", transconv", "fixed_unpool")
+                The upsampling method. One of: "interp", "max_unpool", 
+                transconv", "fixed_unpool" TODO
             decoder_weight_init (str, default="he"):
-                weight initialization method One of ("he", "eoc", "fixup")
+                weight initialization method. One of: "he", "eoc", 
+                "fixup" TODO
             decoder_short_skips (str, default=None):
-                The short skip connection style of the decoder. One of 
-                ("residual", "dense", None)
+                The short skip connection style of the decoder. One of: 
+                "residual", "dense", None
             decoder_channels (List[int], default=None):
-                list of integers for the number of channels in each decoder block.
-                Length of the list has to be equal to n_blocks.
+                list of integers for the number of channels in each 
+                decoder block. Length of the list has to be equal to 
+                `n_blocks`.
             activation (str, default="relu"):
-                Activation method. One of ("mish", "swish", "relu")
+                Activation method. One of: "mish", "swish", "relu"
             normalization (str, default="bn"):
-                Normalization method. One of ("bn", "bcn" None)
+                Normalization method. One of: "bn", "bcn" None
             weight_standardize (bool, default=False):
                 Apply weight standardization in conv layers
             long_skips (str, default="unet"):
-                The long skip connection style. One of (unet, unet++, unet3+).
+                The long skip connection style. One of: unet, unet++, 
+                unet3+.
             long_skip_merge_policy (str, default="sum"):
-                How to merge the features in long skips. One of ("sum", "cat")
+                How to merge the features in long skips. One of: "sum", 
+                "cat"
             n_types (int, default=2):
-                Number of classes in the dataset. Type decoder branch is set to output this 
-                number of classes. If type_branch = False, this is ignored.
+                Number of classes in the dataset. Type decoder branch is
+                set to output this number of classes. If type_branch is
+                False, this is ignored.
             model_input_size (int, default=256):
-                The input image size of the model. Assumes that input images are square
-                patches i.e. H == W.
+                The input image size of the model. Assumes that input 
+                images are square patches i.e. H == W.
         """
         if decoder_channels is not None:
             assert len(decoder_channels) == encoder_depth, (
-                f"encoder dept: {encoder_depth} != len(decoder_channels): {len(decoder_channels)}" 
+                f"encoder dept: {encoder_depth} != len(decoder_channels):",
+                f"{len(decoder_channels)}" 
             )
         super(Model, self).__init__()
 
@@ -106,7 +122,11 @@ class Model(MultiTaskSegModel):
         self.decoder_preactivate = decoder_preactivate
         self.decoder_short_skips = decoder_short_skips
         self.decoder_upsampling = decoder_upsampling
-        self.decoder_channels = [256, 128, 64, 32, 16] if decoder_channels is None else decoder_channels
+
+        self.decoder_channels = decoder_channels
+        if decoder_channels is None:
+            self.decoder_channels = [256, 128, 64, 32, 16]
+
         self.long_skips = long_skips
         self.merge_policy = long_skip_merge_policy
 

@@ -33,7 +33,8 @@ UNKNOWN_SIZE = "?"
 
 class LayerSummary(object):
     """
-    Summary class for a single layer in a :class:`~pytorch_lightning.core.lightning.LightningModule`.
+    Summary class for a single layer in a 
+    :class:`~pytorch_lightning.core.lightning.LightningModule`.
     It collects the following information:
 
     - Type of the layer (e.g. Linear, BatchNorm1d, ...)
@@ -41,8 +42,8 @@ class LayerSummary(object):
     - Output shape
     - Number of parameters
 
-    The input and output shapes are only known after the example input array was
-    passed through the model.
+    The input and output shapes are only known after the example input 
+    array was passed through the model.
 
     Example::
 
@@ -76,9 +77,11 @@ class LayerSummary(object):
 
     def _register_hook(self) -> RemovableHandle:
         """
-        Registers a hook on the module that computes the input- and output size(s) on the first forward pass.
-        If the hook is called, it will remove itself from the from the module, meaning that
-        recursive models will only record their input- and output shapes once.
+        Registers a hook on the module that computes the input- and 
+        output size(s) on the first forward pass. If the hook is called,
+        it will remove itself from the from the module, meaning that
+        recursive models will only record their input- and output shapes
+        once.
 
         Return:
             A handle for the installed hook.
@@ -96,8 +99,8 @@ class LayerSummary(object):
 
     def detach_hook(self):
         """
-        Removes the forward hook if it was not already removed in the forward pass.
-        Will be called after the summary is created.
+        Removes the forward hook if it was not already removed in the 
+        forward pass. Will be called after the summary is created.
         """
         if self._hook_handle is not None:
             self._hook_handle.remove()
@@ -127,24 +130,30 @@ class LayerSummary(object):
 
 class ModelSummary(object):
     """
-    Generates a summary of all layers in a :class:`~pytorch_lightning.core.lightning.LightningModule`.
+    Generates a summary of all layers in a 
+    :class:`~pytorch_lightning.core.lightning.LightningModule`.
 
     Args:
     ---------
-        model: The model to summarize (also referred to as the root module)
+        model: The model to summarize (the root module)
         mode: Can be one of
 
-             - `top` (default): only the top-level modules will be recorded (the children of the root module)
-             - `full`: summarizes all layers and their submodules in the root module
+             - `top` (default): only the top-level modules will be
+                     recorded (the children of the root module)
+             - `full`: summarizes all layers and their submodules
+                       in the root module
 
-    The string representation of this summary prints a table with columns containing
-    the name, type and number of parameters for each layer.
+    The string representation of this summary prints a table with 
+    columns containing the name, type and number of parameters for each 
+    layer.
 
-    The root module may also have an attribute ``example_input_array`` as shown in the example below.
-    If present, the root module will be called with it as input to determine the
-    intermediate input- and output shapes of all layers. Supported are tensors and
-    nested lists and tuples of tensors. All other types of inputs will be skipped and show as `?`
-    in the summary table. The summary will also display `?` for layers not used in the forward pass.
+    The root module may also have an attribute ``example_input_array`` 
+    as shown in the example below. If present, the root module will be 
+    called with it as input to determine the intermediate input- and 
+    output shapes of all layers. Supported are tensors and nested lists 
+    and tuples of tensors. All other types of inputs will be skipped and
+    show as `?` in the summary table. The summary will also display `?` 
+    for layers not used in the forward pass.
 
     Example::
 
@@ -153,7 +162,9 @@ class ModelSummary(object):
         ...
         ...     def __init__(self):
         ...         super().__init__()
-        ...         self.net = nn.Sequential(nn.Linear(256, 512), nn.BatchNorm1d(512))
+        ...         self.net = nn.Sequential(
+        ...                 nn.Linear(256, 512), nn.BatchNorm1d(512)
+        ...         )
         ...         self.example_input_array = torch.zeros(10, 256)  # optional
         ...
         ...     def forward(self, x):

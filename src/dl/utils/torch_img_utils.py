@@ -4,7 +4,12 @@ from typing import Union
 
 
 # Dataset level normalization
-def normalize(img: torch.Tensor, mean: np.ndarray, std: np.ndarray, to_uint8: bool=True) -> torch.Tensor:
+def normalize(
+        img: torch.Tensor,
+        mean: np.ndarray,
+        std: np.ndarray,
+        to_uint8: bool=True
+    ) -> torch.Tensor:
     """
     Normalize a tensor with mean and standard deviation of the dataset.
 
@@ -24,8 +29,12 @@ def normalize(img: torch.Tensor, mean: np.ndarray, std: np.ndarray, to_uint8: bo
     ----------
         Tensor: Normalized Tensor image. Same shape as input.
     """
-    assert isinstance(img, torch.Tensor), f"input img needs to be a  tensor. Got {img.dtype}."
-    assert img.ndim >= 3, f"img tensor shae should be either (C, H, W)|(B, C, H, W)"
+    assert isinstance(img, torch.Tensor), (
+        f"input img needs to be a  tensor. Got {img.dtype}."
+    )
+    assert img.ndim >= 3, (
+        f"img tensor shae should be either (C, H, W)|(B, C, H, W)"
+    )
 
     if to_uint8:
         mean = mean*255
@@ -35,7 +44,9 @@ def normalize(img: torch.Tensor, mean: np.ndarray, std: np.ndarray, to_uint8: bo
     mean = torch.as_tensor(mean[0], dtype=img.dtype, device=img.device)
     std = torch.as_tensor(std[0], dtype=img.dtype, device=img.device)
 
-    assert not (std == 0).any(), "zeros detected in std-values -> would lead to zero-div error"
+    assert not (std == 0).any(), (
+        "zeros detected in std-values -> would lead to zero-div error"
+    )
 
     if mean.ndim == 1:
         mean = mean.view(-1, 1, 1)
@@ -43,6 +54,7 @@ def normalize(img: torch.Tensor, mean: np.ndarray, std: np.ndarray, to_uint8: bo
         std = std.view(-1, 1, 1)
     
     img.sub_(mean).div_(std)
+
     return img
 
 
@@ -58,12 +70,15 @@ def percentile(t: torch.tensor, q: float) -> Union[int, float]:
        ``numpy.percentile(..., interpolation="nearest")``.
        
     :param t: Input tensor.
-    :param q: Percentile to compute, which must be between 0 and 100 inclusive.
+    :param q: Percentile to compute, which must be between 0 and 100 
+              inclusive.
+
     :return: Resulting value (scalar).
     """
-    # Note that ``kthvalue()`` works one-based, i.e. the first sorted value
-    # indeed corresponds to k=1, not k=0! Use float(q) instead of q directly,
-    # so that ``round()`` returns an integer, even if q is a np.float32.
+    # Note that ``kthvalue()`` works one-based, i.e. the first sorted 
+    # value indeed corresponds to k=1, not k=0! Use float(q) instead of 
+    # q directly, so that ``round()`` returns an integer, even if q is 
+    # a np.float32.
     k = 1 + round(.01 * float(q) * (t.numel() - 1))
     result = t.view(-1).kthvalue(k).values.item()
     return result
@@ -90,7 +105,10 @@ def percentile_normalize_torch(img: torch.Tensor) -> torch.Tensor:
         percentile1[channel] = percentile(img[channel, ...], q=1)
         percentile99[channel] = percentile(img[channel, ...], q=99)
 
-    img.sub_(percentile1.view(-1, 1, 1)).div_((percentile99 - percentile1).view(-1, 1, 1))
+    img.sub_(percentile1.view(-1, 1, 1)).div_(
+        (percentile99 - percentile1).view(-1, 1, 1)
+    )
+
     return img
 
 
@@ -115,7 +133,10 @@ def minmax_normalize_torch(img: torch.Tensor) -> torch.Tensor:
         chl_min[channel] = torch.min(img[channel, ...])
         chl_max[channel] = torch.max(img[channel, ...])
 
-    img.sub_(chl_min.view(-1, 1, 1)).div_((chl_max - chl_min).view(-1, 1, 1))
+    img.sub_(chl_min.view(-1, 1, 1)).div_(
+        (chl_max - chl_min).view(-1, 1, 1)
+    )
+
     return img
 
 
@@ -137,4 +158,5 @@ def normalize_torch(img: torch.Tensor) -> torch.Tensor:
     chl_stds = torch.std(img.float(), dim=(1, 2))
 
     img.sub_(chl_means.view(-1, 1, 1)).div_(chl_stds.view(-1, 1, 1))
+    
     return img

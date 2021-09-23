@@ -7,13 +7,15 @@ from src.utils.file_manager import FileHandler
 
 # Inheriting Trainer does not work so init w/ class method only
 class SegTrainer:
-    def __init__(self,
-                 experiment_name: str,
-                 experiment_version: str,
-                 num_gpus: int,
-                 num_epochs: int,
-                 resume_training: bool,
-                 extra_callbacks: List[pl.Callback]=None) -> None:
+    def __init__(
+            self,
+            experiment_name: str,
+            experiment_version: str,
+            num_gpus: int,
+            num_epochs: int,
+            resume_training: bool,
+            extra_callbacks: List[pl.Callback]=None
+        ) -> None:
         """
         Initializes lightning trainer based on the experiment.yml
 
@@ -45,7 +47,6 @@ class SegTrainer:
             version=experiment_version
         )
 
-        # save dir = results/{experiment_name}/version_{experiment_version}
         self.ckpt_dir = exp_dir
 
         # set checkpoint callback
@@ -64,7 +65,10 @@ class SegTrainer:
 
         # set attributes
         self.callbacks = [checkpoint_callback] #, gpu_callback]
-        self.callbacks += extra_callbacks if extra_callbacks is not None else []
+
+        if extra_callbacks is not None:
+            self.callbacks += extra_callbacks
+            
         self.gpus = num_gpus
         self.epochs = num_epochs
         self.resume_training = resume_training
@@ -81,12 +85,15 @@ class SegTrainer:
         self.logging_dir = exp_dir / "tf"
 
     @classmethod
-    def from_conf(cls, 
-                  conf: DictConfig, 
-                  extra_callbacks: List[pl.Callback]=None, 
-                  **kwargs) -> pl.Trainer:
+    def from_conf(
+            cls, 
+            conf: DictConfig, 
+            extra_callbacks: List[pl.Callback]=None, 
+            **kwargs
+        ) -> pl.Trainer:
         """
-        Class method to initialize the class from experiment.yml config file
+        Class method to initialize the class from experiment.yml config 
+        file
 
         Args:
         --------

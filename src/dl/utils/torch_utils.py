@@ -1,13 +1,17 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from typing import Union, Optional
 
 
-def ndarray_to_tensor(array: np.ndarray, dim_order: str="HWC", add_channel: bool=False) -> torch.Tensor:
+def ndarray_to_tensor(
+        array: np.ndarray, 
+        dim_order: str="HWC", 
+        add_channel: bool=False
+    ) -> torch.Tensor:
     """
-    Convert img or mask of shape (H, W)|(H, W, C)|(B, H, W, C) to tensor (B, C, H, W)
+    Convert img or mask of shape (H, W)|(H, W, C)|(B, H, W, C) to tensor
+    of shape (B, C, H, W)
 
     Args:
     -----------
@@ -18,10 +22,14 @@ def ndarray_to_tensor(array: np.ndarray, dim_order: str="HWC", add_channel: bool
 
     Returns:
     -----------
-        torch.Tensor. Shape (B, C, H, W).
+        torch.Tensor: A tensor of shape (B, C, H, W).
     """
-    assert isinstance(array, np.ndarray), f"Input type: {type(array)} is not np.ndarray"
-    assert 1 < len(array.shape) <= 4, f"ndarray.shape {array.shape}, rank needs to be bw [2, 4]" 
+    assert isinstance(array, np.ndarray), (
+        f"Input type: {type(array)} is not np.ndarray"
+    )
+    assert 1 < len(array.shape) <= 4, (
+        f"ndarray.shape {array.shape}, rank needs to be bw [2, 4]"
+    )
     assert dim_order in ("HW", "HWC", "BHWC", "BCHW", "BHW")
 
     # Add channel dim if needed
@@ -41,12 +49,14 @@ def ndarray_to_tensor(array: np.ndarray, dim_order: str="HWC", add_channel: bool
     return torch.from_numpy(array)
 
 
-def tensor_to_ndarray(tensor: torch.Tensor, 
-                      channel: Optional[int]=None,
-                      squeeze: Optional[bool]=False) -> np.ndarray:
+def tensor_to_ndarray(
+        tensor: torch.Tensor, 
+        channel: Optional[int]=None,
+        squeeze: Optional[bool]=False
+    ) -> np.ndarray:
     """
-    Convert img or network output tensor (B, C, H, W) or (B, H, W) to ndarray 
-    of shape (B, H, W, C)|(B, H, W)|(H, W, C)|(H, W)
+    Convert img or network output tensor (B, C, H, W) or (B, H, W) 
+    to ndarray of shape (B, H, W, C)|(B, H, W)|(H, W, C)|(H, W)
 
     Args:
     ------------
@@ -60,10 +70,16 @@ def tensor_to_ndarray(tensor: torch.Tensor,
     
     Returns:
     -----------
-        np.ndarray. Shape (B, H, W, C)|(B, H, W)|(H, W, C)|(H, W)
+        np.ndarray: ndarray of shape 
+        (B, H, W, C)|(B, H, W)|(H, W, C)|(H, W)
     """
-    assert isinstance(tensor, torch.Tensor), f"Input type: {type(tensor)} is not torch.Tensor"
-    assert 3 <= tensor.dim() <= 4, f"tensor needs to have shape (B, H, W) or (B, C, H, W). Shape {tensor.shape}"
+    assert isinstance(tensor, torch.Tensor), (
+        f"Input type: {type(tensor)} is not torch.Tensor"
+    )
+    assert 3 <= tensor.dim() <= 4, (
+        "tensor needs to have shape (B, H, W) or (B, C, H, W)", 
+        f"Shape of the given tensor: {tensor.shape}"
+    )
     
     res_tensor = tensor.detach()
     if tensor.is_cuda:
@@ -83,11 +99,14 @@ def tensor_to_ndarray(tensor: torch.Tensor,
     return res_tensor
 
 
-def argmax_and_flatten(yhat: torch.Tensor, activation: Optional[str]=None) -> torch.Tensor:
+def argmax_and_flatten(
+        yhat: torch.Tensor, 
+        activation: Optional[str]=None
+    ) -> torch.Tensor:
     """
-    Get an output from a prediction by argmaxing a yhat of shape (B, C, H, W)
-    and flatten the result to tensor of shape (1, n_pixels). Where each value represents
-    a class for a pixel.
+    Get an output from a prediction by argmaxing a yhat of shape 
+    (B, C, H, W) and flatten the result to tensor of shape (1, n_pixels)
+    where each value represents a class for a pixel.
 
     Args:
     -----------
@@ -98,11 +117,14 @@ def argmax_and_flatten(yhat: torch.Tensor, activation: Optional[str]=None) -> to
 
     Returns:
     -----------
-         torch.Tensor. Tensor that can be used as input to different classification metrics. 
-         Shape (H, W)
+         torch.Tensor: A tensor that can be used as input to different 
+         classification metrics. Shape: (H, W)
     """
     if activation is not None:
-        assert activation in ("sigmoid", "softmax"), f"activation: {activation} sigmoid and softmax allowed."
+        assert activation in ("sigmoid", "softmax"), (
+            f"activation: {activation} sigmoid and softmax allowed."
+        )
+
         if activation == "sigmoid":
             yhat = torch.sigmoid(yhat)
         elif activation == "softmax":
@@ -137,8 +159,8 @@ def to_device(tensor: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
 
 def one_hot(type_map: torch.Tensor, n_classes: int) -> torch.Tensor:
     """
-    Take in a type map of shape (B, H, W) with class indices as values and reshape it
-    into a tensor of shape (B, C, H, W)
+    Take in a type map of shape (B, H, W) with class indices as values 
+    and reshape it into a tensor of shape (B, C, H, W)
 
     Args:
     -----------
@@ -149,16 +171,30 @@ def one_hot(type_map: torch.Tensor, n_classes: int) -> torch.Tensor:
 
     Returns:
     -----------
-        torch.Tensor one hot tensor from the type map of shape (B, C, H, W)
+        torch.Tensor: A one hot tensor from the type map of shape 
+        (B, C, H, W)
     """
-    assert type_map.dtype == torch.int64, f"Wrong type_map dtype: {type_map.dtype}. Should be torch.int64"
-    one_hot = torch.zeros(type_map.shape[0], n_classes, *type_map.shape[1:], device=type_map.device, dtype=type_map.dtype)
-    return one_hot.scatter_(dim=1, index=type_map.unsqueeze(1), value=1.0) + 1e-7
+    assert type_map.dtype == torch.int64, (
+        f"Wrong type_map dtype: {type_map.dtype}. Shld be torch.int64"
+    )
+
+    one_hot = torch.zeros(
+        type_map.shape[0], n_classes, *type_map.shape[1:], 
+        device=type_map.device, dtype=type_map.dtype
+    )
+
+    return one_hot.scatter_(
+        dim=1, index=type_map.unsqueeze(1), value=1.0
+    ) + 1e-7
 
 
-def filter2D(input_tensor: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
+def filter2D(
+        input_tensor: torch.Tensor, 
+        kernel: torch.Tensor
+    ) -> torch.Tensor:
     """
-    Convolves a given kernel on input tensor without losing dimensional shape
+    Convolves a given kernel on input tensor without losing dimensional 
+    shape
 
     Args:
     ----------
@@ -169,7 +205,7 @@ def filter2D(input_tensor: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
 
     Returns:
     ----------
-        Convolved torch.Tensor. Same shape as input
+        torch.Tensor: The convolved tensor of same shape as the input
     """
 
     (_, channel, _, _) = input_tensor.size()

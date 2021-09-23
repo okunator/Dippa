@@ -4,9 +4,11 @@ import torch.nn.functional as F
 from typing import Optional
 
 
-def confusion_mat(yhat: torch.Tensor, 
-                  target: torch.Tensor, 
-                  activation: Optional[str]=None) -> torch.Tensor:
+def confusion_mat(
+        yhat: torch.Tensor, 
+        target: torch.Tensor, 
+        activation: Optional[str]=None
+    ) -> torch.Tensor:
     """
     Computes confusion matrix from the soft mask and target tensor
 
@@ -26,7 +28,10 @@ def confusion_mat(yhat: torch.Tensor,
 
     yhat_soft = yhat
     if activation is not None:
-        assert activation in ("sigmoid", "softmax"), f"activation: {activation} sigmoid and softmax allowed."
+        assert activation in ("sigmoid", "softmax"), (
+            f"activation: {activation} sigmoid and softmax allowed."
+        )
+
         if activation == "sigmoid":
             yhat_soft = torch.sigmoid(yhat)
         elif activation == "softmax":
@@ -44,15 +49,19 @@ def confusion_mat(yhat: torch.Tensor,
         confusion_list.append(bin_count)
 
     confusion_vec = torch.stack(confusion_list)
-    confusion_mat = confusion_vec.view(batch_size, n_classes, n_classes).to(torch.float32)
+    confusion_mat = confusion_vec.view(
+        batch_size, n_classes, n_classes
+    ).to(torch.float32)
 
     return confusion_mat
 
 
-def iou(yhat: torch.Tensor, 
+def iou(
+        yhat: torch.Tensor, 
         target: torch.Tensor,
         activation: Optional[str]=None,
-        eps: Optional[float]=1e-7) -> torch.Tensor:
+        eps: Optional[float]=1e-7
+    ) -> torch.Tensor:
     """
     Compute the per class intersection over union for dense predictions
 
@@ -76,14 +85,16 @@ def iou(yhat: torch.Tensor,
     colsum = torch.sum(conf_mat, dim=2) # [(TP + FN), (FP + TN)]
     diag = torch.diagonal(conf_mat, dim1=-2, dim2=-1) # [TP, TN]
     denom = rowsum + colsum - diag # [(TP + FN + FP), (TN + FN + FP)]
-    ious = (diag + eps) / (denom + eps) # [(TP/(TP + FN + FP)), (TN/(TN + FN + FP))]
-    return ious
+    ious = (diag + eps) / (denom + eps) 
+    return ious # [(TP/(TP + FN + FP)), (TN/(TN + FN + FP))]
 
 
-def accuracy(yhat: torch.Tensor,
-             target: torch.Tensor,
-             activation: Optional[str]=None,
-             eps: float=1e-7) -> torch.Tensor:
+def accuracy(
+        yhat: torch.Tensor,
+        target: torch.Tensor,
+        activation: Optional[str]=None,
+        eps: float=1e-7
+    ) -> torch.Tensor:
     """
     Compute the per class accuracy for dense predictions
 
