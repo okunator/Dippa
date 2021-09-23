@@ -8,7 +8,8 @@ from albumentations.core.transforms_interface import BasicTransform
 
 def rigid_transforms(**kwargs) -> List[BasicTransform]:
     """
-    Wrapper for rigid albumentations augmentations. For every patch, either:
+    Wrapper for rigid albumentations augmentations. For every 
+    patch, either:
     - Rotation
     - random rotate 90 degrees
     - flip (rotate 180 degrees)
@@ -31,8 +32,8 @@ def rigid_transforms(**kwargs) -> List[BasicTransform]:
 
 def non_rigid_transforms(**kwargs) -> List[BasicTransform]:
     """
-    Wrapper for non rigid albumentations augmentations. For every patch, 
-    either:
+    Wrapper for non rigid albumentations augmentations. For every 
+    patch, either:
     - elastic transformation
     - grid distortion
     - optical distortion
@@ -53,8 +54,8 @@ def non_rigid_transforms(**kwargs) -> List[BasicTransform]:
 
 def hue_saturation_transforms(**kwargs) -> List[BasicTransform]:
     """
-    Wrapper for non hue saturation albumentations augmentations. For every 
-    patch, either:
+    Wrapper for non hue saturation albumentations augmentations. 
+    For every patch, either:
     - hue saturation value shift
     is applied with a probability of 0.5
 
@@ -74,7 +75,8 @@ def hue_saturation_transforms(**kwargs) -> List[BasicTransform]:
 
 def blur_transforms(**kwargs) -> List[BasicTransform]:
     """
-    Wrapper for blur albumentations augmentations. For every patch, either:
+    Wrapper for blur albumentations augmentations. For every 
+    patch, either:
     - motion blur
     - median blur
     - gaussian blur
@@ -95,8 +97,8 @@ def blur_transforms(**kwargs) -> List[BasicTransform]:
 
 def non_spatial_transforms(**kwargs) -> List[BasicTransform]:
     """
-    Wrapper for non spatial albumentations augmentations. For every patch, 
-    either:
+    Wrapper for non spatial albumentations augmentations. For every 
+    patch, either:
     - CLAHE
     - brightness contrast
     - random gamma
@@ -183,8 +185,9 @@ def to_tensor(**kwargs) -> List[BasicTransform]:
 
 def compose(transforms_to_compose: List[BasicTransform]) -> A.Compose:
     """
-    Wrapper for albumentations compose func. Takes in a list of albumentation
-    transforms and composes them to one transformation pipeline
+    Wrapper for albumentations compose func. Takes in a list of 
+    albumentation transforms and composes them to one transformation 
+    pipeline
 
     Returns:
     ----------
@@ -200,13 +203,16 @@ def compose(transforms_to_compose: List[BasicTransform]) -> A.Compose:
 ###################################
 
 
-def rigid_augs_and_crop(image: np.ndarray,
-                        masks: np.ndarray, 
-                        crop_shape: Tuple[int]) -> A.Compose:
+def rigid_augs_and_crop(
+        image: np.ndarray,
+        masks: np.ndarray, 
+        crop_shape: Tuple[int]
+    ) -> A.Compose:
     """
-    Do rigid augmentations and crop the patch to the size of the input_size.
-    These are used after before patches are saved to hdf5 databases.
-    The database access is several times faster if the patches are smaller.
+    Do rigid augmentations and crop the patch to the size of the 
+    input_size. These are used after before patches are saved to hdf5
+    databases. The database access is several times faster if the 
+    patches are smaller.
     """
     transforms = compose([
         rigid_transforms(),

@@ -5,12 +5,15 @@ from ..base_dataset import BaseDataset
 
 
 class BasicDataset(BaseDataset):
-    def __init__(self,
-                 fname: str,
-                 transforms: List,
-                 normalize_input: bool=False) -> None:
+    def __init__(
+            self,
+            fname: str,
+            transforms: List,
+            normalize_input: bool=False
+        ) -> None:
         """
-        Basic dataset without any task-specific pre-processing for labels
+        Basic dataset without any task-specific pre-processing for 
+        labels
 
         Args:
         -----------
@@ -19,7 +22,8 @@ class BasicDataset(BaseDataset):
             transforms (albu.Compose): 
                 Albumentations.Compose obj (a list of augmentations)
             normalize_input (bool, default=False):
-                apply percentile normalization to inmut images after transforms
+                apply percentile normalization to inmut images after 
+                transforms
         """
         assert transforms is not None, (
             "No augmentations given. Give at least epmty albu.Compose"
@@ -33,7 +37,8 @@ class BasicDataset(BaseDataset):
         1. read data from hdf5/zarr db
         2. fix duplicated instances due to mirror padding
         3. generate the weight map for the borders of overlapping nuclei
-        4. binarize input for the branch predicting foreground vs. background
+        4. binarize input for the branch predicting foreground vs. 
+           background
         5. augment
         """
         im_patch, inst_patch, type_patch = self.read_patch(self.fname, index)

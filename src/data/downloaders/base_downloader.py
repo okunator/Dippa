@@ -6,11 +6,13 @@ from src.utils import FileHandler
 
 
 class BaseDownloader(FileHandler):
-    def __init__(self, 
-                 save_dir: Union[str, Path], 
-                 dataset_name: str,
-                 handler_func: Callable,
-                 **kwargs) -> None:
+    def __init__(
+            self, 
+            save_dir: Union[str, Path], 
+            dataset_name: str,
+            handler_func: Callable,
+            **kwargs
+        ) -> None:
         """
         Base downloader class.
 
@@ -21,32 +23,34 @@ class BaseDownloader(FileHandler):
             dataset_name (str):
                 A name for the db dataset
             handler_func (Callable):
-                A function that executes the processing & converting & moving
-                of the downloaded data files. 
+                A function that executes the processing & converting & 
+                moving of the downloaded data files. 
         """
         self.save_dir = Path(save_dir)
         self.dataset_name = dataset_name
         self.handler_func = handler_func
         self.kwargs = kwargs
 
-    def processor(self, 
-                 fname: Union[str, Path], 
-                 action: str, 
-                 pooch: pooch.Pooch) -> Dict[str, Path]:
+    def processor(
+            self, 
+            fname: Union[str, Path], 
+            action: str, 
+            pooch: pooch.Pooch
+        ) -> Dict[str, Path]:
         """
-        Post-processing hook to unzip a file and convert file formats after 
-        downloading 
+        Post-processing hook to unzip a file and convert file formats 
+        after downloading 
 
         Args:
         ----------
             fname (str):
                 Full path of the zipped file in local storage
             action (str):
-                One of "download" (file doesn't exist and will download),
+                One of "download" (file doesn't exist and will download)
                 "update" (file is outdated and will download), and
                 "fetch" (file exists and is updated so no download).
             pooch (pooch.Pooch)
-                The instance of Pooch that called the processor function.
+                The instance of Pooch that called the processor function
 
         Returns:
         ----------

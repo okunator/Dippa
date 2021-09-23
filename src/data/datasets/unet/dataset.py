@@ -1,6 +1,5 @@
 import torch
-import numpy as np
-from typing import List, Optional, Dict
+from typing import List, Dict
 
 from ..base_dataset import BaseDataset 
 
@@ -11,8 +10,8 @@ class UnetDataset(BaseDataset):
                  transforms: List,
                  normalize_input: bool=False) -> None:
         """
-        Dataset where masks are pre-processed similarly to the U-net paper
-        https://arxiv.org/abs/1505.04597
+        Dataset where masks are pre-processed similarly to the U-net 
+        paper: https://arxiv.org/abs/1505.04597
 
         Args:
         -----------
@@ -21,7 +20,8 @@ class UnetDataset(BaseDataset):
             transforms (albu.Compose): 
                 albumentations.Compose obj (a list of augmentations)
             normalize_input (bool, default=False):
-                apply percentile normalization to inmut images after transforms
+                apply percentile normalization to inmut images after 
+                transforms
         """
         super(UnetDataset, self).__init__(fname)
         self.transforms = transforms
@@ -31,9 +31,10 @@ class UnetDataset(BaseDataset):
         """
         1. read data from hdf5/zarr file
         2. fix duplicated instances due to mirror padding
-        3. remove overlaps in occluded nuclei and generate the weight map for 
-           the borders of overlapping nuclei
-        4. binarize input for the branch predicting foreground vs. background
+        3. remove overlaps in occluded nuclei and generate the weight 
+           map for the borders of overlapping nuclei
+        4. binarize input for the branch predicting foreground vs.
+           background
         5. augment
         """
         im_patch, inst_patch, type_patch = self.read_patch(self.fname, index)

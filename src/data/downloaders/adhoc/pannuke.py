@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 import scipy.io
 from pathlib import Path 
-from typing import Dict
 from tqdm import tqdm
 
 from src.utils import (
@@ -71,18 +70,21 @@ def get_inst_map(pannuke_mask: np.ndarray) -> np.ndarray:
     return inst_map
 
 
-def handle_pannuke(orig_dir: Path,
-                   imgs_train_dir: Path, 
-                   anns_train_dir: Path, 
-                   imgs_test_dir: Path, 
-                   anns_test_dir: Path,
-                   fold: int,
-                   phase: str) -> None:
+def handle_pannuke(
+        orig_dir: Path,
+        imgs_train_dir: Path, 
+        anns_train_dir: Path, 
+        imgs_test_dir: Path, 
+        anns_test_dir: Path,
+        fold: int,
+        phase: str
+    ) -> None:
     """
-    Pannuke fold patches are saved in a numpy .npy file. This converts them to the same
-    .mat (consep) format and saves each fold to a specific directory in the parent dir
-    of the 'orig_dir' directory. Two folds are saved to train dir and to test dir.
-    If valid fold is needed the train folder can be split afterwards. Each filename 
+    Pannuke fold patches are saved in a numpy .npy file. This converts 
+    them to the same .mat (consep) format and saves each fold to a 
+    specific directory in the parent dir of the 'orig_dir' directory. 
+    Two folds are saved to train dir and to test dir. If valid fold is 
+    needed the train folder can be split afterwards. Each filename 
     include the tissue type and fold which can be used for splitting
 
     Args:
@@ -92,11 +94,13 @@ def handle_pannuke(orig_dir: Path,
         imgs_train_dir (Path): 
             Path to the directory where the training images are saved
         anns_train_dir (Path): 
-            Path to the directory where the training gt annotations are saved
+            Path to the directory where the training gt annotations are 
+            saved
         imgs_test_dir (Path): 
             Path to the directory where the testing images are saved
         anns_test_dir (Path): 
-            Path to the directory where the testing gt annotations are saved
+            Path to the directory where the testing gt annotations are
+            saved
         fold (int): 
             the fold number
         phase (str):
@@ -110,7 +114,8 @@ def handle_pannuke(orig_dir: Path,
     
     # Dict["fold{i}_{images/masks/types}", file]
     fold_files = {
-        f"{file.parts[-2]}_{file.name[:-4]}": file for dir1 in orig_dir.iterdir() if dir1.is_dir()
+        f"{file.parts[-2]}_{file.name[:-4]}": file 
+        for dir1 in orig_dir.iterdir() if dir1.is_dir()
         for dir2 in dir1.iterdir() if dir2.is_dir()
         for dir3 in dir2.iterdir() if dir3.is_dir()
         for file in dir3.iterdir() if file.is_file() and file.suffix == ".npy"
@@ -133,13 +138,16 @@ def handle_pannuke(orig_dir: Path,
     imgs = np.load(fold_files[f"fold{fold}_images"]).astype("uint8")
     types = np.load(fold_files[f"fold{fold}_types"])
         
-    with tqdm(total=len(types)) as pbar: # number of patches in the whole dataset 7901
+    with tqdm(total=len(types)) as pbar:
         # loop by tissue
         for tissue_type in np.unique(types):
 
             # tqdm logs
             pbar.set_postfix(
-                info=f"Converting {tissue_type} patches from fold_{fold} .npy file to .png/.mat files"
+                info=(
+                    f"Converting {tissue_type} patches from fold_{fold}.npy",
+                    "file to .png/.mat files"
+                )
             ) 
 
             imgs_by_type = imgs[types == tissue_type]
@@ -150,7 +158,11 @@ def handle_pannuke(orig_dir: Path,
                 mask_dir = fold_phases[phase]["mask"]
 
                 fn_im = Path(img_dir / name).with_suffix(".png")
-                cv2.imwrite(str(fn_im), cv2.cvtColor(imgs_by_type[j, ...], cv2.COLOR_RGB2BGR))
+                cv2.imwrite(
+                    str(fn_im), 
+                    cv2.cvtColor(imgs_by_type[j, ...], 
+                    cv2.COLOR_RGB2BGR)
+                )
                 
                 # Create inst and type maps
                 temp_mask = masks_by_type[j, ...]
@@ -159,9 +171,12 @@ def handle_pannuke(orig_dir: Path,
 
                 # add other data
                 centroids = get_inst_centroid(inst_map)
-                inst_ids = list(np.unique(inst_map)[1:])
-                bboxes = np.array([bounding_box(np.array(inst_map == id_, np.uint8)) for id_ in inst_ids])
                 inst_types = get_inst_types(inst_map, type_map)
+                inst_ids = list(np.unique(inst_map)[1:])
+                bboxes = np.array(
+                    [bounding_box(np.array(inst_map == id_, np.uint8)) 
+                    for id_ in inst_ids]
+                )
 
                 # save results
                 fn_mask = Path(mask_dir / name).with_suffix(".mat")

@@ -10,66 +10,66 @@ from .base_writer import BaseWriter
 
 # TODO: update to match the HDF%writer
 class ZarrWriter(BaseWriter):
-    def __init__(self,
-                 img_dir: Union[str, Path],
-                 mask_dir: Union[str, Path],
-                 save_dir: Union[str, Path],
-                 file_name: str,
-                 classes: Dict[str, int],
-                 patch_shape: Tuple[int]=(512, 512),
-                 stride_size: int=80,
-                 n_copies: int=None,
-                 rigid_augs_and_crop: bool = True,
-                 crop_shape: Tuple[int]=(256, 256),
-                 chunk_size: int=1,
-                 chunk_synchronization: bool=True) -> None:
+    def __init__(
+            self,
+            img_dir: Union[str, Path],
+            mask_dir: Union[str, Path],
+            save_dir: Union[str, Path],
+            file_name: str,
+            classes: Dict[str, int],
+            patch_shape: Tuple[int]=(512, 512),
+            stride_size: int=80,
+            n_copies: int=None,
+            rigid_augs_and_crop: bool = True,
+            crop_shape: Tuple[int]=(256, 256),
+            chunk_size: int=1,
+            chunk_synchronization: bool=True
+        ) -> None:
         """
-        Iterates image and mask folders, patches them, and appends the patches 
-        to a zarr dataset.  
+        Iterates image and mask folders, patches them, and appends the 
+        patches to a zarr dataset.  
         
         Args:
         ------------
             img_dir (str, or Path obj):
-                Path to the image dir. Image reading is performed with cv2, so 
-                image format needs to be cv2 readable.
+                Path to the image directory. Image reading is performed 
+                with cv2, so image format needs to be cv2 readable.
             mask_dir (str or Path obj):
-                directory of the corresponding masks for the images. (Make sure
-                the mask filenames are the same or at least contain a part of 
-                the corresponding image file names. Masks need to be stored in 
-                .mat files that contain at least the key: "inst_map".
+                directory of the corresponding masks for the images. 
+                Make sure the mask filenames correspond to image file 
+                names. Masks need to be stored in .mat files that 
+                contain at least the key: "inst_map".
             save_dir (str, Path):
-                The directory, where the zarr array is written/saved.
+                The directory, where the h5 array is written.
             file_name (str):
-                name of the zarr array
+                name of the h5 array.
             classes (Dist[str, int]):
                 Dictionary of class integer key-value pairs
                 e.g. {"background":0, "inflammatory":1, "epithel":2}
             patch_shape (Tuple[int], default=(512, 512)):
-                specifies the height and width of the patches that are stored 
-                in zarr-arrays.
+                Specifies the height and width of the patches. If this 
+                is None, no patching is applied. 
             stride_size (int, default=80):
-                Stride size for the sliding window patcher. Needs to be less or
-                equal to patch_shape. If < patch_shape, patches are created 
-                with overlap.
+                Stride size for the sliding window patcher. Needs to be 
+                less or equal to the patch_shape. If less than 
+                patch_shape, patches are created with overlap. This arg
+                is ignored if patch_shape is None.
             n_copies (int, default=None):
-                Number of copies created per one input image & corresponding 
-                mask. This argument is ignored if patch_shape is provided. 
-                This is used for already patched data such as Pannuke data. If 
-                patch_shape and n_copies are None, no additional data is 
-                created but transforms may still be applied to the patches.
+                Number of copies created per one input image and the 
+                corresponding mask. This argument is ignored if 
+                patch_shape is provided. This arg is used for already 
+                patched data such as Pannuke to multiply the # of imgs.
             rigid_augs_and_crop (bool, default=True):
-                If True, rotations, flips etc are applied to the patches which 
-                is followed by a center cropping. 
+                If True, rotations, flips etc are applied to the patches
+                which is followed by a center cropping. 
             crop_shape (Tuple[int], default=(256, 256)):
-                If rigid_augs_and_crop is True, this is the crop shape for the
-                center crop. 
+                If rigid_augs_and_crop is True, this is the crop shape 
+                for the center crop. 
             chunk_size (int, default=1):
-                The chunk size of the zarr array of shape: (npatches, H, W, C).
-                This param defines the num_patches i.e. How many patches are 
-                included in one read of the array.
+                The chunk size of the zarr arrays
             chunk_synchronization (bool: default=True):
-                Make chunks thread safe. No concurrent writes and reads to the
-                same chunk.
+                Make chunks thread safe. No concurrent writes and reads
+                to the same chunk.
         """
         super(ZarrWriter, self).__init__()
         self.img_dir = Path(img_dir)

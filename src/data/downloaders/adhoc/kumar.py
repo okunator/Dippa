@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import scipy.io
+import scipy.io as sio
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from distutils import dir_util, file_util
@@ -54,14 +54,16 @@ def kumar_xml2mat(x: Path, to: Path) -> None:
     type_map[ann > 0] = 1
 
     mask_fn = Path(to / x.with_suffix(".mat").name)
-    scipy.io.savemat(mask_fn, mdict={"inst_map": ann, "type_map": type_map})
+    sio.savemat(mask_fn, mdict={"inst_map": ann, "type_map": type_map})
 
 
-def handle_kumar(orig_dir: Path,
-                 imgs_train_dir: Path,
-                 anns_train_dir: Path,
-                 imgs_test_dir: Path,
-                 anns_test_dir: Path) -> None:
+def handle_kumar(
+        orig_dir: Path,
+        imgs_train_dir: Path,
+        anns_train_dir: Path,
+        imgs_test_dir: Path,
+        anns_test_dir: Path
+    ) -> None:
     """
     This traverses the files downloaded online and saves each fold to a 
     specific directory in the parent dir of the 'orig_dir' directory.
@@ -73,11 +75,13 @@ def handle_kumar(orig_dir: Path,
         imgs_train_dir (Path): 
             Path to the directory where the training images are saved
         anns_train_dir (Path):
-            Path to the directory where the training gt annotations are saved
+            Path to the directory where the training gt annotations are 
+            saved
         imgs_test_dir (Path): 
             Path to the directory where the testing images are saved
         anns_test_dir (Path): 
-            Path to the directory where the testing gt annotations are saved
+            Path to the directory where the testing gt annotations are 
+            saved
     """
     FileHandler.create_dir(anns_train_dir)
     FileHandler.create_dir(imgs_train_dir)
@@ -88,8 +92,7 @@ def handle_kumar(orig_dir: Path,
         if f.is_dir() and "training" in f.name.lower():
             for item in f.iterdir():
                 if item.name == "Tissue Images":
-                    # item.rename(item.parents[2]/"train") #cut/paste
-                    dir_util.copy_tree(str(item), str(imgs_train_dir)) #copy/paste
+                    dir_util.copy_tree(str(item), str(imgs_train_dir))
                 elif item.name == "Annotations":
                     for ann in item.iterdir():
                         kumar_xml2mat(ann, anns_train_dir)

@@ -31,9 +31,11 @@ from src.utils import center_crop, bounding_box
 
 # Ported from 
 # https://github.com/vqdang/hover_net/blob/195ed9b6cc67b12f908285492796fb5c6c15a000/src/loader/augs.py#L21
-def gen_dist_maps(inst_map: np.ndarray,
-                  crop_shape: Tuple[int]=(256, 256), 
-                  normalize: bool=True) -> np.ndarray:
+def gen_dist_maps(
+        inst_map: np.ndarray,
+        crop_shape: Tuple[int]=(256, 256), 
+        normalize: bool=True
+    ) -> np.ndarray:
     """
     Compute distance transforms for every distinct nuclear object
 

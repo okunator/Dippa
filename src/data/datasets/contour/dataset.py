@@ -6,13 +6,15 @@ from .pre_proc import contours
 
 
 class ContourDataset(BaseDataset):
-    def __init__(self,
-                 fname: str,
-                 transforms: List,
-                 normalize_input: bool=False) -> None:
+    def __init__(
+            self,
+            fname: str,
+            transforms: List,
+            normalize_input: bool=False
+        ) -> None:
         """
-        Dataset where masks are pre-processed similarly to the DCAN paper
-        https://arxiv.org/abs/1604.02677
+        Dataset where masks are pre-processed similarly to the DCAN 
+        paper: https://arxiv.org/abs/1604.02677
 
         Args:
         ----------
@@ -21,7 +23,8 @@ class ContourDataset(BaseDataset):
             transforms (albu.Compose): 
                 Albumentations.Compose obj (a list of augmentations)
             normalize_input (bool, default=False):
-                apply percentile normalization to inmut images after transforms
+                apply percentile normalization to inmut images after 
+                transforms
         """
         assert transforms is not None, (
             "No augmentations given. Give at least epmty albu.Compose"
@@ -34,10 +37,11 @@ class ContourDataset(BaseDataset):
         """
         1. read data from hdf5/zarr file
         2. fix duplicated instances due to mirror padding
-        3. remove overlaps in occluded nuclei and generate the weight map for 
-           the borders of overlapping nuclei
+        3. remove overlaps in occluded nuclei and generate the weight 
+           map for the borders of overlapping nuclei
         4. Compute contours 
-        5. binarize input for the branch predicting foreground vs. background
+        5. binarize input for the branch predicting foreground vs.
+           background
         6. augment
         """
         im_patch, inst_patch, type_patch = self.read_patch(self.fname, index)

@@ -1,7 +1,7 @@
 import numpy as np
 from pathlib import Path
-from scipy.io import loadmat, savemat
-from distutils import dir_util, file_util
+from scipy.io import savemat
+from distutils import dir_util
 from tqdm import tqdm
 
 from src.utils import (
@@ -9,7 +9,6 @@ from src.utils import (
     get_inst_centroid, 
     bounding_box, 
     get_inst_types,
-    fix_duplicates
 )
 
 
@@ -23,15 +22,17 @@ def convert_consep_classes(type_map: np.ndarray) -> np.ndarray:
     return type_map
 
 
-def handle_consep(orig_dir: Path,
-                  imgs_train_dir: Path,
-                  anns_train_dir: Path,
-                  imgs_test_dir: Path,
-                  anns_test_dir: Path,
-                  convert_classes: bool=True) -> None:
+def handle_consep(
+        orig_dir: Path,
+        imgs_train_dir: Path,
+        anns_train_dir: Path,
+        imgs_test_dir: Path,
+        anns_test_dir: Path,
+        convert_classes: bool=True
+    ) -> None:
     """
-    Moves the consep files to the "consep" directory and creates train and testing
-    folders for the data.
+    Moves the consep files to the "consep" directory and creates train 
+    and testing folders for the data.
 
     Args:
     -----------
@@ -40,13 +41,15 @@ def handle_consep(orig_dir: Path,
         imgs_train_dir (Path): 
             Path to the directory where the training images are saved
         anns_train_dir (Path): 
-            Path to the directory where the training gt annotations are saved
+            Path to the directory where the training gt annotations are 
+            saved
         imgs_test_dir (Path): 
             Path to the directory where the testing images are saved
         anns_test_dir (Path): 
-            Path to the directory where the testing gt annotations are saved
+            Path to the directory where the testing gt annotations are 
+            saved
         convert_classes (bool, default=True):
-            Convert CoNSeP dataset classes same way they did in the paper
+            Convert CoNSeP dataset classes same way as in the paper
     """
     FileHandler.create_dir(anns_train_dir)
     FileHandler.create_dir(imgs_train_dir)
@@ -70,8 +73,10 @@ def handle_consep(orig_dir: Path,
                         elif g.name == "Labels":
                             dir_util.copy_tree(str(g), str(anns_train_dir))
 
+    total = len(list(anns_train_dir.iterdir())) \
+            + len(list(anns_test_dir.iterdir()))
+    
     # Add data and convert classes
-    total = len(list(anns_train_dir.iterdir())) + len(list(anns_test_dir.iterdir()))
     with tqdm(total=total) as pbar:
         for f in anns_train_dir.iterdir():
             pbar.set_postfix(info= f"Processing mask: {f.name}")
@@ -83,9 +88,12 @@ def handle_consep(orig_dir: Path,
                 type_map = convert_consep_classes(type_map)
 
             centroids = get_inst_centroid(inst_map)
-            inst_ids = list(np.unique(inst_map)[1:])
-            bboxes = np.array([bounding_box(np.array(inst_map == id_, np.uint8)) for id_ in inst_ids])
             inst_types = get_inst_types(inst_map, type_map)
+            inst_ids = list(np.unique(inst_map)[1:])
+            bboxes = np.array(
+                [bounding_box(np.array(inst_map == id_, np.uint8)) 
+                for id_ in inst_ids]
+            )
 
             savemat(
                 file_name=f.as_posix(), 
@@ -109,9 +117,12 @@ def handle_consep(orig_dir: Path,
                 type_map = convert_consep_classes(type_map)
 
             centroids = get_inst_centroid(inst_map)
-            inst_ids = list(np.unique(inst_map)[1:])
-            bboxes = np.array([bounding_box(np.array(inst_map == id_, np.uint8)) for id_ in inst_ids])
             inst_types = get_inst_types(inst_map, type_map)
+            inst_ids = list(np.unique(inst_map)[1:])
+            bboxes = np.array(
+                [bounding_box(np.array(inst_map == id_, np.uint8)) 
+                for id_ in inst_ids]
+            )
 
             savemat(
                 file_name=f.as_posix(), 

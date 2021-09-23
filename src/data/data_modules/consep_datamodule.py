@@ -14,25 +14,27 @@ from ..datasets.dataset_builder import DatasetBuilder
 
 
 class ConsepDataModule(pl.LightningDataModule, FileHandler):
-    def __init__(self, 
-                 database_type: str,
-                 augmentations: List[str]=["hue_sat", "non_rigid", "blur"],
-                 normalize: bool=False,
-                 aux_branch: str="hover",
-                 batch_size: int=8,
-                 num_workers: int=8,
-                 download_dir: Union[str, Path]=None, 
-                 database_dir: Union[str, Path]=None,
-                 convert_classes: bool=True) -> None:
+    def __init__(
+            self, 
+            database_type: str,
+            augmentations: List[str]=["hue_sat", "non_rigid", "blur"],
+            normalize: bool=False,
+            aux_branch: str="hover",
+            batch_size: int=8,
+            num_workers: int=8,
+            download_dir: Union[str, Path]=None, 
+            database_dir: Union[str, Path]=None,
+            convert_classes: bool=True
+        ) -> None:
         """
         CoNSeP dataset lightning datamodule
 
         CoNSeP dataset paper:
         --------------
-        S. Graham, Q. D. Vu, S. E. A. Raza, A. Azam, Y-W. Tsang, J. T. Kwak and
-        N. Rajpoot. "HoVer-Net: Simultaneous Segmentation and Classification of
-        Nuclei in Multi-Tissue Histology Images." Medical Image Analysis, 
-        Sept. 2019. 
+        S. Graham, Q. D. Vu, S. E. A. Raza, A. Azam, Y-W. Tsang, 
+        J. T. Kwak and N. Rajpoot. "HoVer-Net: Simultaneous Segmentation
+        and Classification of Nuclei in Multi-Tissue Histology Images." 
+        Medical Image Analysis, Sept. 2019. 
 
         Args:
         -----------
@@ -40,34 +42,34 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
                 One of ("zarr", "hdf5"). The files are written in either
                 zarr or hdf5 files that is used by the torch dataloader 
                 during training.
-            augmentations (List[str], default=["hue_sat", "non_rigid", "blur"])
-                List of augmentations. e.g. ["hue_sat", "non_rigid", "blur"]...
-                allowed augs: ("hue_sat", "rigid", "non_rigid", "blur", 
-                "non_spatial", "normalize")
+            augmentations (List, default=["hue_sat","non_rigid","blur"])
+                List of augmentations. Allowed augs: "hue_sat", "rigid",
+                "non_rigid", "blur", "non_spatial", "normalize"
             normalize (bool, default=False):
-                If True, channel-wise min-max normalization is applied to input
-                imgs in the dataloading process
+                If True, channel-wise min-max normalization is applied 
+                to input imgs in the dataloading process
             aux_branch (str, default="hover"):
-                Signals that the dataset needs to prepare an input for an 
-                auxiliary branch in the __getitem__ method. One of ("hover", 
-                "dist", "contour", None). If None, assumes that the network 
-                does not contain auxiliary branch and the unet style dataset 
-                (edge weights and no overlapping cells) is used as the dataset. 
+                Signals that the dataset needs to prepare an input for 
+                an auxiliary branch in the __getitem__ method. One of: 
+                "hover", "dist", "contour", None. If None, assumes that
+                the network does not contain auxiliary branch and the
+                unet style dataset (edge weights) is used as the dataset 
             batch_size (int, default=8):
                 Batch size for the dataloader
             num_workers (int, default=8):
-                number of cpu cores/threads used in the dataloading process.
+                number of cpu cores/threads used in the dataloading 
+                process.
             download_dir (str, or Path obj, default=None):
-                directory where the downloaded data is located or saved to. If
-                None, and downloading is required, will be downloaded in 
-                Dippa/data/pannuke/ folders.
+                directory where the downloaded data is located. If None, 
+                and downloading is required, will be downloaded in 
+                .../Dippa/data/consep/ folders.
             database_dir (str or Path, default=None):
-                The directory where the db is located or saved to. If None, and
+                The directory where the db is located. If None, and
                 writing is required, will be downloaded in 
-                Dippa/patches/pannuke/ folders
+                .../Dippa/patches/consep/ folders
             convert_classes (bool, default=True):
-                Convert the original classes to the reduced set of classes
-                See the paper.
+                Convert the original classes to the reduced set of 
+                classes. More info in their github and their paper.
             
         """
         super(ConsepDataModule, self).__init__()
@@ -127,19 +129,22 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
         }
 
     @staticmethod
-    def download(download_dir: Union[Path, str], convert_classes: bool=True) -> Dict[str, Path]:
+    def download(
+            download_dir: Union[Path, str], 
+            convert_classes: bool=True
+        ) -> Dict[str, Path]:
         """
         Download CoNSeP dataset from: 
         https://warwick.ac.uk/fac/cross_fac/tia/data/hovernet/.
-        and optionally creduce the classes from 8 to 5. See their README..
+        and optionally creduce the classes from 8 to 5. See their README
 
         Args:
         -----------
             download_dir (str or Path):
                 The directory where the data is downloaded
             convert_classes (bool, default=True):
-                Convert the original classes to the reduced set of classes
-                See the paper.
+                Convert the original classes to the reduced set of 
+                classes
         
         Returns:
         -----------
@@ -158,26 +163,29 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
         return consep.download()
 
     @staticmethod
-    def write_db(img_dir: Union[Path, str],
-                 mask_dir: Union[Path, str],
-                 save_dir: Union[Path, str],
-                 phase: str,
-                 database_type: str, 
-                 classes: Dict[str, int],
-                 augment: bool=True,
-                 stride_size: int=80,
-                 patch_shape: Tuple[int, int]=(512, 512),
-                 crop_shape: Tuple[int, int]=(256,256)) -> None:
+    def write_db(
+            img_dir: Union[Path, str],
+            mask_dir: Union[Path, str],
+            save_dir: Union[Path, str],
+            phase: str,
+            database_type: str, 
+            classes: Dict[str, int],
+            augment: bool=True,
+            stride_size: int=80,
+            patch_shape: Tuple[int, int]=(512, 512),
+            crop_shape: Tuple[int, int]=(256,256)
+        ) -> None:
         """
-        Write overlapping (img [.png], mask [.mat]) pairs to either Zarr or 
-        HDF5 db
+        Write overlapping (img [.png], mask [.mat]) pairs to either 
+        Zarr or HDF5 database
 
         Args:
         ---------
             img_dir (Path or str):
                 Path to the dir containing the image .png files
             mask_dir (Path or str):
-                Path to the dir containing the corresponding mask .mat files
+                Path to the dir containing the corresponding mask .mat 
+                files
             save_dir (Path or str):
                 Path to the dir where the DB is written
             phase (str):
@@ -185,19 +193,20 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
             database_type (str):
                 One of ("zarr", "hdf5")
             classes (Dict[str, int]):
-                classes dictionary e.g. {"bg":0, "neoplastic":1, "inflamma":2}
+                classes dictionary e.g. {"bg":0, "neopl":1, "infl":2}
             augment (bool, default=True):
-                If True, rigid augmentations are applied to the (img, mask) 
-                pairs
+                If True, rigid augs are applied to the (img, mask) pairs
             patch_shape (Tuple[int, int], default=(512, 512)):
-                Specifies the height and width of the patches. If this is None,
-                no patching is applied.
+                Specifies the height and width of the patches. If this 
+                is None, no patching is applied.
             stride_size (int, default=80):
-                Stride size for the sliding window patcher. Needs to be less or
-                equal to patch_shape. If less than patch_shape, patches are 
-                created with overlap. Ignored if patch_shape is None.
+                Stride size for the sliding window patcher. Needs to be 
+                less or equal to patch_shape. If less than patch_shape, 
+                patches are created with overlap. This arg is ignored if
+                patch_shape is None.
             crop_shape (Tuple[int, int], default=(256, 256)):
-                If augment is True, this is the crop shape for the center crop.
+                If augment is True, this is the crop shape for the 
+                center crop.
         """
         assert database_type in ("zarr", "hdf5")
         writerobj = HDF5Writer if database_type == "hdf5" else ZarrWriter 

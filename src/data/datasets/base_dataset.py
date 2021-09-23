@@ -73,7 +73,7 @@ class BaseDataset(Dataset, FileHandler):
 
         Returns:
         --------
-            np.ndarray. The nuclei border weight map. Shape (H, W) 
+            np.ndarray: The nuclei border weight map. Shape (H, W) 
         """
         wmap = get_weight_map(inst_map)
         wmap += 1 # uniform weight for all classes
@@ -90,13 +90,15 @@ class BaseDataset(Dataset, FileHandler):
 
         Returns:
         --------
-            np.ndarray. Resulting instance segmentaiton map. Shape (H, W) 
+            np.ndarray: Resulting instance segmentaiton map. 
+            Shape (H, W).
         """
         return remove_1px_boundary(inst_map)
 
     def fix_mirror_pad(self, inst_map: np.ndarray) -> np.ndarray:
         """
-        Fix the redundant indices of the nuclear instances after mirror padding
+        Fix the redundant indices of the nuclear instances after mirror 
+        padding
 
         Args:
         --------
@@ -105,7 +107,8 @@ class BaseDataset(Dataset, FileHandler):
 
         Returns:
         --------
-            np.ndarray. Resulting instance segmentaiton map. Shape (H, W) 
+            np.ndarray: Resulting instance segmentaiton map. 
+            Shape (H, W).
         """
         return fix_duplicates(inst_map)
         
@@ -120,7 +123,7 @@ class BaseDataset(Dataset, FileHandler):
 
         Returns:
         --------
-            np.ndarray. Binary mask. Shape (H, W) 
+            np.ndarray: Binary mask. Shape (H, W).
         """
         return binarize(inst_map)
 
@@ -135,6 +138,7 @@ class BaseDataset(Dataset, FileHandler):
 
         Returns:
         --------
-            torch.Tensor. Normalized input image tensor. Shape (C, H, W)
+            torch.Tensor: Normalized input image tensor. 
+            Shape (C, H, W).
         """
         return minmax_normalize_torch(img)

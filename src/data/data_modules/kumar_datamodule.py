@@ -13,25 +13,27 @@ from ..downloaders import KUMAR
 
 
 class KumarDataModule(pl.LightningDataModule, FileHandler):
-    def __init__(self, 
-                 database_type: str,
-                 augmentations: List[str]=["hue_sat", "non_rigid", "blur"],
-                 normalize: bool=False,
-                 aux_branch: str=True,
-                 batch_size: int=8,
-                 num_workers: int=8,
-                 download_dir: Union[str, Path]=None, 
-                 database_dir: Union[str, Path]=None,
-                 convert_classes: bool=True) -> None:
+    def __init__(
+            self, 
+            database_type: str,
+            augmentations: List[str]=["hue_sat", "non_rigid", "blur"],
+            normalize: bool=False,
+            aux_branch: str=True,
+            batch_size: int=8,
+            num_workers: int=8,
+            download_dir: Union[str, Path]=None, 
+            database_dir: Union[str, Path]=None,
+            convert_classes: bool=True
+        ) -> None:
         """
         Kumar dataset lightning datamodule
 
         Kumar dataset paper:
         --------------
-        N. Kumar, R. Verma, S. Sharma, S. Bhargava, A. Vahadane and A. Sethi, 
-        "A Dataset and a Technique for Generalized Nuclear Segmentation for 
-        Computational Pathology," in IEEE Transactions on Medical Imaging, vol.
-        36, no. 7, pp. 1550-1560, July 2017
+        N. Kumar, R. Verma, S. Sharma, S. Bhargava, A. Vahadane and 
+        A. Sethi, "A Dataset and a Technique for Generalized Nuclear 
+        Segmentation for Computational Pathology," in IEEE Transactions 
+        on Medical Imaging, vol.36, no. 7, pp. 1550-1560, July 2017
 
         Args:
         -----------
@@ -39,31 +41,31 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
                 One of ("zarr", "hdf5"). The files are written in either
                 zarr or hdf5 files that is used by the torch dataloader 
                 during training.
-            augmentations (List[str]):
-                List of augmentations. e.g. ["hue_sat", "non_rigid", "blur"]...
-                allowed augs: ("hue_sat", "rigid", "non_rigid", "blur", 
-                "non_spatial", "normalize")
-            normalize (bool):
-                If True, channel-wise min-max normalization is applied to input
-                imgs in the dataloading process
-            aux_branch (str):
-                Signals that the dataset needs to prepare an input for an 
-                auxiliary branch in the __getitem__ method. One of ("hover", 
-                "dist", "contour", None). If None, assumes that the network 
-                does not contain auxiliary branch and the unet style dataset 
-                (edge weights and no overlapping cells) is used as the dataset. 
-            batch_size (int):
+            augmentations (List, default=["hue_sat","non_rigid","blur"])
+                List of augmentations. Allowed augs: "hue_sat", "rigid",
+                "non_rigid", "blur", "non_spatial", "normalize"
+            normalize (bool, default=False):
+                If True, channel-wise min-max normalization is applied 
+                to input imgs in the dataloading process
+            aux_branch (str, default="hover"):
+                Signals that the dataset needs to prepare an input for 
+                an auxiliary branch in the __getitem__ method. One of: 
+                "hover", "dist", "contour", None. If None, assumes that
+                the network does not contain auxiliary branch and the
+                unet style dataset (edge weights) is used as the dataset 
+            batch_size (int, default=8):
                 Batch size for the dataloader
-            num_workers (int):
-                number of cpu cores/threads used in the dataloading process.
-            download_dir (str, or Path obj):
-                directory where the downloaded data is located or saved to. 
-                If None, and downloading is required, will be downloaded in 
-                Dippa/data/pannuke/ folders.
-            database_dir (str or Path):
-                The directory where the db is located or saved to. If None, 
-                and writing is required, will be downloaded in 
-                Dippa/patches/pannuke/ folders
+            num_workers (int, default=8):
+                number of cpu cores/threads used in the dataloading 
+                process.
+            download_dir (str, or Path obj, default=None):
+                directory where the downloaded data is located. If None, 
+                and downloading is required, will be downloaded in 
+                .../Dippa/data/kumar/ folders.
+            database_dir (str or Path, default=None):
+                The directory where the db is located. If None, and
+                writing is required, will be downloaded in 
+                .../Dippa/patches/kumar/ folders
             
         """
         super(KumarDataModule, self).__init__()
@@ -113,8 +115,9 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
         2. Test: 
         https://drive.google.com/file/d/1NKkSQ5T0ZNQ8aUhh0a8Dt2YKYCQXIViw/view
 
-        and convert the mask xml files to .mat files containing "inst_map", 
-        "type_map", "inst_centroid", "inst_type" and "inst_bbox" slots.
+        and convert the mask xml files to .mat files containing 
+        "inst_map", "type_map", "inst_centroid","inst_type", "inst_bbox"
+        keys
 
         Args:
         -----------
@@ -137,14 +140,16 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
         return KUMAR()
 
     @staticmethod
-    def write_db(img_dir: Union[Path, str],
-                 mask_dir: Union[Path, str],
-                 save_dir: Union[Path, str],
-                 phase: str,
-                 database_type: str, 
-                 classes: Dict[str, int],
-                 augment: bool=True,
-                 n_copies: int=3) -> None:
+    def write_db(
+            img_dir: Union[Path, str],
+            mask_dir: Union[Path, str],
+            save_dir: Union[Path, str],
+            phase: str,
+            database_type: str, 
+            classes: Dict[str, int],
+            augment: bool=True,
+            n_copies: int=3
+        ) -> None:
         """
         Write (img [.png], mask [.mat]) pairs to either Zarr or HDF5 db
 
@@ -153,7 +158,8 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
             img_dir (Path or str):
                 Path to the dir containing the image .png files
             mask_dir (Path or str):
-                Path to the dir containing the corresponding mask .mat files
+                Path to the dir containing the corresponding mask .mat 
+                files
             save_dir (Path or str):
                 Path to the dir where the DB is written
             phase (str):
@@ -161,10 +167,9 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
             database_type (str):
                 One of ("zarr", "hdf5")
             classes (Dict[str, int]):
-                classes dictionary e.g. {"bg":0, "neoplastic":1, "inflamma":2}
+                classes dictionary e.g. {"bg":0, "neopl":1, "infl":2}
             augment (bool, default=True):
-                If True, rigid augmentations are applied to the (img, mask) 
-                pairs
+                If True, rigid augs are applied to the (img, mask) pairs
         """
         assert database_type in ("zarr", "hdf5")
         writerobj = HDF5Writer if database_type == "hdf5" else ZarrWriter 
@@ -186,7 +191,8 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
     @property
     def class_weights(self) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Get the proportion of pixels of diffenrent classes in the train dataset
+        Get the proportion of pixels of diffenrent classes in the 
+        train dataset
         """
         weights = self.get_class_weights(self.db_fname_train.as_posix())
         weights_bin = self.get_class_weights(

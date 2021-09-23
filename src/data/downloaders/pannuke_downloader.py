@@ -1,6 +1,6 @@
 import pooch
 from pathlib import Path
-from typing import Union, Dict
+from typing import Union
 
 from .adhoc import handle_pannuke
 from .base_downloader import BaseDownloader
@@ -14,19 +14,28 @@ HASHES = {
 
 
 class PANNUKE(BaseDownloader):
-    def __init__(self, save_dir: Union[str, Path], fold: int, phase: str) -> None:
+    def __init__(
+            self, 
+            save_dir: Union[str, Path], 
+            fold: int, 
+            phase: str
+        ) -> None:
         """
-        Fetches a single fold of the pannuke dataset from https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke.
-        Uses pooch package. Saves the data in dir called pannuke under the save_dir that is
-        specified.
+        Fetches a single fold of the pannuke dataset from: 
+        https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke.
+        
 
         Pannuke papers:
         ---------------
-        Gamper, J., Koohbanani, N., Benet, K., Khuram, A., & Rajpoot, N. (2019). PanNuke: an open pan-cancer histology dataset         
-        for nuclei instance segmentation and classification. In European Congress on Digital Pathology (pp. 11–19).
+        Gamper, J., Koohbanani, N., Benet, K., Khuram, A., & Rajpoot, N.
+        (2019). PanNuke: an open pan-cancer histology dataset for nuclei
+        instance segmentation and classification. 
+        In European Congress on Digital Pathology (pp. 11–19).
 
-        Gamper, J., Koohbanani, N., Graham, S., Jahanifar, M., Khurram, S., Azam, A., Hewitt, K., & Rajpoot, N. (2020). 
-        PanNuke Dataset Extension, Insights and Baselines. arXiv preprint arXiv:2003.10778.
+        Gamper, J., Koohbanani, N., Graham, S., Jahanifar, M., Khurram,
+        S., Azam, A., Hewitt, K., & Rajpoot, N. (2020). PanNuke Dataset 
+        Extension, Insights and Baselines. arXiv preprint 
+        arXiv:2003.10778.
 
         Args:
         ----------
@@ -49,8 +58,9 @@ class PANNUKE(BaseDownloader):
 
         # Create pooch and set downloader
         self.downloader = pooch.HTTPDownloader(progressbar=True)
+        path = Path(self.save_dir / "pannuke/original")
         self.POOCH = pooch.create(
-            path=pooch.os_cache(f"{self.save_dir.as_posix()}/pannuke/original/"),
+            path=pooch.os_cache(path.as_posix()),
             base_url="https://warwick.ac.uk/fac/cross_fac/tia/data/pannuke/",
             retry_if_failed=2,
             registry={
