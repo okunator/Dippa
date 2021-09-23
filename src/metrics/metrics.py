@@ -23,22 +23,21 @@ SOFTWARE.
 """
 
 import numpy as np
-import cv2
-
 from typing import Dict
 from scipy import ndimage as ndi
 from scipy.optimize import linear_sum_assignment
 from skimage.metrics import variation_of_information
 
 
-# Ported from here: https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
+# Ported from: 
+# https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
 def AJI(true: np.ndarray, pred: np.ndarray) -> float:
     """
-    AJI version distributed by MoNuSeg, has no permutation problem but suffered from 
-    over-penalisation similar to DICE2
-    Fast computation requires instance IDs are in contiguous orderding i.e [1, 2, 3, 4] 
-    not [2, 3, 6, 10]. Please call `remap_label` before hand and `by_size` flag has no 
-    effect on the result. 
+    AJI version distributed by MoNuSeg, has no permutation problem but 
+    suffered from over-penalisation similar to DICE2 Fast computation
+    requires instance IDs are in contiguous orderding i.e [1, 2, 3, 4] 
+    not [2, 3, 6, 10]. Please call `remap_label` before hand and 
+    `by_size` flag has no effect on the result. 
 
     Args:
     ----------
@@ -64,10 +63,20 @@ def AJI(true: np.ndarray, pred: np.ndarray) -> float:
         p_mask = np.array(pred == p, np.int8)
         pred_masks[p] = p_mask
 
-    pairwise_inter = np.zeros([len(true_masks.keys())+1, 
-                               len(pred_masks.keys())+1], dtype=np.float64)
-    pairwise_union = np.zeros([len(true_masks.keys())+1, 
-                               len(pred_masks.keys())+1], dtype=np.float64)
+    pairwise_inter = np.zeros(
+        shape=[
+            len(true_masks.keys()) + 1, 
+            len(pred_masks.keys()) + 1
+        ], 
+        dtype=np.float64
+    )
+    pairwise_union = np.zeros(
+        shape=[
+            len(true_masks.keys()) + 1, 
+            len(pred_masks.keys()) + 1
+        ],
+        dtype=np.float64
+    )
     
     # for true_id in true_id_list[1:]: # 0-th is background
     for true_id in true_masks.keys():
@@ -97,34 +106,44 @@ def AJI(true: np.ndarray, pred: np.ndarray) -> float:
     # Calculate the pairwise (matching nuclei pair) IoU    
     pairwise_iou = pairwise_inter / (pairwise_union + 1.0e-6)
 
-    # Get the instance idxs of predicted nucleis that give highest IoU for each ground truth nuclei, 
-    # dont care about reusing the prediction instance multiple times here
+    # Get the instance idxs of predicted nucleis that give highest IoU 
+    # for each ground truth nuclei, dont care about reusing the 
+    # prediction instance multiple times here
     paired_pred = np.argmax(pairwise_iou, axis=1)
 
     # Now get the corresponding IoU values 
     pairwise_iou = np.max(pairwise_iou, axis=1)
 
-    # Exlude those that dont have intersection i.e. pairwise iou > 0 or intersection > 0
-    # These are the indexes for the non-zero values in pairwise_iou var
+    # Exlude those that dont have intersection i.e. pairwise iou > 0 or 
+    # intersection > 0 These are the indexes for the non-zero values in 
+    # pairwise_iou var
     paired_true = np.nonzero(pairwise_iou > 0.0)[0]
 
-    # Get the prediction idxs that match with the indexes that actually have overlap (intersection > 0)
-    # There may be lonely predction nucleis that don't have a matching ground truth nuclei or vice versa.
-    # So basically these are only the true positive matches. False negatives and false positives excluded
+    # Get the prediction idxs that match with the indexes that actually
+    # have overlap (intersection > 0) There may be lonely predction 
+    # nucleis that don't have a matching ground truth nuclei or vice 
+    # versa. So basically these are only the true positive matches. 
+    # False negatives and false positives excluded
     paired_pred = paired_pred[paired_true]
 
-    # Calculate the overall intersection and union on these matching nucleis
-    # NOTE: We have excluded the predictions of nuclei instances that are FALSE POSITIVES
+    # Calculate the overall intersection and union on these matching 
+    # nucleis NOTE: We have excluded the predictions of nuclei instances
+    # that are FALSE POSITIVES
     overall_inter = (pairwise_inter[paired_true, paired_pred]).sum()
     overall_union = (pairwise_union[paired_true, paired_pred]).sum()
 
     paired_true = (list(paired_true + 1))
     paired_pred = (list(paired_pred + 1))
 
-    # Find the indices that were those FALSE POSITIVES and FALSE NEGATIVES
-    # that were excluded then we add all those unpaired ground truths and predictions into the union
-    unpaired_true = np.array([idx for idx in true_id_list[1:] if idx not in paired_true])
-    unpaired_pred = np.array([idx for idx in pred_id_list[1:] if idx not in paired_pred])
+    # Find the indices that were those FALSE POSITIVES and FALSE 
+    # NEGATIVES that were excluded then we add all those unpaired ground
+    #  truths and predictions into the union
+    unpaired_true = np.array(
+        [idx for idx in true_id_list[1:] if idx not in paired_true]
+    )
+    unpaired_pred = np.array(
+        [idx for idx in pred_id_list[1:] if idx not in paired_pred]
+    )
 
     for true_id in unpaired_true:
         overall_union += true_masks[true_id].sum()
@@ -140,13 +159,15 @@ def AJI(true: np.ndarray, pred: np.ndarray) -> float:
 # ported from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
 def AJI_plus(true: np.ndarray, pred: np.ndarray) -> float:
     """
-    AJI+, an AJI version with maximal unique pairing to obtain overall intersecion.
-    Every prediction instance is paired with at most 1 GT instance (1 to 1) mapping, unlike AJI 
-    where a prediction instance can be paired against many GT instances (1 to many).
-    Remaining unpaired GT and Prediction instances will be added to the overall union.
-    The 1 to 1 mapping prevents AJI's over-penalisation from happening.
-    Fast computation requires instance IDs are in contiguous orderding i.e [1, 2, 3, 4] 
-    not [2, 3, 6, 10]. Please call `remap_label` before hand and `by_size` flag has no 
+    AJI+, an AJI version with maximal unique pairing to obtain overall 
+    intersecion. Every prediction instance is paired with at most 1 GT 
+    instance (1 to 1) mapping, unlike AJI 
+    where a prediction instance can be paired against many GT instances 
+    (1 to many). Remaining unpaired GT and Prediction instances will be
+    added to the overall union. The 1 to 1 mapping prevents AJI's over-
+    penalisation from happening. Fast computation requires instance IDs 
+    are in contiguous orderding i.e [1, 2, 3, 4] not [2, 3, 6, 10]. 
+    Please call `remap_label` before hand and `by_size` flag has no 
     effect on the result.
 
     Args:
@@ -280,20 +301,25 @@ def DICE2(true: np.ndarray, pred: np.ndarray) -> float:
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/metrics/stats_utils.py
-def PQ(true: np.ndarray, pred: np.ndarray, match_iou: float=0.5) -> Dict[str, float]:
+def PQ(
+        true: np.ndarray, 
+        pred: np.ndarray, 
+        match_iou: float=0.5
+    ) -> Dict[str, float]:
     """
-    `match_iou` is the IoU threshold level to determine the pairing between
-    GT instances `p` and prediction instances `g`. `p` and `g` is a pair
-    if IoU > `match_iou`. However, pair of `p` and `g` must be unique 
-    (1 prediction instance to 1 GT instance mapping).
-    If `match_iou` < 0.5, Munkres assignment (solving minimum weight matching
-    in bipartite graphs) is caculated to find the maximal amount of unique pairing. 
-    If `match_iou` >= 0.5, all IoU(p,g) > 0.5 pairing is proven to be unique and
-    the number of pairs is also maximal.    
+    `match_iou` is the IoU threshold level to determine the pairing 
+    between GT instances `p` and prediction instances `g`. `p` and `g` 
+    is a pair if IoU > `match_iou`. However, pair of `p` and `g` must be
+    unique (1 prediction instance to 1 GT instance mapping). If 
+    `match_iou` < 0.5, Munkres assignment (solving minimum weight 
+    matching in bipartite graphs) is caculated to find the maximal 
+    amount of unique pairing. If `match_iou` >= 0.5, all IoU(p,g) > 0.5
+    pairing is proven to be unique and the number of pairs is also 
+    maximal.    
     
     Fast computation requires instance IDs are in contiguous orderding 
-    i.e [1, 2, 3, 4] not [2, 3, 6, 10]. Please call `remap_label` beforehand 
-    and `by_size` flag has no effect on the result.
+    i.e [1, 2, 3, 4] not [2, 3, 6, 10]. Please call `remap_label`
+    beforehand and `by_size` flag has no effect on the result.
 
     Args:
     ----------
@@ -306,7 +332,8 @@ def PQ(true: np.ndarray, pred: np.ndarray, match_iou: float=0.5) -> Dict[str, fl
 
     Returns:
     ----------
-        Dictionary of computed metrics. Metrics included: PQ, SQ, DQ, recall, precision 
+        Dict: Dictionary of computed metrics. Metrics included: 
+        PQ, SQ, DQ, recall, precision 
                     
     """
     assert match_iou >= 0.0, "Cant' be negative"
@@ -324,7 +351,9 @@ def PQ(true: np.ndarray, pred: np.ndarray, match_iou: float=0.5) -> Dict[str, fl
         p_mask = np.array(pred == p, np.uint8)
         pred_masks.append(p_mask)
         
-    pairwise_iou = np.zeros([len(true_id_list)-1, len(pred_id_list)-1], dtype=np.float64)
+    pairwise_iou = np.zeros(
+        [len(true_id_list)-1, len(pred_id_list)-1], dtype=np.float64
+    )
 
     # caching pairwise iou
     for true_id in true_id_list[1:]: # 0-th is background
@@ -352,8 +381,8 @@ def PQ(true: np.ndarray, pred: np.ndarray, match_iou: float=0.5) -> Dict[str, fl
         # Exhaustive maximal unique pairing
         # Munkres pairing with scipy library (Hungarian algorithm)
         # the algorithm returns (row indices, matched column indices)
-        # if there is multiple same cost in a row, index of first occurence 
-        # is returned, thus the unique pairing is ensured
+        # if there is multiple same cost in a row, index of first 
+        # occurence is returned, thus the unique pairing is ensured
         # inverse pair to get high IoU as minimum   
         paired_true, paired_pred = linear_sum_assignment(-pairwise_iou)
         # extract the paired cost and remove invalid pairs 
@@ -366,8 +395,14 @@ def PQ(true: np.ndarray, pred: np.ndarray, match_iou: float=0.5) -> Dict[str, fl
         paired_iou = paired_iou[paired_iou > match_iou]
 
     # get the actual FP and FN
-    unpaired_true = [idx for idx in true_id_list[1:] if idx not in paired_true]
-    unpaired_pred = [idx for idx in pred_id_list[1:] if idx not in paired_pred]
+    unpaired_true = [
+        idx for idx in true_id_list[1:] 
+        if idx not in paired_true
+    ]
+    unpaired_pred = [
+        idx for idx in pred_id_list[1:] 
+        if idx not in paired_pred
+    ]
 
     TP = len(paired_true)
     FP = len(unpaired_pred)
@@ -391,13 +426,11 @@ def PQ(true: np.ndarray, pred: np.ndarray, match_iou: float=0.5) -> Dict[str, fl
     return res
 
 
-def conventional_metrics(true: np.ndarray, pred: np.ndarray) -> Dict[str, float]:
+def conventional_metrics(
+        true: np.ndarray, 
+        pred: np.ndarray
+    ) -> Dict[str, float]:
     """
-    DICE = 2TP/(2TP + FP + FN)
-    JACCARD = TP/(TP+FP+FN) or just DICE/(2-DICE) also called intersection over union IoU
-    sensitivity = TP/(TP+FN)
-    specificity = TN/(TN+FP)
-
     Args:
     ----------
         true (np.ndarray):
@@ -407,7 +440,8 @@ def conventional_metrics(true: np.ndarray, pred: np.ndarray) -> Dict[str, float]
 
     Returns:
     ----------
-        Dictionary of the computed metrics. (dice, iou, sensitivity, specificity)
+        Dict: Dictionary of the computed metrics: 
+        Dice, iou, sensitivity, specificity
     """
     true[true > 0] = 1
     pred[pred > 0] = 1 
@@ -433,7 +467,8 @@ def conventional_metrics(true: np.ndarray, pred: np.ndarray) -> Dict[str, float]
 
 def split_and_merge(true: np.ndarray, pred: np.ndarray) -> float:
     """
-    Split and merge for all the predicted nuclei instances vs gt nuclei instances
+    Split and merge for all the predicted nuclei instances vs gt nuclei
+    minstances
 
     Args:
     ----------

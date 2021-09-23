@@ -15,20 +15,28 @@ from typing import Dict, Tuple, Union
 from .mask_utils import get_inst_centroid, get_inst_types, bounding_box
 
 
-def poly2mask(contour: np.ndarray, shape: Tuple[int, int], x_off: int=None, y_off: int=None) -> np.ndarray:
+def poly2mask(
+        contour: np.ndarray, 
+        shape: Tuple[int, int], 
+        x_off: int=None, 
+        y_off: int=None
+    ) -> np.ndarray:
     """
     Convert shapely Polygons to np.ndarray mask
 
     Args:
     ---------
         contour (Polygon.exterior.coords):
-            Shapely xy coords for the polygon. Something like array(0 30, 5 50, ... , 90 500)
+            Shapely xy coords for the polygon. Something like 
+            array(0 30, 5 50, ... , 90 500)
         shape (Tuple[int, int]):
             shape of the mask  
         x_off (int, default=None):
-            the amount of translation/offset that is encoded into the x-coord in the geojson
+            the amount of translation/offset that is encoded into the 
+            x-coord in the geojson
         y_off (int, default=None):
-            the amount of translation/offset that is encoded into the y-coord in the geojson
+            the amount of translation/offset that is encoded into the
+            y-coord in the geojson
 
     Returns:
     ---------
@@ -45,31 +53,39 @@ def poly2mask(contour: np.ndarray, shape: Tuple[int, int], x_off: int=None, y_of
     return inst
 
 
-def mask2mat(inst_map: np.ndarray, 
-             type_map: np.ndarray, 
-             fname: Union[str, Path]=None,
-             save_dir: Union[str, Path]=None) -> None:
+def mask2mat(
+        inst_map: np.ndarray, 
+        type_map: np.ndarray, 
+        fname: Union[str, Path]=None,
+        save_dir: Union[str, Path]=None
+    ) -> None:
     """
     Convert one set of NN output masks into a .mat file
     that contain (key, value) pairs. 
     
-    Keys: "inst_map", "type_map", "inst_type", "inst_centroid", "inst_bbox" 
+    Keys: "inst_map","type_map","inst_type","inst_centroid","inst_bbox" 
 
     Args:
     ---------
         inst_map (np.ndarray):
-            instance labelled instance segmentation mask from the segmentation model
+            instance labelled instance segmentation mask from the 
+            segmentation model
         type_map (np.ndarray):
-            cell type labelled semantic segmentation mask from the segmentation model
+            cell type labelled semantic segmentation mask from the
+            segmentation model
         fname (str, default=None):
-            File name for the annotation json file. If None, no file is written.
+            File name for the annotation json file. If None, no file is
+            written.
         save_dir (str):
             directory where the .mat files are saved
     """
     centroids = get_inst_centroid(inst_map)
-    inst_ids = list(np.unique(inst_map)[1:])
-    bboxes = np.array([bounding_box(np.array(inst_map == id_, np.uint8)) for id_ in inst_ids])
     inst_types = get_inst_types(inst_map, type_map)
+    inst_ids = list(np.unique(inst_map)[1:])
+    bboxes = np.array(
+        [bounding_box(np.array(inst_map == id_, np.uint8)) 
+        for id_ in inst_ids]
+    )
 
     save_dir = Path(save_dir)
     new_fname = Path(fname).with_suffix(".mat").name
@@ -86,12 +102,14 @@ def mask2mat(inst_map: np.ndarray,
     )
 
 
-def geojson2mat(fname: Union[str, Path], 
-                target_shape: Tuple[int, int], 
-                classes: Dict[str, int]=None, 
-                save_dir: Union[str, Path]=None,
-                x_off: int=None, 
-                y_off: int=None) -> Tuple[np.ndarray, np.ndarray]:
+def geojson2mat(
+        fname: Union[str, Path], 
+        target_shape: Tuple[int, int], 
+        classes: Dict[str, int]=None, 
+        save_dir: Union[str, Path]=None,
+        x_off: int=None, 
+        y_off: int=None
+    ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Converts geojson annotation file to numpy arrays and saves them
     to .mat files if save_dir is specified.
@@ -105,17 +123,21 @@ def geojson2mat(fname: Union[str, Path],
         save_dir (str):
             directory where the .mat files are saved
         target_shape (Tuple[int, int]):
-            Height and width of the numpy array that the geojson is converted into
+            Height and width of the numpy array that the geojson is 
+            converted into
         classes (Dict[str, int], default=None):
             class dict e.g. {"inflam":1, "epithelial":2, "connec":3}
         x_off (int):
-            the amount of translation/offset that is encoded into the x-coord in the geojson
+            the amount of translation/offset that is encoded into the 
+            x-coord in the geojson
         y_off (int):
-            the amount of translation/offset that is encoded into the y-coord in the geojson
+            the amount of translation/offset that is encoded into the 
+            y-coord in the geojson
 
     Retrurns:
     ------------
-        Tuple on np.ndarrays. The instance segmentation map and the semantic segmentation map
+        Tuple: Tuple on np.ndarrays. The instance segmentation map and 
+        the semantic segmentation map
     """
     # read files and init GeoDf
     anno = pd.read_json(fname)
@@ -123,33 +145,58 @@ def geojson2mat(fname: Union[str, Path],
     annots = gpd.GeoDataFrame(anno).set_geometry('geometry')
 
     # Drop rectangle objects
-    drop_ixs = [i for i, row in annots.iterrows() if np.isclose(row.geometry.minimum_rotated_rectangle.area, row.geometry.area)]
+    drop_ixs = [
+        i for i, row in annots.iterrows() 
+        if np.isclose(
+            row.geometry.minimum_rotated_rectangle.area, 
+            row.geometry.area
+        )
+    ]
     annots = annots.drop(drop_ixs)
 
     # inits
     # use pannuke classes if no classes are given
     if classes is None:
-        classes = {"background":0, "neoplastic":1, "inflammatory":2, "connective":3, "dead":4, "epithelial":5}
+        classes = {
+            "background":0, "neoplastic":1, "inflammatory":2, 
+            "connective":3, "dead":4, "epithelial":5
+        }
 
-    cls_max = max([classes[t] for t in set([prop["classification"]["name"] for prop in annots["properties"]])])
+    cls_max = max(
+        [
+            classes[t] for t in set(
+                [
+                    prop["classification"]["name"] 
+                    for prop in annots["properties"]
+                ]
+            )
+        ]
+    )
     target_shape = target_shape
     inst_map = np.zeros(target_shape, np.int32)
     type_map = np.zeros(target_shape, np.int32)
 
     # loop over the polygons of the GeoDataFrame
     with tqdm(total=len(annots)) as pbar:
-        for i, (poly, props) in enumerate(zip(annots["geometry"], annots["properties"])):
+        for i, (poly, props) in enumerate(zip(
+            annots["geometry"], 
+            annots["properties"])
+        ):
             pbar.set_description("processing nuclear annotations")
             class_num = classes[props["classification"]["name"]]
             if isinstance(poly, shapely.geometry.multipolygon.MultiPolygon):
                 for p in list(poly):
-                    inst = poly2mask(p.exterior.coords, target_shape, x_off, y_off)
+                    inst = poly2mask(
+                        p.exterior.coords, target_shape, x_off, y_off
+                    )
                     inst = remove_small_objects(inst, 10)
                     inst_map[inst > 0] += (i + 1)
                     type_map[(inst > 0) & (type_map != class_num)] = class_num
 
             else:
-                inst = poly2mask(poly.exterior.coords, target_shape, x_off, y_off)
+                inst = poly2mask(
+                    poly.exterior.coords, target_shape, x_off, y_off
+                )
                 inst = remove_small_objects(inst, 10)
                 inst_map[inst > 0] += (i + 1)
                 type_map[(inst > 0) & (type_map != class_num)] = class_num
@@ -167,24 +214,29 @@ def geojson2mat(fname: Union[str, Path],
     return inst_map, type_map
 
 
-def mask2geojson(inst_map: np.ndarray, 
-                 type_map: np.ndarray, 
-                 fname: Union[str, Path]=None,
-                 classes: Dict[str, int]=None,
-                 save_dir: Union[str, Path]=None,
-                 x_offset: int=0,
-                 y_offset: int=0) -> Union[Dict, None]:
+def mask2geojson(
+        inst_map: np.ndarray, 
+        type_map: np.ndarray, 
+        fname: Union[str, Path]=None,
+        classes: Dict[str, int]=None,
+        save_dir: Union[str, Path]=None,
+        x_offset: int=0,
+        y_offset: int=0
+    ) -> Union[Dict, None]:
     """
     Convert one set of NN output masks into a single geoJSON obj
 
     Args:
     ---------
         inst_map (np.ndarray):
-            instance labelled instance segmentation mask from the segmentation model
+            instance labelled instance segmentation mask from the 
+            segmentation model
         type_map (np.ndarray):
-            cell type labelled semantic segmentation mask from the segmentation model
+            cell type labelled semantic segmentation mask from the 
+            segmentation model
         fname (Path or str, default=None):
-            File name for the annotation json file. If None, no file is written.
+            File name for the annotation json file. If None, no file is 
+            written.
         classes (Dict[str, int], default=None):
             class dict e.g. {"inflam":1, "epithelial":2, "connec":3}
         save_dir (Path or str, default=None):
@@ -196,34 +248,46 @@ def mask2geojson(inst_map: np.ndarray,
 
     Returns:
     ----------
-        A dictionary with geojson fields or None
+        Dict: A dictionary with geojson fields or None
     """
     inst_list = list(np.unique(inst_map))[1:]
     geo_objs = []
 
     # use pannuke classes if no classes are given
     if classes is None:
-        classes = {"background":0, "neoplastic":1, "inflammatory":2, "connective":3, "dead":4, "epithelial":5}
+        classes = {
+            "background":0, "neoplastic":1, "inflammatory":2, 
+            "connective":3, "dead":4, "epithelial":5
+        }
 
     # with tqdm(total=len(inst_list)) as pbar:
-    for idx, inst_id in enumerate(inst_list):
-        # pbar.set_description("processing nuclear annotations")
-
+    for inst_id in inst_list:
         # set up the annotation geojson obj
         geo_obj = {}
         geo_obj.setdefault("type", "Feature")
-        geo_obj.setdefault("id", "PathCellDetection") # PathCellAnnotation, PathCellDetection, PathDetectionObject
-        geo_obj.setdefault("geometry", {"type": "Polygon", "coordinates": None})
-        geo_obj.setdefault("properties", {"isLocked": "false", "measurements": [], "classification": {"name": None}})
+
+        # PathCellAnnotation, PathCellDetection, PathDetectionObject
+        geo_obj.setdefault("id", "PathCellDetection") 
+        geo_obj.setdefault(
+            "geometry", {"type": "Polygon", "coordinates": None}
+        )
+        geo_obj.setdefault(
+            "properties", {
+                "isLocked": "false", "measurements": [], 
+                "classification": {"name": None}
+            }
+        )
 
         # Get cell instance and cell type
         inst = np.array(inst_map == inst_id, np.uint8)
         inst_type = type_map[inst_map == inst_id].astype("uint8")
         inst_type = np.unique(inst_type)[0]
-        inst_type = [key for key, val in classes.items() if classes[key] == inst_type][0]
+        inst_type = [
+            key for key in classes.keys() if classes[key] == inst_type
+        ][0]
 
         # get the cell contour coordinates
-        contours, hierarchy = cv2.findContours(
+        contours, _ = cv2.findContours(
             inst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
 
@@ -254,6 +318,4 @@ def mask2geojson(inst_map: np.ndarray,
             geojson.dump(geo_objs, out)
         return
 
-            # pbar.update(1)
-        
     return geo_objs

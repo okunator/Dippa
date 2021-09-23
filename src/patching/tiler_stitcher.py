@@ -6,11 +6,13 @@ from .viz_patches import viz_patches
 
 
 class TilerStitcher:
-    def __init__(self,
-                 im_shape: Tuple[int],
-                 patch_shape: Tuple[int],
-                 stride_size: int,
-                 padding: bool=True) -> None:
+    def __init__(
+            self,
+            im_shape: Tuple[int],
+            patch_shape: Tuple[int],
+            stride_size: int,
+            padding: bool=True
+        ) -> None:
         """
         Patch extractor and stitcher class.
         Operates on numpy arrays
@@ -24,10 +26,13 @@ class TilerStitcher:
             stride_size (int):
                 Stride of the sliding window
             padding (bool):
-                pad the input image to a multiple of patch_shape such that 
-                every part of input gets patched. Creates some redundancy.
+                pad the input image to a multiple of patch_shape such 
+                that every part of input gets patched. Creates some 
+                redundancy.
         """
-        assert 1 <= len(patch_shape) <= 3, "Too many patch dims. Use (H, W) or (H, W, C)"
+        assert 1 <= len(patch_shape) <= 3, (
+            "Too many patch dims. Use (H, W) or (H, W, C)"
+        )
         self.ih, self.iw = im_shape[:2]
         self.ph, self.pw = patch_shape[:2]
         self.stride_size = stride_size
@@ -40,16 +45,21 @@ class TilerStitcher:
         """
         Returns:
         ------------
-            Tuple[int]. Length of margins needed in the input image. Multiple of patch_shape
+            Tuple[int]. Length of margins needed in the input image. 
+            Multiple of patch_shape
         """
         extra_pad = 200
-        margin_y = int(np.ceil((self.ih + extra_pad) / self.ph)*self.ph - self.ih)
-        margin_x = int(np.ceil((self.iw + extra_pad) / self.pw)*self.pw - self.iw)
+        margin_y = int(
+            np.ceil((self.ih + extra_pad) / self.ph)*self.ph - self.ih
+        )
+        margin_x = int(
+            np.ceil((self.iw + extra_pad) / self.pw)*self.pw - self.iw
+        )
         return margin_y, margin_x
 
     def extract_patches_quick(self, im: np.ndarray) -> np.ndarray:
         """
-        Use numpy stride tricks via skimage to patch the image quickly.
+        Use numpy stride tricks via skimage to patch the image.
 
         Args:
         -------------
@@ -58,16 +68,25 @@ class TilerStitcher:
 
         Returns:
         -------------
-            patched image of shape (n_patches, patch_height, patch_width, C)
+            np.ndarray: patched image of shape 
+            (n_patches, patch_height, patch_width, C)
         """
         if len(im.shape) == 2:
             im = im[..., None]
 
         if self.padding:
             pad_y, pad_x = self.margins
-            im = np.pad(im, [(pad_y, pad_y), (pad_x, pad_x), (0, 0)], mode="reflect")
+            im = np.pad(
+                im, 
+                [(pad_y, pad_y),(pad_x, pad_x), (0, 0)], 
+                mode="reflect"
+            )
         
-        patches = util.view_as_windows(im, (self.ph, self.pw, self.C), self.stride_size)
+        patches = util.view_as_windows(
+            im, 
+            (self.ph, self.pw, self.C),
+            self.stride_size
+        )
         self.ntile_y = patches.shape[0]
         self.ntile_x = patches.shape[1]
         patches = patches.reshape(-1, self.ph, self.pw, self.C)
@@ -91,7 +110,8 @@ class TilerStitcher:
             np.ndarray (image) of shape (H, W, C) 
         """
         assert self.ntile_x != None, (
-            "Stitching patches has to be done with the same TilerStitcher instance as patch extracting"
+            "Stitching patches has to be done with the same",
+            "TilerStitcher instance as patch extracting"
         )
 
         if len(patches.shape) == 3:
@@ -99,7 +119,9 @@ class TilerStitcher:
 
         n_channels = patches.shape[-1]
         pad = self.stride_size
-        patches = patches.reshape(self.ntile_y, self.ntile_x, self.ph, self.pw, n_channels)
+        patches = patches.reshape(
+            self.ntile_y, self.ntile_x, self.ph, self.pw, n_channels
+        )
         patches = patches[:, :, 0:pad, 0:pad, :]
         im = np.concatenate(np.concatenate(patches, 1), 1)
 

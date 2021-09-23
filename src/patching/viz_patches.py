@@ -7,8 +7,8 @@ from skimage.color import label2rgb
 def viz_patches(patches: np.ndarray) -> Tuple[int]:
     """
     patches is assumed to be of shape (n_patches, H, W, n_channels)
-    This function vizualizes those patches. Don't put too many patches in
-    or everything willl crash.
+    This function vizualizes those patches. Don't put too many patches 
+    in or everything willl crash.
 
     Args:
     ----------
@@ -18,7 +18,7 @@ def viz_patches(patches: np.ndarray) -> Tuple[int]:
 
     Returns:
     ----------
-        Shape of the patches array
+        Tuple: Shape of the patches array
     """
     fignum = 200
     low=0

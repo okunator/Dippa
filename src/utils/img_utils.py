@@ -2,7 +2,10 @@ import numpy as np
 from skimage import img_as_ubyte
 
 
-def percentile_normalize(img: np.ndarray, channels: str="HWC") -> np.ndarray:
+def percentile_normalize(
+        img: np.ndarray, 
+        channels: str="HWC"
+    ) -> np.ndarray:
     """ 
     1-99 percentile normalization per image channel. Numpy version
 
@@ -36,7 +39,11 @@ def percentile_normalize(img: np.ndarray, channels: str="HWC") -> np.ndarray:
     return im
 
 
-def percentile_normalize_and_clamp(im: np.ndarray, a_min: float=-1, a_max: float=1) -> np.ndarray:
+def percentile_normalize_and_clamp(
+        im: np.ndarray, 
+        a_min: float=-1, 
+        a_max: float=1
+    ) -> np.ndarray:
     """
     1-99-percentile normalization + clamping to [a_min, a_max].
     Assumes that input image is "HWC" or "HW". Does not handle
@@ -63,7 +70,11 @@ def percentile_normalize_and_clamp(im: np.ndarray, a_min: float=-1, a_max: float
     return normed
 
 
-def normalize(img: np.ndarray, channels: str="HWC", standardize: bool=True) -> np.ndarray:
+def normalize(
+        img: np.ndarray,
+        channels: str="HWC",
+        standardize: bool=True
+    ) -> np.ndarray:
     """
     Mean center or standardize per image channel
 
@@ -98,7 +109,10 @@ def normalize(img: np.ndarray, channels: str="HWC", standardize: bool=True) -> n
     return im
 
 
-def minmax_normalize(img: np.ndarray, channels: str="HWC") -> np.ndarray:
+def minmax_normalize(
+        img: np.ndarray,
+        channels: str="HWC"
+    ) -> np.ndarray:
     """
     Min-max normalization per image channel
 
@@ -128,10 +142,15 @@ def minmax_normalize(img: np.ndarray, channels: str="HWC") -> np.ndarray:
     return im
 
 
-def float2ubyte(mat: np.ndarray, channels: str="HWC", normalize: bool=False) -> np.ndarray:
+def float2ubyte(
+        mat: np.ndarray,
+        channels: str="HWC",
+        normalize: bool=False
+    ) -> np.ndarray:
     """
-    Convert float64 to uint8. float matrix values need to be in [-1, 1] for img_as_ubyte
-    So the image is normalized or clamped before conversion.
+    Convert float64 to uint8. float matrix values need to be in [-1, 1] 
+    for img_as_ubyte so the image is normalized or clamped before 
+    conversion.
 
     Args:
     ------------

@@ -96,8 +96,8 @@ class ZarrWriter(BaseWriter):
         Args:
         ---------
             skip (bool, default=False):
-                If True, skips the db writing and just returns the filename of 
-                the db
+                If True, skips the db writing and just returns the 
+                filename of the db
         """
         fname = Path(self.save_dir / f"{self.file_name}.zarr")
 

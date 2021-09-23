@@ -11,7 +11,10 @@ from .metrics import PQ, AJI, AJI_plus, DICE2, split_and_merge
 
 
 class Benchmarker:
-    def compute_metrics(self, true_pred: List[np.ndarray]) -> Dict[str, float]:
+    def compute_metrics(
+            self, 
+            true_pred: List[np.ndarray]
+        ) -> Dict[str, float]:
         """
         Computes metrics for one (inst_map, gt_mask) pair.
         If GT does not contain any nuclear objects, returns None
@@ -19,8 +22,8 @@ class Benchmarker:
         Args:
         -----------
             true_pred (List[np.ndarray]): 
-                Ground truth annotations in true_pred[1] and corresponding 
-                predicted instance map in true_pred[2]
+                Ground truth annotations in true_pred[1] and
+                corresponding predicted instance map in true_pred[2]
 
         Returns:
         -----------
@@ -33,11 +36,13 @@ class Benchmarker:
 
         # Skip empty GTs
         if len(np.unique(true)) > 1:
-            pq = PQ(remap_label(true), remap_label(pred))
-            aji = AJI(remap_label(true), remap_label(pred))
-            aji_p = AJI_plus(remap_label(true), remap_label(pred))
-            dice2 = DICE2(remap_label(true), remap_label(pred))
-            splits, merges = split_and_merge(remap_label(true), remap_label(pred))
+            true = remap_label(true)
+            pred = remap_label(pred)
+            pq = PQ(true, pred)
+            aji = AJI(true, pred)
+            aji_p = AJI_plus(true, pred)
+            dice2 = DICE2(true, pred)
+            splits, merges = split_and_merge(true, pred)
 
             result = {
                 "name":name,
@@ -55,16 +60,19 @@ class Benchmarker:
 
             return result
 
-    def benchmark_insts(self,
-                        inst_maps: Dict[str, np.ndarray],
-                        gt_masks: Dict[str, np.ndarray],
-                        pattern_list: List[str]=None,
-                        save_dir: Union[str, Path]=None,
-                        prefix: str="") -> pd.DataFrame:
+    def benchmark_insts(
+            self,
+            inst_maps: Dict[str, np.ndarray],
+            gt_masks: Dict[str, np.ndarray],
+            pattern_list: List[str]=None,
+            save_dir: Union[str, Path]=None,
+            prefix: str=""
+        ) -> pd.DataFrame:
         """
-        Run benchmarking metrics for instance maps for all of the files in the 
-        dataset. Note that the inst_maps and gt_masks need to share exact same 
-        keys and be sorted so that they align when computing metrics.
+        Run benchmarking metrics for instance maps for all of the files 
+        in the dataset. Note that the inst_maps and gt_masks need to 
+        share exact same keys and be sorted so that they align when 
+        computing metrics.
         
         Args:
         -----------
@@ -73,9 +81,9 @@ class Benchmarker:
             gt_masks (OrderedDict[str, np.ndarray]): 
                 A dict of file_name:gt_inst_map key vals in order
             pattern_list (List[str], default=None):
-                A list of patterns contained in the gt_mask and inst_map names.
-                Averages for the masks containing these patterns will be added
-                to the result df.
+                A list of patterns contained in the gt_mask and inst_map
+                names. Averages for the masks containing these patterns 
+                will be added to the result df.
             save_dir (str or Path):
                 directory where to save the result .csv
             prefix (str, default=""):
@@ -84,8 +92,8 @@ class Benchmarker:
 
         Returns:
         ----------
-            a pandas dataframe of the metrics. Samples are rows and metrics 
-            are columns:
+            a pandas dataframe of the metrics. Samples are rows and 
+            metrics are columns:
             _____________________
             |sample|PQ|SQ|DQ|AJI|
             |img1  |.5|.4|.6|.6 |
@@ -123,15 +131,19 @@ class Benchmarker:
         
         # drop Nones if no nuclei are found in an image
         metrics = [metric for metric in metrics if metric]
-        score_df = pd.DataFrame.from_records(metrics).set_index("name").sort_index()
+        score_df = pd.DataFrame.from_records(metrics)
+        score_df = score_df.set_index("name").sort_index()
         score_df.loc["averages_for_the_set"] = score_df.mean(axis=0)
 
         # Add averages to the df of files which contain patterns
         if pattern_list is not None:
             pattern_avgs = {
-                f"{p}_avg": score_df[score_df.index.str.contains(f"{p}")].mean(axis=0) for p in pattern_list
+                f"{p}_avg": score_df[score_df.index.str.contains(f"{p}")].mean(axis=0) 
+                for p in pattern_list
             }
-            score_df = pd.concat([score_df, pd.DataFrame(pattern_avgs).transpose()])
+            score_df = pd.concat(
+                [score_df, pd.DataFrame(pattern_avgs).transpose()]
+            )
 
         # Save results to .csv
         if save_dir is not None:
@@ -140,19 +152,22 @@ class Benchmarker:
 
         return score_df
 
-    def benchmark_per_type(self,
-                           inst_maps: Dict[str, np.ndarray],
-                           type_maps: Dict[str, np.ndarray],
-                           gt_mask_insts: Dict[str, np.ndarray],
-                           gt_mask_types: Dict[str, np.ndarray],
-                           classes: Dict[str, int],
-                           pattern_list: List[str]=None,
-                           save_dir: Union[str, Path]=None,
-                           prefix: str="") -> pd.DataFrame:
+    def benchmark_per_type(
+            self,
+            inst_maps: Dict[str, np.ndarray],
+            type_maps: Dict[str, np.ndarray],
+            gt_mask_insts: Dict[str, np.ndarray],
+            gt_mask_types: Dict[str, np.ndarray],
+            classes: Dict[str, int],
+            pattern_list: List[str]=None,
+            save_dir: Union[str, Path]=None,
+            prefix: str=""
+        ) -> pd.DataFrame:
         """
-        Run benchmarking metrics per class type for all of the files in the 
-        dataset. Note that the inst_maps and gt_masks need to share exact same 
-        keys and be sorted so that they align when computing metrics.
+        Run benchmarking metrics per class type for all of the files in 
+        the dataset. Note that the inst_maps and gt_masks need to share
+        exact same keys and be sorted so that they align when computing
+        metrics.
 
         Args:
         -----------
@@ -165,12 +180,12 @@ class Benchmarker:
             gt_masks_types (Dict[str, np.ndarray]): 
                 A dict of file_name:gt_panoptic_map key vals in order
             classes (Dict[str, int]): 
-                The class dict e.g. 
-                {bg: 0, immune: 1, epithel: 2} background must be 0 class
+                The class dict e.g. {bg: 0, immune: 1, epithel: 2}. 
+                background must be 0 class
             pattern_list (List[str], default=None):
-                A list of patterns contained in the gt_mask and inst_map names.
-                Averages for the masks containing these patterns will be added
-                to the result df.
+                A list of patterns contained in the gt_mask and inst_map
+                names. Averages for the masks containing these patterns
+                will be added to the result df.
             save_dir (str or Path):
                 directory where to save the result .csv
             prefix (str, default=""):
@@ -178,8 +193,8 @@ class Benchmarker:
 
         Returns:
         -----------
-            a pandas dataframe of the metrics. Samples are rows and metrics are
-            columns:
+            a pandas dataframe of the metrics. Samples are rows and 
+            metrics are columns:
             __________________________
             |sample      |PQ|SQ|DQ|AJI|
             |img1_type1  |.5|.4|.6|.6 |
@@ -216,10 +231,12 @@ class Benchmarker:
         df_total = pd.DataFrame()
         for c, ix in list(classes.items())[1:]: # skip bg
             gts_per_class = [
-                get_type_instances(i, t, ix) for i, t in zip(gt_mask_insts.values(), gt_mask_types.values())
+                get_type_instances(i, t, ix) 
+                for i, t in zip(gt_mask_insts.values(), gt_mask_types.values())
             ]
             insts_per_class = [
-                get_type_instances(i, t, ix) for i, t in zip(inst_maps.values(), type_maps.values())
+                get_type_instances(i, t, ix) 
+                for i, t in zip(inst_maps.values(), type_maps.values())
             ]
 
             masks = list(zip(inst_maps.keys(), gts_per_class, insts_per_class))
@@ -234,13 +251,16 @@ class Benchmarker:
             
             # drop Nones if no classes are found in an image
             metrics = [metric for metric in metrics if metric]
-            score_df = pd.DataFrame.from_records(metrics).set_index("name").sort_index()
+            score_df = pd.DataFrame.from_records(metrics)
+            score_df = score_df.set_index("name").sort_index()
             score_df.loc[f"{c}_avg_for_the_set"] = score_df.mean(axis=0)
 
-            # Add averages to the df of files which contain patterns in the pattern list
+            # Add averages to the df of files which contain patterns i
+            # in the pattern list
             if pattern_list is not None:
                 pattern_avgs = {
-                    f"{c}_{p}_avg": score_df[score_df.index.str.contains(f"{p}")].mean(axis=0) for p in pattern_list
+                    f"{c}_{p}_avg": score_df[score_df.index.str.contains(f"{p}")].mean(axis=0) 
+                    for p in pattern_list
                 }
                 score_df = pd.concat([score_df, pd.DataFrame(pattern_avgs).transpose()])
 

@@ -7,15 +7,17 @@ import numpy as np
 
 from tqdm import tqdm
 from pathlib import Path
-from typing import List, Union, Dict, Tuple, Optional
+from typing import List, Union, Dict, Tuple
 
 
 class GSONTile:
-    def __init__(self, 
-                 fname: Union[Path, str], 
-                 xmin: int, 
-                 ymin: int, 
-                 tile_size: int=(1000, 1000)) -> None:
+    def __init__(
+            self, 
+            fname: Union[Path, str], 
+            xmin: int, 
+            ymin: int, 
+            tile_size: int=(1000, 1000)
+        ) -> None:
         """
         Class abstaraction for one tile of geojson annotations.
 
@@ -65,11 +67,11 @@ class GSONTile:
         Get all the annotations/polygons that do not touch any edges
         of the tile
         """
-        not_right = self.gdf["xmax"] !=  self.xmax
-        not_left = self.gdf["xmin"] !=  self.xmin
-        not_bottom = self.gdf["ymax"] !=  self.ymax
-        not_top = self.gdf["ymin"] !=  self.ymin
-        non_border_annots = self.gdf[not_right & not_left & not_bottom & not_top].copy()
+        not_r = self.gdf["xmax"] !=  self.xmax
+        not_l = self.gdf["xmin"] !=  self.xmin
+        not_b = self.gdf["ymax"] !=  self.ymax
+        not_t = self.gdf["ymin"] !=  self.ymin
+        non_border_annots = self.gdf[not_r & not_l & not_b & not_t].copy()
         non_border_annots.loc[:, "geometry"] = non_border_annots
         non_border_annots = non_border_annots.reset_index(drop=True)
         return non_border_annots
@@ -80,10 +82,12 @@ class GSONTile:
         Get all the annotations/polygons that touch the right edge
         of the tile
         """
-        right_border_annots = self.gdf[self.gdf["xmax"] ==  self.xmax].copy()
-        right_border_annots.loc[:, "geometry"] = right_border_annots.translate(xoff=1.0) # translate 1-unit right
-        right_border_annots = right_border_annots.reset_index(drop=True)
-        return right_border_annots
+        r_border_anns = self.gdf[self.gdf["xmax"] ==  self.xmax].copy()
+
+        # translate one unit right
+        r_border_anns.loc[:, "geometry"] = r_border_anns.translate(xoff=1.0)
+        r_border_anns = r_border_anns.reset_index(drop=True)
+        return r_border_anns
 
     @property
     def left_border_annots(self) -> gpd.GeoDataFrame:
@@ -91,10 +95,10 @@ class GSONTile:
         Get all the annotations/polygons that touch the left edge
         of the tile
         """
-        left_border_annots = self.gdf[self.gdf["xmin"] ==  self.xmin].copy()
-        left_border_annots.loc[:, "geometry"] = left_border_annots
-        left_border_annots = left_border_annots.reset_index(drop=True)
-        return left_border_annots
+        l_border_anns = self.gdf[self.gdf["xmin"] ==  self.xmin].copy()
+        l_border_anns.loc[:, "geometry"] = l_border_anns
+        l_border_anns = l_border_anns.reset_index(drop=True)
+        return l_border_anns
 
     @property
     def bottom_border_annots(self) -> gpd.GeoDataFrame:
@@ -102,34 +106,40 @@ class GSONTile:
         Get all the annotations/polygons that touch the bottom edge
         of the tile. (Origin in the top-left corner of the image/tile)
         """
-        bottom_border_annots = self.gdf[self.gdf["ymax"] ==  self.ymax].copy()
-        bottom_border_annots.loc[:, "geometry"] = bottom_border_annots.translate(yoff=1.0) # # translate 1-unit down
-        bottom_border_annots = bottom_border_annots.reset_index(drop=True)
-        return bottom_border_annots
+        b_border_anns = self.gdf[self.gdf["ymax"] ==  self.ymax].copy()
+        # translate 1-unit down
+        b_border_anns.loc[:, "geometry"] = b_border_anns.translate(yoff=1.0) 
+        b_border_anns = b_border_anns.reset_index(drop=True)
+        return b_border_anns
 
     @property
-    def top_border_annots(self) -> gpd.GeoDataFrame:
+    def t_border_anns(self) -> gpd.GeoDataFrame:
         """
         Get all the annotations/polygons that touch the top edge
         of the tile. (Origin in the top-left corner of the image/tile)
         """
-        top_border_annots = self.gdf[self.gdf["ymin"] ==  self.ymin].copy()
-        top_border_annots.loc[:, "geometry"] = top_border_annots
-        top_border_annots = top_border_annots.reset_index(drop=True)
-        return top_border_annots
+        t_border_anns = self.gdf[self.gdf["ymin"] ==  self.ymin].copy()
+        t_border_anns.loc[:, "geometry"] = t_border_anns
+        t_border_anns = t_border_anns.reset_index(drop=True)
+        return t_border_anns
 
 
 class GSONMerger:
-    def __init__(self, 
-                 in_dir: Union[Path, str],
-                 xmax: int=None, 
-                 ymax: int=None, 
-                 xmin: int=None, 
-                 ymin: int=None,
-                 tile_size: Tuple[int, int]=(1000, 1000)) -> None:
+    def __init__(
+            self, 
+            in_dir: Union[Path, str],
+            xmax: int=None, 
+            ymax: int=None, 
+            xmin: int=None, 
+            ymin: int=None,
+            tile_size: Tuple[int, int]=(1000, 1000)
+        ) -> None:
         """
-        Helper class to merge geojson tile-files that are named with histoprep convetion
-        I.e. "x-45000_y-56000.json", "x-34000_y-16000.json" etc.
+        Helper class to merge geojson tile-files that are named with 
+        histoprep convetion:
+        
+        Examples:
+        "x-45000_y-56000.json", "x-34000_y-16000.json" etc.
 
         Args:
         ---------
@@ -161,7 +171,10 @@ class GSONMerger:
             "bottom": {"main":"bottom", "adj":"top"}, 
         }
         self.doned = {
-            f.name: {"left": None, "right":None, "top": None, "bottom": None, "non_border": None} for f in self.files
+            f.name: {
+                "left": None, "right":None, "top": None, 
+                "bottom": None, "non_border": None
+            } for f in self.files
         }
 
     
@@ -169,13 +182,22 @@ class GSONMerger:
     def _gsonobj(self) -> Dict:
         geo_obj = {}
         geo_obj.setdefault("type", "Feature")
-        geo_obj.setdefault("id", "PathCellDetection") # PathDetectionObject, PathCellDetection, PathCellAnnotation
-        geo_obj.setdefault("geometry", {"type": "Polygon", "coordinates": None})
-        geo_obj.setdefault("properties", {"isLocked": "false", "measurements": [], "classification": {"name": None}})
+
+        # PathDetectionObject, PathCellDetection, PathCellAnnotation
+        geo_obj.setdefault("id", "PathCellDetection") 
+        geo_obj.setdefault(
+            "geometry", {"type": "Polygon", "coordinates": None}
+        )
+        geo_obj.setdefault(
+            "properties", {
+                "isLocked": "false", "measurements": [], 
+                "classification": {"name": None}
+            }
+        )
         return geo_obj
 
     @staticmethod
-    def drop_rectangles(self, gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    def drop_rectangles(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         """
         Drop rectangular objects from a gpd.GeoDataFrame.
 
@@ -188,21 +210,31 @@ class GSONMerger:
         --------
             gpd.GeoDataFrame without rectangular objects
         """
-        ixs = [i for i, row in gdf.iterrows() if np.isclose(row.geometry.minimum_rotated_rectangle.area, row.geometry.area)]
+        ixs = [
+            i for i, row in gdf.iterrows() 
+            if np.isclose(
+                row.geometry.minimum_rotated_rectangle.area, 
+                row.geometry.area
+            )
+        ]
         return gdf.drop(ixs)
 
     def _get_xy_coords(self, fname: str) -> Tuple[int, int]:
         """
-        fname needs to contain x & y-coordinates in "x-[coord1]_y-[coord2]"-format
+        fname needs to contain x & y-coordinates in 
+        "x-[coord1]_y-[coord2]"-format
         """
-        assert re.findall(r"(x-\d+_y-\d+)", fname), "fname not in 'x-[coord1]_y-[coord2]'-format"
+        assert re.findall(r"(x-\d+_y-\d+)", fname), (
+            "fname not in 'x-[coord1]_y-[coord2]'-format"
+        )
         xy_str = re.findall(r"(x-\d+_y-\d+)", fname)
         x, y = (int(c) for c in re.findall(r"\d+", xy_str[0]))
         return x, y
 
     def _get_file_from_coords(self, x: int, y: int) -> str:
         """
-        fname needs to contain x & y-coordinates in "x-[coord1]_y-[coord2]"-format
+        fname needs to contain x & y-coordinates in 
+        "x-[coord1]_y-[coord2]"-format
         """
         f = [f for f in self.files if f"x-{x}_y-{y}" in f.name]
         ret = f[0] if f else None
@@ -263,7 +295,8 @@ class GSONMerger:
 
     def _get_non_border_polygons(self, gson: GSONTile) -> List[Dict]:
         """
-        Get all the polygons of a tile that are not adjascent to polygons in other tiles
+        Get all the polygons of a tile that are not adjascent to 
+        polygons in other tiles
 
         Args:
         ----------
@@ -272,77 +305,100 @@ class GSONMerger:
 
         Returns:
         ----------
-            List of geojson formatted dictionaries of the combined cell annotations
+            List: A list of geojson formatted dictionaries of the 
+            combined cell annotations
         """
         non_border_annots = gson.non_border_annots
 
         new_polys = []
         if not non_border_annots.empty:
-            for poly, c in zip(non_border_annots["geometry"], non_border_annots["properties"]):
-                    
-                    # workaround to handle invalid polygons
-                    if not poly.is_valid:
-                        poly = poly.buffer(0)
+            for poly, c in zip(
+                non_border_annots["geometry"], 
+                non_border_annots["properties"]
+            ):  
+                # workaround to handle invalid polygons
+                if not poly.is_valid:
+                    poly = poly.buffer(0)
 
-                    poly = poly.buffer(10.0, join_style=1).buffer(-10.0, join_style=1).simplify(0.3) # do some smoothing
+                # do some simplifying
+                poly = poly.buffer(
+                    10.0, join_style=1
+                ).buffer(-10.0, join_style=1).simplify(0.3)
 
-                    # init new geojson obj and set coords & cell type and append
-                    geo_obj = self._gsonobj
-                    cell_type = c["classification"]["name"]
-                    geo_obj["properties"]["classification"]["name"] = cell_type
+                # init new geojson obj and set coords & cell type and append
+                geo_obj = self._gsonobj
+                ctype = c["classification"]["name"]
+                geo_obj["properties"]["classification"]["name"] = ctype
 
-                    if poly.geom_type == 'MultiPolygon':
-                        try:
-                            poly = shapely.ops.cascaded_union([
-                                shapely.geometry.Polygon(c.exterior).buffer(0.01).buffer(-0.01) for p in poly
-                            ])
-                        except:
-                            continue
+                # Union for multipolygon polygons
+                if poly.geom_type == 'MultiPolygon':
+                    try:
+                        poly = shapely.ops.cascaded_union([
+                            shapely.geometry.Polygon(
+                                c.exterior
+                            ).buffer(0.01).buffer(-0.01) for p in poly
+                        ])
+                    except:
+                        continue
 
-                    geo_obj["geometry"]["coordinates"] = [[list(tup) for tup in poly.exterior.coords[:]]]
-                    new_polys.append(geo_obj)
+                geo_obj["geometry"]["coordinates"] = [
+                    [list(tup) for tup in poly.exterior.coords[:]]
+                ]
+
+                new_polys.append(geo_obj)
         
         return new_polys
 
-    def _merge_adj_ploygons(self, gson_main: GSONTile, gson_adj: GSONTile, adj_pos: str) -> List[Dict]:
+    def _merge_adj_ploygons(
+            self, 
+            gson: GSONTile, 
+            gson_adj: GSONTile, 
+            adj_pos: str
+        ) -> List[Dict]:
         """
-        Merge adjascent geojsons. Combines the cells that are split at the image borders
+        Merge adjascent geojsons. Combines the cells that are split at 
+        the image borders
 
 
         Args:
         ----------
-            gson_main (GSONTile):
+            gson (GSONTile):
                 geojson of the main tile 
             gson_adj (GSONTile):
                 geojson of the adjascent tile 
             adj_pos (str):
-                the postition of the adjascent tile relative to the main tile.
-                One of ("left", "right", "bottom", "bottomleft", "bottomright", "top", "topleft", "topright")
+                the postition of the adjascent tile relative to the main
+                tile. One of "left", "right", "bottom", "bottomleft", 
+                "bottomright", "top", "topleft", "topright"
 
         Returns:
         ----------
-            List of geojson formatted dictionaries of the combined cell annotations
+            List: A list of geojson formatted dictionaries of the 
+            combined cell annotations
 
         """
         # Get the polygons that end/start at the image border
         if adj_pos == "right":
-            border_annots_main = gson_main.right_border_annots
+            border_annots_main = gson.right_border_annots
             border_annots_adj = gson_adj.left_border_annots
         elif adj_pos == "left":
-            border_annots_main = gson_main.left_border_annots
+            border_annots_main = gson.left_border_annots
             border_annots_adj = gson_adj.right_border_annots
         elif adj_pos == "bottom":
-            border_annots_main = gson_main.bottom_border_annots
-            border_annots_adj = gson_adj.top_border_annots
+            border_annots_main = gson.bottom_border_annots
+            border_annots_adj = gson_adj.t_border_anns
         elif adj_pos == "top":
-            border_annots_main = gson_main.top_border_annots
+            border_annots_main = gson.t_border_anns
             border_annots_adj = gson_adj.bottom_border_annots
         
         # combine polygons that intersect/touch between two image tiles
         # (cells that are split in two between two image tiles)
         new_polys = []
         if not border_annots_main.empty and not border_annots_adj.empty:
-            for main_poly, c in zip(border_annots_main["geometry"], border_annots_main["properties"]):
+            for main_poly, c in zip(
+                border_annots_main["geometry"], 
+                border_annots_main["properties"]
+            ):
                 for adj_poly in border_annots_adj["geometry"]:  
                     
                     # workaround to handle invalid polygons
@@ -353,23 +409,36 @@ class GSONMerger:
 
                     # combine the polygons if they intersect
                     if main_poly.intersects(adj_poly):
-                        new_poly = shapely.ops.unary_union([main_poly, adj_poly])
-                        new_poly = new_poly.buffer(10.0, join_style=1).buffer(-10.0, join_style=1).simplify(0.3) # do some smoothing
+                        new_poly = shapely.ops.unary_union(
+                            [main_poly, adj_poly]
+                        )
+                        # do some simplifying
+                        new_poly = new_poly.buffer(
+                            10.0, join_style=1
+                        ).buffer(-10.0, join_style=1).simplify(0.3)
 
-                        # init new geojson obj and set coords & cell type and append
+                        # init gson obj, set coords & type and append
                         geo_obj = self._gsonobj
-                        cell_type = c["classification"]["name"]
-                        geo_obj["properties"]["classification"]["name"] = cell_type
+                        ctype = c["classification"]["name"]
+                        geo_obj["properties"]["classification"]["name"] = ctype
 
                         if new_poly.geom_type == 'MultiPolygon':
                             try:
-                                new_poly = shapely.ops.cascaded_union([
-                                    shapely.geometry.Polygon(c.exterior).buffer(0.01).buffer(-0.01) for p in new_poly
-                                ])
+                                new_poly = shapely.ops.cascaded_union(
+                                    [
+                                        shapely.geometry.Polygon(
+                                            c.exterior
+                                        ).buffer(0.01).buffer(-0.01) 
+                                        for p in new_poly
+                                    ]
+                                )
                             except:
                                 continue
 
-                        geo_obj["geometry"]["coordinates"] = [[list(tup) for tup in new_poly.exterior.coords[:]]]
+                        geo_obj["geometry"]["coordinates"] = [
+                            [list(tup) for tup in new_poly.exterior.coords[:]]
+                        ]
+
                         new_polys.append(geo_obj)
 
         return new_polys
@@ -394,12 +463,12 @@ class GSONMerger:
             
             # Init GSONTile obj
             x1, y1 = self._get_xy_coords(f.name)
-            gson_main = GSONTile(f, x1, y1)
+            gson = GSONTile(f, x1, y1)
 
-            if gson_main.gdf is not None:
+            if gson.gdf is not None:
                 # add the non border polygons
                 if self.doned[f.name]["non_border"] is None:
-                    non_border_polygons = self._get_non_border_polygons(gson_main)
+                    non_border_polygons = self._get_non_border_polygons(gson)
                     annotations.extend(non_border_polygons)
                     self.doned[f.name]["non_border"] = f.name
 
@@ -411,7 +480,9 @@ class GSONMerger:
                             gson_adj = GSONTile(f_adj, x2, y2)
                             
                             if gson_adj.gdf is not None:
-                                border_polygons = self._merge_adj_ploygons(gson_main, gson_adj, pos)
+                                border_polygons = self._merge_adj_ploygons(
+                                    gson, gson_adj, pos
+                                )
                                 annotations.extend(border_polygons)
                                 
                                 # update lookup

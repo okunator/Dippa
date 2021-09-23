@@ -25,15 +25,17 @@ KEY_COLORS = {
 
 
 # Adapted from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
-def draw_contours(inst_map: np.ndarray, 
-                  image: np.ndarray,
-                  type_map: Optional[np.ndarray]=None,
-                  fill_contours: Optional[bool]=False,
-                  thickness: int=2,
-                  classes: Optional[Dict[str, int]]=None) -> np.ndarray:
+def draw_contours(
+        inst_map: np.ndarray, 
+        image: np.ndarray,
+        type_map: Optional[np.ndarray]=None,
+        fill_contours: Optional[bool]=False,
+        thickness: int=2,
+        classes: Optional[Dict[str, int]]=None
+    ) -> np.ndarray:
     """
-    Find coloured contours for a mask and superimpose it on the original image
-    mask needs to be instance inst_mapled.
+    Find coloured contours for a mask and superimpose it on the original
+    image mask needs to be instance inst_mapled.
 
     Args:
     ---------
@@ -52,7 +54,8 @@ def draw_contours(inst_map: np.ndarray,
     
     Returns:
     ---------
-        np.ndarray. The contours overlaid on top of original image. Shape (H, W)
+        np.ndarray: The contours overlaid on top of original image. 
+        Shape (H, W).
     """
     bg = np.copy(image)
     
@@ -105,17 +108,18 @@ def draw_contours(inst_map: np.ndarray,
 def viz_patches(patches: np.ndarray) -> Tuple[int]:
     """
     patches is assumed to be of shape (n_patches, H, W, n_channels)
-    This function vizualizes those patches. Don't put too many patches in
-    or everything willl crash.
+    This function vizualizes those patches. Don't put too many patches
+    in or everything willl crash.
 
     Args:
     ----------
         patches (np.ndarray): 
-            numpy array of stacked image patches. Shape (n_patches, H, W, C)
+            numpy array of stacked image patches. Shape: 
+            (n_patches, H, W, C)
 
     Returns:
     ----------
-        Shape of the patches array
+        Tuple: Shape of the patches array
     """
     fignum = 200
     low=0
@@ -136,7 +140,8 @@ def viz_patches(patches: np.ndarray) -> Tuple[int]:
 
 def viz_instance(inst_map: np.ndarray, ix: int = 1) -> Tuple[int]:
     """
-    This function will visualize a single instance with id 'ix' from the 'inst_map'
+    This function will visualize a single instance with id 'ix' from the
+    'inst_map'
 
     Args:
     ----------
