@@ -16,7 +16,12 @@ class MSE(nn.Module):
         super(MSE, self).__init__()
         self.reduction = reduction
 
-    def forward(self, yhat: torch.Tensor, target: torch.Tensor, **kwargs) -> torch.Tensor:
+    def forward(
+            self,
+            yhat: torch.Tensor,
+            target: torch.Tensor,
+            **kwargs
+        ) -> torch.Tensor:
         """
         Args:
         ---------
@@ -28,6 +33,6 @@ class MSE(nn.Module):
 
         Returns:
         ----------
-            torch.Tensor. Computed mse loss (scalar or pixelwise matrix)
+            torch.Tensor: Computed mse loss (scalar or pixelwise matrix)
         """
         return F.mse_loss(yhat, target, reduction=self.reduction)

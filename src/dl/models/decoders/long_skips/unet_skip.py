@@ -4,10 +4,12 @@ from typing import Tuple
 
 
 class UnetSkipBlock(nn.ModuleDict):
-    def __init__(self, 
-                 in_channels: int=None,
-                 skip_channels: int=None,
-                 merge_policy: str="summation") -> None:
+    def __init__(
+            self,
+            in_channels: int=None,
+            skip_channels: int=None,
+            merge_policy: str="summation"
+        ) -> None:
         """
         Simple U-net like skip connection block
 
@@ -34,9 +36,20 @@ class UnetSkipBlock(nn.ModuleDict):
 
         # channel pooling for skip features if "summation"
         if self.merge_policy == "summation" and skip_channels > 0:
-            self.add_module("ch_pool", nn.Conv2d(skip_channels, in_channels, kernel_size=1, padding=0, bias=False))
+            self.add_module(
+                "ch_pool", nn.Conv2d(
+                    skip_channels, in_channels, 
+                    kernel_size=1, padding=0, bias=False
+                )
+            )
 
-    def forward(self, x: torch.Tensor, skips: Tuple[torch.Tensor], idx: int, **kwargs) -> torch.Tensor:
+    def forward(
+            self,
+            x: torch.Tensor,
+            skips: Tuple[torch.Tensor],
+            idx: int,
+            **kwargs
+        ) -> torch.Tensor:
         """
         Args:
         ------------

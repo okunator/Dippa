@@ -3,13 +3,15 @@ import numpy as np
 import scipy.ndimage as ndi
 import skimage.morphology as morph
 
-from src.utils.mask_utils import binarize
-from src.utils.img_utils import percentile_normalize_and_clamp
+from src.utils import percentile_normalize_and_clamp
 from ..thresholding import naive_thresh_prob
 
 
 # Adapted from https://github.com/vqdang/hover_net/blob/tensorflow-final/src/postproc/other.py
-def post_proc_dcan(prob_map: np.ndarray, contour_map: np.ndarray) -> np.ndarray:
+def post_proc_dcan(
+        prob_map: np.ndarray,
+        contour_map: np.ndarray
+    ) -> np.ndarray:
     """
     DCAN post-processing pipeline:
     https://arxiv.org/abs/1604.02677
@@ -19,7 +21,8 @@ def post_proc_dcan(prob_map: np.ndarray, contour_map: np.ndarray) -> np.ndarray:
         prob_map (np.ndarray):
             Probablilty map of the nuclei. Shape (H, W)
         contour_map (np.ndarray):
-            Prediction from the contour branch of the network. Shape (H, W)
+            Prediction from the contour branch of the network. 
+            Shape (H, W)
 
     Returns:
     ----------

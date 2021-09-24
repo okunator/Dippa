@@ -8,16 +8,18 @@ from src.dl.utils import one_hot
 class IoULoss(nn.Module):
     def __init__(self, **kwargs) -> None:
         """
-        Intersection over union Loss criterion. Optionally applies weights
-        at the nuclei edges and weights for different classes.
+        Intersection over union Loss criterion. Optionally applies 
+        weights at the nuclei edges and weights for different classes.
         """
         super(IoULoss, self).__init__()
         self.eps = 1e-6
 
-    def forward(self, 
-                yhat: torch.Tensor,
-                target: torch.Tensor,
-                **kwargs) -> torch.Tensor:
+    def forward(
+            self,
+            yhat: torch.Tensor,
+            target: torch.Tensor,
+            **kwargs
+        ) -> torch.Tensor:
         """
         Computes the DICE coefficient
 

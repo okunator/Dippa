@@ -1,19 +1,22 @@
 import numpy as np
 from collections import OrderedDict
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Tuple, List
 
 from .post_proc import post_proc_cellpose
 from ..base_processor import PostProcessor
 
 
 class CellposePostProcessor(PostProcessor):
-    def __init__(self,
-                 thresh_method: str="naive",
-                 thresh: float=0.5,
-                 **kwargs) -> None:
+    def __init__(
+            self,
+            thresh_method: str="naive",
+            thresh: float=0.5,
+            **kwargs
+        ) -> None:
         """
-        Wrapper class to run the CellPose post processing pipeline for networks
-        outputting instance maps, Optional[type maps], and horizontal & vertical maps.
+        Wrapper class to run the CellPose post processing pipeline for 
+        networks outputting instance maps, Optional[type maps], 
+        and horizontal & vertical maps.
 
         CellPose:
         https://www.nature.com/articles/s41592-020-01018-x
@@ -21,15 +24,18 @@ class CellposePostProcessor(PostProcessor):
         Args:
         -----------
             thresh_method (str, default="naive"):
-                Thresholding method for the soft masks from the insntance branch.
-                One of ("naive", "argmax", "sauvola", "niblack")).
+                Thresholding method for the soft masks from the instance
+                branch. One of: "naive", "argmax", "sauvola", "niblack".
             thresh (float, default = 0.5): 
-                threshold probability value. Only used if method == "naive"
+                threshold prob value. Used if `thresh_method` == "naive"
         """
         super(CellposePostProcessor, self).__init__(thresh_method, thresh)
         self.flows = OrderedDict()
 
-    def post_proc_pipeline(self, maps: List[np.ndarray]) -> Tuple[str, np.ndarray, np.ndarray]:
+    def post_proc_pipeline(
+            self,
+            maps: List[np.ndarray]
+        ) -> Tuple[str, np.ndarray, np.ndarray]:
         """
         1. Threshold
         2. Post process instance map
@@ -38,11 +44,13 @@ class CellposePostProcessor(PostProcessor):
         Args:
         -----------
             maps (List[np.ndarray]):
-                A list of the name of the file, soft masks, and hover maps from the network
+                A list of the name of the file, soft masks, and hover 
+                maps from the network
 
         Returns:
         ----------
-            The filename (str), instance segmentation mask (H, W), semantic segmentation mask (H, W).
+            Tuple: the filename (str), instance segmentation mask (H, W)
+            and semantic segmentation mask (H, W).
         """
         name = maps[0]
         prob_map = maps[1]
@@ -54,7 +62,10 @@ class CellposePostProcessor(PostProcessor):
         
         combined = None
         if type_map is not None:
-            combined = self.combine_inst_type(cellpose_dict["inst_map"], type_map)
+            combined = self.combine_inst_type(
+                cellpose_dict["inst_map"], 
+                type_map
+            )
         
         inst_map = self.clean_up(cellpose_dict["inst_map"])
 
@@ -63,10 +74,12 @@ class CellposePostProcessor(PostProcessor):
 
         return name, inst_map, combined
 
-    def run_post_processing(self,
-                            inst_probs: Dict[str, np.ndarray],
-                            aux_maps: Dict[str, np.ndarray],
-                            type_probs: Dict[str, np.ndarray]) -> List[Tuple[str, np.ndarray, np.ndarray]]:
+    def run_post_processing(
+            self,
+            inst_probs: Dict[str, np.ndarray],
+            aux_maps: Dict[str, np.ndarray],
+            type_probs: Dict[str, np.ndarray]
+        ) -> List[Tuple[str, np.ndarray, np.ndarray]]:
         """
         Run post processing for all predictions
 
@@ -85,10 +98,22 @@ class CellposePostProcessor(PostProcessor):
 
         Returns:
         -----------
-            A list of tuples containing filename, post-processed inst map and type map
-            e.g. ("filename1", inst_map: np.ndarray, type_map: np.ndarray)
+            List: a list of tuples containing filename, post-processed 
+            inst map and type map
+            
+            Example: 
+            [("filename1", inst_map: np.ndarray, type_map: np.ndarray),
+             ("filename2", inst_map: np.ndarray, type_map: np.ndarray)]
         """
         # Set arguments for threading pool
-        maps = list(zip(inst_probs.keys(), inst_probs.values(), aux_maps.values(), type_probs.values()))
+        maps = list(
+            zip(
+                inst_probs.keys(), 
+                inst_probs.values(), 
+                aux_maps.values(), 
+                type_probs.values()
+            )
+        )
         seg_results = self.parallel_pipeline(maps)
+        
         return seg_results

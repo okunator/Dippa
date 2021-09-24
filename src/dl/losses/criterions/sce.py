@@ -1,5 +1,4 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from typing import Optional
 
@@ -7,23 +6,27 @@ from src.dl.utils import one_hot
 from ..weighted_base_loss import WeightedBaseLoss
 
 
-# This is adapted from: https://catalyst-team.github.io/catalyst/_modules/catalyst/contrib/nn/criterion/ce.html#SymmetricCrossEntropyLoss
+# This is adapted from: Catalyst package
 class WeightedSCELoss(WeightedBaseLoss):
-    def __init__(self, 
-                 alpha: float = 0.5,
-                 beta: float = 1.0,
-                 edge_weight: Optional[float] = None,
-                 class_weights: Optional[torch.Tensor] = None,
-                 **kwargs) -> None:
+    def __init__(
+            self,
+            alpha: float=0.5,
+            beta: float=1.0,
+            edge_weight: Optional[float]=None,
+            class_weights: Optional[torch.Tensor]=None,
+            **kwargs
+        ) -> None:
         """
-        The Symmetric Cross Entropy loss: https://arxiv.org/abs/1908.06112
+        The Symmetric Cross Entropy loss: 
+        https://arxiv.org/abs/1908.06112
 
         Args:
         ----------
             alpha (float, default=0.5): 
                 Corresponds to overfitting issue of CE
             beta (float, default=1.0): 
-                Corresponds to flexible exploration on the robustness of RCE
+                Corresponds to flexible exploration on the robustness of
+                RCE
             edge_weight (float, optional, default=None):
                 Weight to be added to nuclei borders like in Unet paper
             class_weights (torch.Tensor, optional, None): 
@@ -34,13 +37,16 @@ class WeightedSCELoss(WeightedBaseLoss):
         self.beta = beta
         self.eps = 1e-6
 
-    def forward(self, 
-                yhat: torch.Tensor,
-                target: torch.Tensor,
-                target_weight: Optional[torch.Tensor] = None,
-                **kwargs) -> torch.Tensor:
+    def forward(
+            self,
+            yhat: torch.Tensor,
+            target: torch.Tensor,
+            target_weight: Optional[torch.Tensor]=None,
+            **kwargs
+        ) -> torch.Tensor:
         """
-        Computes the symmetric cross entropy loss between ``yhat`` and ``target`` tensors.
+        Computes the symmetric cross entropy loss between 
+        ``yhat`` and ``target`` tensors.
 
         Args:
         ----------
@@ -75,12 +81,19 @@ class WeightedSCELoss(WeightedBaseLoss):
 
         if self.class_weights is not None:
             cross_entropy = self.apply_class_weights(cross_entropy, target)
-            reverse_cross_entropy = self.apply_class_weights(reverse_cross_entropy, target)    
+            reverse_cross_entropy = self.apply_class_weights(
+                reverse_cross_entropy, target
+            )    
 
         if self.edge_weight is not None:
-            cross_entropy = self.apply_edge_weights(cross_entropy, target_weight)
-            reverse_cross_entropy = self.apply_edge_weights(reverse_cross_entropy, target_weight)
+            cross_entropy = self.apply_edge_weights(
+                cross_entropy, target_weight
+            )
+            reverse_cross_entropy = self.apply_edge_weights(
+                reverse_cross_entropy, target_weight
+            )
 
-        loss = self.alpha * cross_entropy.mean() + self.beta * reverse_cross_entropy.mean()
+        loss = self.alpha * cross_entropy.mean() \
+               + self.beta * reverse_cross_entropy.mean()
         
         return loss

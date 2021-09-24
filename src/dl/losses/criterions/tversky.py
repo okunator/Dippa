@@ -6,10 +6,12 @@ from src.dl.utils import one_hot
 
 
 class TverskyLoss(nn.Module):
-    def __init__(self,
-                 alpha: float = 0.7,
-                 beta: float = 0.3,
-                 **kwargs) -> None:
+    def __init__(
+            self,
+            alpha: float=0.7,
+            beta: float=0.3,
+            **kwargs
+        ) -> None:
         """
         Tversky loss: https://arxiv.org/abs/1706.05721
 
@@ -24,11 +26,13 @@ class TverskyLoss(nn.Module):
         self.alpha = alpha
         self.beta = beta
 
-    def forward(self,
-                yhat: torch.Tensor,
-                target: torch.Tensor,
-                eps: float = 1e-7,
-                **kwargs) -> torch.Tensor:
+    def forward(
+            self,
+            yhat: torch.Tensor,
+            target: torch.Tensor,
+            eps: float=1e-7,
+            **kwargs
+        ) -> torch.Tensor:
         """
         Computes the tversky loss
 

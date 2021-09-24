@@ -12,8 +12,8 @@ from .initialization import initialize_decoder, initialize_head
 
 class MultiTaskSegModel(nn.Module):
     """
-    Base class for instance seg models that have also cell type cls branch
-    and an optional aux branch
+    Base class for instance seg models that have also cell type cls 
+    branch and an optional aux branch
     """
     def initialize(self) -> None:
         initialize_decoder(self.inst_decoder)
@@ -52,7 +52,14 @@ class MultiTaskSegModel(nn.Module):
         for param in self.encoder.parameters():
             param.requires_grad = False
     
-    def convert_activation(self, model: nn.Module=None, act: str="relu") -> None:
+    def convert_activation(
+            self,
+            model: nn.Module=None,
+            act: str="relu"
+        ) -> None:
+        """
+        Change the pre-trained encoder act function
+        """
         assert act in ("swish", "mish", "leaky-relu")
             
         if act == "swish":
@@ -66,7 +73,9 @@ class MultiTaskSegModel(nn.Module):
             inplace = True
 
         for child_name, child in model.named_children():
-            if isinstance(child, nn.ReLU) or type(child).__name__ == "MemoryEfficientSwish": # the latter for efficientnets
+            if (isinstance(child, nn.ReLU) or 
+                type(child).__name__ == "MemoryEfficientSwish"):
+                 # the latter clause for efficientnets
                 setattr(model, child_name, Act(inplace=inplace))
             else:
                 self.convert_activation(child, act)

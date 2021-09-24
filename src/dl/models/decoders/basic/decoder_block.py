@@ -7,22 +7,24 @@ from ..base_decoder_block import BaseDecoderBlock
 
 
 class BasicDecoderBlock(BaseDecoderBlock):
-    def __init__(self,
-                 in_channels: int,
-                 out_channel_list: List[int],
-                 skip_channel_list: List[int],
-                 same_padding: bool=True,
-                 batch_norm: str="bn",
-                 activation: str="relu",
-                 weight_standardize: bool=False,
-                 up_sampling: str="fixed_unpool",
-                 long_skip: str="unet",
-                 long_skip_merge_policy: str="summation",
-                 n_layers: int=1,
-                 n_blocks: int=2,
-                 preactivate: bool=False,
-                 skip_index: int=None,
-                 out_dims: List[int]=None) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channel_list: List[int],
+            skip_channel_list: List[int],
+            same_padding: bool=True,
+            batch_norm: str="bn",
+            activation: str="relu",
+            weight_standardize: bool=False,
+            up_sampling: str="fixed_unpool",
+            long_skip: str="unet",
+            long_skip_merge_policy: str="summation",
+            n_layers: int=1,
+            n_blocks: int=2,
+            preactivate: bool=False,
+            skip_index: int=None,
+            out_dims: List[int]=None
+        ) -> None:
 
         """
         Basic decoder block. 
@@ -35,47 +37,47 @@ class BasicDecoderBlock(BaseDecoderBlock):
         Args:
         -----------
             in_channels (int):
-                The number of channels coming in from the previous head/decoder branch
+                The number of channels coming in from the previous head
+                or decoder branch
             out_channel_list (List[int]):
                 List of the number of decoder branch output channels.
                 First index contains the number of head channels.
             skip_channel_list (List[int]):
-                List of the number of channels in the encoder skip tensors.
-                Ignored if long_skip == None.
-                of the decoder blocks 
+                List of the number of channels in the encoder skip 
+                tensors. Ignored if long_skip == None.
             same_padding (bool, default=True):
                 if True, performs same-covolution
             batch_norm (str, default="bn"): 
-                Perform normalization. Methods:
-                Batch norm, batch channel norm, group norm, etc.
-                One of ("bn", "bcn", None)
+                Normalization method. One of: "bn", "bcn", None
             activation (str, default="relu"):
-                Activation method. One of ("relu", "swish". "mish")
+                Activation method. One of: "relu", "swish". "mish"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             up_sampling (str, default="fixed_unpool"):
-                up sampling method to be used.
-                One of ("interp", "max_unpool", "transconv", "fixed_unpool")
+                Up sampling method to be used. One of: "interp", 
+                "max_unpool", "transconv",  "fixed_unpool"
             long_skip (str, default="unet"):
-                long skip connection style to be used.
-                One of ("unet", "unet++", "unet3+", None)
+                long skip connection style to be used. One of: "unet", 
+                "unet++", "unet3+", None
             long_skip_merge_policy (str, default: "cat):
-                whether long skip is summed or concatenated
-                One of ("summation", "concatenate")
+                whether long skip is summed or concatenated One of: 
+                "summation", "concatenate"
             n_layers (int, default=1):
-                The number of residual multiconv blocks inside one residual 
-                decoder block
+                The number of multiconv blocks inside one decoder block
             n_blocks (int, default=2):
-                Number of basic (bn->relu->conv)-blocks inside one residual
+                Number of basic (bn->relu->conv)-blocks inside one
                 multiconv block        
             preactivate (bool, default=False)
-                If True, normalization and activation are applied before convolution
+                If True, normalization and activation are applied before
+                convolution
             skip_index (int, default=None):
-                the index of the skip_channel_list list. Used if long_skip="unet"
+                the index of the skip_channel_list list. Used if 
+                `long_skip`="unet"
             out_dims (List[int], default=None):
-                List of the heights/widths of each encoder/decoder feature map
-                e.g. [256, 128, 64, 32, 16]. Assumption is that feature maps are
-                square. This is used for unet3+ skip blocks
+                List of the heights/widths of each encoder/decoder 
+                feature map e.g. [256, 128, 64, 32, 16]. Assumption is
+                that feature maps are square. This is used for unet3+ 
+                skip blocks
         """
         super(BasicDecoderBlock, self).__init__(
             in_channels=in_channels,
@@ -113,22 +115,24 @@ class BasicDecoderBlock(BaseDecoderBlock):
             )
             self.conv_modules[f"multiconv_block{i + 1}"] = layer
         
-    def forward(self, 
-                x: torch.Tensor, 
-                idx: int,
-                skips: Tuple[torch.Tensor], 
-                extra_skips: List[torch.Tensor]=None) -> torch.Tensor:
+    def forward(
+            self,
+            x: torch.Tensor,
+            idx: int,
+            skips: Tuple[torch.Tensor],
+            extra_skips: List[torch.Tensor]=None
+        ) -> torch.Tensor:
         """
         Args:
         ----------
             x (torch.Tensor):
                 Input tensor. Shape (B, C, H, W).
             idx (int, default=None):
-                runnning index used to get the right skip tensor(s) from the skips
-                Tuple for the skip connection.
+                runnning index used to get the right skip tensor(s) from
+                the skips tuple for the skip connection.
             skips (Tuple[torch.Tensor]):
-                Tuple of tensors generated from consecutive encoder blocks.
-                Shapes (B, C, H, W).
+                Tuple of tensors generated from consecutive encoder 
+                blocks. Shapes (B, C, H, W).
             extra_skips (List[torch.Tensor], default=None):
                 extra skip connections, Used in unet3+ and unet++
         """
@@ -140,11 +144,13 @@ class BasicDecoderBlock(BaseDecoderBlock):
             if self.long_skip == "unet":
                 x = self.skip(x, skips, idx=idx)
             elif self.long_skip in ("unet++", "unet3+"):
-                x, extra = self.skip(x, idx=idx, skips=skips, extra_skips=extra_skips)
+                x, extra = self.skip(
+                    x, idx=idx, skips=skips, extra_skips=extra_skips
+                )
                 extra_skips = extra
 
         # final basic conv blocks
-        for name, module in self.conv_modules.items():
+        for _, module in self.conv_modules.items():
             x = module(x)
         
         return x, extra_skips

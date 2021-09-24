@@ -8,16 +8,18 @@ from src.dl.utils import one_hot
 class DiceLoss(nn.Module):
     def __init__(self, **kwargs) -> None:
         """
-        Sørensen-Dice Coefficient Loss criterion. Optionally applies weights
-        at the nuclei edges and weights for different classes.
+        Sørensen-Dice Coefficient Loss criterion. Optionally applies
+        weights at the nuclei edges and weights for different classes.
         """
         super(DiceLoss, self).__init__()
         self.eps = 1e-6
 
-    def forward(self, 
-                yhat: torch.Tensor,
-                target: torch.Tensor,
-                **kwargs) -> torch.Tensor:
+    def forward(
+            self,
+            yhat: torch.Tensor,
+            target: torch.Tensor,
+            **kwargs
+        ) -> torch.Tensor:
         """
         Computes the DICE coefficient
 
@@ -31,7 +33,7 @@ class DiceLoss(nn.Module):
 
         Returns:
         ---------
-            torch.Tensor. computed DICE loss (scalar)
+            torch.Tensor: computed DICE loss (scalar)
         """
         
         # activation

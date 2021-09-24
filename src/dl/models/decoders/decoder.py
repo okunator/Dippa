@@ -6,22 +6,24 @@ from . import BasicDecoderBlock, ResidualDecoderBlock, DenseDecoderBlock
 
 
 class Decoder(nn.ModuleDict):
-    def __init__(self,
-                 encoder_channels: List[int],
-                 decoder_channels: List[int],
-                 same_padding: bool=True,
-                 batch_norm: str="bn",
-                 activation: str="relu",
-                 weight_standardize: bool=False,
-                 up_sampling: str="fixed_unpool",
-                 short_skip: str="basic",
-                 long_skip: str="unet",
-                 long_skip_merge_policy: str ="summation",
-                 n_layers: int=1,
-                 n_blocks: int=2,
-                 preactivate: bool=False,
-                 model_input_size: int=256,
-                 **kwargs) -> None:
+    def __init__(
+            self,
+            encoder_channels: List[int],
+            decoder_channels: List[int],
+            same_padding: bool=True,
+            batch_norm: str="bn",
+            activation: str="relu",
+            weight_standardize: bool=False,
+            up_sampling: str="fixed_unpool",
+            short_skip: str="basic",
+            long_skip: str="unet",
+            long_skip_merge_policy: str="summation",
+            n_layers: int=1,
+            n_blocks: int=2,
+            preactivate: bool=False,
+            model_input_size: int=256,
+            **kwargs
+        ) -> None:
         """
         Basic Decoder block. Adapted from the implementation of 
         the unet model in segmentation_models_pytorch.
@@ -46,7 +48,8 @@ class Decoder(nn.ModuleDict):
                 Number of basic convolution blocks in this Decoder block
             up_sampling (str, default="fixed_unpool"):
                 up sampling method to be used.
-                One of ("interp", "max_unpool", "transconv", "fixed_unpool")
+                One of: "interp", "max_unpool", "transconv", 
+                "fixed_unpool"
             short_skip (str, default=None):
                 Use short skip connections inside the decoder blocks.
                 One of ("resdidual", "dense", None)
@@ -64,14 +67,17 @@ class Decoder(nn.ModuleDict):
                 Number of basic (bn->relu->conv)-blocks inside one dense 
                 multiconv block.
             preactivate (bool, default=False)
-                If True, normalization and activation are applied before convolution
+                If True, normalization and activation are applied before
+                convolution
             model_input_size (int,default=256):
-                The input image size of the model. Assumes that input images are square
-                patches i.e. H == W.
+                The input image size of the model. Assumes that input 
+                images are square patches i.e. H == W.
         """
         super(Decoder, self).__init__()
-        assert len(encoder_channels[1:]) == len(decoder_channels), "Encoder and decoder need to have same number of layers (symmetry)"
         assert short_skip in ("residual", "dense", None)
+        assert len(encoder_channels[1:]) == len(decoder_channels), (
+            "Encoder and decoder need to have same number of layers (symmetry)"
+        )
         self.decoder_type = short_skip
         self.long_skip = long_skip
 
@@ -120,7 +126,9 @@ class Decoder(nn.ModuleDict):
         # Build decoder
         for i, (in_chl, _) in enumerate(zip(decoder_channels, skip_channels)):
             kwargs["skip_index"] = i
-            decoder_block = DecoderBlock(in_chl, decoder_channels, skip_channels, **kwargs)
+            decoder_block = DecoderBlock(
+                in_chl, decoder_channels, skip_channels, **kwargs
+            )
             self.add_module(f"decoder_block{i + 1}", decoder_block)
 
     def forward(self, *features: Tuple[torch.Tensor]) -> torch.Tensor:
@@ -130,7 +138,7 @@ class Decoder(nn.ModuleDict):
         skips = features[1:]
         
         x = head
-        for i, (key, block) in enumerate(self.items()):
+        for i, (_, block) in enumerate(self.items()):
             x, extra = block(x, idx=i, skips=skips, extra_skips=extra_skips)
             extra_skips = extra
 

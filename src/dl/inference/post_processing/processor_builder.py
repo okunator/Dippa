@@ -10,10 +10,12 @@ class PostProcBuilder:
     Class used to initialize the the post-processor. 
     """
     @classmethod
-    def set_postprocessor(cls, 
-                          post_proc_method: str,
-                          thresh_method: str="naive",
-                          thresh: float=0.5) -> PostProcessor:
+    def set_postprocessor(
+            cls, 
+            post_proc_method: str,
+            thresh_method: str="naive",
+            thresh: float=0.5
+        ) -> PostProcessor:
         """
         Init the post-processor
 
@@ -21,18 +23,19 @@ class PostProcBuilder:
         ----------
             post_proc_method (str):
                 The post processing pipeline to use.
-                One of ("hover", "dist", "contour", "cellpose", "basic")
+                One of: "hover", "dist", "contour", "cellpose", "basic"
             thresh_method (str, default="naive"):
-                Thresholding method for the soft masks from the instance branch
-                One of ("naive", "argmax", "sauvola", "niblack")).
+                Thresholding method for the soft masks from the instance
+                branch One of: "naive", "argmax", "sauvola", "niblack".
             thresh (float, default = 0.5): 
-                threshold probability value. Only used if method == "naive"
+                Threshold prob value. Only used if method is "naive"
 
         Returns:
         ----------
             Initialized PostProcessor instance.
         """
-        assert post_proc_method in ("drfns", "dcan", "dran", "cellpose", "hover", "basic")
+        allowed = ("drfns", "dcan", "dran", "cellpose", "hover", "basic")
+        assert post_proc_method in allowed, "Illegal post proc method"
         c = cls()
         key = post_proc.POST_PROC_LOOKUP[post_proc_method]
         return post_proc.__dict__[key](thresh_method, thresh)

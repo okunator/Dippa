@@ -8,8 +8,10 @@ class EstBN(nn.Module):
     def __init__(self, num_features: int, eps: float=1e-7) -> None:
         """
         Estimate of the batch statistics
-        From: https://github.com/joe-siyuan-qiao/Batch-Channel-Normalization
+        From: 
+        https://github.com/joe-siyuan-qiao/Batch-Channel-Normalization
 
+        Article:
         https://arxiv.org/abs/1911.09738
         
         Args:
@@ -25,8 +27,10 @@ class EstBN(nn.Module):
         self.bias = Parameter(torch.zeros(num_features))
         self.register_buffer('running_mean', torch.zeros(num_features))
         self.register_buffer('running_var', torch.ones(num_features))
-        self.register_buffer('num_batches_tracked', torch.tensor(0, dtype=torch.long))
         self.register_buffer('estbn_moving_speed', torch.zeros(1))
+        self.register_buffer(
+            'num_batches_tracked', torch.tensor(0, dtype=torch.long)
+        )
         self.eps = eps
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -49,22 +53,26 @@ class EstBN(nn.Module):
 
 
 class BCNorm(nn.Module):
-    def __init__(self,
-                 num_features: int, 
-                 num_groups: int=None,
-                 eps: float=1e-7,
-                 estimate: bool=False) -> None:
+    def __init__(
+            self,
+            num_features: int, 
+            eps: float=1e-7,
+            estimate: bool=False
+        ) -> None:
         """
         Batch channel normalization
-        Adapted From: https://github.com/joe-siyuan-qiao/Batch-Channel-Normalization
+        Adapted From: 
+        https://github.com/joe-siyuan-qiao/Batch-Channel-Normalization
 
+        Paper:
         https://arxiv.org/abs/1911.09738
 
         Infers the num_groups from the num_features to avoid
         errors. By default: uses 16 channels per group. 
         If channels <= 16, squashes to batch layer norm
 
-        magic number 16 comes from the paper: https://arxiv.org/abs/1803.08494
+        magic number 16 comes from the paper: 
+        https://arxiv.org/abs/1803.08494
 
         Args:
         ----------

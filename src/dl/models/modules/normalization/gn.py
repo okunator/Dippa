@@ -1,12 +1,13 @@
-import torch
 import torch.nn as nn
 
 
 class GroupNorm(nn.GroupNorm):
-    def __init__(self,
-                 num_features: int,
-                 num_groups: int=None,
-                 **kwargs) -> None:
+    def __init__(
+            self,
+            num_features: int,
+            num_groups: int=None,
+            **kwargs
+        ) -> None:
         """
         Convenience wrapper for nn.GroupNorm to make kwargs
         compatible with nn.BatchNorm
@@ -15,7 +16,8 @@ class GroupNorm(nn.GroupNorm):
         errors. By default: uses 16 channels per group. 
         If channels <= 16, squashes to layer norm
 
-        magic number 16 comes from the paper: https://arxiv.org/abs/1803.08494
+        magic number 16 comes from the paper: 
+        https://arxiv.org/abs/1803.08494
 
         Args:
         ----------

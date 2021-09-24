@@ -4,9 +4,11 @@ from typing import Optional
 
 
 class WeightedBaseLoss(nn.Module):
-    def __init__(self, 
-                 class_weights: Optional[torch.Tensor] = None,
-                 edge_weight: Optional[float] = None) -> None:
+    def __init__(
+            self,
+            class_weights: Optional[torch.Tensor]=None,
+            edge_weight: Optional[float]=None
+        ) -> None:
         """
         Base class for a cross entropy based loss where the nuclei edges
         and classes can be given weights
@@ -22,9 +24,11 @@ class WeightedBaseLoss(nn.Module):
         self.class_weights = class_weights
         self.edge_weight = edge_weight
     
-    def apply_class_weights(self, 
-                            loss_matrix: torch.Tensor,
-                            target: torch.Tensor) -> torch.Tensor:
+    def apply_class_weights(
+            self,
+            loss_matrix: torch.Tensor,
+            target: torch.Tensor
+        ) -> torch.Tensor:
         """
         Multiply pixelwise loss matrix by the class weights
         Note: No normalization
@@ -38,7 +42,8 @@ class WeightedBaseLoss(nn.Module):
 
         Returns:
         ----------
-            torch.Tensor. The loss matrix scaled with the weight matrix. Shape (B, H, W).
+            torch.Tensor: The loss matrix scaled with the weight matrix.
+            Shape (B, H, W).
         """
         # add weights
         weight_mat = self.class_weights[target].to(target.device)
@@ -46,11 +51,14 @@ class WeightedBaseLoss(nn.Module):
         
         return loss
 
-    def apply_edge_weights(self, 
-                           loss_matrix: torch.Tensor,
-                           weight_map: torch.Tensor) -> torch.Tensor:
+    def apply_edge_weights(
+            self,
+            loss_matrix: torch.Tensor,
+            weight_map: torch.Tensor
+        ) -> torch.Tensor:
         """
-        Apply weights to the nuclear boundaries by computing edge_weight**weight_map 
+        Apply weights to the nuclear boundaries by computing 
+        `edge_weight`**`weight_map`
 
         Args:
         ----------
@@ -61,6 +69,7 @@ class WeightedBaseLoss(nn.Module):
 
         Returns:
         ----------
-            torch.Tensor. The loss matrix scaled with the nuclear boundary weights. Shape (B, H, W).
+            torch.Tensor: The loss matrix scaled with the nuclear 
+            boundary weights. Shape (B, H, W).
         """
         return loss_matrix*self.edge_weight**weight_map

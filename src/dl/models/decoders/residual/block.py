@@ -5,14 +5,16 @@ from ..base_conv_block import BaseConvBlock
 
 
 class ResidualConvBlockPreact(BaseConvBlock):
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 same_padding: bool=True,
-                 batch_norm: str="bn",
-                 activation: str="relu",
-                 weight_standardize: bool=False,
-                 use_residual: bool=True) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            same_padding: bool=True,
+            batch_norm: str="bn",
+            activation: str="relu",
+            weight_standardize: bool=False,
+            use_residual: bool=True
+        ) -> None:
         """
         Preactivated Residual conv block that can be used in decoders.
         Residual connection applied after the final conv.
@@ -33,9 +35,7 @@ class ResidualConvBlockPreact(BaseConvBlock):
             same_padding (bool, default=True):
                 if True, performs same-covolution
             batch_norm (str, default="bn"): 
-                Perform normalization. Methods:
-                Batch norm, batch channel norm, group norm, etc.
-                One of ("bn", "bcn", None)
+                Normalization method. One of: "bn", "bcn", None
             activation (str, default="relu"):
                 Activation method. One of (relu, swish. mish)
             weight_standardize (bool, default=False):
@@ -57,7 +57,12 @@ class ResidualConvBlockPreact(BaseConvBlock):
 
         # Use channel pooling if dims don't match
         if in_channels != out_channels:
-            self.add_module("ch_pool", nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0, bias=False))
+            self.add_module(
+                "ch_pool", nn.Conv2d(
+                    in_channels, out_channels, 
+                    kernel_size=1, padding=0, bias=False
+                )
+            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         identity = x
@@ -74,14 +79,16 @@ class ResidualConvBlockPreact(BaseConvBlock):
 
 
 class ResidualConvBlock(BaseConvBlock):
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 same_padding: bool=True,
-                 batch_norm: str="bn",
-                 activation: str="relu",
-                 weight_standardize: bool=False,
-                 use_residual: bool=True) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            same_padding: bool=True,
+            batch_norm: str="bn",
+            activation: str="relu",
+            weight_standardize: bool=False,
+            use_residual: bool=True
+        ) -> None:
         """
         Residual conv block that can be used in decoders.
         Residual connection applied before the final activation.
@@ -102,11 +109,9 @@ class ResidualConvBlock(BaseConvBlock):
             same_padding (bool, default=True):
                 if True, performs same-covolution
             batch_norm (str, default="bn"): 
-                Perform normalization. Methods:
-                Batch norm, batch channel norm, group norm, etc.
-                One of ("bn", "bcn", None)
+                Normalization method. One of: "bn", "bcn", None
             activation (str, default="relu"):
-                Activation method. One of (relu, swish. mish)
+                Activation method. One of: "relu", "swish". "mish"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             use_residual (bool, default=True):
@@ -126,7 +131,12 @@ class ResidualConvBlock(BaseConvBlock):
 
         # Use channel pooling if dims don't match
         if in_channels != out_channels:
-            self.add_module("ch_pool", nn.Conv2d(in_channels, out_channels, kernel_size=1, padding=0, bias=False))
+            self.add_module(
+                "ch_pool", nn.Conv2d(
+                    in_channels, out_channels, 
+                    kernel_size=1, padding=0, bias=False
+                )
+            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         identity = x
@@ -143,20 +153,22 @@ class ResidualConvBlock(BaseConvBlock):
 
 
 class MultiBlockResidual(nn.ModuleDict):
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 same_padding: bool=True,
-                 batch_norm: str="bn",
-                 activation: str="relu",
-                 weight_standardize: bool=False,
-                 n_blocks: int=2,
-                 preactivate: bool=False) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            same_padding: bool=True,
+            batch_norm: str="bn",
+            activation: str="relu",
+            weight_standardize: bool=False,
+            n_blocks: int=2,
+            preactivate: bool=False
+        ) -> None:
         """
-        Stack residual conv blocks in a ModuleDict. These are used in the
-        full sized decoderblocks. The number of basic conv blocks can be 
-        adjusted. Default is 2. The residual connection is applied at the
-        final conv block, before the last activation.
+        Stack residual conv blocks in a ModuleDict. These are used in 
+        the full sized decoderblocks. The number of basic conv blocks 
+        can be adjusted. Default is 2. The residual connection is 
+        applied at the final conv block, before the last activation.
 
         Args:
         ----------
@@ -167,24 +179,26 @@ class MultiBlockResidual(nn.ModuleDict):
             same_padding (bool, default=True):
                 If True, performs same-covolution
             batch_norm (str, default="bn"): 
-                Perform normalization. Methods:
-                Batch norm, batch channel norm, group norm, etc.
-                One of ("bn", "bcn", None)
+                Normalization method. One of "bn", "bcn", None
             activation (str, default="relu"):
-                Activation method. One of (relu, swish. mish)
+                Activation method. One of: "relu", "swish". "mish"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             n_blocks (int, default=2):
                 Number of BasicConvBlocks used in this block
             preactivate (bool, default=False)
-                If True, normalization and activation are applied before convolution
+                If True, normalization and activation are applied before
+                convolution
         """
         super(MultiBlockResidual, self).__init__()
 
         # use either preact or normal (original) resblock
-        ResBlock = ResidualConvBlockPreact if preactivate else ResidualConvBlock
+        ResBlock = ResidualConvBlock
+        if preactivate:
+            ResBlock = ResidualConvBlockPreact
 
-        # First res conv block. If n_blocks != 1 no residual skip at the first conv block
+        # First res conv block. If n_blocks != 1 no residual skip 
+        # at the first conv block
         use_residual = n_blocks == 1
         self.conv1 = ResBlock(
             in_channels=in_channels, 
@@ -212,6 +226,6 @@ class MultiBlockResidual(nn.ModuleDict):
             self.add_module('conv%d' % (i + 1), conv_block)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        for name, conv_block in self.items():
+        for _, conv_block in self.items():
             x = conv_block(x)
         return x

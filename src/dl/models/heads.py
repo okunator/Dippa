@@ -3,10 +3,12 @@ import torch.nn as nn
 
 
 class SegHead(nn.Module):
-    def __init__(self, 
-                 in_channels: int,
-                 out_channels: int,
-                 kernel_size: int = 1) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int=1
+        ) -> None:
         """
         Segmentation head at the end of decoder branches.
         Reduces the number of channels to out_channels
@@ -25,7 +27,8 @@ class SegHead(nn.Module):
 
         if kernel_size != 1:
             self.conv2d = nn.Conv2d(
-                in_channels, out_channels, kernel_size=kernel_size, padding=kernel_size // 2
+                in_channels, out_channels, 
+                kernel_size=kernel_size, padding=kernel_size // 2
             )
         else:
             self.conv2d = nn.Conv2d(

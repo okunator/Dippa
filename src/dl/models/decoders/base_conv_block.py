@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 
 from ..modules import (
@@ -7,18 +6,20 @@ from ..modules import (
 
 
 class BaseConvBlock(nn.Module):
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 same_padding: bool=True,
-                 batch_norm: str="bn",
-                 activation: str="relu",
-                 weight_standardize: bool=False,
-                 preactivate: bool=False) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            same_padding: bool=True,
+            batch_norm: str="bn",
+            activation: str="relu",
+            weight_standardize: bool=False,
+            preactivate: bool=False
+        ) -> None:
         """
         Base conv block that is used in all decoder blocks
-        This uses moduledicts which let you choose the different methods
-        to use.
+        This uses moduledicts which let you choose the different 
+        methods to use.
 
         Args:
         -----------
@@ -53,9 +54,15 @@ class BaseConvBlock(nn.Module):
         
         # set convolution module
         if self.conv_choice == "wsconv":
-            self.conv = WSConv2d(in_channels, out_channels, kernel_size=3, padding=int(same_padding))
+            self.conv = WSConv2d(
+                in_channels, out_channels, 
+                kernel_size=3, padding=int(same_padding)
+            )
         elif self.conv_choice == "conv":
-            self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=int(same_padding))
+            self.conv = nn.Conv2d(
+                in_channels, out_channels, 
+                kernel_size=3, padding=int(same_padding)
+            )
 
         # set normalization module
         if self.batch_norm == "bn":

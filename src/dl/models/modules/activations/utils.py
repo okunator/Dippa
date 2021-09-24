@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 
 from .mish import Mish
@@ -10,6 +9,7 @@ def convert_relu_to_mish(model: nn.Module) -> None:
     Convert ReLU activations in a give model to Mish
 
     Args:
+    --------
         model (nn.Module):
             pytorch model specification
     """
@@ -25,6 +25,7 @@ def convert_relu_to_swish(model: nn.Module) -> None:
     Convert ReLU activations in a give model to Mish
 
     Args:
+    ----------
         model (nn.Module):
             pytorch model specification
     """

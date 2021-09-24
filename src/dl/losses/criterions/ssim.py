@@ -6,14 +6,17 @@ from typing import Optional
 from src.dl.utils import one_hot, gaussian_kernel2d, filter2D
 
 
-# Adapted from https://github.com/ZJUGiveLab/UNet-Version/blob/master/loss/msssimLoss.py
-def ssim(img1: torch.Tensor,
-         img2: torch.Tensor,
-         window_size: int = 11,
-         val_range: Optional[int] = None) -> torch.Tensor:
+# Adapted from:
+# https://github.com/ZJUGiveLab/UNet-Version/blob/master/loss/msssimLoss.py
+def ssim(
+        img1: torch.Tensor,
+        img2: torch.Tensor,
+        window_size: int=11,
+        val_range: Optional[int]=None
+    ) -> torch.Tensor:
     """
-    Computes the structural similarity loss between target and yhat as described in
-    UNET3+ paper: https://arxiv.org/pdf/2004.08790.pdf
+    Computes the structural similarity loss between target and yhat as 
+    described in UNET3+ paper: https://arxiv.org/pdf/2004.08790.pdf
 
     Args:
     ----------
@@ -26,7 +29,7 @@ def ssim(img1: torch.Tensor,
 
     Returns:
     ----------
-        torch.Tensor computed ssim loss and 
+        torch.Tensor: computed ssim loss and 
     """
     
     if val_range is None:
@@ -45,7 +48,9 @@ def ssim(img1: torch.Tensor,
 
     (_, channel, height, width) = img1.size()
     real_size = min(window_size, height, width)
-    kernel = gaussian_kernel2d(real_size, sigma=1.5, n_channels=channel, device=img1.device)
+    kernel = gaussian_kernel2d(
+        real_size, sigma=1.5, n_channels=channel, device=img1.device
+    )
 
     mu1 = filter2D(img1, kernel)
     mu2 = filter2D(img2, kernel)
@@ -72,10 +77,17 @@ def ssim(img1: torch.Tensor,
 
 
 class SSIM(nn.Module):
-    def __init__(self, window_size: int = 11, return_cs: bool = False, **kwargs) -> None:
+    def __init__(
+            self,
+            window_size: int=11,
+            return_cs: bool=False,
+            **kwargs
+        ) -> None:
         """
-        Computes Structural Similarity (SSIM) index between each element in the input x img and target img.
-        and returns the structural dissimilarity (1 - SSIM(x, y)) / 2 That can be used as the loss function
+        Computes Structural Similarity (SSIM) index between each element
+        in the input x img and target img. and returns the structural 
+        dissimilarity (1 - SSIM(x, y)) / 2 That can be used as the loss
+        function
 
         Args:
         ----------
@@ -88,10 +100,12 @@ class SSIM(nn.Module):
         self.window_size = window_size
         self.return_cs = return_cs
 
-    def forward(self,
-                yhat: torch.Tensor,
-                target: torch.Tensor,
-                **kwargs) -> torch.Tensor:
+    def forward(
+            self,
+            yhat: torch.Tensor,
+            target: torch.Tensor,
+            **kwargs
+        ) -> torch.Tensor:
         """
         Computes the SSIM loss i.e structural dissimilarity
 
@@ -104,7 +118,7 @@ class SSIM(nn.Module):
         
         Returns: 
         ---------
-            Computed MS-SSIM Loss
+            torch.Tensor: computed MS-SSIM Loss
         """
 
         # if target is label mask shaped (B, H, W) then one hot
@@ -128,12 +142,16 @@ class SSIM(nn.Module):
 
 # Adapted from https://github.com/ZJUGiveLab/UNet-Version/blob/master/loss/msssimLoss.py
 class MSSSIM(nn.Module):
-    def __init__(self,
-                 window_size: int = 11,
-                 **kwargs) -> None:
+    def __init__(
+            self,
+            window_size: int=11,
+            **kwargs
+        ) -> None:
         """
-        MSSIM loss from UNET3+ paper: https://arxiv.org/pdf/2004.08790.pdf
-        to penalize fuzzy boundaries
+        MSSIM loss from UNET3+ paper: 
+        https://arxiv.org/pdf/2004.08790.pdf
+        
+        penalizes fuzzy boundaries
 
         Args:
         -----------
@@ -144,10 +162,12 @@ class MSSSIM(nn.Module):
         self.window_size = window_size
         self.ssim = SSIM(window_size=window_size, return_cs=True)
 
-    def forward(self,
-                yhat: torch.Tensor,
-                target: torch.Tensor,
-                **kwargs) -> torch.Tensor:
+    def forward(
+            self,
+            yhat: torch.Tensor,
+            target: torch.Tensor,
+            **kwargs
+        ) -> torch.Tensor:
         """
         Computes the MS-SSIM loss
 
@@ -162,7 +182,10 @@ class MSSSIM(nn.Module):
         ----------
             Computed MS-SSIM Loss
         """
-        weights = torch.tensor([0.0448, 0.2856, 0.3001, 0.2363, 0.1333], device=yhat.device)
+        weights = torch.tensor(
+            [0.0448, 0.2856, 0.3001, 0.2363, 0.1333], device=yhat.device
+        )
+
         levels = weights.size()[0]
         msssim = []
         mcs = []
@@ -178,13 +201,13 @@ class MSSSIM(nn.Module):
         msssim = torch.stack(msssim)
         mcs = torch.stack(mcs)
 
-        # Normalize (to avoid NaNs during training unstable models, not compliant with original definition)
+        # Normalize to avoid NaNs during training unstable models, 
+        # not compliant with original definition
         msssim = (msssim + 1) / 2
         mcs = (mcs + 1) / 2
 
         pow1 = mcs ** weights
         pow2 = msssim ** weights
 
-        # From Matlab implementation https://ece.uwaterloo.ca/~z70wang/research/iwssim/
         loss = torch.prod(pow1[:-1] * pow2[-1])
         return loss 

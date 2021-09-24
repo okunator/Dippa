@@ -4,9 +4,11 @@ from pathos.multiprocessing import ThreadPool as Pool
 from typing import Tuple, List
 from tqdm import tqdm
 
-from .thresholding import argmax, sauvola_thresh, niblack_thresh, naive_thresh_prob
+from src.utils import remove_debris
 from .combine_type_inst import combine_inst_semantic
-from src.utils.mask_utils import remove_debris
+from .thresholding import (
+    argmax, sauvola_thresh, niblack_thresh, naive_thresh_prob
+)
 
 
 THRESH_LOOKUP = {
@@ -25,13 +27,15 @@ class PostProcessor(ABC):
         Args:
         ----------
             thresh_method (str, default="naive"):
-                Thresholding method for the soft masks from the insntance branch.
-                One of ("naive", "argmax", "sauvola", "niblack").
-            thresh (float, default = 0.5): 
-                threshold probability value. Only used if method == "naive"
+                Thresholding method for soft masks from the insntance 
+                branch. One of: "naive", "argmax", "sauvola", "niblack".
+            thresh (float, default = 0.5):
+                Threshold prob value. Used if `thres_method` == "naive"
         """
-        methods = ("naive", "argmax", "sauvola", "niblack")
-        assert thresh_method in methods, f"method: {thresh_method} not one of {methods}"
+        allowed = ("naive", "argmax", "sauvola", "niblack")
+        assert thresh_method in allowed, (
+            f"method: {thresh_method} not one of {allowed}"
+        )
         
         self.method = thresh_method
         self.thresh = thresh
@@ -44,24 +48,34 @@ class PostProcessor(ABC):
     def run_post_processing(self):
             raise NotImplementedError
 
-    def parallel_pipeline(self, maps: List[Tuple[np.ndarray]]) -> List[Tuple[str, np.ndarray, np.ndarray]]:
+    def parallel_pipeline(
+            self,
+            maps: List[Tuple[np.ndarray]]
+        ) -> List[Tuple[str, np.ndarray, np.ndarray]]:
         """
         Run post proc pipeline in parallel for each set of predictions
 
         Args:
         -----------
             maps (List[Tuple[np.ndarray]]):
-                A list of tuples containing the fname, inst_map, Optional[aux_map], Optional[type_map]
-                to be post processed.
+                A list of tuples containing the fname, inst_map, 
+                aux_map, and type_map to be post processed.
 
         Returns:
         -----------
-            A list of tuples containing filename, post-processed inst map and type map
-            e.g. ("filename1", inst_map: np.ndarray, type_map: np.ndarray)
+            List: a list of tuples containing filename, post-processed 
+            inst map and type map.
+            
+            Example:
+            [("filename1", inst_map: np.ndarray, type_map: np.ndarray),
+             ("filename2", inst_map: np.ndarray, type_map: np.ndarray)]
         """
         seg_results = []
         with Pool() as pool:
-            for x in tqdm(pool.imap_unordered(self.post_proc_pipeline, maps), total=len(maps), desc=f"Post-processing"):
+            for x in tqdm(
+                pool.imap_unordered(self.post_proc_pipeline, maps), 
+                total=len(maps), desc=f"Post-processing"
+            ):
                 seg_results.append(x)
 
         return seg_results
@@ -69,16 +83,16 @@ class PostProcessor(ABC):
     def threshold(self, prob_map: np.ndarray) -> np.ndarray:
         """
         Thresholds the probability map from the network. 
-        Available methods in .thresholding.py
 
         Args:
         ----------
             prob_map (np.ndarray, np.float64): 
-                probability map from the inst branch of the network. Shape (H, W, 2).
+                probability map from the inst branch of the network. 
+                Shape (H, W, 2).
             
         Returns:
         ----------
-            np.ndarray. Thresholded integer valued mask. Shape (H, W) 
+            np.ndarray: Thresholded integer valued mask. Shape (H, W) 
         """
         kwargs = {}
         kwargs["prob_map"] = prob_map
@@ -95,27 +109,33 @@ class PostProcessor(ABC):
 
         return result
 
-    def combine_inst_type(self, inst_map: np.ndarray, type_map: np.ndarray) -> np.ndarray:
+    def combine_inst_type(
+            self,
+            inst_map: np.ndarray,
+            type_map: np.ndarray
+        ) -> np.ndarray:
         """
         Combines the nuclei types and instances 
 
         Args:
         -----------
-            inst_map (np.ndarray, np.uint32):
-                The instance map. (Output from post-processing). Shape (H, W)
-            type_map (np.ndarray, np.uint32):
-                The type map. (Probabilities from type cls branch of the network). Shape (H, W, C)
+            inst_map (np.ndarray):
+                The post-processed instance map. Shape (H, W)
+            type_map (np.ndarray):
+                The soft type map. Shape (H, W, C)
 
         Returns:
         -----------
-            np.ndarray. The final combined inst_map+type_map prediction. Shape (H, W) 
+            np.ndarray: The final combined inst_map + type_map 
+            prediction (instance segmentation). Shape (H, W) 
         """
         types = np.argmax(type_map, axis=2)
         return combine_inst_semantic(inst_map, types)
 
     def clean_up(self, inst_map: np.ndarray, min_size: int=10) -> np.ndarray:
         """
-        Remove small objects. Sometimes ndimage and skimage does not work properly.
+        Remove small objects. Sometimes the ndimage and skimage methods 
+        do not work as they should and fail to remove small objs...
 
         Args:
         ---------
@@ -126,7 +146,7 @@ class PostProcessor(ABC):
 
         Returns:
         ---------
-            np.ndarray cleaned up inst map. Shape (H, W)
+            np.ndarray: cleaned up inst map. Shape (H, W)
         """
         return remove_debris(inst_map, min_size)
 

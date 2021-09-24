@@ -7,19 +7,20 @@ from ...modules import FixedUnpool
 
 
 class Unet3pSumSkipBlock(nn.Module):
-    def __init__(self,
-                 in_channels: int,
-                 out_channel_list: List[int],
-                 skip_channel_list: List[int],
-                 skip_index: int,
-                 out_dims: List[int],
-                 same_padding: bool=True,
-                 batch_norm: str="bn",
-                 activation: str="relu",
-                 weight_standardize: bool=False,
-                 preactivate: bool=False,
-                 n_conv_blocks: int=1,
-                 **kwargs) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channel_list: List[int],
+            skip_channel_list: List[int],
+            skip_index: int,
+            out_dims: List[int],
+            batch_norm: str="bn",
+            activation: str="relu",
+            weight_standardize: bool=False,
+            preactivate: bool=False,
+            n_conv_blocks: int=1,
+            **kwargs
+        ) -> None:
         """
         U-net3+ like skip connection block.
         https://arxiv.org/abs/2004.08790
@@ -34,27 +35,25 @@ class Unet3pSumSkipBlock(nn.Module):
                 List of the number of output channels in decoder blocks.
                 First index contains the number of head channels
             skip_channel_list (List[int]):
-                List of the number of channels in each of the encoder skip tensors.
+                List of the number of channels in each of the encoder
+                skip tensors.
             skip_index (int):
                 index of the current skip channel in skip_channels_list.
             out_dims (List[int]):
-                List of the heights/widths of each encoder/decoder feature map
-                e.g. [256, 128, 64, 32, 16]. Assumption is that feature maps are
-                square shaped.
-            same_padding (bool, default=True):
-                if True, performs same-covolution
+                List of the heights/widths of each encoder/decoder 
+                feature map e.g. [256, 128, 64, 32, 16]. Assumption is 
+                that feature maps are square shaped.
             batch_norm (str, default="bn"): 
-                Perform normalization. Methods:
-                Batch norm, batch channel norm, group norm, etc.
-                One of ("bn", "bcn", None)
+                Normalization method. One of "bn", "bcn", None
             activation (str, default="relu"):
-                Activation method. One of ("relu", "swish". "mish")
+                Activation method. One of: "relu", "swish". "mish"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             preactivate (bool, default=False)
-                If True, normalization and activation are applied before convolution
+                If True, normalization and activation are applied before
+                convolution
             n_conv_blocks (int, default=2):
-                Number of basic (bn->relu->conv)-blocks inside one residual
+                Number of basic (bn->relu->conv)-blocks inside one
                 multiconv block        
         """
         super(Unet3pSumSkipBlock, self).__init__()
@@ -65,8 +64,8 @@ class Unet3pSumSkipBlock(nn.Module):
         if prev_dims:
             prev_dims.insert(0, prev_dims[0]) # insert head dims to pre dims
         
-        skip_channels = skip_channel_list[skip_index:-1] # no skip at the final block
-        out_dims = out_dims[skip_index:] # no skip at the final block
+        skip_channels = skip_channel_list[skip_index:-1] # no skip @ last block
+        out_dims = out_dims[skip_index:] # no skip @ last block
         
         # TODO option for short skips
         self.decoder_feat_conv = MultiBlockBasic(
@@ -85,14 +84,16 @@ class Unet3pSumSkipBlock(nn.Module):
             target_size = out_dims[0]
             self.up_scales = nn.ModuleDict()
             self.dense_convs = nn.ModuleDict()
-            for i, (in_chl, prev_dim) in enumerate(zip(dense_channels, prev_dims), 1):
+            for i, (in_chl, prev_dim) in enumerate(
+                zip(dense_channels, prev_dims), 1
+            ):
                 up_scale = self.scale(prev_dim, target_size)
                 self.up_scales[f"up_scale{i}"] = up_scale
                 self.dense_convs[f"dec_skip_conv{i}"] = MultiBlockBasic(
-                    in_channels=in_chl, 
+                    in_channels=in_chl,
                     out_channels=current_out_chl,
                     n_blocks=n_conv_blocks,
-                    batch_norm=batch_norm, 
+                    batch_norm=batch_norm,
                     activation=activation,
                     weight_standardize=weight_standardize,
                     preactivate=preactivate
@@ -100,14 +101,16 @@ class Unet3pSumSkipBlock(nn.Module):
 
             self.down_scales = nn.ModuleDict()
             self.skip_convs = nn.ModuleDict()
-            for i, (in_chl, out_dim) in enumerate(zip(skip_channels, out_dims)):
+            for i, (in_chl, out_dim) in enumerate(
+                zip(skip_channels, out_dims)
+            ):
                 down_scale = self.scale(out_dim, target_size)
                 self.down_scales[f"down_scale{i + 1}"] = down_scale
                 self.skip_convs[f"skip_conv{i + 1}"] = MultiBlockBasic(
-                    in_channels=in_chl, 
+                    in_channels=in_chl,
                     out_channels=current_out_chl,
                     n_blocks=n_conv_blocks,
-                    batch_norm=batch_norm, 
+                    batch_norm=batch_norm,
                     activation=activation,
                     weight_standardize=weight_standardize,
                     preactivate=preactivate
@@ -128,12 +131,14 @@ class Unet3pSumSkipBlock(nn.Module):
 
         Returns:
         ---------
-            nn.MaxPool2d, FixedUnpool or nn.identity if scaling not needed
+            nn.MaxPool2d: FixedUnpool or nn.identity
         """
         scale_factor = in_size / target_size
         
         if scale_factor > 1:
-            scale_op = nn.MaxPool2d(kernel_size=int(scale_factor), ceil_mode=True)
+            scale_op = nn.MaxPool2d(
+                kernel_size=int(scale_factor), ceil_mode=True
+            )
         elif scale_factor < 1:
             scale_op = FixedUnpool(scale_factor=int(1 / scale_factor)) 
         else:
@@ -141,12 +146,14 @@ class Unet3pSumSkipBlock(nn.Module):
 
         return scale_op
 
-    def forward(self, 
-                x: torch.Tensor, 
-                idx: int, 
-                skips: Tuple[torch.Tensor], 
-                extra_skips: List[torch.Tensor]=None, 
-                **kwargs) -> torch.Tensor:
+    def forward(
+            self,
+            x: torch.Tensor,
+            idx: int,
+            skips: Tuple[torch.Tensor],
+            extra_skips: List[torch.Tensor]=None,
+            **kwargs
+        ) -> torch.Tensor:
         """
         Args:
         ------------
@@ -162,27 +169,30 @@ class Unet3pSumSkipBlock(nn.Module):
 
         Returns:
         ------------
-            Tuple of tensors. First return is the decoder branch output.
-            The second return value are the outputs from the previous decoder branches
+            Tuple of tensors: First return is the decoder branch output.
+            The second return value are the outputs from the previous 
+            decoder branches
         """
         decoder_out_features = [x] if idx == 0 else extra_skips
         x = self.decoder_feat_conv(x)
 
         if idx < len(skips):
-            skip_features = []
-            decoder_features = []
             skips = skips[idx:]
             
             if skips:
                 # loop over the encoder features
-                for i, (scale, conv_block) in enumerate(zip(self.down_scales.values(), self.skip_convs.values())):
+                for i, (scale, conv_block) in enumerate(
+                    zip(self.down_scales.values(), self.skip_convs.values())
+                ):
                     skip_feat = scale(skips[i])
                     skip_feat = conv_block(skip_feat)
                     x = x + skip_feat
 
             if extra_skips:
                 # loop over the decoder features
-                for i, (scale, conv_block) in enumerate(zip(self.up_scales.values(), self.dense_convs.values())):
+                for i, (scale, conv_block) in enumerate(
+                    zip(self.up_scales.values(), self.dense_convs.values())
+                ):
                     dense_feat = scale(extra_skips[i])
                     dense_feat = conv_block(dense_feat)
                     x = x + dense_feat
@@ -194,19 +204,20 @@ class Unet3pSumSkipBlock(nn.Module):
 
 
 class Unet3pSumSkipBlockLight(nn.Module):
-    def __init__(self,
-                 in_channels: int,
-                 out_channel_list: List[int],
-                 skip_channel_list: List[int],
-                 skip_index: int,
-                 out_dims: List[int],
-                 same_padding: bool=True,
-                 batch_norm: str="bn",
-                 activation: str="relu",
-                 weight_standardize: bool=False,
-                 preactivate: bool=False,
-                 n_conv_blocks: int=1,
-                 **kwargs) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channel_list: List[int],
+            skip_channel_list: List[int],
+            skip_index: int,
+            out_dims: List[int],
+            batch_norm: str="bn",
+            activation: str="relu",
+            weight_standardize: bool=False,
+            preactivate: bool=False,
+            n_conv_blocks: int=1,
+            **kwargs
+        ) -> None:
         """
         U-net3+ like skip connection block.
         https://arxiv.org/abs/2004.08790
@@ -222,13 +233,14 @@ class Unet3pSumSkipBlockLight(nn.Module):
                 List of the number of output channels in decoder blocks.
                 First index contains the number of head channels
             skip_channel_list (List[int]):
-                List of the number of channels in each of the encoder skip tensors.
+                List of the number of channels in each of the encoder 
+                skip tensors.
             skip_index (int):
                 index of the current skip channel in skip_channels_list.
             out_dims (List[int]):
-                List of the heights/widths of each encoder/decoder feature map
-                e.g. [256, 128, 64, 32, 16]. Assumption is that feature maps are
-                square shaped.
+                List of the heights/widths of each encoder/decoder 
+                feature map e.g. [256, 128, 64, 32, 16]. Assumption is 
+                that feature maps are square shaped.
             same_padding (bool, default=True):
                 if True, performs same-covolution
             batch_norm (str, default="bn"): 
@@ -240,10 +252,11 @@ class Unet3pSumSkipBlockLight(nn.Module):
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             preactivate (bool, default=False)
-                If True, normalization and activation are applied before convolution
+                If True, normalization and activation are applied before
+                convolution
             n_conv_blocks (int, default=2):
-                Number of basic (bn->relu->conv)-blocks inside one residual
-                multiconv block        
+                Number of basic (bn->relu->conv)-blocks inside one 
+                residual multiconv block        
         """
         super(Unet3pSumSkipBlockLight, self).__init__()
         current_out_chl = out_channel_list[skip_index + 1]
@@ -253,15 +266,15 @@ class Unet3pSumSkipBlockLight(nn.Module):
         if prev_dims:
             prev_dims.insert(0, prev_dims[0]) # insert head dims to pre dims
         
-        skip_channels = skip_channel_list[skip_index:-1] # no skip at the final block
-        out_dims = out_dims[skip_index:] # no skip at the final block
+        skip_channels = skip_channel_list[skip_index:-1] # no skip @ last block
+        out_dims = out_dims[skip_index:] # no skip @ last block
         
         # TODO option for short skips
         self.decoder_feat_conv = MultiBlockBasic(
-            in_channels=in_channels, 
+            in_channels=in_channels,
             out_channels=current_out_chl,
             n_blocks=n_conv_blocks,
-            batch_norm=batch_norm, 
+            batch_norm=batch_norm,
             activation=activation,
             weight_standardize=weight_standardize,
             preactivate=preactivate
@@ -271,14 +284,16 @@ class Unet3pSumSkipBlockLight(nn.Module):
             target_size = out_dims[0]
             self.down_scales = nn.ModuleDict()
             self.skip_convs = nn.ModuleDict()
-            for i, (in_chl, out_dim) in enumerate(zip(skip_channels, out_dims)):
+            for i, (in_chl, out_dim) in enumerate(
+                zip(skip_channels, out_dims)
+            ):
                 down_scale = self.scale(out_dim, target_size)
                 self.down_scales[f"down_scale{i + 1}"] = down_scale
                 self.skip_convs[f"skip_conv{i + 1}"] = MultiBlockBasic(
-                    in_channels=in_chl, 
+                    in_channels=in_chl,
                     out_channels=current_out_chl,
                     n_blocks=n_conv_blocks,
-                    batch_norm=batch_norm, 
+                    batch_norm=batch_norm,
                     activation=activation,
                     weight_standardize=weight_standardize,
                     preactivate=preactivate
@@ -304,17 +319,21 @@ class Unet3pSumSkipBlockLight(nn.Module):
         scale_factor = in_size / target_size
         
         if scale_factor > 1:
-            scale_op = nn.MaxPool2d(kernel_size=int(scale_factor), ceil_mode=True)
+            scale_op = nn.MaxPool2d(
+                kernel_size=int(scale_factor), ceil_mode=True
+            )
         else:
             scale_op = nn.Identity()
 
         return scale_op
 
-    def forward(self, 
-                x: torch.Tensor, 
-                idx: int, 
-                skips: Tuple[torch.Tensor], 
-                **kwargs) -> torch.Tensor:
+    def forward(
+            self,
+            x: torch.Tensor,
+            idx: int,
+            skips: Tuple[torch.Tensor],
+            **kwargs
+        ) -> torch.Tensor:
         """
         Args:
         ------------
@@ -328,18 +347,19 @@ class Unet3pSumSkipBlockLight(nn.Module):
         Returns:
         ------------
             Tuple of tensors. First return is the decoder branch output.
-            The second return value is None (Need to return a tuple so this fits to other parts..)
+            The second return value is None (Need to return a tuple so 
+            this fits to other parts..)
         """
         x = self.decoder_feat_conv(x)
 
         if idx < len(skips):
-            skip_features = []
-            decoder_features = []
             skips = skips[idx:]
             
             if skips:
                 # loop over the encoder features
-                for i, (scale, conv_block) in enumerate(zip(self.down_scales.values(), self.skip_convs.values())):
+                for i, (scale, conv_block) in enumerate(
+                    zip(self.down_scales.values(), self.skip_convs.values())
+                ):
                     skip_feat = scale(skips[i])
                     skip_feat = conv_block(skip_feat)
                     x = x + skip_feat

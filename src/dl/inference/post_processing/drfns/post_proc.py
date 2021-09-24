@@ -24,17 +24,19 @@ SOFTWARE.
 
 import numpy as np
 import skimage.segmentation as segm
-import skimage.measure as measure
 import skimage.morphology as morph
 import scipy.ndimage as ndi
 from skimage import img_as_ubyte
 
-from src.utils.mask_utils import binarize
-from src.utils.img_utils import percentile_normalize_and_clamp
+from src.utils import binarize, percentile_normalize_and_clamp
 
 
-# Adapted from https://github.com/PeterJackNaylor/DRFNS/blob/master/src_RealData/postproc/postprocessing.py
-def h_minima_reconstruction(inv_dist_map: np.ndarray, lamb: int=7) -> np.ndarray:
+# Adapted from 
+# https://github.com/PeterJackNaylor/DRFNS/blob/master/src_RealData/postproc/postprocessing.py
+def h_minima_reconstruction(
+        inv_dist_map: np.ndarray,
+        lamb: int=7
+    ) -> np.ndarray:
     """
     Performs a H minimma reconstruction via an erosion method.
 
@@ -47,7 +49,8 @@ def h_minima_reconstruction(inv_dist_map: np.ndarray, lamb: int=7) -> np.ndarray
 
     Returns:
     ----------
-        np.ndarray. H minima reconstruction from the inverse distance transform. Shape (H, W)
+        np.ndarray: H minima reconstruction from the inverse distance 
+        transform. Shape (H, W)
     """
 
     def making_top_mask(x: np.ndarray, lamb: int=lamb) -> int:
@@ -60,7 +63,10 @@ def h_minima_reconstruction(inv_dist_map: np.ndarray, lamb: int=7) -> np.ndarray
     # reconstruct
     seed = shift_inv_dist_map
     mask = inv_dist_map
-    reconstructed = morph.reconstruction(seed, mask, method="erosion").astype("uint8")
+    reconstructed = morph.reconstruction(
+        seed, mask, method="erosion"
+    ).astype("uint8")
+
     return reconstructed
 
 
@@ -77,7 +83,7 @@ def find_maxima(inv_dist_map: np.ndarray, mask: np.ndarray=None) -> np.ndarray:
 
     Returns:
     ----------
-        np.ndarray, the found maxima. Shape (H, W).
+        np.ndarray: the found maxima. Shape (H, W).
 
     """
     reconstructed = h_minima_reconstruction(inv_dist_map, 40)
@@ -89,24 +95,31 @@ def find_maxima(inv_dist_map: np.ndarray, mask: np.ndarray=None) -> np.ndarray:
     return res
 
 
-def dynamic_ws_alias(dist_map: np.ndarray, binary_mask: np.ndarray, thresh: float=0.5) -> np.ndarray:
+def dynamic_ws_alias(
+        dist_map: np.ndarray,
+        binary_mask: np.ndarray,
+        thresh: float=0.5
+    ) -> np.ndarray:
     """
     Runs the dynamic watershed segmentation. 
     
-    Removed the suspicious stuff from the end. Just obscured the results...
+    Removed the suspicious stuff from the end. Just obscured the results
 
     Args:
     ----------
         dist_map (np.ndarray):
-            The regressed distance transform from auxiliary branch of the network
+            The regressed distance transform from auxiliary branch of 
+            the network
         binary_mask (np.ndarray):
-            The thresholded probability map from the binary seg branch of the network
+            The thresholded probability map from the binary seg branch
+            of the network
         thresh (float, default=0.5):
             The threshold value to find markers from the dist_map
 
     Returns:
     ----------
-        np.ndarray, the labelled watershed segmentation result. Shape (H, W)
+        np.ndarray: the labelled watershed segmentation result.
+        Shape (H, W)
     """
     # binarize probs and dist map
     binary_dist_map = (dist_map > thresh)
@@ -125,29 +138,37 @@ def dynamic_ws_alias(dist_map: np.ndarray, binary_mask: np.ndarray, thresh: floa
     return ws
 
 
-def post_proc_drfns(dist_map: np.ndarray, inst_map: np.ndarray, thresh: float=0.5) -> np.ndarray:
+def post_proc_drfns(
+        dist_map: np.ndarray,
+        inst_map: np.ndarray,
+        thresh: float=0.5
+    ) -> np.ndarray:
     """
     Post processing pipeline introduced in:
     https://ieeexplore.ieee.org/document/8438559
 
-    Slightly modified. Uses the thresholded prob_map as the mask param in watershed.
-    Markers are computed from the regressed distance map (inverted).
+    Slightly modified. Uses the thresholded prob_map as the mask param 
+    in watershed. Markers are computed from the regressed distance map 
+    (inverted).
 
-    Uses regressed distance transform from an auxiliary branch to separate clumped nuclei. 
+    Uses regressed distance transform from an auxiliary branch to 
+    separate clumped nuclei. 
 
     Args:
     -----------
         dist_map (np.ndarray):
-            Regressed distance transform from the auxiliary branch. Shape (H, W, 1)
+            Regressed distance transform from the auxiliary branch. 
+            Shape (H, W, 1)
         inst_map (np.ndarray):
-            The segmentation mask from the binary seg branch of thenetwork. Shape (H, W)
-            If inst_map is labelled it will be binarized.
+            The segmentation mask from the binary seg branch of the 
+            network. Shape (H, W) If inst_map is labelled it will be 
+            binarized.
         thresh (float, default=0.5):
             threshold value for markers and binary mask 
 
     Returns:
     -----------
-            np.ndarray, the post-processed inst_map. Same shape as input (H, W)
+        np.ndarray: the post-processed inst_map. Shape: (H, W)
     """
     dist_map = percentile_normalize_and_clamp(dist_map, a_min=0, a_max=1)
     binary_mask = binarize(inst_map)

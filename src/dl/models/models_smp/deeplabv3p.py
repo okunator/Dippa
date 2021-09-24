@@ -22,10 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from typing import List, Tuple, Optional, Union
+from typing import Optional
 from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.base import SegmentationHead
 from segmentation_models_pytorch.deeplabv3.decoder import DeepLabV3PlusDecoder
@@ -34,59 +31,72 @@ from ..base_model import MultiTaskSegModel
 
 
 class DeepLabV3PlusSmpMulti(MultiTaskSegModel):
-    def __init__(self,
-                 encoder_name: str = "resnet34",
-                 encoder_depth: int = 5,
-                 encoder_weights: Optional[str] = "imagenet",
-                 encoder_output_stride: int = 16,
-                 decoder_channels: int = 256,
-                 decoder_atrous_rates: tuple = (12, 24, 36),
-                 in_channels: int = 3,
-                 classes: int = 2,
-                 activation: Optional[str] = None,
-                 upsampling: int = 4,
-                 type_branch: bool = True,
-                 aux_branch: bool = True,
-                 aux_out_channels: int = 1,
-                 **kwargs) -> None:
+    def __init__(
+            self,
+            encoder_name: str="resnet34",
+            encoder_depth: int=5,
+            encoder_weights: Optional[str]="imagenet",
+            encoder_output_stride: int=16,
+            decoder_channels: int=256,
+            decoder_atrous_rates: tuple=(12, 24, 36),
+            in_channels: int=3,
+            classes: int=2,
+            activation: Optional[str]=None,
+            upsampling: int=4,
+            type_branch: bool=True,
+            aux_branch: bool=True,
+            aux_out_channels: int=1,
+            **kwargs
+        ) -> None:
         """
-        DeepLabV3Plus_ implemetation from "Encoder-Decoder with Atrous Separable
-        Convolution for Semantic Image Segmentation"
+        DeepLabV3Plus_ implemetation from "Encoder-Decoder with Atrous 
+        Separable Convolution for Semantic Image Segmentation"
 
-        This class uses https://github.com/qubvel/segmentation_models.pytorch/ implementation
-        of the model and adds a semantic segmentation branch for classifying cell types that
-        outputs type maps (B, C, H, W). Adds also an optional aux branch for regressing (B, 2, H, W) outputs
+        This class uses 
+            https://github.com/qubvel/segmentation_models.pytorch/ 
+        implementation of the model and adds a semantic segmentation 
+        branch for classifying cell types that outputs type maps. 
+        Adds also an optional auxiliary branch for regressing auxiliary
+        outputs
 
         Args:
         -----------
             encoder_name (str, default="resnet34"):
-                name of classification model (without last dense layers) used as feature
-                extractor to build segmentation model.
+                name of classification model (without last dense layers)
+                used as feature extractor to build segmentation model.
             encoder_depth (int, default=5): 
-                number of stages used in decoder, larger depth - more features are generated.
-                e.g. for depth=3 encoder will generate list of features with following spatial shapes
-                [(H,W), (H/2, W/2), (H/4, W/4), (H/8, W/8)], so in general the deepest feature will have
-                spatial resolution (H/(2^depth), W/(2^depth)]
+                number of stages used in decoder, larger depth - more
+                features are generated. e.g. for depth=3 encoder will 
+                generate list of features with following spatial shapes
+                [(H,W), (H/2, W/2), (H/4, W/4), (H/8, W/8)], so in 
+                general the deepest feature will have spatial resolution
+                (H/(2^depth), W/(2^depth)]
             encoder_weights (str, optional, default="imagenet"):
-                one of ``None`` (random initialization), ``imagenet`` (pre-training on ImageNet).
+                one of ``None`` (random initialization), ``imagenet`` 
+                (pre-training on ImageNet).
+            encoder_output_stride (int, default=16):
+                Stride size for the encoder output
             decoder_channels (int, default=256):
-                a number of convolution filters in ASPP module (default 256).
+                a number of convolution filters in ASPP module.
             decoder_atrous_rates (tuple, default=(12, 24, 36)): 
-                dilation rates for ASPP module (should be a tuple of 3 integer values)
+                dilation rates for ASPP module. Should be a tuple of 3 
+                integer values
             in_channels (int, default=3): 
                 number of input channels for model, default is 3.
             classes (int, default=2): 
-                a number of classes for output (output shape - ``(batch, classes, h, w)``).
+                a number of classes for output output shape - 
+                ``(batch, classes, h, w)``.
             activation (str, callable, optional, default=None): 
-                activation function used in ``.predict(x)`` method for inference.
-                One of [``sigmoid``, ``softmax2d``, callable, None]
+                activation function used in ``.predict(x)`` method for 
+                inference. One of: ``sigmoid``, ``softmax2d``, callable,
+                None
             upsampling (int, default=4): 
-                optional, final upsampling factor
-                (default is 4 to preserve input -> output spatial shape identity)
+                optional, final upsampling factor default is 4 to 
+                preserve input -> output spatial shape identity
             type_branch (bool, default=True)
-                if True, type cls decoder branch is added to the network
+                if True, type cls branch is added to the decoder
             aux_branch (bool, default=True)
-                if True, auxiliary decoder branch is added to the network
+                if True, auxiliary branch is added to the decoder
             aux_out_channels (int, default=1):
                 number of output channels from the auxiliary branch
 
@@ -122,7 +132,7 @@ class DeepLabV3PlusSmpMulti(MultiTaskSegModel):
             )
         else:
             raise ValueError(
-                "Encoder output stride should be 8 or 16, got {}".format(encoder_output_stride)
+                f"Encoder out stride shld be 8|16, got {encoder_output_stride}"
             )
 
         # inst decoder

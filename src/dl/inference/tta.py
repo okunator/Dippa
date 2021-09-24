@@ -4,6 +4,7 @@ from typing import List
 from albumentations.core.transforms_interface import BasicTransform
 
 
+# TODO: These will be rewritten
 def tta_augs() -> List[BasicTransform]:
     """
     Returns a list of flip and rotation augmentations
@@ -21,7 +22,8 @@ def tta_augs() -> List[BasicTransform]:
 
 def tta_deaugs() -> List[BasicTransform]:
     """
-    Returns a list of rotations and flips that are used as deaugmentations for tta_augs()
+    Returns a list of rotations and flips that are used as
+    deaugmentations for tta_augs()
     """
     return [
         A.VerticalFlip(p=1),
@@ -36,9 +38,11 @@ def tta_deaugs() -> List[BasicTransform]:
 
 def tta_five_crops(io: np.ndarray) -> List[BasicTransform]:
     """
-    returns a list of five crops of same size on an image. One at each corner and a center crop
+    returns a list of five crops of same size on an image. One at each
+    corner and a center crop
 
     Args:
+    -----------
         io (np.ndarray): input image. shape (H, W)
     """
     return [
@@ -65,10 +69,12 @@ def resize(height: int, width: int, **kwargs) -> List[BasicTransform]:
     Wrapper for albumentations resize transform. 
 
     Args:
+    ----------
         height (int): height of the output image
         width (int): width of the input image
 
     Returns:
+    -----------
         A resize transform
     """
     return  A.Resize(height=height, width=width, p=1)

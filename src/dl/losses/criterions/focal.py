@@ -1,7 +1,6 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from typing import List, Optional
+from typing import Optional
 
 from src.dl.utils import one_hot
 from ..weighted_base_loss import WeightedBaseLoss
@@ -9,10 +8,10 @@ from ..weighted_base_loss import WeightedBaseLoss
 
 class WeightedFocalLoss(WeightedBaseLoss):
     def __init__(self,
-                 alpha: float = 0.5,
-                 gamma: float = 2.0,
-                 edge_weight: Optional[float] = None,
-                 class_weights: Optional[torch.Tensor] = None,
+                 alpha: float=0.5,
+                 gamma: float=2.0,
+                 edge_weight: Optional[float]=None,
+                 class_weights: Optional[torch.Tensor]=None,
                  **kwargs) -> None:
         """
         Focal loss criterion: https://arxiv.org/abs/1708.02002
@@ -33,13 +32,16 @@ class WeightedFocalLoss(WeightedBaseLoss):
         self.gamma = gamma
         self.eps = 1e-6
 
-    def forward(self,
-                yhat: torch.Tensor,
-                target: torch.Tensor,
-                target_weight: Optional[torch.Tensor] = None,
-                **kwargs) -> torch.Tensor:
+    def forward(
+            self,
+            yhat: torch.Tensor,
+            target: torch.Tensor,
+            target_weight: Optional[torch.Tensor]=None,
+            **kwargs
+        ) -> torch.Tensor:
         """
-        Computes the focal loss. Option to apply nuclei borders weights and class weights
+        Computes the focal loss. Option to apply nuclei borders weights 
+        and class weights
 
         Args:
         ---------
@@ -54,7 +56,7 @@ class WeightedFocalLoss(WeightedBaseLoss):
 
         Returns:
         ----------
-            torch.Tensor. Computed focal loss (scalar)
+            torch.Tensor: Computed focal loss (scalar)
         """
 
         input_soft = F.softmax(yhat, dim=1) + self.eps

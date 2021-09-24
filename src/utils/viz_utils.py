@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from typing import List, Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional
 from matplotlib import pyplot as plt
 
 from .mask_utils import bounding_box
@@ -24,7 +24,8 @@ KEY_COLORS = {
 }
 
 
-# Adapted from https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
+# Adapted from:
+# https://github.com/vqdang/hover_net/blob/master/src/misc/viz_utils.py
 def draw_contours(
         inst_map: np.ndarray, 
         image: np.ndarray,

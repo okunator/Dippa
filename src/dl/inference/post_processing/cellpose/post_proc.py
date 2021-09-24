@@ -24,41 +24,53 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 OF SUCH DAMAGE.
 """
 
-# Ported only the CellPose 2D versions from https://github.com/MouseLand/cellpose/tree/master/cellpose
-# Check out CellPose for more info: https://www.nature.com/articles/s41592-020-01018-x
+# Ported only the CellPose 2D versions from:
+# https://github.com/MouseLand/cellpose/tree/master/cellpose
+
+# Check out CellPose for more info: 
+# https://www.nature.com/articles/s41592-020-01018-x
 
 import torch
 import numpy as np
-from typing import Union, Dict, List
+from typing import Union, Dict
 from skimage.color import hsv2rgb
 from scipy.ndimage import find_objects, binary_fill_holes
 from scipy.ndimage.filters import maximum_filter1d
 
-from src.utils.img_utils import percentile_normalize, percentile_normalize_and_clamp
-from src.utils.mask_utils import binarize
+from src.utils import (
+    percentile_normalize, percentile_normalize_and_clamp, binarize
+)
 
 
-def enhance_hover(hover: np.ndarray, order: str="XY", channels: str="HWC") -> np.ndarray:
+def enhance_hover(
+        hover: np.ndarray,
+        order: str="XY",
+        channels: str="HWC"
+    ) -> np.ndarray:
     """
-    Normalizes to the 0-99 percentiles and clamps the values of the horizontal & vertical maps
-    like in CellPose. Assumes that the hovermaps are stacked in "YX" order. And that the shape
-    is (H, W, 2). If not, then reshapes the np.ndarray.
+    Normalizes to the 0-99 percentiles and clamps the values of the 
+    horizontal & vertical maps like in CellPose. Assumes that the 
+    hovermaps are stacked in "YX" order. And that the shape = (H, W, 2).
+    If not, then reshapes the np.ndarray.
 
     This is ported from the CellPose repo and slightly modified.
 
     Args:
     -----------
         hover (np.ndarray):
-            Regressed Horizontal and Vertical gradient maps. Shape (2, H, W)|(H, W, 2)
+            Regressed Horizontal and Vertical gradient maps. 
+            Shape (2, H, W)|(H, W, 2)
         order (str, default="XY"):
-            The order the horizontal and vertical maps are stacked. Horizontal = "X"
-            Vertical = "Y". In Cellpose the order is "YX". Networks in this repo output "XY"
+            The order the horizontal and vertical maps are stacked. 
+            Horizontal = "X", vertical = "Y". In Cellpose the order is 
+            "YX". Networks in this repo output "XY"
         channels (str, default="HWC"):
-            The order of image dimensions. One of ("HW", "HWC", "CHW")
+            The order of image dimensions. One of :"HW", "HWC", "CHW"
     
     Returns:
     -----------
-        Enhanced hover-maps (np.ndarray) with channel order "YX" and shape (H, W, 2)
+        np.ndarray: Enhanced hover-maps with channel order "YX" and 
+        shape (H, W, 2)
     """
     assert order in ("XY", "YX")
     assert channels in ("HWC", "CHW")
@@ -73,9 +85,15 @@ def enhance_hover(hover: np.ndarray, order: str="XY", channels: str="HWC") -> np
     return enhanced
 
 
-def flows_from_hover(hover: np.ndarray, order: str="XY", channels: str="HWC") -> np.ndarray:
+def flows_from_hover(
+        hover: np.ndarray,
+        order: str="XY",
+        channels: str="HWC"
+    ) -> np.ndarray:
     """
-    Convert Horizontal and Vertical gradients to gradient flows like in CellPose.
+    Convert Horizontal and Vertical gradients to gradient flows like in 
+    CellPose. 
+    
     This is ported from the CellPose repo and slightly modified.
 
     Args:
@@ -95,22 +113,28 @@ def flows_from_hover(hover: np.ndarray, order: str="XY", channels: str="HWC") ->
         np.ndarray, the optical flow representation. Shape (H, W, 3)
     """
     enhanced = enhance_hover(hover, order=order, channels=channels)
-    H = (np.arctan2(enhanced[..., 1], enhanced[..., 0]) + np.pi) / (2*np.pi) # X, Y
+    H = (np.arctan2(enhanced[..., 1], enhanced[..., 0]) + np.pi) / (2*np.pi)
     S = percentile_normalize(enhanced[..., 1]**2 + enhanced[..., 0]**2, channels="HW")
     HSV = np.stack([H, S, S], axis=-1)
     HSV = np.clip(HSV, a_min=0.0, a_max=1.0)
-    flow = (hsv2rgb(HSV)*255).astype(np.uint8) 
+    flow = (hsv2rgb(HSV)*255).astype(np.uint8)
+
     return flow
 
 
-def steps2D_interp_torch(p: np.ndarray, dP: np.ndarray, niter: int=200) -> np.ndarray:
+def steps2D_interp_torch(
+        p: np.ndarray,
+        dP: np.ndarray,
+        niter: int=200
+    ) -> np.ndarray:
     """
     Ported from CellPose repo (torch 2D interp part)
     polished for readability. 
 
-    "run a dynamical system starting at that pixel location and following 
-    the spatial derivatives specified by the horizontal and vertical gradient maps. 
-    We use finite differences with a step size of one."
+    "run a dynamical system starting at that pixel location and 
+     following the spatial derivatives specified by the horizontal and
+     vertical gradient maps. We use finite differences with a step size 
+     of one."
 
     Args:
     ----------
@@ -197,11 +221,13 @@ def follow_flows(dP: np.ndarray, niter: int=200) -> np.ndarray:
     return p
 
 
-def get_masks(p: np.ndarray, 
-              threshold: int=0.4,
-              rpad: int=20, 
-              flows: Union[np.ndarray, None]=None,
-              iscell: Union[np.ndarray, None]=None) -> np.ndarray:
+def get_masks(
+        p: np.ndarray, 
+        threshold: int=0.4,
+        rpad: int=20, 
+        flows: Union[np.ndarray, None]=None,
+        iscell: Union[np.ndarray, None]=None
+    ) -> np.ndarray:
     """ 
     create masks using pixel convergence after running dynamics
     
@@ -312,10 +338,12 @@ def get_masks(p: np.ndarray,
     return M0
 
 
-def fill_holes_and_remove_small_masks(masks: np.ndarray, min_size: int=15):
+def fill_holes_and_remove_small_masks(
+        masks: np.ndarray,
+        min_size: int=15
+    ) -> np.ndarray:
     """ 
     fill holes in masks 2D and discard masks smaller than min_size
-    fills holes in each mask using scipy.ndimage.morphology.binary_fill_holes
     
     Parameters
     ----------------
@@ -334,7 +362,9 @@ def fill_holes_and_remove_small_masks(masks: np.ndarray, min_size: int=15):
     
     """
     if masks.ndim != 2:
-        raise ValueError('masks_to_outlines takes 2D, not %dD array'%masks.ndim)
+        raise ValueError(
+            'masks_to_outlines takes 2D, not %dD array'%masks.ndim
+        )
     
     slices = find_objects(masks)
     j = 0
@@ -352,13 +382,17 @@ def fill_holes_and_remove_small_masks(masks: np.ndarray, min_size: int=15):
     return masks
 
 
-def post_proc_cellpose(hover_map:np.ndarray, inst_map: np.ndarray) -> Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]:
+def post_proc_cellpose(
+        hover_map: np.ndarray,
+        inst_map: np.ndarray
+    ) -> Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]:
     """
     Runs the CellPose post-processing pipeline and flows
     as described in the CellPose paper:
     https://www.nature.com/articles/s41592-020-01018-x
 
-    Does not discard bad flows which are removed in the paper..
+    Does not discard bad flows which are removed in the original paper.
+    In general the flows are somewhat useless... except for nice viz.. 
 
     Args:
     -----------
@@ -373,12 +407,15 @@ def post_proc_cellpose(hover_map:np.ndarray, inst_map: np.ndarray) -> Dict[str, 
 
     Returns:
     -----------
-        Dict[str, Union[np.ndarray, Dict[str, np.ndarray]]]. Dictionary where key "flows"
-        returns a dict of the components needed in flow computations. Key "inst_map"
-        returns the instance map.
+        Dict: Dictionary where key "flows" returns a dict of the 
+        components needed in flow computations. Key "inst_map"
+        returns the post-processed instance map.
 
         Dict["flows"] contain:
-            flows (H, W, 3), HoVer-maps (2, H, W), binary mask (H, W), pixel_loc (2, H, W)
+            flows (H, W, 3), 
+            HoVer-maps (2, H, W), 
+            binary mask (H, W), 
+            pixel_loc (2, H, W)
     """
     # Flip channels which are "YX" to "XY" and convert channels to CHW
     dp = hover_map[..., (1, 0)].transpose(2, 0, 1)

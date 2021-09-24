@@ -8,15 +8,17 @@ import src.dl.utils as util
 # import src.dl.inference.tta as tta
 
 
-def compute_pyramid_patch_weight_loss(width: int, height: int) -> np.ndarray:
+def compute_pyramid_patch_weight_loss(
+        width: int, 
+        height: int
+    ) -> np.ndarray:
     """
-    Compute a weight matrix that assigns bigger weight on pixels in center and
-    less weight to pixels on image boundary. This weight matrix is used for merging
-    individual tile predictions and helps dealing with prediction artifacts on tile
-    boundaries.
+    Compute a weight matrix that assigns bigger weight on pixels in 
+    center and less weight to pixels on image boundary. This weight 
+    matrix is used for merging individual tile predictions and helps 
+    dealing with prediction artifacts on tile boundaries.
 
-    Ported from:
-    https://github.com/BloodAxe/pytorch-toolbelt/blob/develop/pytorch_toolbelt/inference/tiles.py
+    Ported from: pytorch-toolbelt
 
     Args:
     ----------
@@ -57,13 +59,18 @@ def compute_pyramid_patch_weight_loss(width: int, height: int) -> np.ndarray:
 
 
 class Predictor:
-    def __init__(self, model: nn.Module, patch_size: Tuple[int]=(256, 256)) -> None:
+    def __init__(
+            self, 
+            model: nn.Module, 
+            patch_size: 
+            Tuple[int]=(256, 256)
+        ) -> None:
         """
         Helper class for predicting soft masks at inference time
         
         Contains a weight matrix that can assign bigger weight on pixels
-        in center and less weight to pixels on image boundary. helps dealing with
-        prediction artifacts on tile boundaries.
+        in center and less weight to pixels on image boundary. helps
+        dealing with prediction artifacts on tile boundaries.
 
         Args:
         ------------
@@ -71,18 +78,26 @@ class Predictor:
                 nn.Module pytorch model
         """
         self.model = model
-        weight_mat = compute_pyramid_patch_weight_loss(patch_size[0], patch_size[1])
-        self.weight_mat = torch.from_numpy(weight_mat).float().to(self.model.device).unsqueeze(0).unsqueeze(0)
+        weight_mat = compute_pyramid_patch_weight_loss(
+            patch_size[0], patch_size[1]
+        )
+
+        self.weight_mat = torch.from_numpy(weight_mat).float().to(
+            self.model.device
+        ).unsqueeze(0).unsqueeze(0)
 
 
-    def forward_pass(self, 
-                     patch: Union[np.ndarray, torch.Tensor],
-                     norm: bool=False,
-                     mean: np.ndarray=None,
-                     std: np.ndarray=None) -> Dict[str, torch.Tensor]:
+    def forward_pass(
+            self, 
+            patch: Union[np.ndarray, torch.Tensor],
+            norm: bool=False,
+            mean: np.ndarray=None,
+            std: np.ndarray=None
+        ) -> Dict[str, torch.Tensor]:
         """
-        Input an image patch or batch of patches to the network and return logits.
-        patch input_size likely to be 256x256 depending how the images were patched
+        Input an image patch or batch of patches to the network and 
+        return logits. Patch input_size likely to be 256x256 depending 
+        how the images were patched
 
         Args:
         -----------
@@ -93,33 +108,44 @@ class Predictor:
                 Normalize input data. Set to True only if input data was
                 normalized in the training phase.
             mean (np.ndarray): 
-                Means for each channel. Shape (1, 3). Ignored id norm = False
+                Means for each channel. Shape (1, 3). Ignored id norm is
+                False
             std (np.ndarray): 
-                Standard deviations for each channel. Shape (1, 3). Ignored if norm = False
+                Standard deviations for each channel. Shape (1, 3). 
+                Ignored if norm = False
 
         Returns:
         -----------
-            A dictionary {"instances":Tensor, "types":Union[Tensor, None], "aux":Union[Tensor, None]}
+            Dict: example:  
+            
+            {
+                "instances":Tensor,
+                "types":Union[Tensor, None],
+                "aux":Union[Tensor, None]
+            }
         """
         if isinstance(patch, np.ndarray):
-            patch = util.ndarray_to_tensor(patch)  # (B, 3, H, W) | (1, 3, H, W)
+            # (B, 3, H, W)|(1, 3, H, W)
+            patch = util.ndarray_to_tensor(patch)
 
         if norm:
             for i in range(patch.shape[0]):
                 patch[i] = util.minmax_normalize_torch(patch[i])
             
         input_tensor = util.to_device(patch) # to cpu|gpu
-        return self.model(input_tensor)  # Dict[(B, 2, H, W), (B, C, H, W)]
+        return self.model(input_tensor) # {[(B, 2, H, W), (B, C, H, W)]}
 
-    def classify(self, 
-                 patch: torch.Tensor, 
-                 act: Union[str, None]="softmax", 
-                 apply_weights: bool=False,
-                 to_cpu: bool=False) -> np.ndarray:
+    def classify(
+            self, 
+            patch: torch.Tensor, 
+            act: Union[str, None]="softmax", 
+            apply_weights: bool=False,
+            to_cpu: bool=False
+        ) -> np.ndarray:
         """
-        Take in a patch or a batch of patches of logits produced by the model and
-        use sigmoid activation for instance logits and softmax for semantic logits
-        and convert the output to numpy nd.array.
+        Take in a patch or a batch of patches of logits produced by the
+        model and use sigmoid activation for instance logits and softmax
+        for semantic logits and convert the output to numpy nd.array.
 
         Args:
         -----------
@@ -127,14 +153,17 @@ class Predictor:
                 a tensor of logits produced by the network.
                 Shape: (B, C, input_size, input_size)
             act (str or None, default="softmax"):
-                activation to be used. One of ("sigmoid", "softmax", None)
+                activation to be used. One of: "sigmoid", "softmax" or 
+                None
             apply_weights (bool, default=True):
-                apply a weight matrix that assigns bigger weight on pixels
-                in center and less weight to pixels on image boundary. helps dealing with
-                prediction artifacts on tile boundaries.
+                apply a weight matrix that assigns bigger weight on
+                pixels in center and less weight to pixels on image
+                boundary. helps dealing with prediction artifacts on
+                tile boundaries.
             to_cpu (str, default=False):
-                Detach tensor from gpu to cpu. If batch_size is very large this can be used
-                to avoid memory errors during inference.
+                Detach tensor from gpu to cpu. If batch_size is very
+                large this can be used to avoid memory errors during
+                inference.
 
         Returns:
         -----------
@@ -154,7 +183,9 @@ class Predictor:
         if apply_weights:
             # work out the tensor shape first for the weight mat
             B, C = pred.shape[:2]
-            W = torch.repeat_interleave(self.weight_mat, repeats=C, dim=1).repeat_interleave(repeats=B, dim=0)
+            W = torch.repeat_interleave(
+                self.weight_mat, repeats=C, dim=1
+            ).repeat_interleave(repeats=B, dim=0)
             pred *= W
 
         # from gpu to cpu
@@ -166,7 +197,11 @@ class Predictor:
         return pred 
 
     # TODO: DOES NOT WORK CURRENTLY! FIX! TORCH IMPLEMENTATION PREFERRED
-    def tta_classify(self, patch: np.ndarray, branch_key: str = "instances") -> np.ndarray:
+    def tta_classify(
+            self, 
+            patch: np.ndarray, 
+            branch_key: str = "instances"
+        ) -> Dict[str, torch.Tensor]:
         """
         Tta ensemble prediction pipeline.
     
@@ -180,7 +215,12 @@ class Predictor:
 
         Returns:
         ------------
-            A dictionary {"instances":Tensor, "types":Union[Tensor, None], "aux":Union[Tensor, None]}
+            Dict: example: 
+            {
+                "instances":Tensor, 
+                "types":Union[Tensor, None], 
+                "aux":Union[Tensor, None]
+            }
         
         Following instructions of 'beneficial augmentations' from:
         

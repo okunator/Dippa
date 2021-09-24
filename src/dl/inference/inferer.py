@@ -14,7 +14,6 @@ from src.utils import FileHandler, mask2geojson, mask2mat
 from src.patching import TilerStitcherTorch
 from src.metrics import Benchmarker
 from src.dl.utils import tensor_to_ndarray
-
 from .post_processing.processor_builder import PostProcBuilder
 from .predictor import Predictor
 

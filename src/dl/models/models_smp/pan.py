@@ -23,68 +23,73 @@ THE SOFTWARE.
 """
 
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from typing import List, Tuple, Optional, Union
+from typing import Optional, Union
 from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.base import SegmentationHead
 from segmentation_models_pytorch.pan.decoder import PANDecoder
 
 from ..base_model import MultiTaskSegModel
 
-# adapted from https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/pan/model.py
 
 class PanSmpMulti(MultiTaskSegModel):
-    def __init__(self,
-                 encoder_name: str = "resnet34",
-                 encoder_weights: str = "imagenet",
-                 encoder_dilation: bool = True,
-                 decoder_channels: int = 32,
-                 in_channels: int = 3,
-                 classes: int = 2,
-                 activation: Optional[Union[str, callable]] = None,
-                 upsampling: int = 4,
-                 type_branch: bool = True,
-                 aux_branch: bool = True,
-                 aux_out_channels: int = 1,
-                 **kwargs) -> None:
+    def __init__(
+            self,
+            encoder_name: str="resnet34",
+            encoder_weights: str="imagenet",
+            encoder_dilation: bool=True,
+            decoder_channels: int=32,
+            in_channels: int=3,
+            classes: int=2,
+            activation: Optional[Union[str, callable]]=None,
+            upsampling: int=4,
+            type_branch: bool=True,
+            aux_branch: bool=True,
+            aux_out_channels: int=1,
+            **kwargs
+        ) -> None:
 
         """ 
         Implementation of _PAN (Pyramid Attention Network).
-        Currently works with shape of input tensor >= [B x C x 128 x 128] for pytorch <= 1.1.0
-        and with shape of input tensor >= [B x C x 256 x 256] for pytorch == 1.3.1
+        Currently works with shape of in tensor >= [B x C x 128 x 128] 
+        for pytorch <= 1.1.0 and with shape of input tensor >= 
+        [B x C x 256 x 256] for pytorch == 1.3.1
 
-        This class uses https://github.com/qubvel/segmentation_models.pytorch/ implementation
-        of the model and adds a semantic segmentation branch for classifying cell types that
-        outputs type maps (B, C, H, W). Adds also an optional aux branch for regressing (B, 2, H, W) outputs
+        This class uses 
+            https://github.com/qubvel/segmentation_models.pytorch/ 
+        implementation of the model and adds a semantic segmentation 
+        branch for classifying cell types that outputs type maps. 
+        Adds also an optional auxiliary branch for regressing auxiliary 
+        outputs
 
         Args:
         -----------
             encoder_name (str, default="resnet34"):
-                name of classification model (without last dense layers) used as feature
-                extractor to build segmentation model.
+                name of classification model (without last dense layers)
+                used as feature extractor to build segmentation model.
             encoder_weights (str, optional, default="imagenet"):
-                one of ``None`` (random initialization), ``imagenet`` (pre-training on ImageNet).
+                one of ``None`` (random initialization), ``imagenet`` 
+                (pre-training on ImageNet).
             encoder_dilation (bool, default=True): 
-                Flag to use dilation in encoder last layer.
-                Doesn't work with [``*ception*``, ``vgg*``, ``densenet*``] backbones, default is True.
+                Flag to use dilation in encoder last layer. Doesn't work
+                with [``*ception*``, ``vgg*``, ``densenet*``] backbones,
+                default is True.
             decoder_channels (int, default=32):
                 Number of ``Conv2D`` layer filters in decoder blocks
             in_channels (int, default=3): 
                 number of input channels for model, default is 3.
             classes (int, default=2): 
-                a number of classes for output (output shape - ``(batch, classes, h, w)``).
+                a number of classes for output (output shape - 
+                ``(batch, classes, h, w)``).
             activation (str, callable, optional, default=None): 
-                activation function used in ``.predict(x)`` method for inference.
-                One of [``sigmoid``, ``softmax2d``, callable, None]
+                activation function used in ``.predict(x)`` method for
+                inference. One of [``sigmoid``, ``softmax2d``, callable, None]
             upsampling (int, default=4): 
-                optional, final upsampling factor
-                (default is 4 to preserve input -> output spatial shape identity)
+                optional, final upsampling factor. Default is 4 to 
+                preserve input -> output spatial shape identity
             type_branch (bool, default=True)
-                if True, type cls decoder branch is added to the network
+                if True, type cls branch is added to the decoder
             aux_branch (bool, default=True)
-                if True, auxiliary decoder branch is added to the network
+                if True, auxiliary branch is added to the decoder
             aux_out_channels (int, default=1):
                 number of output channels from the auxiliary branch
             

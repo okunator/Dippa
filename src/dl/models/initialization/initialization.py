@@ -1,4 +1,5 @@
-# ported from https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/base/initialization.py
+# ported from 
+# https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/base/initialization.py
 import torch.nn as nn
 
 def initialize_decoder(module: nn.Module):
