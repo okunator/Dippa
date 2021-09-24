@@ -149,9 +149,3 @@ class PostProcessor(ABC):
             np.ndarray: cleaned up inst map. Shape (H, W)
         """
         return remove_debris(inst_map, min_size)
-
-
-        
-
-
-    

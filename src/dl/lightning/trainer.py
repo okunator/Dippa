@@ -14,7 +14,8 @@ class SegTrainer:
             num_gpus: int,
             num_epochs: int,
             resume_training: bool,
-            extra_callbacks: List[pl.Callback]=None
+            extra_callbacks: List[pl.Callback]=None,
+            wandb_logger: bool=False
         ) -> None:
         """
         Initializes lightning trainer based on the experiment.yml
@@ -33,6 +34,8 @@ class SegTrainer:
                 resume training where you left off
             extra_callbacks (List[pl.CallBack], default=None):
                 List of extra callbacks to add to the Trainer
+            wandb_logger (bool, default=False):
+                Flag to use also wandb logger.
         """
         # init paths
         exp_dir = FileHandler.get_experiment_dir(
@@ -41,23 +44,36 @@ class SegTrainer:
         )
 
         # set test tube logger
-        self.tt_logger = pl.loggers.TestTubeLogger(
-            save_dir=FileHandler.result_dir(),
-            name=experiment_name,
-            version=experiment_version
+        self.loggers = []
+        self.loggers.append(
+            pl.loggers.TestTubeLogger(
+                save_dir=FileHandler.result_dir(),
+                name=experiment_name,
+                version=experiment_version
+            )
         )
 
+        if wandb_logger:
+            self.loggers.append(
+                pl.loggers.WandbLogger(
+                    save_dir=exp_dir,
+                    project=experiment_name,
+                    name=experiment_version,
+                    log_model="all"
+                )
+            )
+        
         self.ckpt_dir = exp_dir
 
         # set checkpoint callback
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
-            dirpath = self.ckpt_dir,
-            save_top_k = 1,
-            save_last = True,
-            verbose = True, 
-            monitor = 'avg_val_loss',
-            mode = 'min',
-            prefix = ''
+            dirpath=self.ckpt_dir,
+            save_top_k=1,
+            save_last=True,
+            verbose=True, 
+            monitor='val_loss',
+            mode='min',
+            prefix=''
         )
 
         # set gpu monitoring callback
@@ -104,13 +120,14 @@ class SegTrainer:
         
         Returns:
         --------
-            The SegTrainer instance.
+            pl.Trainer: The SegTrainer instance.
         """
         experiment_name = conf.experiment_args.experiment_name
         experiment_version = conf.experiment_args.experiment_version
         num_gpus = conf.runtime_args.num_gpus
         num_epochs = conf.runtime_args.num_epochs
         resume_training = conf.runtime_args.resume_training
+        wandb_logger = conf.runtime_args.wandb
 
         c = cls(
             experiment_name,
@@ -118,13 +135,14 @@ class SegTrainer:
             num_gpus,
             num_epochs,
             resume_training,
-            extra_callbacks
+            extra_callbacks,
+            wandb_logger
         )
 
         return pl.Trainer(
             max_epochs=c.epochs,
             gpus=c.gpus,
-            logger=c.tt_logger,
+            logger=c.loggers,
             callbacks=c.callbacks,
             resume_from_checkpoint=c.last_ckpt,
             log_gpu_memory=True,

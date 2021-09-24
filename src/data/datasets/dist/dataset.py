@@ -44,7 +44,7 @@ class DistDataset(BaseDataset):
            background
         6. augment
         """
-        im_patch, inst_patch, type_patch = self.read_patch(self.fname, index)
+        im_patch, inst_patch, type_patch, _ = self.read_patch(self.fname, index)
         inst_patch = self.fix_mirror_pad(inst_patch)
         weight_map = self.generate_weight_map(self.remove_overlaps(inst_patch))
 

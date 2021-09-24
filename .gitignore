@@ -32,4 +32,5 @@ notebooks/tests/
 README.txt
 Dippa.egg-info
 DippaEnv
+wandb
 .vscode

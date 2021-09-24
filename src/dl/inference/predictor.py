@@ -62,8 +62,7 @@ class Predictor:
     def __init__(
             self, 
             model: nn.Module, 
-            patch_size: 
-            Tuple[int]=(256, 256)
+            patch_size: Tuple[int]=(256, 256)
         ) -> None:
         """
         Helper class for predicting soft masks at inference time
@@ -76,6 +75,8 @@ class Predictor:
         ------------
             model (nn.Module):
                 nn.Module pytorch model
+            patch_size (Tuple[int, int]):
+                The shape of the input patch
         """
         self.model = model
         weight_mat = compute_pyramid_patch_weight_loss(

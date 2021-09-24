@@ -50,13 +50,14 @@ class DatasetBuilder:
         """
         kwargs={"height":256, "width":256}
 
-        augs_list = []
+        aug_list = []
         if augs_list:
             aug_list = [
                 ds.__dict__[ds.AUGS_LOOKUP[aug_name]](**kwargs) 
                 for aug_name in augs_list
             ] 
-        aug_list.append(ds.to_tensor()) 
+        aug_list.append(ds.to_tensor())
+
         return ds.compose(aug_list)
 
     @classmethod
@@ -91,6 +92,7 @@ class DatasetBuilder:
         """
         c = cls(decoder_aux_branch)
         aug = c.get_augs(augmentations)
+
         return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](
             fname=fname, 
             transforms=aug, 
@@ -125,6 +127,7 @@ class DatasetBuilder:
         """
         c = cls(decoder_aux_branch)
         aug = c.get_augs()
+
         return ds.__dict__[ds.DS_LOOKUP[c.ds_name]](
             fname=fname, 
             transforms=aug, 

@@ -2,7 +2,7 @@ import torch
 import torch.optim as optim
 import pandas as pd
 import pytorch_lightning as pl
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from pathlib import Path
 from omegaconf import DictConfig
 
@@ -399,10 +399,10 @@ class SegModel(pl.LightningModule):
         return self.model(x)
 
     def step(
-            self, 
-            batch: torch.Tensor,
+            self,
+            batch: Dict[str, torch.Tensor],
             batch_idx: int,
-            phase:str
+            phase: str
         ) -> Dict[str, torch.Tensor]:
         """
         General training step
@@ -430,15 +430,15 @@ class SegModel(pl.LightningModule):
                 aux_target = aux_target.unsqueeze(dim=1)
 
         # Forward pass
-        soft_mask = self.forward(x)
+        soft_masks = self.forward(x)
 
         # Compute loss
         loss = self.criterion(
-            yhat_inst=soft_mask["instances"], 
+            yhat_inst=soft_masks["instances"], 
             target_inst=inst_target, 
-            yhat_type=soft_mask["types"],
+            yhat_type=soft_masks["types"],
             target_type=type_target, 
-            yhat_aux=soft_mask["aux"],
+            yhat_aux=soft_masks["aux"],
             target_aux=aux_target,
             target_weight=target_weight,
             edge_weight=1.1
@@ -447,104 +447,62 @@ class SegModel(pl.LightningModule):
         # Compute metrics for monitoring
         key = "types" if self.decoder_type_branch else "instances" 
         type_iou = self.metrics[f"{phase}_iou"](
-            soft_mask[key], type_target, "softmax"
+            soft_masks[key], type_target, "softmax"
         )
         type_acc = self.metrics[f"{phase}_acc"](
-            soft_mask[key], type_target, "softmax"
+            soft_masks[key], type_target, "softmax"
         )
 
         return {
-            "loss":loss,
-            "accuracy":type_acc,
-            "mean_iou":type_iou
+            "soft_masks": soft_masks,
+            "loss": loss,
+            "accuracy": type_acc,
+            "mean_iou": type_iou
         }
 
-    def step_return_dict(
-            self, 
-            z: torch.Tensor, 
-            phase: str
-        ) -> Dict[str, torch.Tensor]:
-        """
-        Batch level metrics
-        """
-        logs = {
-            f"{phase}_loss": z["loss"],
-            f"{phase}_accuracy": z["accuracy"],
-            f"{phase}_mean_iou": z["mean_iou"],
-        }
-
-        prog_bar = phase == "train"
-        self.log_dict(
-            logs, on_step=True, on_epoch=True, prog_bar=prog_bar, logger=True
-        )
-
-        return {
-            "loss": z["loss"],
-            "accuracy": z["accuracy"],
-            "mean_iou": z["mean_iou"],
-        }
-
-    def epoch_end(
-            self, 
-            outputs: torch.Tensor, 
-            phase: str
-        ) -> Dict[str, torch.Tensor]:
-        """
-        Full train data metrics
-        """
-        accuracy = torch.stack([x["accuracy"] for x in outputs]).mean()
-        iou = torch.stack([x["mean_iou"] for x in outputs]).mean()
-        loss = torch.stack([x["loss"] for x in outputs]).mean()
-
-        logs = {
-            f"avg_{phase}_loss": loss,
-            f"avg_{phase}_accuracy": accuracy,
-            f"avg_{phase}_iou": iou,
-        }
-
-        self.log_dict(
-            logs, on_step=False, on_epoch=True, prog_bar=False, logger=True
-        )
-        return {f"avg_{phase}_loss": loss}
-    
     def training_step(
-            self, 
-            train_batch: torch.Tensor, 
+            self,
+            batch: Dict[str, torch.Tensor],
             batch_idx: int
         ) -> Dict[str, torch.Tensor]:
-        """Training step"""
-        z = self.step(train_batch, batch_idx, "train")
-        return_dict = self.step_return_dict(z, "train")
-        return return_dict
+        """
+        Training step
+        """
+        res = self.step(batch, batch_idx, "train")
+        self.log("train_loss", res["loss"], prog_bar=True)
+        self.log("train_miou", res["mean_iou"], prog_bar=True)
+        self.log("train_accuracy", res["accuracy"], prog_bar=True)
+
+        return res["loss"]
 
     def validation_step(
-            self, 
-            val_batch: torch.Tensor, 
+            self,
+            batch: Dict[str, torch.Tensor],
             batch_idx: int
         ) -> Dict[str, torch.Tensor]:
-        """Validation step"""
-        z = self.step(val_batch, batch_idx, "val")
-        return_dict = self.step_return_dict(z, "val")
-        return return_dict
+        """
+        Validation step
+        """
+        res = self.step(batch, batch_idx, "val")
+        self.log("val_loss", res["loss"], prog_bar=False)
+        self.log("val_miou", res["mean_iou"], prog_bar=False)
+        self.log("val_accuracy", res["accuracy"], prog_bar=False)
+
+        return res["soft_masks"]
 
     def test_step(
-            self, 
-            test_batch: torch.Tensor, 
+            self,
+            batch: Dict[str, torch.Tensor], 
             batch_idx: int
         ) -> Dict[str, torch.Tensor]:
-        """Test step"""
-        z = self.step(test_batch, batch_idx, "test")
-        return_dict = self.step_return_dict(z, "test")
-        return return_dict
-    
-    def training_epoch_end(self, outputs: torch.Tensor) -> None:
-        self.epoch_end(outputs, "train")
-        
-    def validation_epoch_end(self, outputs: torch.Tensor) -> None:
-        self.epoch_end(outputs, "val")
+        """
+        Test step
+        """
+        res = self.step(batch, batch_idx, "test")
+        self.log("test_loss", res["loss"], prog_bar=False)
+        self.log("test_miou", res["mean_iou"], prog_bar=False)
+        self.log("test_accuracy", res["accuracy"], prog_bar=False)
 
-    def test_epoch_end(self, outputs: torch.Tensor) -> None:
-        self.epoch_end(outputs, "test")
 
     def configure_optimizers(self):
         optimizer = OptimizerBuilder.set_optimizer(
@@ -564,7 +522,7 @@ class SegModel(pl.LightningModule):
                 factor=self.scheduler_factor, 
                 patience=self.scheduler_patience
             ),
-            "monitor": "avg_val_loss",
+            "monitor": "val_loss",
             "interval": "epoch",
             "frequency": 1
         }
@@ -583,4 +541,36 @@ class SegModel(pl.LightningModule):
             edge_weight=self.edge_weight
         )
         return loss
+
+    # def epoch_end(
+    #         self, 
+    #         outputs: torch.Tensor, 
+    #         phase: str
+    #     ) -> Dict[str, torch.Tensor]:
+    #     """
+    #     Full train data metrics
+    #     """
+    #     accuracy = torch.stack([x["accuracy"] for x in outputs]).mean()
+    #     iou = torch.stack([x["mean_iou"] for x in outputs]).mean()
+    #     loss = torch.stack([x["loss"] for x in outputs]).mean()
+
+    #     logs = {
+    #         f"avg_{phase}_loss": loss,
+    #         f"avg_{phase}_accuracy": accuracy,
+    #         f"avg_{phase}_iou": iou,
+    #     }
+
+    #     self.log_dict(
+    #         logs, on_step=False, on_epoch=True, prog_bar=False, logger=True
+    #     )
+    #     return {f"avg_{phase}_loss": loss}
+    
+    # def training_epoch_end(self, outputs: torch.Tensor) -> None:
+    #     self.epoch_end(outputs, "train")
+        
+    # def validation_epoch_end(self, outputs: torch.Tensor) -> None:
+    #     self.epoch_end(outputs, "val")
+
+    # def test_epoch_end(self, outputs: torch.Tensor) -> None:
+    #     self.epoch_end(outputs, "test")
         

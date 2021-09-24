@@ -121,9 +121,11 @@ class FileHandler:
         return Path(RESULT_DIR)
 
     @staticmethod
-    def get_model_checkpoint(experiment: str, 
-                             version: str, 
-                             which: str = "last") -> Path:
+    def get_model_checkpoint(
+            experiment: str,
+            version: str,
+            which: str="last"
+        ) -> Path:
 
         assert which in ("best", "last"), (
             f"param which: {which} not one of ('best', 'last')"
@@ -131,7 +133,9 @@ class FileHandler:
 
         experiment_dir = Path(f"{RESULT_DIR}/{experiment}/version_{version}")  
         assert experiment_dir.exists(), (
-            f"Experiment dir: {experiment_dir.as_posix()} does not exist."
+            f"Experiment dir: {experiment_dir.as_posix()} does not exist.",
+            "It might be that you have `resume_training` set to True",
+            "but you are trying to run the experiment for the first time."
         )
 
         cpt = None
