@@ -178,7 +178,7 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
             img_dir=img_dir,
             mask_dir=mask_dir,
             save_dir=save_dir,
-            file_name=f"{phase}_pannuke",
+            file_name=f"{phase}_kumar",
             classes=classes,
             patch_shape=None,
             stride_size=None,

@@ -128,6 +128,7 @@ class SegTrainer:
         num_epochs = conf.runtime_args.num_epochs
         resume_training = conf.runtime_args.resume_training
         wandb_logger = conf.runtime_args.wandb
+        metrics_to_cpu = conf.runtime_args.metrics_to_cpu
 
         c = cls(
             experiment_name,
@@ -146,6 +147,7 @@ class SegTrainer:
             callbacks=c.callbacks,
             resume_from_checkpoint=c.last_ckpt,
             log_gpu_memory=True,
-            profiler=True #pl.profiler.AdvancedProfiler(),
+            profiler=True, #pl.profiler.AdvancedProfiler(),
+            move_metrics_to_cpu=metrics_to_cpu
             # fast_dev_run=False
         )

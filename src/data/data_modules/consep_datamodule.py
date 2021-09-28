@@ -253,7 +253,7 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
         fold1 = self.download(self.download_dir, convert_classes=self.convert_classes)
 
         # Write dbs if they dont yet exist
-        if self.db_fname_train.exists():
+        if not self.db_fname_train.exists():
             self.write_db(
                 img_dir=fold1["img_train"],
                 mask_dir=fold1["mask_train"],

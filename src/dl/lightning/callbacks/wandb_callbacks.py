@@ -1,36 +1,58 @@
 import wandb
 import torch
 import pytorch_lightning as pl
+from typing import Dict
 
 
 class WandbImageCallback(pl.Callback):
     """
-    Logs the input and output images of a module.
-    
-    Images are stacked into a mosaic, with output on the top
-    and input on the bottom.
+    Logs the inputs and outputs of the model
+    at the first validation batch
     """
-    
-    def __init__(self, val_samples, max_samples=32):
-        super().__init__()
-        self.val_imgs, _ = val_samples
-        self.val_imgs = self.val_imgs[:max_samples]
-          
-    def on_validation_end(
+    def on_validation_batch_end(
             self,
             trainer: pl.Trainer,
-            pl_module: pl.LightningModule
+            pl_module: pl.LightningModule,
+            outputs: Dict[str, torch.Tensor],
+            batch: Dict[str, torch.Tensor],
+            batch_idx: int,
+            dataloader_idx: int,
         ) -> None:
         """
         
         """
-        val_imgs = self.val_imgs.to(device=pl_module.device)
-        outs = pl_module(val_imgs)
-    
-        mosaics = torch.cat([outs, val_imgs], dim=-2)
-        caption = "Top: Output, Bottom: Input"
-        trainer.logger.experiment.log({
-            "val/examples": [wandb.Image(mosaic, caption=caption) 
-                              for mosaic in mosaics],
-            "global_step": trainer.global_step
+        if batch_idx == 0:
+            img = batch["image"].float().to(device="cpu")
+            inst_target = batch["binary_map"].long().to(device="cpu")
+            type_target = batch["type_map"].long().to(device="cpu")
+            soft_insts = outputs["instances"].to(device="cpu")
+            soft_types = outputs["types"].to(device="cpu")
+            insts = torch.argmax(soft_insts, dim=1)
+            types = torch.argmax(soft_types, dim=1)
+            gts = torch.stack([inst_target, type_target], dim=1).long()
+            preds = torch.stack([insts, types], dim=1).long()
+
+            trainer.logger.experiment[1].log({
+                "val/soft_insts": [
+                    wandb.Image(si[1, ...], caption="soft inst masks") 
+                    for si in soft_insts
+                ],
+                "val/soft_types": [
+                    wandb.Image(st[i, ...], caption="Soft type masks") 
+                    for st in soft_types
+                    for i in range(st.shape[0])
+                ],
+                "val/preds": [
+                    wandb.Image(pred[i, ...].float(), caption="Predictions") 
+                    for pred in preds
+                    for i in range(pred.shape[0])
+                ],
+                "val/GT": [
+                    wandb.Image(gt[i, ...].float(), caption="Ground truths") 
+                    for gt in gts
+                    for i in range(gt.shape[0])
+                ],
+                "val/img": [wandb.Image(img, caption="Input img")],
+                "global_step": trainer.global_step
             })
+

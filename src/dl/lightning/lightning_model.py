@@ -2,7 +2,7 @@ import torch
 import torch.optim as optim
 import pandas as pd
 import pytorch_lightning as pl
-from typing import List, Dict, Tuple
+from typing import List, Dict
 from pathlib import Path
 from omegaconf import DictConfig
 
@@ -292,12 +292,12 @@ class SegModel(pl.LightningModule):
             self.valid_miou = miou.clone()
 
             self.metrics = {
-                "train_acc":self.train_acc,
-                "test_acc":self.test_acc,
-                "val_acc":self.valid_acc,
-                "train_iou":self.train_miou,
-                "test_iou":self.test_miou,
-                "val_iou":self.valid_miou,
+                "train_acc": self.train_acc,
+                "test_acc": self.test_acc,
+                "val_acc": self.valid_acc,
+                "train_iou": self.train_miou,
+                "test_iou": self.test_miou,
+                "val_iou": self.valid_miou,
             }
 
     @classmethod
@@ -454,7 +454,7 @@ class SegModel(pl.LightningModule):
         )
 
         return {
-            "soft_masks": soft_masks,
+            "soft_masks": soft_masks if phase == "val" else None,
             "loss": loss,
             "accuracy": type_acc,
             "mean_iou": type_iou
@@ -473,7 +473,11 @@ class SegModel(pl.LightningModule):
         self.log("train_miou", res["mean_iou"], prog_bar=True)
         self.log("train_accuracy", res["accuracy"], prog_bar=True)
 
-        return res["loss"]
+        return {
+            "accuracy": res["accuracy"],
+            "miou": res["mean_iou"],
+            "loss": res["loss"]
+        }
 
     def validation_step(
             self,
@@ -502,8 +506,7 @@ class SegModel(pl.LightningModule):
         self.log("test_loss", res["loss"], prog_bar=False)
         self.log("test_miou", res["mean_iou"], prog_bar=False)
         self.log("test_accuracy", res["accuracy"], prog_bar=False)
-
-
+        
     def configure_optimizers(self):
         optimizer = OptimizerBuilder.set_optimizer(
             optimizer_name=self.optimizer_name,
@@ -541,36 +544,3 @@ class SegModel(pl.LightningModule):
             edge_weight=self.edge_weight
         )
         return loss
-
-    # def epoch_end(
-    #         self, 
-    #         outputs: torch.Tensor, 
-    #         phase: str
-    #     ) -> Dict[str, torch.Tensor]:
-    #     """
-    #     Full train data metrics
-    #     """
-    #     accuracy = torch.stack([x["accuracy"] for x in outputs]).mean()
-    #     iou = torch.stack([x["mean_iou"] for x in outputs]).mean()
-    #     loss = torch.stack([x["loss"] for x in outputs]).mean()
-
-    #     logs = {
-    #         f"avg_{phase}_loss": loss,
-    #         f"avg_{phase}_accuracy": accuracy,
-    #         f"avg_{phase}_iou": iou,
-    #     }
-
-    #     self.log_dict(
-    #         logs, on_step=False, on_epoch=True, prog_bar=False, logger=True
-    #     )
-    #     return {f"avg_{phase}_loss": loss}
-    
-    # def training_epoch_end(self, outputs: torch.Tensor) -> None:
-    #     self.epoch_end(outputs, "train")
-        
-    # def validation_epoch_end(self, outputs: torch.Tensor) -> None:
-    #     self.epoch_end(outputs, "val")
-
-    # def test_epoch_end(self, outputs: torch.Tensor) -> None:
-    #     self.epoch_end(outputs, "test")
-        

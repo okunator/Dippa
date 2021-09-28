@@ -1,6 +1,6 @@
 import pooch
 from pathlib import Path
-from typing import Union, Dict
+from typing import Union
 
 from .adhoc import handle_consep
 from .base_downloader import BaseDownloader

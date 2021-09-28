@@ -23,7 +23,7 @@ model_args:
       preactivate: False        # If True, BN & RELU applied before CONV
       short_skips: null         # One of (residual, dense, null) (for decoder branch only)
       long_skips: unet          # One of (unet, unet++, unet3+, null)
-      merge_policy: concatenate # One of (summation, concatenate) (for long skips)
+      merge_policy: summation   # One of (summation, concatenate) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
       decoder_channels:         # Number of out channels for every decoder layer
         - 256
@@ -59,13 +59,14 @@ training_args:
     edge_weight: null         # (float|null) Give penalty to nuclei borders in cross-entropy based losses
 
 runtime_args:
-  resume_training: False
-  num_epochs: 1
+  resume_training: True
+  num_epochs: 4
   num_gpus: 1
   batch_size: 4
   num_workers: 4              # number workers for data loader
   model_input_size: 256       # size of the model input (input_size, input_size)
   db_type: hdf5               # The type of the input data db. One of (hdf5, zarr).
   wandb: True                 # Wandb logging
+  metrics_to_cpu: True        # Lowers GPU memory but training gets slower.
 
 
