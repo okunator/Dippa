@@ -34,3 +34,6 @@ Dippa.egg-info
 DippaEnv
 wandb
 .vscode
+Dockerfile
+.dockerignore
+docker-compose.yml

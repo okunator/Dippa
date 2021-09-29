@@ -1,5 +1,5 @@
 experiment_args:
-  experiment_name: wandb_test
+  experiment_name: wandb_test2
   experiment_version: eka
 
 dataset_args:
@@ -59,7 +59,7 @@ training_args:
     edge_weight: null         # (float|null) Give penalty to nuclei borders in cross-entropy based losses
 
 runtime_args:
-  resume_training: True
+  resume_training: False
   num_epochs: 4
   num_gpus: 1
   batch_size: 4

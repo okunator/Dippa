@@ -90,6 +90,7 @@ def mask2mat(
     save_dir = Path(save_dir)
     new_fname = Path(fname).with_suffix(".mat").name
     fn_mask = Path(save_dir / new_fname)
+    
     scipy.io.savemat(
         file_name=fn_mask,
         mdict={
