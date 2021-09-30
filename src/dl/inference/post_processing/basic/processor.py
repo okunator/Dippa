@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Dict, Tuple, List
 
-from .post_proc import shape_index_watershed2
+from .post_proc import shape_index_watershed
 from ..base_processor import PostProcessor
 
 
@@ -51,7 +51,7 @@ class BasicPostProcessor(PostProcessor):
         type_map = maps[2]
 
         inst_map = self.threshold(prob_map)
-        inst_map = shape_index_watershed2(prob_map[..., 1], inst_map)
+        inst_map = shape_index_watershed(prob_map[..., 1], inst_map)
 
         combined = None
         if type_map is not None:

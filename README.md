@@ -46,21 +46,23 @@ pip install -r requirements.txt
 ### Training Script 
 
 ```python
-import src.dl.lightning as lightning
-from src.config import CONFIG
-
+# Insert the model to pytorch lightning
 config = CONFIG
 lightning_model = lightning.SegModel.from_conf(config)
-trainer = lightning.SegTrainer.from_conf(config)
 
-# use pannuke dataset
+
+# init the trainer and optional callbacks
+extra_callbacks = [] # add lightning callbacks in this list
+trainer = lightning.SegTrainer.from_conf(config, extra_callbacks=extra_callbacks)
+
+# Use the pannuke dataset
 pannuke = PannukeDataModule(
     database_type="hdf5",
     augmentations=["hue_sat", "non_rigid", "blur"],
     normalize=False,
 )
 
-# Train the model. the dataset will be downloaded at first run
+# Train
 trainer.fit(model=lightning_model, datamodule=pannuke)
 ```
 
@@ -69,8 +71,8 @@ trainer.fit(model=lightning_model, datamodule=pannuke)
 
 ```yaml
 experiment_args:
-  experiment_name: testi2
-  experiment_version: radam
+  experiment_name: my_experiment
+  experiment_version: version2
 
 dataset_args:
   n_classes: 6
@@ -136,6 +138,8 @@ runtime_args:
   num_workers: 8                 # number workers for data loader
   model_input_size: 256          # size of the model input
   db_type: hdf5                  # One of (hdf5, zarr). 
+  wandb: True                    # Wandb logging
+  metrics_to_cpu: True           # Lowers GPU memory but training gets slower.
 ```
 
 ## Inference Example
@@ -148,6 +152,7 @@ import src.dl.lightning as lightning
 from src.config import CONFIG
 
 in_dir = "my_input_dir" # input directory for the image files
+gt_dir = "my_gt_dir" # This is optional. Can be None. Used for benchmarking
 exp_name = "my_experiment" # name of the experiment (directory)
 exp_version = "dense_skip_test" # name of the experiment version (sub directory inside the experiment dir)
 lightning_model = lightning.SegModel.from_experiment(name=exp_name, version=exp_version)
@@ -155,6 +160,7 @@ lightning_model = lightning.SegModel.from_experiment(name=exp_name, version=exp_
 inferer = Inferer(
     lightning_model,
     in_data_dir=in_dir,
+    gt_mask_dir=gt_dir,
     patch_size=(256, 256),
     stride_size=80,
     fn_pattern="*",
@@ -164,7 +170,6 @@ inferer = Inferer(
     loader_batch_size=1,
     loader_num_workers=1,
     model_batch_size=16,
-    n_images=32,
 )
 
 inferer.run_inference(

@@ -185,7 +185,9 @@ def geojson2mat(
         ):
             pbar.set_description("processing nuclear annotations")
             class_num = classes[props["classification"]["name"]]
+
             if isinstance(poly, shapely.geometry.multipolygon.MultiPolygon):
+                # handle multipolygons exceptions
                 for p in list(poly):
                     inst = poly2mask(
                         p.exterior.coords, target_shape, x_off, y_off
@@ -193,6 +195,15 @@ def geojson2mat(
                     inst = remove_small_objects(inst, 10)
                     inst_map[inst > 0] += (i + 1)
                     type_map[(inst > 0) & (type_map != class_num)] = class_num
+            elif isinstance(poly, shapely.geometry.linestring.LineString):
+                # handle linestring exceptions
+                coords = poly.coords[:]
+                coords.append(coords[-1])
+                p = shapely.geometry.polygon.Polygon(coords)
+                inst = poly2mask(p.exterior.coords, target_shape, x_off, y_off)
+                inst = remove_small_objects(inst, 10)
+                inst_map[inst > 0] += (i + 1)
+                type_map[(inst > 0) & (type_map != class_num)] = class_num
 
             else:
                 inst = poly2mask(

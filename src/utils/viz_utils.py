@@ -79,16 +79,11 @@ def draw_contours(
             inst_crop, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
         
-        # print(classes)
         inst_color = None
         if classes is not None:
-            #clumsy
-            class_nums = np.unique(type_map[inst_map > 0].astype("uint8"))
-            for key, val in classes.items():
-                for num in class_nums:
-                    if val == num:
-                        inst_color = KEY_COLORS[key]
-            
+            class_num = np.unique(type_map[inst > 0].astype("uint8"))[0]
+            class_name = [key for key, item in classes.items() if class_num == item][0]
+            inst_color = KEY_COLORS[class_name]
 
         if fill_contours:
             contoured_rgb = cv2.drawContours(

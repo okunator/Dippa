@@ -206,7 +206,7 @@ class Inferer(FileHandler):
         thresh: float=0.5,
         apply_weights: bool=False,
         post_proc_method: str=None,
-        n_images: int=32,
+        n_images: int=None,
         fn_pattern: str="*",
         xmax: Optional[int]=None,
         ymax: Optional[int]=None,
@@ -283,7 +283,7 @@ class Inferer(FileHandler):
                 aux_type == "hover", then the HoVer-Net and CellPose 
                 pipelines can be used. One of: None, "hover","cellpose",
                 "drfns", "dcan", "dran". 
-            n_images (int, default=32):
+            n_images (int, default=None):
                 Number of images inferred before clearing the memory. 
                 Useful if there is a large number of images in a folder.
                 The segmentation results are saved after n_images are 
@@ -343,11 +343,17 @@ class Inferer(FileHandler):
 
         self.patch_size = patch_size
         self.stride_size = stride_size
-        self.n_images = n_images
+
 
         # Set input data folder
         self.in_data_dir = in_data_dir
         
+        # Set num images inferred before clearing mem (chunk size)
+        # By default there is no chunking.
+        self.n_images = len(list(Path(self.in_data_dir).iterdir()))
+        if n_images is not None:
+            self.n_images = n_images
+
         # set gt mask folder
         self.gt_mask_dir = None
         if gt_mask_dir:
