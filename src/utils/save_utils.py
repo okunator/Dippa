@@ -40,7 +40,7 @@ def poly2mask(
 
     Returns:
     ---------
-        np.ndarray of shape (H, W)
+        np.ndarray: Shape (H, W)
     """
     nuc = np.asarray(contour) # gdp contour = xy-coord. Need to flip
 

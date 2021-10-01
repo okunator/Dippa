@@ -45,15 +45,49 @@ class FileHandler:
                 item.unlink()
 
     @staticmethod
-    def read_zarr_patch(path: str, ix: int):
+    def read_zarr_patch(path: str, ix: int) -> Tuple[np.ndarray]:
+        """
+        Read img & mask patches at index `ix` from zarr db-arrays
+
+        Args:
+        --------
+            path (str):
+                Path to the hdf5 database
+            ix (int):
+                Index for the hdf5 db-arrays
+
+        Returns:
+        --------
+            Tuple[np.ndarray]: Tuple of numpy matrices. Img is of shape
+            (H, W, 3) & masks are of shape (H, W). the order of the
+            returned matrices is img, inst, type, area.
+        """
         d = zarr.open(path, mode="r")
         im_patch = d["imgs"][ix, ...]
         inst_patch = d["insts"][ix, ...]
         type_patch = d["types"][ix, ...]
-        return im_patch, inst_patch, type_patch 
+        sem_patch = d["areas"][ix, ...]
+
+        return im_patch, inst_patch, type_patch , sem_patch
 
     @staticmethod
-    def read_h5_patch(path: str, ix: int):
+    def read_h5_patch(path: str, ix: int) -> Tuple[np.ndarray]:
+        """
+        Read img & mask patches at index `ix` from hdf5 db-arrays
+
+        Args:
+        --------
+            path (str):
+                Path to the hdf5 database
+            ix (int):
+                Index for the hdf5 db-arrays
+
+        Returns:
+        --------
+            Tuple[np.ndarray]: Tuple of numpy matrices. Img is of shape
+            (H, W, 3) & masks are of shape (H, W). the order of the
+            returned matrices is img, inst, type, area.
+        """
         with tb.open_file(path, "r") as h5:
             im_patch = h5.root.imgs[ix, ...]
             inst_patch = h5.root.insts[ix, ...]

@@ -76,11 +76,8 @@ class SegTrainer:
             prefix=''
         )
 
-        # set gpu monitoring callback
-        # gpu_callback = pl.callbacks.GPUStatsMonitor()
-
         # set attributes
-        self.callbacks = [checkpoint_callback] #, gpu_callback]
+        self.callbacks = [checkpoint_callback]
 
         if extra_callbacks is not None:
             self.callbacks += extra_callbacks
@@ -147,7 +144,7 @@ class SegTrainer:
             callbacks=c.callbacks,
             resume_from_checkpoint=c.last_ckpt,
             log_gpu_memory=True,
-            profiler=True, #pl.profiler.AdvancedProfiler(),
-            move_metrics_to_cpu=metrics_to_cpu
-            # fast_dev_run=False
+            profiler=True,
+            move_metrics_to_cpu=metrics_to_cpu,
+            **kwargs
         )

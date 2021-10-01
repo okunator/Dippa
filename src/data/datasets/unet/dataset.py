@@ -1,67 +1,75 @@
 import torch
+import albumentations as A
 from typing import List, Dict
 
 from ..base_dataset import BaseDataset 
 
 
 class UnetDataset(BaseDataset):
-    def __init__(self,
-                 fname: str,
-                 transforms: List,
-                 normalize_input: bool=False) -> None:
+    def __init__(
+            self,
+            fname: str,
+            transforms: A.Compose,
+            normalize_input: bool=False,
+            type_branch: bool=True,
+            semantic_branch: bool=False,
+            **kwargs
+    ) -> None:
         """
         Dataset where masks are pre-processed similarly to the U-net 
-        paper: https://arxiv.org/abs/1505.04597
+        paper: https://arxiv.org/abs/1505.04597.
+
+        Overrides `rm_overalps` and `edge_weights` args in the 
+        `experiment.yml`-file. Both of these args are set to `True`.
 
         Args:
         -----------
             fname (str): 
-                path to the pytables database
+                Path to the pytables database
             transforms (albu.Compose): 
-                albumentations.Compose obj (a list of augmentations)
+                Albumentations.Compose obj (a list of augmentations)
             normalize_input (bool, default=False):
-                apply percentile normalization to inmut images after 
+                apply minmax normalization to input images after 
                 transforms
+            type_branch (bool, default=False):
+                If cell type branch is included in the model, this arg
+                signals that the cell type annotations are included per
+                each dataset iter. Given that these annotations exist in
+                db
+            semantic_branch (bool, default=False):
+                If the model contains a semnatic area branch, this arg 
+                signals that the area annotations are included per each 
+                dataset iter. Given that these annotations exist in db
         """
-        super(UnetDataset, self).__init__(fname)
-        self.transforms = transforms
-        self.normalize_input = normalize_input
-
-    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
-        """
-        1. read data from hdf5/zarr file
-        2. fix duplicated instances due to mirror padding
-        3. remove overlaps in occluded nuclei and generate the weight 
-           map for the borders of overlapping nuclei
-        4. binarize input for the branch predicting foreground vs.
-           background
-        5. augment
-        """
-        im_patch, inst_patch, type_patch, _ = self.read_patch(self.fname, index)
-        inst_patch = self.fix_mirror_pad(inst_patch)
-        inst_patch = self.remove_overlaps(inst_patch)
-        weight_map = self.generate_weight_map(inst_patch)
-        
-        # binarize inst branch input
-        inst_patch = self.binary(inst_patch)
-
-        # augment
-        augmented_data = self.transforms(
-            image=im_patch, 
-            masks=[inst_patch, type_patch, weight_map]
+        super(UnetDataset, self).__init__(
+            fname,
+            transforms,
+            normalize_input,
+            type_branch,
+            semantic_branch,
+            edge_weights=True,
+            rm_touching_nuc_borders=True,
         )
-        
-        img = augmented_data["image"]
-        masks = augmented_data["masks"]
 
-        if self.normalize_input:
-            img = self.normalize(img)
+    def __getitem__(self, ix: int) -> Dict[str, torch.Tensor]:
+        """
+        Read and pre-process all the data and apply augmentations.
+        Generates weight maps for loss weighting and remove overlapping
+        nuclei borders.
 
-        result = {
-            "image": img,
-            "binary_map": torch.from_numpy(masks[0]),
-            "type_map": torch.from_numpy(masks[1]),
-            "weight_map": torch.from_numpy(masks[2]),
-            "filename": self.fname
-        }
-        return result
+        Args:
+        --------
+            ix (int):
+                index of the iterable dataset
+
+        Returns:
+        --------
+            Dict: A dictionary containing all the augmented data patches
+                  (torch.Tensor) and the filename of the patches
+        """
+        data = self._get_and_preprocess(ix)
+        aug_data = self._augment(data)
+
+        return aug_data
+
+

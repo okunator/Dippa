@@ -50,7 +50,7 @@ def gen_dist_maps(
 
     Returns:
     ----------
-        np.ndarray: distance maps of nuclei
+        np.ndarray: distance maps of nuclei. Shape (H, W)
     """
 
     if inst_map.shape[0] > crop_shape[0]: 

@@ -19,6 +19,8 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
             augmentations: List[str]=["hue_sat", "non_rigid", "blur"],
             normalize: bool=False,
             aux_branch: str=True,
+            rm_touching_nuc_borders: bool=False,
+            edge_weights: bool=False,
             batch_size: int=8,
             num_workers: int=8,
             download_dir: Union[str, Path]=None, 
@@ -52,7 +54,14 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
                 an auxiliary branch in the __getitem__ method. One of: 
                 "hover", "dist", "contour", None. If None, assumes that
                 the network does not contain auxiliary branch and the
-                unet style dataset (edge weights) is used as the dataset 
+                unet style dataset (edge weights) is used as the dataset
+            rm_touching_nuc_borders (bool, default=False):
+                If True, the pixels that are touching between distinct
+                nuclear objects are removed from the masks.
+            edge_weights (bool, default=False):
+                If True, each dataset iteration will create weight maps
+                for the nuclear edges. This can be used to penalize
+                nuclei edges in cross-entropy based loss functions.
             batch_size (int, default=8):
                 Batch size for the dataloader
             num_workers (int, default=8):
@@ -88,6 +97,8 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
         self.augs = augmentations
         self.norm = normalize
         self.aux_branch = aux_branch
+        self.edge_weights = edge_weights
+        self.rm_touching_nuc_borders = rm_touching_nuc_borders
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.suffix = ".h5" if self.database_type == "hdf5" else ".zarr"
@@ -205,20 +216,35 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
 
     def setup(self, stage: Optional[str] = None) -> None:
         self.trainset = DatasetBuilder.set_train_dataset(
-            aux_branch=self.aux_branch,
-            augmentations=self.augs,
             fname=self.db_fname_train.as_posix(),
-            norm=self.norm
+            decoder_aux_branch=self.aux_branch,
+            augmentations=self.augs,
+            normalize_input=self.norm,
+            rm_touching_nuc_borders=self.rm_touching_nuc_borders,
+            edge_weights=self.edge_weights,
+            type_branch=False,
+            semantic_branch=False
+
         )
         self.validset = DatasetBuilder.set_test_dataset(
-            aux_branch=self.aux_branch,
             fname=self.db_fname_test.as_posix(),
-            norm=self.norm
+            decoder_aux_branch=self.aux_branch,
+            augmentations=None,
+            normalize_input=self.norm,
+            rm_touching_nuc_borders=self.rm_touching_nuc_borders,
+            edge_weights=self.edge_weights,
+            type_branch=False,
+            semantic_branch=False
         )
         self.testset = DatasetBuilder.set_test_dataset(
-            aux_branch=self.aux_branch,
             fname=self.db_fname_test.as_posix(),
-            norm=self.norm
+            decoder_aux_branch=self.aux_branch,
+            augmentations=None,
+            normalize_input=self.norm,
+            rm_touching_nuc_borders=self.rm_touching_nuc_borders,
+            edge_weights=self.edge_weights,
+            type_branch=False,
+            semantic_branch=False
         )
 
     def train_dataloader(self) -> DataLoader:

@@ -1,5 +1,6 @@
 import torch
-from typing import List, Dict
+import albumentations as A
+from typing import Dict
 
 from .pre_proc import gen_dist_maps
 from ..base_dataset import BaseDataset 
@@ -9,8 +10,12 @@ class DistDataset(BaseDataset):
     def __init__(
             self,
             fname: str,
-            transforms: List,
-            normalize_input: bool=False
+            transforms: A.Compose,
+            normalize_input: bool=False,
+            rm_touching_nuc_borders: bool=False,
+            edge_weights: bool=False,
+            type_branch: bool=True,
+            semantic_branch: bool=False,
         ) -> None:
         """
         Dataset where masks are processed with distance transform
@@ -19,59 +24,65 @@ class DistDataset(BaseDataset):
         Args:
         -----------
             fname (str): 
-                path to the pytables database
+                Path to the pytables database
             transforms (albu.Compose): 
-                albumentations.Compose obj (a list of augmentations)
+                Albumentations.Compose obj (a list of augmentations)
             normalize_input (bool, default=False):
-                apply percentile normalization to inmut images after 
+                apply minmax normalization to input images after 
                 transforms
+            rm_touching_nuc_borders (bool, default=False):
+                If True, the pixels that are touching between distinct
+                nuclear objects are removed from the masks.
+            edge_weights (bool, default=False):
+                If True, each dataset iteration will create weight maps
+                for the nuclear edges. This can be used to penalize
+                nuclei edges in cross-entropy based loss functions.
+            type_branch (bool, default=False):
+                If cell type branch is included in the model, this arg
+                signals that the cell type annotations are included per
+                each dataset iter. Given that these annotations exist in
+                db
+            semantic_branch (bool, default=False):
+                If the model contains a semnatic area branch, this arg 
+                signals that the area annotations are included per each 
+                dataset iter. Given that these annotations exist in db
         """
-        assert transforms is not None, (
-            "No augmentations given. Give at least epmty albu.Compose"
+        super(DistDataset, self).__init__(
+            fname,
+            transforms,
+            normalize_input,
+            rm_touching_nuc_borders,
+            edge_weights,
+            type_branch,
+            semantic_branch
         )
-        super(DistDataset, self).__init__(fname)
-        self.transforms = transforms
-        self.normalize_input = normalize_input
 
-    def __getitem__(self, index: int) -> Dict[str, torch.Tensor]:
+    def __getitem__(self, ix: int) -> Dict[str, torch.Tensor]:
         """
-        1. read data from hdf5/zarr file
-        2. fix duplicated instances due to mirror padding
-        3. remove overlaps in occluded nuclei and generate the weight 
-           map for the borders of overlapping nuclei
-        4. create distance maps
-        5. binarize input for the branch predicting foreground vs. 
-           background
-        6. augment
+        Read and pre-process all the data and apply augmentations
+        Creates auxilliary distance transform maps of the nuclei 
+        as extra inputs for the network.
+
+        Args:
+        --------
+            ix (int):
+                index of the iterable dataset
+
+        Returns:
+        --------
+            Dict: A dictionary containing all the augmented data patches
+                  (torch.Tensor) and the filename of the patches
         """
-        im_patch, inst_patch, type_patch, _ = self.read_patch(self.fname, index)
-        inst_patch = self.fix_mirror_pad(inst_patch)
-        weight_map = self.generate_weight_map(self.remove_overlaps(inst_patch))
+        data = self._get_and_preprocess(ix)
 
         # generate dist-maps
-        distmap = gen_dist_maps(inst_patch)
+        data["dist_map"] = gen_dist_maps(data["inst_map"])
 
-        # binarize inst branch input
-        inst_patch = self.binary(inst_patch)
+        # augment everything
+        aug_data = self._augment(data)
 
-        # augment
-        augmented_data = self.transforms(
-            image=im_patch, 
-            masks=[inst_patch, type_patch, weight_map, distmap]
-        )
+        # TODO: Test if this is faster to do here
+        # create an extra dim so that loss computing works
+        aug_data["dist_map"] = aug_data["dist_map"].unsqueeze(dim=0)
 
-        img = augmented_data["image"]
-        masks = augmented_data["masks"]
-
-        if self.normalize_input:
-            img = self.normalize(img)
-
-        result = {
-            "image": img,
-            "binary_map": torch.from_numpy(masks[0]),
-            "type_map": torch.from_numpy(masks[1]),
-            "weight_map": torch.from_numpy(masks[2]),
-            "dist_map": torch.from_numpy(masks[3]),
-            "filename": self.fname
-        }
-        return result
+        return aug_data

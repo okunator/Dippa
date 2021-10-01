@@ -1,5 +1,5 @@
 experiment_args:
-  experiment_name: wandb_test2
+  experiment_name: wandb_test3
   experiment_version: eka
 
 dataset_args:
@@ -21,7 +21,7 @@ model_args:
       n_layers: 1               # Number multi conv blocks inside one decoder level 
       n_blocks: 2               # Number of convolutions blocks in each multi conv block
       preactivate: False        # If True, BN & RELU applied before CONV
-      short_skips: null         # One of (residual, dense, null) (for decoder branch only)
+      short_skips: dense         # One of (residual, dense, null) (for decoder branch only)
       long_skips: unet          # One of (unet, unet++, unet3+, null)
       merge_policy: summation   # One of (summation, concatenate) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
@@ -33,13 +33,22 @@ model_args:
         - 16 
 
   decoder_branches:
-    type_branch: True
-    aux_branch: hover        # One of (hover, dist, contour, null)
+    type_branch: True           # Adds a cell type prediction branch
+    aux_branch: hover           # Adds an auxiliary branch. One of (hover, dist, contour, null)
+    semantic_branch: False      # Adds an extra branch for semantic annotations
 
 training_args:
-  normalize_input: False          # minmax normalize input images after augs
   freeze_encoder: False          # freeze the weights in the encoder (for fine tuning)
   weight_balancing: null         # One of (gradnorm, uncertainty, null)
+
+  input_args:
+    normalize_input: False       # minmax normalize input images after augs
+    rm_overlaps: False           # Remove overlapping nuclei borders from masks
+    edge_weights: False          # Compute nuclei border weight maps for each input
+    augmentations:
+      - hue_sat
+      - non_rigid
+      - blur
 
   optimizer_args:
     optimizer: radam              # One of https://github.com/jettify/pytorch-optimizer 
@@ -56,7 +65,8 @@ training_args:
     inst_branch_loss: dice_ce
     type_branch_loss: dice_ce
     aux_branch_loss: mse_ssim
-    edge_weight: null         # (float|null) Give penalty to nuclei borders in cross-entropy based losses
+    semantic_branch_loss: dice_ce
+    edge_weight: null            # (float|null)
 
 runtime_args:
   resume_training: False
@@ -68,5 +78,3 @@ runtime_args:
   db_type: hdf5               # The type of the input data db. One of (hdf5, zarr).
   wandb: True                 # Wandb logging
   metrics_to_cpu: True        # Lowers GPU memory but training gets slower.
-
-

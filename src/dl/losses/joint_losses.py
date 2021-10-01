@@ -24,7 +24,7 @@ class JointLoss(nn.ModuleDict):
         super().__init__()
         if weights is not None:
             assert all(0 <= val <= 1.0 for val in weights), (
-                "Weights need to be 0 <= weight <= 1"
+                f"Weights need to be 0 <= weight <= 1. Got: {weights}"
             )
 
         self.weights = weights
@@ -41,9 +41,9 @@ class JointLoss(nn.ModuleDict):
             input List
         """
         if self.weights is not None:
-            l = list(zip(self.values(), self.weigths))
+            l = zip(self.values(), self.weigths)
         else:
-            l = list(zip(self.values(), [1.0]*len(self.values())))
+            l = zip(self.values(), [1.0]*len(self.values()))
 
         losses = torch.stack([loss(**kwargs)*weight for loss, weight in l])
         return torch.sum(losses)
@@ -55,6 +55,7 @@ class MultiTaskLoss(nn.Module):
             inst_loss: nn.Module,
             type_loss: Optional[nn.Module]=None,
             aux_loss: Optional[nn.Module]=None,
+            sem_loss: Optional[nn.Module]=None,
             loss_weights: Optional[List[float]]=None
         ) -> None:
         """
@@ -64,11 +65,13 @@ class MultiTaskLoss(nn.Module):
         Args:
         ----------
             inst_loss (nn.Module): 
-                Loss function for the instance segmentation head
+                Loss func for the instance segmentation head
             type_loss (nn.Module, optional, default=None): 
-                Loss function for the semantic segmentation head
-            aux_loss (nn.Module, optional, default=None): 
-                Loss function for the auxilliary regression head
+                Loss func for the cell type semantic segmentation head
+            aux_loss (nn.Module, optional, default=None):
+                Loss func for the auxilliary regression head
+            sem_loss (nn.Module, optional, default=None):
+                Loss function for the area semantic segmentation head 
             loss_weights (List[float], optional, default=None): 
                 List of weights for loss functions of instance,
                 type and auxilliary branches in this order. If there is
@@ -79,6 +82,7 @@ class MultiTaskLoss(nn.Module):
         self.inst_loss = inst_loss
         self.type_loss = type_loss
         self.aux_loss = aux_loss
+        self.sem_loss = sem_loss
         
         self.weights = [1.0, 1.0, 1.0]
         if loss_weights is not None:

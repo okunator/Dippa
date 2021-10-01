@@ -110,7 +110,7 @@ def flows_from_hover(
 
     Returns:
     ----------
-        np.ndarray, the optical flow representation. Shape (H, W, 3)
+        np.ndarray: the optical flow representation. Shape (H, W, 3)
     """
     enhanced = enhance_hover(hover, order=order, channels=channels)
     H = (np.arctan2(enhanced[..., 1], enhanced[..., 0]) + np.pi) / (2*np.pi)

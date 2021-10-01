@@ -410,7 +410,10 @@ class SegModel(pl.LightningModule):
         # Get data
         x = batch["image"].float()
         inst_target = batch["binary_map"].long()
-        target_weight = batch["weight_map"].float()
+
+        target_weight = None
+        if self.edge_weight:
+            target_weight = batch["weight_map"].float()
             
         type_target = None
         if self.decoder_type_branch:
@@ -418,17 +421,9 @@ class SegModel(pl.LightningModule):
 
         aux_target = None
         if self.decoder_aux_branch is not None:
-            if self.decoder_aux_branch == "hover":
-                xmap = batch["xmap"].float()
-                ymap = batch["ymap"].float()
-                aux_target = torch.stack([xmap, ymap], dim=1)
-            elif self.decoder_aux_branch == "dist":
-                aux_target = batch["dist_map"].float()
-                aux_target = aux_target.unsqueeze(dim=1)
-            elif self.decoder_aux_branch == "contour":
-                aux_target = batch["contour"].float()
-                aux_target = aux_target.unsqueeze(dim=1)
-
+            aux_key = f"{self.decoder_aux_branch}_map"
+            aux_target = batch[aux_key].float()
+            
         # Forward pass
         soft_masks = self.forward(x)
 

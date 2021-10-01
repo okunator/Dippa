@@ -5,10 +5,7 @@ from typing import Dict
 
 
 class WandbImageCallback(pl.Callback):
-    """
-    Logs the inputs and outputs of the model
-    at the first validation batch
-    """
+
     def on_validation_batch_end(
             self,
             trainer: pl.Trainer,
@@ -19,40 +16,62 @@ class WandbImageCallback(pl.Callback):
             dataloader_idx: int,
         ) -> None:
         """
-        
+        Logs the inputs and outputs of the model
+        at the first validation batch to weights and biases.
         """
         if batch_idx == 0:
             img = batch["image"].float().to(device="cpu")
-            inst_target = batch["binary_map"].long().to(device="cpu")
-            type_target = batch["type_map"].long().to(device="cpu")
             soft_insts = outputs["instances"].to(device="cpu")
-            soft_types = outputs["types"].to(device="cpu")
+            inst_target = batch["binary_map"].long().to(device="cpu")
             insts = torch.argmax(soft_insts, dim=1)
-            types = torch.argmax(soft_types, dim=1)
-            gts = torch.stack([inst_target, type_target], dim=1).long()
-            preds = torch.stack([insts, types], dim=1).long()
 
-            trainer.logger.experiment[1].log({
+            log_dict = {
                 "val/soft_insts": [
                     wandb.Image(si[1, ...], caption="soft inst masks") 
                     for si in soft_insts
                 ],
-                "val/soft_types": [
-                    wandb.Image(st[i, ...], caption="Soft type masks") 
-                    for st in soft_types
-                    for i in range(st.shape[0])
+                "val/inst_preds": [
+                    wandb.Image(pred.float(), caption="Predictions") 
+                    for pred in insts
                 ],
-                "val/preds": [
-                    wandb.Image(pred[i, ...].float(), caption="Predictions") 
-                    for pred in preds
-                    for i in range(pred.shape[0])
-                ],
-                "val/GT": [
-                    wandb.Image(gt[i, ...].float(), caption="Ground truths") 
-                    for gt in gts
-                    for i in range(gt.shape[0])
+                "val/inst_GT": [
+                    wandb.Image(gt.float(), caption="Inst ground truths") 
+                    for gt in inst_target
                 ],
                 "val/img": [wandb.Image(img, caption="Input img")],
                 "global_step": trainer.global_step
-            })
+            }
+
+
+            if "types" in list(outputs.keys()):
+                type_target = batch["type_map"].long().to(device="cpu")
+                soft_types = outputs["types"].to(device="cpu")
+                types = torch.argmax(soft_types, dim=1)
+
+                log_dict["val/soft_types"] = [
+                    wandb.Image(st[i, ...], caption="Soft type masks") 
+                    for st in soft_types
+                    for i in range(st.shape[0])
+                ]
+
+                log_dict["val/type_GT"] = [
+                    wandb.Image(gt.float(), caption="Type ground truths") 
+                    for gt in type_target
+                ]
+
+                log_dict["val/type_pred"] = [
+                    wandb.Image(pred.float(), caption="Type ground truths") 
+                    for pred in types
+                ]
+
+
+            if "aux" in list(outputs.keys()):
+                aux = outputs["aux"].to(device="cpu")
+                log_dict["val/aux_maps"] = [
+                    wandb.Image(a[i, ...], caption="Aux maps") 
+                    for a in aux
+                    for i in range(a.shape[0])
+                ]
+
+            trainer.logger.experiment[1].log(log_dict)
 

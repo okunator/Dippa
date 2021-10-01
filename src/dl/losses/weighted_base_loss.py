@@ -65,11 +65,13 @@ class WeightedBaseLoss(nn.Module):
             loss_matrix (torch.Tensor): 
                 Pixelwise losses tensor of shape (B, C, H, W)
             weight_map (torch.Tensor):
-                Map that points to the pixels that will be weighted. Shape (B, H, W)
+                Map that points to the pixels that will be weighted.
+                Shape (B, H, W)
 
         Returns:
         ----------
             torch.Tensor: The loss matrix scaled with the nuclear 
             boundary weights. Shape (B, H, W).
         """
+
         return loss_matrix*self.edge_weight**weight_map

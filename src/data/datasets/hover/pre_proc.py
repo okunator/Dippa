@@ -24,7 +24,7 @@ SOFTWARE.
 
 import numpy as np
 from scipy import ndimage as ndi
-from typing import Tuple
+from typing import Tuple, Dict
 
 from src.utils import bounding_box, center_crop, remove_small_objects
 
@@ -32,12 +32,10 @@ from src.utils import bounding_box, center_crop, remove_small_objects
 # https://github.com/vqdang/hover_net/blob/195ed9b6cc67b12f908285492796fb5c6c15a000/src/loader/augs.py#L21
 def gen_hv_maps(
         inst_map: np.ndarray, 
-        crop_shape: Tuple[int] = (256, 256)
-    ) -> np.ndarray:
+        crop_shape: Tuple[int]=(256, 256)
+    ) -> Dict[str, np.ndarray]:
     """
     Generates horizontal and vertical maps from instance labels
-
-    Input annotation must be of original shape.
     
     The map is calculated only for instances within the crop portion
     but based on the original shape in original image.
@@ -47,10 +45,18 @@ def gen_hv_maps(
     nuclear instance.
 
     Args:
+    ---------
         inst_map (np.ndarray): 
             inst map
         crop_shape (Tuple[int]): 
             crop shape if network output smaller dims than the input
+
+    Returns:
+    ---------
+        Dict[str, np.ndarray]: Dict containing keys "xmap" & "ymap".
+        "xmap" maps to horizontal gradient map and "ymap" maps to
+        vertical gradient map of the input mask. Both are of shape:
+        (H, W) 
     """
 
     if inst_map.shape[0] > crop_shape[0]: 

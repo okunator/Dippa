@@ -109,9 +109,17 @@ model_args:
     aux_branch: hover            # One of (hover, dist, contour, null)
 
 training_args:
-  normalize_input: False         # minmax normalize input images after augs
   freeze_encoder: False          # freeze the weights in the encoder
   weight_balancing: null         # TODO: One of (gradnorm, uncertainty, null)
+
+  input_args:
+    normalize_input: False        # minmax normalize input images after augs
+    rm_overlaps: False            # Remove overlapping nuclei borders from masks
+    edge_weights: True            # Compute nuclei border weight maps for each input
+    augmentations:
+      - hue_sat
+      - non_rigid
+      - blur
 
   optimizer_args:
     optimizer: radam             # https://github.com/jettify/pytorch-optimizer 
@@ -128,7 +136,6 @@ training_args:
     inst_branch_loss: dice_ce
     type_branch_loss: dice_ce
     aux_branch_loss: mse_ssim
-    edge_weight: null            # penalize nuclei edges in ce-based losses
 
 runtime_args:
   resume_training: False

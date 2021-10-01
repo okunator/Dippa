@@ -11,8 +11,6 @@ from src.data import (
 )
 
 
-
-
 def main(conf, extra_params):
     # get conf
     conf = OmegaConf.load(extra_params.yml) if extra_params.yml else CONFIG
@@ -31,9 +29,13 @@ def main(conf, extra_params):
             train_db_path=extra_params.train_db,
             test_db_path=extra_params.test_db,
             classes=classes,
-            augmentations=["hue_sat", "non_rigid", "blur"],
-            normalize=conf.training_args.normalize_input,
+            augmentations=conf.training_args.input_args.augmentations,
+            normalize=conf.training_args.input_args.normalize_input,
             aux_branch=conf.model_args.decoder_branches.aux_branch,
+            type_branch=conf.model_args.decoder_branches.type_branch,
+            edge_weights=conf.training_args.input_args.edge_weights,
+            rm_touching_nuc_borders=conf.training_args.input_args.rm_overlaps,
+            semantic_branch=conf.model_args.decoder_branches.semantic_branch,
             batch_size=conf.runtime_args.batch_size,
             num_workers=conf.runtime_args.num_workers
         )
@@ -48,9 +50,12 @@ def main(conf, extra_params):
 
         datamodule = PannukeDataModule(
             database_type=conf.runtime_args.db_type,
-            augmentations=["hue_sat", "non_rigid", "blur"],
-            normalize=conf.training_args.normalize_input,
+            augmentations=conf.training_args.input_args.augmentations,
+            normalize=conf.training_args.input_args.normalize_input,
             aux_branch=conf.model_args.decoder_branches.aux_branch,
+            type_branch=conf.model_args.decoder_branches.type_branch,
+            edge_weights=conf.training_args.input_args.edge_weights,
+            rm_touching_nuc_borders=conf.training_args.input_args.rm_overlaps,
             batch_size=conf.runtime_args.batch_size,
             num_workers=conf.runtime_args.num_workers,
             database_dir=db_dir,
@@ -67,20 +72,34 @@ def main(conf, extra_params):
 
         datamodule = ConsepDataModule(
             database_type=conf.runtime_args.db_type,
-            augmentations=["hue_sat", "non_rigid", "blur"],
-            normalize=conf.training_args.normalize_input,
+            augmentations=conf.training_args.input_args.augmentations,
+            normalize=conf.training_args.input_args.normalize_input,
             aux_branch=conf.model_args.decoder_branches.aux_branch,
+            type_branch=conf.model_args.decoder_branches.type_branch,
+            edge_weights=conf.training_args.input_args.edge_weights,
+            rm_touching_nuc_borders=conf.training_args.input_args.rm_overlaps,
             batch_size=conf.runtime_args.batch_size,
             num_workers=conf.runtime_args.num_workers,
             database_dir=db_dir,
             download_dir=download_dir
         )
 
-    # init trainer and model and train
-    lightning_model = lightning.SegModel.from_conf(conf, **vars(extra_params))
-    trainer = lightning.SegTrainer.from_conf(conf)
+    # init model
+    lightning_model = lightning.SegModel.from_conf(conf)
+
+    # init trainer
+    extra_callbacks = []
+    if conf.runtime_args.wandb:
+        extra_callbacks.append(lightning.WandbImageCallback())
+
+    trainer = lightning.SegTrainer.from_conf(
+        conf=conf, extra_callbacks=extra_callbacks
+    )
+
+    # train
     trainer.fit(lightning_model, datamodule=datamodule)
 
+    # run tests
     if extra_params.run_testing:
         trainer.test(
             model=lightning_model,

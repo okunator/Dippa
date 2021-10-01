@@ -115,9 +115,8 @@ def binarize(inst_map: np.ndarray) -> np.ndarray:
     -----------
         np.ndarray: Binary mask. Shape (H, W).
     """
-    inst_map[inst_map > 0] = 1
-
-    return inst_map.astype("uint8")
+    binary = np.copy(inst_map > 0)
+    return binary.astype("uint8")
 
 
 # ported from https://github.com/vqdang/hover_net/blob/master/src/loader/augs.py
@@ -180,8 +179,8 @@ def remove_1px_boundary(inst_map: np.ndarray) -> np.ndarray:
 # ported from https://github.com/vqdang/hover_net/blob/master/src/loader/augs.py
 def get_weight_map(
         inst_map: np.ndarray,
-        sigma: float = 5.0,
-        w0: float = 10.0
+        sigma: float=5.0,
+        w0: float=10.0
     ) -> np.ndarray:
     """
     Generate a weight map like in U-Net paper
@@ -197,7 +196,7 @@ def get_weight_map(
 
     Returns:
     -----------
-        np.ndarray. Nuclei boundary weight map. Shape (H, W).
+        np.ndarray: Nuclei boundary weight map. Shape (H, W).
     """
     inst_list = list(np.unique(inst_map))
     inst_list.remove(0) # 0 is background
@@ -249,7 +248,7 @@ def center_crop(img: np.ndarray, ch: int, cw: int) -> np.ndarray:
 
     Returns:
     ----------
-        np.ndarray. Center cropped image. Shape (ch, cw).
+        np.ndarray: Center cropped image. Shape (ch, cw).
     """
     if len(img.shape) == 3:
         H, W, _ = img.shape
@@ -281,7 +280,7 @@ def bounding_box(inst_map: np.ndarray) -> List[int]:
 
     Returns:
     ----------
-        List of the origin- and end-point coordinates of the bbox
+        List: List of the origin- and end-point coordinates of the bbox
     """
     rows = np.any(inst_map, axis=1)
     cols = np.any(inst_map, axis=0)

@@ -226,7 +226,7 @@ class Inferer(FileHandler):
                 image files: .png, .tif, etc
             gt_mask_dir (str, default=None):
                 The directory of the test ground truth masks. Needed for 
-                benchmarking only.
+                benchmarking only. The GT-masks need to be in .mat files
             tta (bool, default=False):
                 If True, performs test time augmentation. Inference time
                 goes up with often marginal performance improvements.
@@ -776,7 +776,8 @@ class Inferer(FileHandler):
         """
         Run benchmarikng metrics for only instance maps and save them 
         into a csv file. The file is written into the "results"
-        directory of the repositoy.
+        directory of the repositoy. This requires that the `gt_mask_dir`
+        arg is given
 
         Args:
         ---------
@@ -791,6 +792,8 @@ class Inferer(FileHandler):
         ----------
             pd.DataFrame: a df containing the benchmarking results
         """
+        assert self.gt_mask_dir is not None, "gt_mask_dir is None"
+        assert self.gt_mask_dir.exists(), "Gt mask dir not found"
         assert "inst_maps" in self.__dict__.keys(), (
             "No instance maps found, run inference first."
         )
@@ -823,7 +826,7 @@ class Inferer(FileHandler):
         """
         Run benchmarking for inst_maps & type maps and save them into a 
         csv file. The file is written into the "results" directory of 
-        the repositoy
+        the repositoy. This requires that the `gt_mask_dir` arg is given
 
         Args:
         ---------
@@ -841,6 +844,8 @@ class Inferer(FileHandler):
         ----------
             pd.DataFrame: A df containing the benchmarking results
         """
+        assert self.gt_mask_dir is not None, "gt_mask_dir is None"
+        assert self.gt_mask_dir.exists(), "Gt mask dir not found"
         assert "inst_maps" in self.__dict__.keys(), (
             "No instance maps found, run inference first"
         )

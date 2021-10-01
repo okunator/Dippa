@@ -18,4 +18,5 @@ pytorch-lightning==1.2.8
 albumentations==0.5.2
 pathos==0.2.7
 test-tube==0.7.5
+wandb==0.12.2
 -e ./
