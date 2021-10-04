@@ -46,26 +46,24 @@ class BasicPostProcessor(PostProcessor):
             Tuple: The filename (str), instance segmentation mask (H, W)
             and semantic segmentation mask (H, W).
         """
-        name = maps[0]
-        prob_map = maps[1]
-        type_map = maps[2]
+        maps = self._threshold_probs(maps)
+        maps["inst_map"] = shape_index_watershed(
+            maps["inst_probs"][..., 1], maps["inst_map"]
+        )
+        maps["inst_map"], maps["type_map"] = self._finalize_inst_seg(maps)
 
-        inst_map = self.threshold(prob_map)
-        inst_map = shape_index_watershed(prob_map[..., 1], inst_map)
+        res = [
+            map for key, map in maps.items()
+            if not any([l in key for l in ("probs", "aux")])
+        ]
 
-        combined = None
-        if type_map is not None:
-            combined = self.combine_inst_type(inst_map, type_map)
-        
-        # Clean up the result
-        inst_map = self.clean_up(inst_map)
-
-        return name, inst_map, combined
+        return res
 
     def run_post_processing(
             self,
             inst_probs: Dict[str, np.ndarray],
             type_probs: Dict[str, np.ndarray],
+            sem_probs: Dict[str, np.ndarray],
             **kwargs) -> List[Tuple[str, np.ndarray, np.ndarray]]:
         """
         Run post processing for all predictions
@@ -90,8 +88,13 @@ class BasicPostProcessor(PostProcessor):
         """
         # Set arguments for threading pool
         maps = list(
-            zip(inst_probs.keys(), inst_probs.values(), type_probs.values())
+            zip(
+                inst_probs.keys(),
+                inst_probs.values(),
+                type_probs.values(),
+                sem_probs.values()
+            )
         )
-        seg_results = self.parallel_pipeline(maps)
+        seg_results = self._parallel_pipeline(maps)
 
         return seg_results

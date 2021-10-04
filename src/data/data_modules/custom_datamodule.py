@@ -14,12 +14,11 @@ class CustomDataModule(pl.LightningDataModule, FileHandler):
         self,
         train_db_path: str,
         test_db_path: str,
-        classes: Dict[str, int],
         augmentations: List[str]=["hue_sat", "non_rigid", "blur"],
         normalize: bool=False,
         aux_branch: str="hover",
         type_branch: bool=True,
-        semantic_branch: bool=False,
+        sem_branch: bool=False,
         rm_touching_nuc_borders: bool=False,
         edge_weights: bool=False,
         batch_size: int=8,
@@ -35,8 +34,6 @@ class CustomDataModule(pl.LightningDataModule, FileHandler):
                 Path to the hdf5/zarr train database
             test_db_path (str):
                 Path to the hdf5/zarr test database
-            classes (Dict[str, int]):
-                A dictionary of classes in the dataset. E.g. {"bg":0 ..}
             augmentations (List, default=["hue_sat","non_rigid","blur"])
                 List of augmentations. Allowed augs: "hue_sat", "rigid",
                 "non_rigid", "blur", "non_spatial", "normalize"
@@ -54,7 +51,7 @@ class CustomDataModule(pl.LightningDataModule, FileHandler):
                 signals that the cell type annotations are included per
                 each dataset iter. Given that these annotations exist in
                 db
-            semantic_branch (bool, default=False):
+            sem_branch (bool, default=False):
                 If the model contains a semnatic area branch, this arg 
                 signals that the area annotations are included per each 
                 dataset iter. Given that these annotations exist in db
@@ -75,13 +72,12 @@ class CustomDataModule(pl.LightningDataModule, FileHandler):
 
         self.db_fname_train = Path(train_db_path)
         self.db_fname_test = Path(test_db_path)
-        self.classes = classes
         
         self.augs = augmentations
         self.norm = normalize
         self.aux_branch = aux_branch
         self.type_branch = type_branch
-        self.sem_branch = semantic_branch
+        self.sem_branch = sem_branch
         self.edge_weights = edge_weights
         self.rm_touching_nuc_borders = rm_touching_nuc_borders
         self.batch_size = batch_size
@@ -114,7 +110,6 @@ class CustomDataModule(pl.LightningDataModule, FileHandler):
         self.validset = DatasetBuilder.set_test_dataset(
             fname=self.db_fname_test.as_posix(),
             decoder_aux_branch=self.aux_branch,
-            augmentations=None,
             normalize_input=self.norm,
             rm_touching_nuc_borders=self.rm_touching_nuc_borders,
             edge_weights=self.edge_weights,
@@ -124,7 +119,6 @@ class CustomDataModule(pl.LightningDataModule, FileHandler):
         self.testset = DatasetBuilder.set_test_dataset(
             fname=self.db_fname_test.as_posix(),
             decoder_aux_branch=self.aux_branch,
-            augmentations=None,
             normalize_input=self.norm,
             rm_touching_nuc_borders=self.rm_touching_nuc_borders,
             edge_weights=self.edge_weights,

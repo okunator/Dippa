@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Union
 
 from .post_proc import post_proc_hover
 from ..base_processor import PostProcessor
@@ -27,7 +27,7 @@ class HoverNetPostProcessor(PostProcessor):
         """
         super(HoverNetPostProcessor, self).__init__(thresh_method, thresh)
 
-    def post_proc_pipeline(self, maps: List[np.ndarray]) -> Tuple[np.ndarray]:
+    def post_proc_pipeline(self, maps: List[np.ndarray]) -> List[np.ndarray]:
         """
         1. Threshold
         2. Post process instance map
@@ -38,29 +38,29 @@ class HoverNetPostProcessor(PostProcessor):
             maps (List[np.ndarray]):
                 A list of the name of the file, soft masks, and hover 
                 maps from the network
+
+        Returns:
+        -----------
+            List: list of the filename and different output masks
+                  masks order: "inst", "types", "sem"
         """
-        name = maps[0]
-        prob_map = maps[1]
-        hover_map = maps[2]
-        type_map = maps[3]
+        maps = self._threshold_probs(maps)
+        maps["inst_map"] = post_proc_hover(maps["inst_map"], maps["aux_map"])
+        maps["inst_map"], maps["type_map"] = self._finalize_inst_seg(maps)
 
-        inst_map = self.threshold(prob_map)
-        inst_map = post_proc_hover(inst_map, hover_map)
+        res = [
+            map for key, map in maps.items() 
+            if not any([l in key for l in ("probs", "aux")])
+        ]
 
-        combined = None
-        if type_map is not None:
-            combined = self.combine_inst_type(inst_map, type_map)
-        
-        # Clean up the result
-        inst_map = self.clean_up(inst_map)
-
-        return name, inst_map, combined
+        return res
 
     def run_post_processing(
             self,
             inst_probs: Dict[str, np.ndarray],
+            type_probs: Dict[str, Union[np.ndarray, None]],
+            sem_probs: Dict[str, Union[np.ndarray, None]],
             aux_maps: Dict[str, np.ndarray],
-            type_probs: Dict[str, np.ndarray]
         ) -> List[Tuple[str, np.ndarray, np.ndarray]]:
         """
         Run post processing for all predictions
@@ -70,13 +70,16 @@ class HoverNetPostProcessor(PostProcessor):
             inst_probs (Dict[str, np.ndarray]):
                 Dictionary of (file name, soft instance map) pairs
                 inst_map shapes are (H, W, 2) 
+            type_probs (Dict[str, np.ndarray | None]):
+                Dictionary of (file name, type map) pairs.
+                type maps are in one hot format (H, W, n_classes).
+            sem_probs (Dict[str, np.ndarray | None]):
+                Dictionary of (file name, sem map) pairs.
+                sem maps are in one hot format (H, W, n_classes).
             aux_maps (Dict[str, np.ndarray]):
                 Dictionary of (file name, hover map) pairs.
                 hover_map[..., 0] = horizontal map
                 hover_map[..., 1] = vertical map
-            type_probs (Dict[str, np.ndarray]):
-                Dictionary of (file name, type map) pairs.
-                type maps are in one hot format (H, W, n_classes).
 
         Returns:
         -----------
@@ -84,18 +87,19 @@ class HoverNetPostProcessor(PostProcessor):
             inst map and type map
             
             Example: 
-            [("filename1", inst_map: np.ndarray, type_map: np.ndarray),
-             ("filename2", inst_map: np.ndarray, type_map: np.ndarray)]
+            [("filename1", inst_map: np.ndarray, aux_map: np.ndarray),
+             ("filename2", inst_map: np.ndarray, aux_map: np.ndarray)]
         """
         # Set arguments for threading pool
         maps = list(
             zip(
                 inst_probs.keys(),
                 inst_probs.values(),
+                type_probs.values(),
+                sem_probs.values(),
                 aux_maps.values(),
-                type_probs.values()
             )
         )
-        seg_results = self.parallel_pipeline(maps)
+        seg_results = self._parallel_pipeline(maps)
         
         return seg_results

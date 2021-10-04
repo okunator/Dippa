@@ -23,6 +23,7 @@ class SegModel(pl.LightningModule):
             encoder_depth: int=5,
             encoder_freeze: bool=False,
             decoder_type_branch: bool=True,
+            decoder_sem_branch: bool=False,
             decoder_aux_branch: str="hover",
             decoder_n_layers: int=1,
             decoder_n_blocks: int=2,
@@ -38,6 +39,7 @@ class SegModel(pl.LightningModule):
             long_skip_merge_policy: str="summation",
             inst_branch_loss: str="ce_dice",
             type_branch_loss: str="cd_dice",
+            sem_branch_loss: str="cd_dice",
             aux_branch_loss: str="mse_ssim",
             edge_weight: float=None,
             optimizer_name: str="adam",
@@ -53,7 +55,8 @@ class SegModel(pl.LightningModule):
             normalize_input: bool=True,
             batch_size: int=8,
             num_workers: int=8,
-            n_classes: int=2,
+            n_classes_type: int=2,
+            n_classes_sem: int=2,
             class_weights: torch.Tensor=None,
             binary_weights: torch.Tensor=None,
             inference_mode: bool=False,
@@ -85,7 +88,10 @@ class SegModel(pl.LightningModule):
             encoder_freeze (bool, default=False):
                 freeze the encoder for training
             decoder_type_branch (bool, default=True):
-                Flag whether to include a type semantic segmentation 
+                Flag whether to include a cell type segmentation 
+                branch to the network.
+            decoder_sem_branch (bool, default=True):
+                Flag whether to include a area semantic segmentation 
                 branch to the network.
             decoder_aux_branch (str, default=True):
                 The auxiliary branch type. One of "hover", "dist", 
@@ -131,9 +137,15 @@ class SegModel(pl.LightningModule):
                 separated with underscores e.g. "ce_dice" One of: "ce", 
                 "dice", "iou", "focal", "gmse", "mse", "sce", "tversky",
                 "ssim"
-            type_branch_loss (str), default="ce_dice":
-                A string specifying the loss funcs used in the semantic 
+            type_branch_loss (str, default="ce_dice"):
+                A string specifying the loss funcs used in the cell type 
                 segmentation branch of the network. Loss names are 
+                separated with underscores e.g. "ce_dice" One of: "ce", 
+                "dice", "iou", "focal", "gmse", "mse", "sce", "tversky",
+                "ssim"
+            sem_branch_loss (str, default="ce_dice"):
+                A string specifying the loss funcs used in the semantic 
+                segmentation branch of the network. Loss names are
                 separated with underscores e.g. "ce_dice" One of: "ce", 
                 "dice", "iou", "focal", "gmse", "mse", "sce", "tversky",
                 "ssim"
@@ -180,10 +192,10 @@ class SegModel(pl.LightningModule):
                 Batch size for the model at training time
             num_workers (int, default=8):
                 Number of workers for the dataloader at training time
-            n_classes (int, default=2):
-                The number of classes in the data. If the database is 
-                defined explicitly, the number of classes need to be 
-                given as well
+            n_classes_type (int, default=2):
+                The number of cell type classes in the data.
+            n_classes_sem (int, default=2):
+                The number of semantic area classes in the data.
             class_weights (torch.Tensor, default=None):
                 A tensor defining the weights (0 < w < 1) for the 
                 different classes in the loss function
@@ -199,7 +211,8 @@ class SegModel(pl.LightningModule):
         self.experiment_name = experiment_name
         self.experiment_version = experiment_version
         self.model_input_size = model_input_size
-        self.n_classes = n_classes
+        self.n_classes_type = n_classes_type
+        self.n_classes_sem = n_classes_sem
 
         # Encoder args
         self.encoder_in_channels = encoder_in_channels
@@ -210,6 +223,7 @@ class SegModel(pl.LightningModule):
 
         # Decoder_args
         self.decoder_type_branch = decoder_type_branch
+        self.decoder_sem_branch = decoder_sem_branch
         self.decoder_aux_branch = decoder_aux_branch
         self.decoder_n_layers = decoder_n_layers
         self.decoder_n_blocks = decoder_n_blocks
@@ -229,6 +243,7 @@ class SegModel(pl.LightningModule):
         # Loss args
         self.inst_branch_loss = inst_branch_loss
         self.type_branch_loss = type_branch_loss
+        self.sem_branch_loss = sem_branch_loss
         self.aux_branch_loss = aux_branch_loss
         self.edge_weight = edge_weight
         self.class_weights = class_weights
@@ -261,6 +276,7 @@ class SegModel(pl.LightningModule):
             encoder_freeze=self.encoder_freeze,
             decoder_type_branch=self.decoder_type_branch,
             decoder_aux_branch=self.decoder_aux_branch,
+            decoder_sem_branch=self.decoder_sem_branch,
             decoder_n_layers=self.decoder_n_layers,
             decoder_n_blocks=self.decoder_n_blocks,
             decoder_preactivate=self.decoder_preactivate,
@@ -273,7 +289,8 @@ class SegModel(pl.LightningModule):
             activation=self.activation,
             normalization=self.normalization,
             weight_standardize=self.weight_standardize,
-            n_types=self.n_classes,
+            n_classes_type=self.n_classes_type,
+            n_classes_sem=self.n_classes_sem,
             model_input_size=self.model_input_size
         )
 
@@ -315,13 +332,14 @@ class SegModel(pl.LightningModule):
         return cls(
             experiment_name=conf.experiment_args.experiment_name,
             experiment_version=conf.experiment_args.experiment_version,
-            model_input_size=conf.runtime_args.model_input_size,
+            model_input_size=conf.training_args.input_args.model_input_size,
             encoder_in_channels=conf.model_args.architecture_design.encoder_args.in_channels,
             encoder_name=conf.model_args.architecture_design.encoder_args.encoder,
             encoder_pretrain=conf.model_args.architecture_design.encoder_args.pretrain,
             encoder_depth=conf.model_args.architecture_design.encoder_args.depth,
             encoder_freeze=conf.training_args.freeze_encoder,
             decoder_type_branch=conf.model_args.decoder_branches.type_branch,
+            decoder_sem_branch=conf.model_args.decoder_branches.sem_branch,
             decoder_aux_branch=conf.model_args.decoder_branches.aux_branch,
             decoder_upsampling=conf.model_args.architecture_design.decoder_args.upsampling,
             decoder_n_layers=conf.model_args.architecture_design.decoder_args.n_layers,
@@ -338,26 +356,32 @@ class SegModel(pl.LightningModule):
             inst_branch_loss=conf.training_args.loss_args.inst_branch_loss,
             type_branch_loss=conf.training_args.loss_args.type_branch_loss,
             aux_branch_loss=conf.training_args.loss_args.aux_branch_loss,
-            edge_weight=conf.training_args.loss_args.edge_weight,
+            sem_branch_loss=conf.training_args.loss_args.sem_branch_loss,
             optimizer_name=conf.training_args.optimizer_args.optimizer,
             decoder_learning_rate=conf.training_args.optimizer_args.lr,
-            encoder_learning_rate=conf.training_args.optimizer_args.encoder_lr, 
-            decoder_weight_decay=conf.training_args.optimizer_args.weight_decay, 
+            encoder_learning_rate=conf.training_args.optimizer_args.encoder_lr,
+            decoder_weight_decay=conf.training_args.optimizer_args.weight_decay,
             encoder_weight_decay=conf.training_args.optimizer_args.encoder_weight_decay,
             scheduler_factor=conf.training_args.optimizer_args.scheduler_factor,
             scheduler_patience=conf.training_args.optimizer_args.scheduler_patience,
             lookahead=conf.training_args.optimizer_args.lookahead,
             bias_weight_decay=conf.training_args.optimizer_args.bias_weight_decay,
             augmentations=conf.training_args.augmentations,
-            normalize_input=conf.training_args.normalize_input,
+            normalize_input=conf.training_args.input_args.normalize_input,
             batch_size=conf.runtime_args.batch_size,
             num_workers=conf.runtime_args.num_workers,
-            n_classes=conf.dataset_args.n_classes,
+            n_classes_type=conf.training_args.input_args.n_classes_type,
+            n_classes_sem=conf.training_args.input_args.n_classes_sem,
             **kwargs
         )
 
     @classmethod
-    def from_experiment(cls, name: str, version: str):
+    def from_experiment(
+        cls,
+        name: str,
+        version: str,
+        inference_mode: bool=False
+    ):
         """
         Construct SegModel from experiment name and version
         """
@@ -392,7 +416,7 @@ class SegModel(pl.LightningModule):
 
         kwargs["experiment_name"] = name
         kwargs["experiment_version"] = version
-        kwargs["inference_mode"] = True
+        kwargs["inference_mode"] = inference_mode
         return cls(**kwargs)
 
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
@@ -419,6 +443,10 @@ class SegModel(pl.LightningModule):
         if self.decoder_type_branch:
             type_target = batch["type_map"].long()
 
+        sem_target = None
+        if self.decoder_sem_branch:
+            sem_target = batch["sem_map"].long()
+
         aux_target = None
         if self.decoder_aux_branch is not None:
             aux_key = f"{self.decoder_aux_branch}_map"
@@ -429,12 +457,14 @@ class SegModel(pl.LightningModule):
 
         # Compute loss
         loss = self.criterion(
-            yhat_inst=soft_masks["instances"], 
-            target_inst=inst_target, 
+            yhat_inst=soft_masks["instances"],
+            target_inst=inst_target,
             yhat_type=soft_masks["types"],
-            target_type=type_target, 
+            target_type=type_target,
             yhat_aux=soft_masks["aux"],
             target_aux=aux_target,
+            yhat_sem=soft_masks["sem"],
+            target_sem=sem_target,
             target_weight=target_weight,
             edge_weight=1.1
         )
@@ -530,9 +560,11 @@ class SegModel(pl.LightningModule):
     def configure_loss(self):
         loss = LossBuilder.set_loss(
             decoder_type_branch=self.decoder_type_branch,
+            decoder_sem_branch=self.decoder_sem_branch,
             decoder_aux_branch=self.decoder_aux_branch,
             inst_branch_loss=self.inst_branch_loss,
             type_branch_loss=self.type_branch_loss,
+            sem_branch_loss=self.sem_branch_loss,
             aux_branch_loss=self.aux_branch_loss,
             binary_weights=self.binary_weights,
             class_weights=self.class_weights,

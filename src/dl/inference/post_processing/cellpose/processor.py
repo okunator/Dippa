@@ -44,7 +44,7 @@ class CellposePostProcessor(PostProcessor):
         Args:
         -----------
             maps (List[np.ndarray]):
-                A list of the name of the file, soft masks, and hover 
+                A list of the name of the file, soft masks, and hover
                 maps from the network
 
         Returns:
@@ -52,33 +52,27 @@ class CellposePostProcessor(PostProcessor):
             Tuple: the filename (str), instance segmentation mask (H, W)
             and semantic segmentation mask (H, W).
         """
-        name = maps[0]
-        prob_map = maps[1]
-        hover_map = maps[2]
-        type_map = maps[3]
+        maps = self._threshold_probs(maps)
+        cellpose_dict = post_proc_cellpose(maps["aux_map"], maps["inst_map"])
+        maps["inst_map"] = cellpose_dict["inst_map"]
+        maps["inst_map"], maps["type_map"] = self._finalize_inst_seg(maps)
 
-        inst_map = self.threshold(prob_map)
-        cellpose_dict = post_proc_cellpose(hover_map, inst_map)      
-        
-        combined = None
-        if type_map is not None:
-            combined = self.combine_inst_type(
-                cellpose_dict["inst_map"], 
-                type_map
-            )
-        
-        inst_map = self.clean_up(cellpose_dict["inst_map"])
+        res = [
+            map for key, map in maps.items() 
+            if not any([l in key for l in ("probs", "aux")])
+        ]
 
         # save the flows here to avoid complicating the inferer code
-        self.flows[name] = cellpose_dict["flows"]["flow"]
+        self.flows[maps["fn"]] = cellpose_dict["flows"]["flow"]
 
-        return name, inst_map, combined
+        return res
 
     def run_post_processing(
             self,
             inst_probs: Dict[str, np.ndarray],
+            type_probs: Dict[str, np.ndarray],
+            sem_probs: Dict[str, np.ndarray],
             aux_maps: Dict[str, np.ndarray],
-            type_probs: Dict[str, np.ndarray]
         ) -> List[Tuple[str, np.ndarray, np.ndarray]]:
         """
         Run post processing for all predictions
@@ -88,13 +82,16 @@ class CellposePostProcessor(PostProcessor):
             inst_probs (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, soft instance map) pairs
                 inst_map shapes are (H, W, 2) 
+            type_probs (OrderedDict[str, np.ndarray]):
+                Ordered dict of (file name, type map) pairs.
+                type maps are in one hot format (H, W, n_classes).
+            sem_probs (Dict[str, np.ndarray]):
+                Dictionary of (file name, sem map) pairs.
+                sem maps are in one hot format (H, W, n_classes).
             aux_maps (OrderedDict[str, np.ndarray]):
                 Ordered dict of (file name, hover map) pairs.
                 hover_map[..., 0] = horizontal map
                 hover_map[..., 1] = vertical map
-            type_probs (OrderedDict[str, np.ndarray]):
-                Ordered dict of (file name, type map) pairs.
-                type maps are in one hot format (H, W, n_classes).
 
         Returns:
         -----------
@@ -110,10 +107,11 @@ class CellposePostProcessor(PostProcessor):
             zip(
                 inst_probs.keys(), 
                 inst_probs.values(), 
+                type_probs.values(),
+                sem_probs.values(),
                 aux_maps.values(), 
-                type_probs.values()
             )
         )
-        seg_results = self.parallel_pipeline(maps)
+        seg_results = self._parallel_pipeline(maps)
         
         return seg_results

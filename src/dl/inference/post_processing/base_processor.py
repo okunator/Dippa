@@ -1,8 +1,9 @@
 import numpy as np
 from abc import ABC, abstractmethod 
 from pathos.multiprocessing import ThreadPool as Pool
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 from tqdm import tqdm
+from collections import OrderedDict
 
 from src.utils import remove_debris
 from .combine_type_inst import combine_inst_semantic
@@ -48,7 +49,67 @@ class PostProcessor(ABC):
     def run_post_processing(self):
             raise NotImplementedError
 
-    def parallel_pipeline(
+    def _threshold_probs(
+        self,
+        maps: List[np.ndarray]
+    ) -> Dict[str, np.ndarray]:
+        """
+        Assemble network output maps in a dictionary for simple access
+        and threshold the instance and sem probabilities
+
+        Args:
+        ---------
+            maps (List[np.ndarray]):
+                A list of the name of the file, soft masks and auxiliary
+                maps
+
+        Returns:
+        ---------
+            Dict: A dictionary containing all the resulting pred maps
+                  from the network plus the filename of the sample.
+                  Order of return masks: "aux", "inst", "types", "sem"
+        """
+        # TODO: this will fail if the order of maps
+        keys = ["fn", "inst_probs", "type_probs", "sem_probs", "aux_map"]
+        maps = OrderedDict({k: v for k, v in zip(keys, maps)})
+        maps["inst_map"] = self.threshold(maps["inst_probs"])
+
+        if maps["type_probs"] is not None:
+            maps["type_map"] = np.argmax(maps["type_probs"], axis=2)
+
+        if maps["sem_probs"] is not None:
+            maps["sem_map"] = np.argmax(maps["sem_probs"], axis=2)
+
+        return maps
+
+    def _finalize_inst_seg(
+        self,
+        maps: List[np.ndarray],
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Finalize the instance segmentation by combining the type maps
+        and post-processed instance maps into one.
+
+        Args:
+        ---------
+            maps (List[np.ndarray]):
+                A list of the name of the file, soft masks, and hover 
+                maps from the network
+
+        Returns:
+        ---------
+            Tuple: The final inst map and combined inst and type seg map
+        """
+        combined = None
+        if maps["type_map"] is not None:
+            combined = combine_inst_semantic(maps["inst_map"], maps["type_map"])
+        
+        # Clean up the result
+        inst_map = remove_debris(maps["inst_map"], min_size=10)
+
+        return inst_map, combined
+
+    def _parallel_pipeline(
             self,
             maps: List[Tuple[np.ndarray]]
         ) -> List[Tuple[str, np.ndarray, np.ndarray]]:
@@ -108,44 +169,3 @@ class PostProcessor(ABC):
             result = niblack_thresh(**kwargs)
 
         return result
-
-    def combine_inst_type(
-            self,
-            inst_map: np.ndarray,
-            type_map: np.ndarray
-        ) -> np.ndarray:
-        """
-        Combines the nuclei types and instances 
-
-        Args:
-        -----------
-            inst_map (np.ndarray):
-                The post-processed instance map. Shape (H, W)
-            type_map (np.ndarray):
-                The soft type map. Shape (H, W, C)
-
-        Returns:
-        -----------
-            np.ndarray: The final combined inst_map + type_map 
-            prediction (instance segmentation). Shape (H, W) 
-        """
-        types = np.argmax(type_map, axis=2)
-        return combine_inst_semantic(inst_map, types)
-
-    def clean_up(self, inst_map: np.ndarray, min_size: int=10) -> np.ndarray:
-        """
-        Remove small objects. Sometimes the ndimage and skimage methods 
-        do not work as they should and fail to remove small objs...
-
-        Args:
-        ---------
-            inst_map (np.ndarray):
-                The input inst map. Shape (H, W)
-            min_size (int):
-                min size for image objects (number of pixels)
-
-        Returns:
-        ---------
-            np.ndarray: cleaned up inst map. Shape (H, W)
-        """
-        return remove_debris(inst_map, min_size)

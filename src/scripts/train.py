@@ -1,4 +1,3 @@
-import json
 import argparse
 from pathlib import Path
 from omegaconf import OmegaConf
@@ -20,22 +19,17 @@ def main(conf, extra_params):
         assert extra_params, (
             "If dataset == 'custom', the train/test db paths are required"
         )
-        assert extra_params.classes, (
-            """Class dict is required in str format. E.g. '{"bg":1, "fg":1}'"""
-        )
 
-        classes = json.loads(extra_params.classes)
         datamodule = CustomDataModule(
             train_db_path=extra_params.train_db,
             test_db_path=extra_params.test_db,
-            classes=classes,
             augmentations=conf.training_args.input_args.augmentations,
             normalize=conf.training_args.input_args.normalize_input,
             aux_branch=conf.model_args.decoder_branches.aux_branch,
             type_branch=conf.model_args.decoder_branches.type_branch,
+            sem_branch=conf.model_args.decoder_branches.sem_branch,
             edge_weights=conf.training_args.input_args.edge_weights,
             rm_touching_nuc_borders=conf.training_args.input_args.rm_overlaps,
-            semantic_branch=conf.model_args.decoder_branches.semantic_branch,
             batch_size=conf.runtime_args.batch_size,
             num_workers=conf.runtime_args.num_workers
         )
@@ -84,8 +78,16 @@ def main(conf, extra_params):
             download_dir=download_dir
         )
 
-    # init model
-    lightning_model = lightning.SegModel.from_conf(conf)
+
+    if conf.runtime_args.resume_training:
+        lightning_model = lightning.SegModel.from_experiment(
+            name=conf.experiment_args.experiment_name,
+            version=conf.experiment_args.experiment_version,
+        )
+    else:
+        # init model
+        lightning_model = lightning.SegModel.from_conf(conf)
+        
 
     # init trainer
     extra_callbacks = []
@@ -114,15 +116,6 @@ def main(conf, extra_params):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        '--classes',
-        type=str,
-        default=None,
-        help=(
-            "A dictionary mapping the correct classes of the dataset.",
-            "E.g. '{'background':0, 'epithel':1, 'neoplastic':2}'"
-        )
-    )
     parser.add_argument(
         '--train_db',
         type=str,

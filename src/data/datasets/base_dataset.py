@@ -128,13 +128,13 @@ class BaseDataset(Dataset, FileHandler):
                   (np.ndarray) and the filename of the patches
         """
         im, insts, types, areas = self.read_patch(self.fname, ix)
-        insts = self.fix_mirror_pad(insts)
+        insts = fix_duplicates(insts)
 
         if self.rm_touching_nuc_borders:
-            insts = self.remove_overlaps(insts)
+            insts = remove_1px_boundary(insts)
     
         # binarize inst branch mask
-        binary_map = self.binary(insts)
+        binary_map = binarize(insts)
 
         # Collect all the data needed to a dict
         data = {
@@ -144,7 +144,7 @@ class BaseDataset(Dataset, FileHandler):
         }
 
         if self.edge_weights:
-            weight_map = self.generate_weight_map(insts)
+            weight_map = self._generate_weight_map(insts)
             data["weight_map"] = weight_map
 
         if self.type_branch:
@@ -179,7 +179,7 @@ class BaseDataset(Dataset, FileHandler):
         # Normalize input img
         img = aug_data["image"]
         if self.normalize_input:
-            img = self.normalize(img)
+            img = minmax_normalize_torch(img)
 
         # gather the augmented data to a dictionary
         res = {
@@ -193,7 +193,7 @@ class BaseDataset(Dataset, FileHandler):
         return res
 
 
-    def generate_weight_map(self, inst_map: np.ndarray) -> np.ndarray:
+    def _generate_weight_map(self, inst_map: np.ndarray) -> np.ndarray:
         """
         Generate a weight map for the nuclei edges
 
@@ -209,67 +209,3 @@ class BaseDataset(Dataset, FileHandler):
         wmap = get_weight_map(inst_map)
         wmap += 1 # uniform weight for all classes
         return wmap
-
-    def remove_overlaps(self, inst_map: np.ndarray) -> np.ndarray:
-        """
-        Remove one pixel from the borders of the nuclei
-
-        Args:
-        --------
-            inst_map (np.ndarray):
-                Instance segmentation map. Shape (H, W)
-
-        Returns:
-        --------
-            np.ndarray: Resulting instance segmentaiton map. 
-            Shape (H, W).
-        """
-        return remove_1px_boundary(inst_map)
-
-    def fix_mirror_pad(self, inst_map: np.ndarray) -> np.ndarray:
-        """
-        Fix the redundant indices of the nuclear instances after mirror 
-        padding
-
-        Args:
-        --------
-            inst_map (np.ndarray):
-                Instance segmentation map. Shape (H, W)
-
-        Returns:
-        --------
-            np.ndarray: Resulting instance segmentaiton map. 
-            Shape (H, W).
-        """
-        return fix_duplicates(inst_map)
-        
-    def binary(self, inst_map: np.ndarray) -> np.ndarray:
-        """
-        binarize the indice in an instance segmentation map
-
-        Args:
-        --------
-            inst_map (np.ndarray):
-                Instance segmentation map. Shape (H, W)
-
-        Returns:
-        --------
-            np.ndarray: Binary mask. Shape (H, W).
-        """
-        return binarize(inst_map)
-
-    def normalize(self, img: torch.Tensor) -> torch.Tensor:
-        """
-        min-max normalize input img tensor
-
-        Args:
-        --------
-            img (torch.Tensor):
-                input tensor image. Shape (C, H, W)
-
-        Returns:
-        --------
-            torch.Tensor: Normalized input image tensor. 
-            Shape (C, H, W).
-        """
-        return minmax_normalize_torch(img)

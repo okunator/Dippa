@@ -120,9 +120,10 @@ class Predictor:
             Dict: example:  
             
             {
-                "instances":Tensor,
-                "types":Union[Tensor, None],
-                "aux":Union[Tensor, None]
+                "instances": torch.Tensor,
+                "types": Union[torch.Tensor, None],
+                "aux": Union[torch.Tensor, None],
+                "sem": Union[torch.Union, None]
             }
         """
         if isinstance(patch, np.ndarray):
@@ -185,7 +186,9 @@ class Predictor:
             # work out the tensor shape first for the weight mat
             B, C = pred.shape[:2]
             W = torch.repeat_interleave(
-                self.weight_mat, repeats=C, dim=1
+                self.weight_mat,
+                dim=1,
+                repeats=C,
             ).repeat_interleave(repeats=B, dim=0)
             pred *= W
 

@@ -13,6 +13,7 @@ class Model(MultiTaskSegModel):
             encoder_depth: int=5,
             encoder_freeze: bool=False,
             decoder_type_branch: bool=True,
+            decoder_sem_branch: bool=False,
             decoder_aux_branch: str=True,
             decoder_n_layers: int=1,
             decoder_n_blocks: int=2,
@@ -26,7 +27,8 @@ class Model(MultiTaskSegModel):
             weight_standardize: bool=False,
             long_skips: str="unet",
             long_skip_merge_policy: str="sum",
-            n_types: int=2,
+            n_classes_type: int=2,
+            n_classes_sem: int=2,
             model_input_size: int=256
         ) -> None: 
         """
@@ -50,7 +52,10 @@ class Model(MultiTaskSegModel):
             encoder_freeze (bool, default=False):
                 freeze the encoder for training
             decoder_type_branch (bool, default=True):
-                Flag whether to include a type semantic segmentation 
+                Flag whether to include a cell type segmentation 
+                branch to the network.
+            decoder_sem_branch (bool, default=False):
+                Flag whether to include a semantic area segmentation 
                 branch to the network.
             decoder_aux_branch (str, default=True):
                 The auxiliary branch type. One of: "hover", "dist", 
@@ -90,10 +95,14 @@ class Model(MultiTaskSegModel):
             long_skip_merge_policy (str, default="sum"):
                 How to merge the features in long skips. One of: "sum", 
                 "cat"
-            n_types (int, default=2):
-                Number of classes in the dataset. Type decoder branch is
-                set to output this number of classes. If type_branch is
-                False, this is ignored.
+            n_classes_type (int, default=2):
+                Number of cell type classes in the dataset. Type decoder
+                branch is set to output this number of classes. If 
+                `type_branch` is `False`, this is ignored.
+            n_classes_sem (int, default=2):
+                Number of semantic area classes in the dataset. Type 
+                decoder branch is set to output this number of classes. 
+                If `type_branch` is `False`, this is ignored.
             model_input_size (int, default=256):
                 The input image size of the model. Assumes that input 
                 images are square patches i.e. H == W.
@@ -115,6 +124,7 @@ class Model(MultiTaskSegModel):
 
         # Decoder args
         self.decoder_type_branch = decoder_type_branch
+        self.decoder_sem_branch = decoder_sem_branch
         self.decoder_aux_branch = decoder_aux_branch
         self.decoder_weight_init = decoder_weight_init
         self.decoder_n_layers = decoder_n_layers
@@ -191,7 +201,33 @@ class Model(MultiTaskSegModel):
 
             self.type_seg_head = SegHead(
                 in_channels=self.decoder_channels[-1],
-                out_channels=n_types,
+                out_channels=n_classes_type,
+                kernel_size=1
+            )
+
+        self.sem_decoder = None
+        self.sem_seg_head = None
+        if self.decoder_sem_branch:
+            self.sem_decoder = Decoder(
+                encoder_channels=list(self.encoder.out_channels),
+                decoder_channels=self.decoder_channels,
+                same_padding=True,
+                batch_norm=self.normalization,
+                activation=self.activation,
+                weight_standardize=self.weight_standardize,
+                n_layers=self.decoder_n_layers,
+                n_blocks=self.decoder_n_blocks,
+                preactivate=self.decoder_preactivate,
+                up_sampling=self.decoder_upsampling,
+                short_skip=self.decoder_short_skips,
+                long_skip=self.long_skips,
+                long_skip_merge_policy=self.merge_policy,
+                model_input_size=self.model_input_size
+            )
+
+            self.sem_seg_head = SegHead(
+                in_channels=self.decoder_channels[-1],
+                out_channels=n_classes_sem,
                 kernel_size=1
             )
 
@@ -226,23 +262,6 @@ class Model(MultiTaskSegModel):
         
         # init decoder weights
         self.initialize()
-
-        # set activations in the encoder if not relu
-        # if self.activation != "relu":
-        #     self.convert_activation(self.encoder, self.activation)
-
-        # # set weight standardization if specified
-        # if self.weight_standardize:
-        #     # HACK for handling efficientnets
-        #     if "efficientnet" in self.encoder_name:
-        #         kwargs = {}
-        #         kwargs.setdefault("image_size", self.encoder._global_params.image_size)
-
-        #     self.convert_conv(self.encoder, **kwargs)
-
-        # # set norm method in the encoder if not BN
-        # if self.normalization != "bn":
-        #     self.convert_norm(self.encoder, self.normalization)
             
         # freeze encoder if specified
         if self.encoder_freeze:

@@ -478,7 +478,11 @@ class Inferer(FileHandler):
                 pred["aux"], act=None, apply_weights=self.apply_weights
             )
 
-        return insts, types, aux
+        sem = None
+        if pred["sem"] is not None:
+            sem = self.predictor.classify(pred["sem"], act="softmax")
+
+        return insts, types, aux, sem
 
     def _infer_large_img_batch(
             self, 
@@ -519,6 +523,7 @@ class Inferer(FileHandler):
         batch_instances = []
         batch_types = []
         batch_aux = []
+        batch_sem = []
 
         # model batch size
         batch_size = self.model.batch_size
@@ -531,13 +536,15 @@ class Inferer(FileHandler):
             pred_inst = []
             pred_type = []
             pred_aux = []
+            pred_sem = []
 
             # Divide patches into batches that can be used as input to model
             for batch in self._get_batch(patches[j, ...], batch_size):
-                insts, types, aux = self._predict_batch(batch)
+                insts, types, aux, sem = self._predict_batch(batch)
                 pred_inst.append(insts)
                 pred_type.append(types) if types is not None else None
                 pred_aux.append(aux) if aux is not None else None
+                pred_sem.append(sem) if sem is not None else None
 
                 self.n_batches_inferred += batch.shape[0]
                 if batch_loader is not None:
@@ -548,10 +555,12 @@ class Inferer(FileHandler):
             pred_inst = torch.cat(pred_inst, dim=0)
             pred_type = torch.cat(pred_type, dim=0) if pred_type else None
             pred_aux = torch.cat(pred_aux, dim=0) if pred_aux else None
+            pred_sem = torch.cat(pred_sem, dim=0) if pred_sem else None
             
             batch_instances.append(pred_inst)
             batch_types.append(pred_type)
             batch_aux.append(pred_aux)
+            batch_sem.append(pred_sem)
 
         # Stitch the patches back to the orig img size
         insts = torch.stack(batch_instances, dim=0).permute(0, 2, 1, 3, 4)
@@ -570,7 +579,13 @@ class Inferer(FileHandler):
             aux = tilertorch.stitch_batched_patches(aux)
             aux = zip(names, tensor_to_ndarray(aux))
 
-        return insts, types, aux
+        sem = zip(names, [None]*len(names))
+        if all(e is not None for e in batch_sem):
+            sem = torch.stack(batch_sem, dim=0).permute(0, 2, 1, 3, 4)
+            sem = tilertorch.stitch_batched_patches(sem)
+            sem = zip(names, tensor_to_ndarray(sem))
+
+        return insts, types, aux, sem
 
     def _infer_img_batch(
             self, 
@@ -596,16 +611,20 @@ class Inferer(FileHandler):
         --------
             Tuple: of Zip objects containing (name, np.ndarray) pairs
         """
-        batch_instances, batch_types, batch_aux = self._predict_batch(batch)
-        insts = zip(names, tensor_to_ndarray(batch_instances))
+        pred_insts, pred_types, pred_aux, pred_sem = self._predict_batch(batch)
+        insts = zip(names, tensor_to_ndarray(pred_insts))
 
         types = zip(names, [None]*len(names))
-        if batch_types is not None:
-            types = zip(names, tensor_to_ndarray(batch_types))
+        if pred_types is not None:
+            types = zip(names, tensor_to_ndarray(pred_types))
 
         aux = zip(names, [None]*len(names))
-        if batch_aux is not None:
-            aux = zip(names, tensor_to_ndarray(batch_aux))
+        if pred_aux is not None:
+            aux = zip(names, tensor_to_ndarray(pred_aux))
+
+        sem = zip(names, [None]*len(names))
+        if pred_sem is not None:
+            sem = zip(names, tensor_to_ndarray(pred_sem))
         
         self.n_batches_inferred += batch.shape[0]
         if batch_loader is not None:
@@ -613,13 +632,13 @@ class Inferer(FileHandler):
                 patches=f"{self.n_batches_inferred}/{len(self.folderset.fnames)}"
             )
 
-        return insts, types, aux
+        return insts, types, aux, sem
 
     def _chunks(self, iterable: Iterable, size: int) -> Iterable:
         """
         Generate adjacent chunks of an iterable 
-        
         This is used to chunk the folder dataset for lower mem footprint
+        
         
         Args:
         ---------
@@ -649,9 +668,10 @@ class Inferer(FileHandler):
         soft_instances = []
         soft_types = []
         aux_maps = []
+        soft_areas = []
 
         with tqdm(chunked_dataloader, unit="batch") as batch_loader:
-            for j, data in enumerate(batch_loader):
+            for data in batch_loader:
                 
                 # Get data
                 batch = data["im"]
@@ -665,23 +685,26 @@ class Inferer(FileHandler):
                 if batch.shape[-1] > self.patch_size[0]:
                     requires_patching = True
 
+                # predict soft maps
                 if requires_patching:
-                    inst_probs, type_probs, aux = self._infer_large_img_batch(
+                    insts, types, aux, sem = self._infer_large_img_batch(
                         batch, names, batch_loader
                     )
                 else:
-                    inst_probs, type_probs, aux = self._infer_img_batch(
+                    insts, types, aux, sem = self._infer_img_batch(
                         batch, names, batch_loader
                     )
 
-                soft_instances.extend(inst_probs)
-                soft_types.extend(type_probs)
+                soft_instances.extend(insts)
+                soft_types.extend(types)
                 aux_maps.extend(aux)
+                soft_areas.extend(sem)
 
         # save intermediate results to mem if save_dir not specified
         self.soft_insts = OrderedDict(soft_instances)
         self.soft_types = OrderedDict(soft_types)
         self.aux_maps = OrderedDict(aux_maps)
+        self.soft_areas = OrderedDict(soft_areas)
 
     def _post_process(self):
         """
@@ -692,18 +715,21 @@ class Inferer(FileHandler):
         )
 
         maps = self.post_processor.run_post_processing(
-            inst_probs=self.soft_insts, 
-            aux_maps=self.aux_maps, 
-            type_probs=self.soft_types
+            inst_probs=self.soft_insts,
+            type_probs=self.soft_types,
+            sem_probs=self.soft_areas,
+            aux_maps=self.aux_maps,
         )
 
         # save to containers
         self.inst_maps = OrderedDict()
         self.type_maps = OrderedDict()
+        self.sem_maps = OrderedDict()
         for res in maps:
             name = res[0]
             self.inst_maps[name] = res[1].astype("int32")
             self.type_maps[name] = res[2].astype("int32")
+            self.sem_maps[name] = res[3].astype("int32")
 
     def run_inference(
             self, 

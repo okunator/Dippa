@@ -64,6 +64,27 @@ class WandbImageCallback(pl.Callback):
                     for pred in types
                 ]
 
+            if "sem" in list(outputs.keys()):
+                sem_target = batch["sem_map"].long().to(device="cpu")
+                soft_sem = outputs["sem"].to(device="cpu")
+                sem = torch.argmax(soft_sem, dim=1)
+
+                log_dict["val/soft_sem"] = [
+                    wandb.Image(ss[i, ...], caption="Soft semantic masks") 
+                    for ss in soft_sem
+                    for i in range(ss.shape[0])
+                ]
+
+                log_dict["val/sem_GT"] = [
+                    wandb.Image(gt.float(), caption="Semantic ground truths") 
+                    for gt in sem_target
+                ]
+
+                log_dict["val/sem_pred"] = [
+                    wandb.Image(pred.float(), caption="Sem ground truths") 
+                    for pred in sem
+                ]
+
 
             if "aux" in list(outputs.keys()):
                 aux = outputs["aux"].to(device="cpu")

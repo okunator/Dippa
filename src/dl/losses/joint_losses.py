@@ -59,8 +59,8 @@ class MultiTaskLoss(nn.Module):
             loss_weights: Optional[List[float]]=None
         ) -> None:
         """
-        Combines losses for different branches to  a single multi-taks 
-        loss function
+        Combines losses for different branches to a single multi-taks 
+        loss function.
 
         Args:
         ----------
@@ -84,9 +84,9 @@ class MultiTaskLoss(nn.Module):
         self.aux_loss = aux_loss
         self.sem_loss = sem_loss
         
-        self.weights = [1.0, 1.0, 1.0]
+        self.weights = [1.0, 1.0, 1.0, 1.0]
         if loss_weights is not None:
-            assert 1 < len(loss_weights) <= 3, (
+            assert 1 < len(loss_weights) <= 4, (
                 f"Too many weights in the loss_weights list: {loss_weights}"
             )
             self.weights = loss_weights
@@ -99,6 +99,8 @@ class MultiTaskLoss(nn.Module):
             target_type: Optional[torch.Tensor]=None,
             yhat_aux: Optional[torch.Tensor]=None,
             target_aux: Optional[torch.Tensor]=None,
+            yhat_sem: Optional[torch.Tensor]=None,
+            target_sem: Optional[torch.Tensor]=None,
             target_weight: Optional[torch.Tensor]=None,
             edge_weight: Optional[float]=1.1,
             **kwargs
@@ -116,27 +118,32 @@ class MultiTaskLoss(nn.Module):
                 Shape: (B, H, W)
             yhat_type (torch.Tensor, optional, default=None): 
                 output of the semantic segmentation decoder branch. 
-                Shape: (B, C, H, W)
+                Shape: (B, C_celltypes, H, W)
             target_type (torch.Tensor, optional, default=None): 
                 ground truth annotaions for semantic segmentation. 
                 Shape: (B, H, W)
             yhat_aux (torch.Tensor, optional, default=None): 
-                aux predictions. Shape: (B, 2, H, W)
+                aux predictions. Shape: (B, 2, H, W)|(B, 1, H, W)
             target_aux (torch.Tensor, optional, default=None): 
-                aux maps ground truth. Shape: (B, H, W)
+                aux maps ground truth. Shape: (B, H, W).
+            yhat_sem (torch.Tensor, optional, default=None): 
+                semantic area predictions. Shape: (B, C_area, H, W)
+            target_sem (torch.Tensor, optional, default=None): 
+                semantic area ground truth. Shape: (B, H, W).
             target_weight (torch.Tensor, optional, default=None): 
-                weight map for nuclei borders. Shape (B, H, W)
+                weight map for nuclei borders. Shape: (B, H, W).
             edge_weight (float, optional, default=1.1): 
                 weight applied at the nuclei borders. 
 
         Returns:
         ------------
-            torch.Tensor: computed multi-task loss
+            torch.Tensor: computed multi-task loss (Scalar).
         """
 
         iw = self.weights[0]
         tw = self.weights[1]
         aw = self.weights[2]
+        sw = self.weights[3]
 
         loss = self.inst_loss(
             yhat=yhat_inst,
@@ -147,7 +154,7 @@ class MultiTaskLoss(nn.Module):
         )
         loss *= iw
 
-        if self.type_loss:
+        if self.type_loss is not None:
             l2 = self.type_loss(
                 yhat=yhat_type,
                 target=target_type,
@@ -157,7 +164,7 @@ class MultiTaskLoss(nn.Module):
             )
             loss += tw*l2
 
-        if self.aux_loss:
+        if self.aux_loss is not None:
             l3 = self.aux_loss(
                 yhat=yhat_aux,
                 target=target_aux,
@@ -165,5 +172,13 @@ class MultiTaskLoss(nn.Module):
                 **kwargs
             )
             loss += l3*aw
+        
+        if self.sem_loss is not None:
+            l4 = self.sem_loss(
+                yhat=yhat_sem,
+                target=target_sem,
+                **kwargs
+            )
+            loss += l4*sw
 
         return loss

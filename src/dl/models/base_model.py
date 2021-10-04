@@ -16,6 +16,10 @@ class MultiTaskSegModel(nn.Module):
     branch and an optional aux branch
     """
     def initialize(self) -> None:
+        """
+        Init the decoder branches and their classification/regression
+        heads.
+        """
         initialize_decoder(self.inst_decoder)
         initialize_head(self.inst_seg_head)
 
@@ -26,6 +30,10 @@ class MultiTaskSegModel(nn.Module):
         if self.decoder_aux_branch:
             initialize_decoder(self.aux_decoder)
             initialize_head(self.aux_seg_head)
+
+        if self.decoder_sem_branch:
+            initialize_decoder(self.sem_decoder)
+            initialize_head(self.sem_seg_head)
 
     def forward(self, x) -> Dict[str, torch.Tensor]:
         features = self.encoder(x)
@@ -42,16 +50,24 @@ class MultiTaskSegModel(nn.Module):
             aux = self.aux_decoder(*features)
             aux = self.aux_seg_head(aux)
 
+        sem = None
+        if self.decoder_sem_branch:
+            sem = self.sem_decoder(*features)
+            sem = self.sem_seg_head(sem)
+
         return {
             "instances": insts,
             "types": types,
-            "aux": aux
+            "aux": aux,
+            "sem": sem
         }
 
     def freeze_encoder(self) -> None:
         for param in self.encoder.parameters():
             param.requires_grad = False
     
+    ###########################
+    # Bunch of HACKS
     def convert_activation(
             self,
             model: nn.Module=None,
