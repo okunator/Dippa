@@ -1,16 +1,13 @@
 experiment_args:
-  experiment_name: wandb_test3
-  experiment_version: eka
-
-dataset_args:
-  n_classes: 6
+  experiment_name: panoptic
+  experiment_version: 2nd_try
 
 model_args:
   architecture_design:
     module_args:
       activation: leaky-relu    # One of (relu, mish, swish, leaky-relu)
-      normalization: bn         # One of (bn, bcn, gn, nope)
-      weight_standardize: False # Weight standardization
+      normalization: bcn        # One of (bn, bcn, gn, nope)
+      weight_standardize: True  # Weight standardization
       weight_init: he           # One of (he, TODO: eoc) (only for decoder if pretrain)
     encoder_args:
       in_channels: 3            # RGB input images
@@ -21,9 +18,9 @@ model_args:
       n_layers: 1               # Number multi conv blocks inside one decoder level 
       n_blocks: 2               # Number of convolutions blocks in each multi conv block
       preactivate: False        # If True, BN & RELU applied before CONV
-      short_skips: dense         # One of (residual, dense, null) (for decoder branch only)
-      long_skips: unet          # One of (unet, unet++, unet3+, null)
-      merge_policy: summation   # One of (summation, concatenate) (for long skips)
+      short_skips: residual     # One of (residual, dense, null) (for decoder branch only)
+      long_skips: unet3+        # One of (unet, unet++, unet3+, null)
+      merge_policy: concatenate # One of (summation, concatenate) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
       decoder_channels:         # Number of out channels for every decoder layer
         - 256
@@ -35,7 +32,7 @@ model_args:
   decoder_branches:
     type_branch: True           # Adds a cell type prediction branch
     aux_branch: hover           # Adds an auxiliary branch. One of (hover, dist, contour, null)
-    semantic_branch: False      # Adds an extra branch for semantic annotations
+    sem_branch: True      # Adds an extra branch for semantic annotations
 
 training_args:
   freeze_encoder: False          # freeze the weights in the encoder (for fine tuning)
@@ -45,6 +42,9 @@ training_args:
     normalize_input: False       # minmax normalize input images after augs
     rm_overlaps: False           # Remove overlapping nuclei borders from masks
     edge_weights: False          # Compute nuclei border weight maps for each input
+    model_input_size: 256       # size of the model input (input_size, input_size)
+    n_classes_type: 7            # num classes for cell types
+    n_classes_sem: 5             # num classes for area types
     augmentations:
       - hue_sat
       - non_rigid
@@ -65,16 +65,15 @@ training_args:
     inst_branch_loss: dice_ce
     type_branch_loss: dice_ce
     aux_branch_loss: mse_ssim
-    semantic_branch_loss: dice_ce
+    sem_branch_loss: dice_ce
     edge_weight: null            # (float|null)
 
 runtime_args:
   resume_training: False
-  num_epochs: 4
+  num_epochs: 1
   num_gpus: 1
   batch_size: 4
   num_workers: 4              # number workers for data loader
-  model_input_size: 256       # size of the model input (input_size, input_size)
   db_type: hdf5               # The type of the input data db. One of (hdf5, zarr).
   wandb: True                 # Wandb logging
   metrics_to_cpu: True        # Lowers GPU memory but training gets slower.
