@@ -76,13 +76,13 @@ class DistDataset(BaseDataset):
         data = self._get_and_preprocess(ix)
 
         # generate dist-maps
-        data["dist_map"] = gen_dist_maps(data["inst_map"])
+        data["aux_map"] = gen_dist_maps(data["inst_map"])
 
         # augment everything
         aug_data = self._augment(data)
 
         # TODO: Test if this is faster to do here
         # create an extra dim so that loss computing works
-        aug_data["dist_map"] = aug_data["dist_map"].unsqueeze(dim=0)
+        aug_data["aux_map"] = aug_data["aux_map"].unsqueeze(dim=0)
 
         return aug_data

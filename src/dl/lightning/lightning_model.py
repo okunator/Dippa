@@ -449,8 +449,7 @@ class SegModel(pl.LightningModule):
 
         aux_target = None
         if self.decoder_aux_branch is not None:
-            aux_key = f"{self.decoder_aux_branch}_map"
-            aux_target = batch[aux_key].float()
+            aux_target = batch["aux_map"].float()
             
         # Forward pass
         soft_masks = self.forward(x)

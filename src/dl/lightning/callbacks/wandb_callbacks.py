@@ -43,7 +43,7 @@ class WandbImageCallback(pl.Callback):
             }
 
 
-            if "types" in list(outputs.keys()):
+            if "type_map" in list(batch.keys()):
                 type_target = batch["type_map"].long().to(device="cpu")
                 soft_types = outputs["types"].to(device="cpu")
                 types = torch.argmax(soft_types, dim=1)
@@ -64,7 +64,7 @@ class WandbImageCallback(pl.Callback):
                     for pred in types
                 ]
 
-            if "sem" in list(outputs.keys()):
+            if "sem_map" in list(batch.keys()):
                 sem_target = batch["sem_map"].long().to(device="cpu")
                 soft_sem = outputs["sem"].to(device="cpu")
                 sem = torch.argmax(soft_sem, dim=1)
@@ -86,7 +86,7 @@ class WandbImageCallback(pl.Callback):
                 ]
 
 
-            if "aux" in list(outputs.keys()):
+            if "aux_map" in list(batch.keys()):
                 aux = outputs["aux"].to(device="cpu")
                 log_dict["val/aux_maps"] = [
                     wandb.Image(a[i, ...], caption="Aux maps") 

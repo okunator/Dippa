@@ -86,7 +86,7 @@ class HoverDataset(BaseDataset):
 
         # TODO: Test if this is faster to do here
         # stack the horizontal and vertical gradients, xy-order
-        aug_data["hover_map"] = torch.stack(
+        aug_data["aux_map"] = torch.stack(
             [aug_data["xmap"], aug_data["ymap"]],
             dim=0
         )

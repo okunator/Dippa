@@ -76,7 +76,7 @@ class ContourDataset(BaseDataset):
         data = self._get_and_preprocess(ix)
         
         # generate boundary-maps
-        data["contour_map"] = contours(
+        data["aux_map"] = contours(
             data["inst_map"],
             thickness=2
         )
@@ -86,6 +86,6 @@ class ContourDataset(BaseDataset):
 
         # TODO: Test if this is faster to do here
         # create an extra dim so that loss computing works
-        aug_data["contour_map"] = aug_data["contour_map"].unsqueeze(dim=0)
+        aug_data["aux_map"] = aug_data["aux_map"].unsqueeze(dim=0)
 
         return aug_data

@@ -20,7 +20,7 @@ KEY_COLORS = {
     "neoplastic": (0., 200., 100.),
     "connective": (255., 0., 0.),
     "dead": (255., 0., 255.),
-    "nuclei":(255., 0., 0.)
+    "nuclei":(255., 255., 255.),
 }
 
 
@@ -83,7 +83,11 @@ def draw_contours(
         if classes is not None:
             class_num = np.unique(type_map[inst > 0].astype("uint8"))[0]
             class_name = [key for key, item in classes.items() if class_num == item][0]
-            inst_color = KEY_COLORS[class_name]
+
+            if class_name in KEY_COLORS.keys():
+                inst_color = KEY_COLORS[class_name]
+            else:
+                inst_color = KEY_COLORS["nuclei"]
 
         if fill_contours:
             contoured_rgb = cv2.drawContours(

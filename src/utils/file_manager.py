@@ -16,11 +16,37 @@ class FileHandler:
     """
     @staticmethod
     def read_img(path: Union[str, Path]) -> np.ndarray:
+        """
+        Read an image & convert from bgr to rgb. (cv2 reads imgs in bgr)
+
+        Args:
+        ---------
+            path (str | Path):
+                Path to the image file.
+
+        Returns:
+        ---------
+            np.ndarray: The image. Shape (H, W, 3)
+        """
         path = Path(path)
         return cv2.cvtColor(cv2.imread(path.as_posix()), cv2.COLOR_BGR2RGB)
 
     @staticmethod
     def read_mask(path: Union[str, Path], key: str="inst_map") -> np.ndarray:
+        """
+        Read a mask from a .mat file.
+
+        Args:
+        ---------
+            path (str | Path):
+                Path to the image file.
+            key (str):
+                name/key of the mask type that is being read from .mat
+        
+        Returns:
+        ----------
+            np.ndarray: The mask indice matrix. Shape (H, W) 
+        """
         assert key in (
             "inst_map", "type_map", "inst_centroid", "inst_type", "sem_map"
         )
@@ -36,14 +62,6 @@ class FileHandler:
         path = Path(path)
         return sio.loadmat(path.as_posix())[key].astype(dtypes[key])
     
-    @staticmethod
-    def remove_existing_files(directory: Union[str, Path]) -> None:
-        assert Path(directory).exists(), f"{directory} does not exist"
-        for item in Path(directory).iterdir():
-            # Do not touch the folders inside the directory
-            if item.is_file():
-                item.unlink()
-
     @staticmethod
     def read_zarr_patch(path: str, ix: int) -> Tuple[np.ndarray]:
         """
@@ -97,8 +115,26 @@ class FileHandler:
         return im_patch, inst_patch, type_patch, sem_patch
 
     @staticmethod
-    def get_class_weights(path: Union[str, Path], 
-                          binary: bool=False) -> np.ndarray:
+    def get_class_weights(
+            path: Union[str, Path],
+            binary: bool=False
+        ) -> np.ndarray:
+        """
+        Read class weight arrays that are saved in h5 or zarr db.
+        h5 or zarr dbs need to be written with the db-writers in this
+        repo for this to work
+
+        Args:
+        --------
+            path (str):
+                Path to the hdf5 database
+            binary (bool, default=False):
+                If True, Computes only background vs. foregroung weights
+
+        Returns:
+        --------
+            np.ndarray: class weights array. Shape (C, )
+        """
         path = Path(path)
         if path.suffix == ".h5": 
             with tb.open_file(path.as_posix(), "r") as db:
@@ -118,6 +154,21 @@ class FileHandler:
 
     @staticmethod
     def get_dataset_stats(path: Union[str, Path]) -> Tuple[np.ndarray]:
+        """
+        Read dataset statistics arrays that are saved in h5 or zarr db.
+        h5 or zarr dbs need to be written with the db-writers in this
+        repo for this to work
+
+        Args:
+        --------
+            path (str):
+                Path to the hdf5 database
+
+        Returns:
+        --------
+            Tuple: Tuple of dataset channel-wise mean and std arrays. 
+                   Both have shape (C, ). Shape for RGB imgs (3, )
+        """
         path = Path(path)
         if path.suffix == ".h5": 
             with tb.open_file(path.as_posix(), "r") as db:
@@ -132,26 +183,80 @@ class FileHandler:
         return mean, std
 
     @staticmethod
+    def get_dataset_size(path: Union[str, Path]) -> Tuple[np.ndarray]:
+        pass
+
+    @staticmethod
     def create_dir(path: Union[str, Path]) -> None:
+        """
+        Create a directory.
+
+        Args:
+        ---------
+            path (str | Path):
+                Path to the image file.
+        """
         Path(path).mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def extract_zips(path: Union[str, Path], rm: bool = False) -> None:
+        """
+        Extract files from all the .zip files inside a folder.
+
+        Args:
+        ---------
+            path (str | Path):
+                Path to the image file.
+            rm (bool, default=False):
+                remove the .zip files after extraction.
+        """
         for f in Path(path).iterdir():
             if f.is_file() and f.suffix == ".zip":
                 with zipfile.ZipFile(f, 'r') as z:
                     z.extractall(path)
                 if rm:
                     f.unlink()
+    @staticmethod
+    def remove_existing_files(path: Union[str, Path]) -> None:
+        """
+        Remove files inside a folder
 
+        Args:
+        ---------
+            path (str | Path):
+                Path to the image file.
+        """
+        assert Path(path).exists(), f"{path} does not exist"
+        for item in Path(path).iterdir():
+            # Do not touch the folders inside the directory
+            if item.is_file():
+                item.unlink()
 
     @staticmethod
     def get_experiment_dir(experiment: str, version: str) -> Path:
+        """
+        Get the path where all thr files related to a specific experiment
+        are saved during training and inference.
+
+        Args:
+        ---------
+            experiment (str):
+                name of the experiment
+            version (str):
+                version of the experiment
+
+        Returns:
+        ---------
+            Path: path to the experiment dir
+        """
         experiment_dir = Path(f"{RESULT_DIR}/{experiment}/version_{version}")
         return experiment_dir
 
     @staticmethod
     def result_dir() -> Path:
+        """
+        Get the default results directory
+        """
         return Path(RESULT_DIR)
 
     @staticmethod
@@ -160,7 +265,21 @@ class FileHandler:
             version: str,
             which: str="last"
         ) -> Path:
+        """
+        Get the path to the model checkpoint/weights inside a specific
+        experiment directory.
 
+        Args:
+        ---------
+            experiment (str):
+                name of the experiment
+            version (str):
+                version of the experiment
+
+        Returns:
+        ---------
+            Path: path to the checkpoint file
+        """
         assert which in ("best", "last"), (
             f"param which: {which} not one of ('best', 'last')"
         )
