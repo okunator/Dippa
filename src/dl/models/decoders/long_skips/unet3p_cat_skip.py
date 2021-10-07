@@ -85,7 +85,7 @@ class Unet3pCatSkipBlock(nn.Module):
             preactivate=preactivate
         )
 
-        # if there are skip channels, init the all the skip convs
+        # if there are skip channels, init all the skip convs
         # init the dense decoder to decoder skips
         if skip_channels:
             target_size = out_dims[0]

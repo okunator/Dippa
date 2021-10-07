@@ -11,15 +11,15 @@ model_args:
       weight_init: he           # One of (he, TODO: eoc) (only for decoder if pretrain)
     encoder_args:
       in_channels: 3            # RGB input images
-      encoder: efficientnet-b5  # https://github.com/qubvel/segmentation_models.pytorch
+      encoder: tf_efficientnetv2_l  # https://github.com/qubvel/segmentation_models.pytorch
       pretrain: True            # Use imagenet pre-trained encoder
       depth: 5                  # Number of layers in encoder
     decoder_args:
-      n_layers: 1               # Number multi conv blocks inside one decoder level 
-      n_blocks: 2               # Number of convolutions blocks in each multi conv block
+      n_layers: 1               # Number multi conv blocks inside one decoder stage 
+      n_blocks: 2               # Number of convolution blocks in each multi conv block
       preactivate: False        # If True, BN & RELU applied before CONV
       short_skips: residual     # One of (residual, dense, null) (for decoder branch only)
-      long_skips: unet3+        # One of (unet, unet++, unet3+, null)
+      long_skips: unet        # One of (unet, unet++, unet3+, null)
       merge_policy: concatenate # One of (summation, concatenate) (for long skips)
       upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
       decoder_channels:         # Number of out channels for every decoder layer
@@ -69,8 +69,8 @@ training_args:
     edge_weight: null            # (float|null)
 
 runtime_args:
-  resume_training: False
-  num_epochs: 1
+  resume_training: True
+  num_epochs: 30
   num_gpus: 1
   batch_size: 4
   num_workers: 4              # number workers for data loader

@@ -116,7 +116,8 @@ class ResidualConvBlock(BaseConvBlock):
                 If True, perform weight standardization
             use_residual (bool, default=True):
                 If True, the identity is summed to the linear unit 
-                before the final activation
+                before the final activation. (This param is used by
+                the MultiBlockResidual)
         """
         super(ResidualConvBlock, self).__init__(
             in_channels=in_channels,

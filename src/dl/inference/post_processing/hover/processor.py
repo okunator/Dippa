@@ -35,14 +35,12 @@ class HoverNetPostProcessor(PostProcessor):
 
         Args:
         -----------
-            maps (List[np.ndarray]):
-                A list of the name of the file, soft masks, and hover 
-                maps from the network
-
-        Returns:
-        -----------
-            List: list of the filename and different output masks
-                  masks order: "inst", "types", "sem"
+            List: A list of tuples containing filename (str), 
+                  post-processed inst, aux, sem, and type map (ndarray)
+            
+            Example:
+            [("filename1", aux_map, inst_map, type_map, sem_map),
+             ("filename2", aux_map, inst_map, type_map, sem_map)]
         """
         maps = self._threshold_probs(maps)
         maps["inst_map"] = post_proc_hover(maps["inst_map"], maps["aux_map"])
@@ -78,17 +76,21 @@ class HoverNetPostProcessor(PostProcessor):
                 sem maps are in one hot format (H, W, n_classes).
             aux_maps (Dict[str, np.ndarray]):
                 Dictionary of (file name, hover map) pairs.
-                hover_map[..., 0] = horizontal map
-                hover_map[..., 1] = vertical map
+                aux_map[..., 0] = horizontal map
+                aux_map[..., 1] = vertical map
 
         Returns:
         -----------
-            List: a list of tuples containing filename, post-processed 
-            inst map and type map
+           List: A list of tuples containing filename (str), 
+                  post-processed inst, aux, sem, and type map (ndarray).
+                  
+                  The output maps depend on the outputs of the network.
+                  If the network does not output type or sem maps,
+                  these are not contained in the result list.
             
-            Example: 
-            [("filename1", inst_map: np.ndarray, aux_map: np.ndarray),
-             ("filename2", inst_map: np.ndarray, aux_map: np.ndarray)]
+            Output example:
+            [("filename1", aux_map, inst_map, type_map, sem_map),
+             ("filename2", aux_map, inst_map, type_map, sem_map)]
         """
         # Set arguments for threading pool
         maps = list(
