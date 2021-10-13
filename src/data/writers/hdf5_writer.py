@@ -2,7 +2,7 @@ import numpy as np
 import tables as tb
 from tqdm import tqdm
 from pathlib import Path
-from typing import Tuple, Union, Dict, BinaryIO
+from typing import Tuple, Union, Dict, BinaryIO, Optional
 
 from src.patching import TilerStitcher
 from src.data.writers.base_writer import BaseWriter
@@ -21,7 +21,8 @@ class HDF5Writer(BaseWriter):
             n_copies: int=None,
             rigid_augs_and_crop: bool=True,
             crop_shape: Tuple[int]=(256, 256),
-            chunk_size: int=1
+            chunk_size: int=1,
+            sem_classes: Optional[Dict[str, int]]=None
         ) -> None:
         """
         Iterates image and mask folders, patches them (if specified), 
@@ -78,6 +79,7 @@ class HDF5Writer(BaseWriter):
         self.classes = classes
         self.rigid_augs_and_crop = rigid_augs_and_crop
         self.crop_shape = crop_shape
+        self.sem_classes = sem_classes
 
         if self.patch_shape is not None:
             self.n_copies = None
@@ -278,6 +280,7 @@ class HDF5Writer(BaseWriter):
         root._v_attrs.save_dir = self.save_dir.as_posix()
         root._v_attrs.file_name = self.file_name
         root._v_attrs.classes = self.classes
+        root._v_attrs.sem_classes = self.sem_classes
 
         # set patch width and height
         ph, pw = self.crop_shape

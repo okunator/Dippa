@@ -1,14 +1,18 @@
 import torch
+import torch.nn as nn
 import torch.optim as optim
 import pandas as pd
 import pytorch_lightning as pl
+from copy import deepcopy
 from typing import List, Dict
 from pathlib import Path
 from omegaconf import DictConfig
+from torchmetrics.metric import Metric
 
 from src.settings import RESULT_DIR
 from src.dl.builders import LossBuilder, OptimizerBuilder, Model
 from .metrics import Accuracy, MeanIoU
+
 
 
 class SegModel(pl.LightningModule):
@@ -59,6 +63,7 @@ class SegModel(pl.LightningModule):
             n_classes_sem: int=2,
             class_weights: torch.Tensor=None,
             binary_weights: torch.Tensor=None,
+            metrics: List[str]=["miou"],
             inference_mode: bool=False,
             **kwargs
         ) -> None:
@@ -202,17 +207,23 @@ class SegModel(pl.LightningModule):
             binary_weights (torch.Tensor, default=None):
                 A tensor defining the weights (0 < w < 1) for the back 
                 and foreground in the loss function
+            metrics (List[str], default=["miou"]):
+                List of metrics that are computed during training and
+                validation. Allowed metrics for now: accuracy ("acc"),
+                mean-iou ("miou").
             inference_mode (bool, default=False):
                 Flag to signal that model is initialized for inference. 
                 This is only used in the Inferer class so no need to 
                 touch this argument.
         """
+        assert all(m in ("acc", "miou") for m in metrics), "Illegal metric."  
         super(SegModel, self).__init__()
         self.experiment_name = experiment_name
         self.experiment_version = experiment_version
         self.model_input_size = model_input_size
         self.n_classes_type = n_classes_type
         self.n_classes_sem = n_classes_sem
+        self.metric_list = metrics
 
         # Encoder args
         self.encoder_in_channels = encoder_in_channels
@@ -298,24 +309,25 @@ class SegModel(pl.LightningModule):
             # init multi loss function
             self.criterion = self.configure_loss()
 
-            # init pl metrics
-            acc = Accuracy()
-            miou = MeanIoU()
-            self.train_acc = acc.clone()
-            self.test_acc = acc.clone()
-            self.valid_acc = acc.clone()
-            self.train_miou = miou.clone()
-            self.test_miou = miou.clone()
-            self.valid_miou = miou.clone()
-
-            self.metrics = {
-                "train_acc": self.train_acc,
-                "test_acc": self.test_acc,
-                "val_acc": self.valid_acc,
-                "train_iou": self.train_miou,
-                "test_iou": self.test_miou,
-                "val_iou": self.valid_miou,
+            # init torchmetrics
+            md = {
+                "acc": {
+                    "type_acc": Accuracy(),
+                },
+                "miou": {
+                    "type_miou": MeanIoU(),
+                }
             }
+
+            if self.decoder_sem_branch:
+                md["miou"]["sem_miou"] = MeanIoU()
+
+            metrics = nn.ModuleDict(
+                {k: v for m in self.metric_list for k, v in md[m].items()}
+            )
+            self.train_metrics = deepcopy(metrics)
+            self.val_metrics = deepcopy(metrics)
+            self.test_metrics = deepcopy(metrics)
 
     @classmethod
     def from_conf(cls, 
@@ -372,6 +384,7 @@ class SegModel(pl.LightningModule):
             num_workers=conf.runtime_args.num_workers,
             n_classes_type=conf.training_args.input_args.n_classes_type,
             n_classes_sem=conf.training_args.input_args.n_classes_sem,
+            metrics=conf.runtime_args.metrics,
             **kwargs
         )
 
@@ -419,6 +432,32 @@ class SegModel(pl.LightningModule):
         kwargs["inference_mode"] = inference_mode
         return cls(**kwargs)
 
+
+    def _compute_metrics(
+            self,
+            preds: Dict[str, torch.Tensor],
+            targets: Dict[str, torch.Tensor],
+            phase: str,
+            key: str,
+        ) -> Dict[str, torch.Tensor]:
+        """
+        Compute all the given torchmetrics
+        """
+        if phase == "train":
+            metrics_dict = self.train_metrics
+        elif phase == "val":
+            metrics_dict = self.val_metrics
+        elif phase == "test":
+            metrics_dict = self.test_metrics
+        
+        ret = {}
+        for k, metric in metrics_dict.items():
+            ret[k] = metric(preds[key], targets[key], "softmax")
+            if "sem" in k:
+                ret[k] = metric(preds["sem"], targets["sem"], "softmax")
+            
+        return ret
+
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         return self.model(x)
 
@@ -429,27 +468,29 @@ class SegModel(pl.LightningModule):
             phase: str
         ) -> Dict[str, torch.Tensor]:
         """
-        General training step
+        General training step. Runs all the required computations based 
+        on the network architecture and other parameters.
         """
         # Get data
+        targets = {}
         x = batch["image"].float()
-        inst_target = batch["binary_map"].long()
+        targets["instances"] = batch["binary_map"].long()
 
-        target_weight = None
+        targets["weight"] = None
         if self.edge_weight:
-            target_weight = batch["weight_map"].float()
+            targets["weight"] = batch["weight_map"].float()
             
-        type_target = None
+        targets["types"] = None
         if self.decoder_type_branch:
-            type_target = batch["type_map"].long()
+            targets["types"] = batch["type_map"].long()
 
-        sem_target = None
+        targets["sem"] = None
         if self.decoder_sem_branch:
-            sem_target = batch["sem_map"].long()
+            targets["sem"] = batch["sem_map"].long()
 
-        aux_target = None
+        targets["aux"] = None
         if self.decoder_aux_branch is not None:
-            aux_target = batch["aux_map"].float()
+            targets["aux"] = batch["aux_map"].float()
             
         # Forward pass
         soft_masks = self.forward(x)
@@ -457,32 +498,27 @@ class SegModel(pl.LightningModule):
         # Compute loss
         loss = self.criterion(
             yhat_inst=soft_masks["instances"],
-            target_inst=inst_target,
+            target_inst=targets["instances"],
             yhat_type=soft_masks["types"],
-            target_type=type_target,
+            target_type=targets["types"],
             yhat_aux=soft_masks["aux"],
-            target_aux=aux_target,
+            target_aux=targets["aux"],
             yhat_sem=soft_masks["sem"],
-            target_sem=sem_target,
-            target_weight=target_weight,
+            target_sem=targets["sem"],
+            target_weight=targets["weight"],
             edge_weight=1.1
         )
 
         # Compute metrics for monitoring
         key = "types" if self.decoder_type_branch else "instances" 
-        type_iou = self.metrics[f"{phase}_iou"](
-            soft_masks[key], type_target, "softmax"
-        )
-        type_acc = self.metrics[f"{phase}_acc"](
-            soft_masks[key], type_target, "softmax"
-        )
+        metrics = self._compute_metrics(soft_masks, targets, phase, key)
 
-        return {
+        ret = {
             "soft_masks": soft_masks if phase == "val" else None,
             "loss": loss,
-            "accuracy": type_acc,
-            "mean_iou": type_iou
         }
+
+        return {**ret, **metrics}
 
     def training_step(
             self,
@@ -490,18 +526,23 @@ class SegModel(pl.LightningModule):
             batch_idx: int
         ) -> Dict[str, torch.Tensor]:
         """
-        Training step
+        Training step + train metric logs
         """
         res = self.step(batch, batch_idx, "train")
-        self.log("train_loss", res["loss"], prog_bar=True)
-        self.log("train_miou", res["mean_iou"], prog_bar=True)
-        self.log("train_accuracy", res["accuracy"], prog_bar=True)
 
-        return {
-            "accuracy": res["accuracy"],
-            "miou": res["mean_iou"],
-            "loss": res["loss"]
-        }
+        del res["soft_masks"] # soft masks not needed at train step
+        loss = res.pop("loss")
+
+        # log all the metrics
+        self.log(
+            "train_loss", loss, prog_bar=True, on_epoch=False, on_step=True
+        )
+        for k, val in res.items():
+            self.log(
+                f"train_{k}", val, prog_bar=True, on_epoch=False, on_step=True
+            )
+
+        return loss
 
     def validation_step(
             self,
@@ -509,28 +550,50 @@ class SegModel(pl.LightningModule):
             batch_idx: int
         ) -> Dict[str, torch.Tensor]:
         """
-        Validation step
+        Validation step + validation metric logs + example outputs for
+        logging
         """
         res = self.step(batch, batch_idx, "val")
-        self.log("val_loss", res["loss"], prog_bar=False)
-        self.log("val_miou", res["mean_iou"], prog_bar=False)
-        self.log("val_accuracy", res["accuracy"], prog_bar=False)
 
-        return res["soft_masks"]
+        soft_masks = res.pop("soft_masks") # soft masks for logging
+        loss = res.pop("loss")
 
+        # log all the metrics
+        self.log(
+            "val_loss", loss, prog_bar=False, on_epoch=True, on_step=False
+        )
+        for k, val in res.items():
+            self.log(
+                f"val_{k}", val, prog_bar=False, on_epoch=True, on_step=False
+            )
+        
+        # If batch_idx = 0, sends outputs to wandb logger
+        if batch_idx in (0, 10):
+            return soft_masks
+        
     def test_step(
             self,
             batch: Dict[str, torch.Tensor], 
             batch_idx: int
         ) -> Dict[str, torch.Tensor]:
         """
-        Test step
+        Test step + test metric logs
         """
         res = self.step(batch, batch_idx, "test")
-        self.log("test_loss", res["loss"], prog_bar=False)
-        self.log("test_miou", res["mean_iou"], prog_bar=False)
-        self.log("test_accuracy", res["accuracy"], prog_bar=False)
+
+        del res["soft_masks"] # soft masks not needed at test step
+        loss = res.pop("loss")
         
+        # log all the metrics
+        self.log(
+            "val_loss", loss, prog_bar=False, on_epoch=True, on_step=False
+        )
+        for k, val in res.items():
+            self.log(
+                f"val_{k}", val, prog_bar=False, on_epoch=True, on_step=False
+            )
+
+    
     def configure_optimizers(self):
         optimizer = OptimizerBuilder.set_optimizer(
             optimizer_name=self.optimizer_name,

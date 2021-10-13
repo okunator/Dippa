@@ -19,7 +19,7 @@ class HoverDataset(BaseDataset):
         ) -> None:
         """
         Dataset where masks are pre-processed similarly to the Hover-Net
-        paper: https://arxiv.org/abs/1812.06499
+        paper: https://www.sciencedirect.com/science/article/abs/pii/S1361841519301045
 
         Args:
         ----------

@@ -1,6 +1,6 @@
 experiment_args:
   experiment_name: panoptic
-  experiment_version: 2nd_try
+  experiment_version: effnetv2
 
 model_args:
   architecture_design:
@@ -11,7 +11,7 @@ model_args:
       weight_init: he           # One of (he, TODO: eoc) (only for decoder if pretrain)
     encoder_args:
       in_channels: 3            # RGB input images
-      encoder: tf_efficientnetv2_l  # https://github.com/qubvel/segmentation_models.pytorch
+      encoder: tu-tf_efficientnetv2_l  # https://github.com/qubvel/segmentation_models.pytorch
       pretrain: True            # Use imagenet pre-trained encoder
       depth: 5                  # Number of layers in encoder
     decoder_args:
@@ -51,29 +51,31 @@ training_args:
       - blur
 
   optimizer_args:
-    optimizer: radam              # One of https://github.com/jettify/pytorch-optimizer 
+    optimizer: adamp              # One of https://github.com/jettify/pytorch-optimizer 
     lr: 0.0005
     encoder_lr: 0.00005
     weight_decay: 0.0003
     encoder_weight_decay: 0.00003
-    lookahead: True
-    bias_weight_decay: True
+    lookahead: False
+    bias_weight_decay: False
     scheduler_factor: 0.25
     scheduler_patience: 3
 
   loss_args:
-    inst_branch_loss: dice_ce
-    type_branch_loss: dice_ce
+    inst_branch_loss: tversky_focal
+    type_branch_loss: tversky_focal
     aux_branch_loss: mse_ssim
-    sem_branch_loss: dice_ce
+    sem_branch_loss: tversky_focal
     edge_weight: null            # (float|null)
 
 runtime_args:
   resume_training: True
-  num_epochs: 30
+  num_epochs: 20
   num_gpus: 1
   batch_size: 4
   num_workers: 4              # number workers for data loader
   db_type: hdf5               # The type of the input data db. One of (hdf5, zarr).
   wandb: True                 # Wandb logging
   metrics_to_cpu: True        # Lowers GPU memory but training gets slower.
+  metrics:
+    - miou

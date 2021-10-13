@@ -95,6 +95,15 @@ class CustomDataModule(pl.LightningDataModule, FileHandler):
         )
         return to_device(weights), to_device(weights_bin)
 
+    @property
+    def class_dicts(self) -> Tuple[Dict[str, int]]:
+        """
+        Get the cell type and possible semantic classes of this dataset. 
+        These should be saved in the db
+        """
+        return self.get_class_dicts(self.db_fname_train.as_posix())
+
+
     def setup(self, stage: Optional[str] = None) -> None:
         self.trainset = DatasetBuilder.set_train_dataset(
             fname=self.db_fname_train.as_posix(),

@@ -5,7 +5,7 @@ import scipy.io as sio
 import numpy as np
 import tables as tb
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Tuple, Union, Dict
 
 from src.settings import RESULT_DIR
 
@@ -113,6 +113,29 @@ class FileHandler:
             sem_patch = h5.root.areas[ix, ...]
         
         return im_patch, inst_patch, type_patch, sem_patch
+
+    @staticmethod
+    def get_class_dicts(path: Union[str, Path]) -> Tuple[Dict[str, int]]:
+        """
+        Read the classes dict from a .h5 db
+
+        Args:
+        --------
+            path (str):
+                Path to the hdf5 database
+
+        Returns:
+        --------
+            Tuple[Dict[str, int]]: A tuple of dict mappings to classes 
+            e.g. ({"bg": 0, "immune": 1, "cancer": 2}, {"cancer": 1}
+            The second return value can also be None.
+        """
+        path = Path(path)
+        with tb.open_file(path.as_posix(), "r") as db:
+            classes = db.root._v_attrs.classes
+            sem_classes = db.root._v_attrs.sem_classes
+
+        return classes, sem_classes
 
     @staticmethod
     def get_class_weights(

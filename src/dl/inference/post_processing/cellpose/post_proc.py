@@ -328,7 +328,7 @@ def get_masks(
     # remove big masks
     M0 = M[tuple(pflows)]
     _, counts = np.unique(M0, return_counts=True)
-    big = np.prod(shape0)*0.4
+    big = np.prod(shape0)*1.0
     for i in np.nonzero(counts > big)[0]:
         M0[M0 == i] = 0
 
@@ -422,7 +422,7 @@ def post_proc_cellpose(
     
     binary_mask = binarize(inst_map).astype(bool)
     dP = dp*binary_mask # dP = -1 * dp * binary_mask / 5.0 # Weird result, Dunno ?? 
-    pixel_loc = follow_flows(dP, niter=300)
+    pixel_loc = follow_flows(dP, niter=3000)
 
     mask = get_masks(
         p=pixel_loc, 

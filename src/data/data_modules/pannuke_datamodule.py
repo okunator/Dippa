@@ -124,15 +124,18 @@ class PannukeDataModule(pl.LightningDataModule, FileHandler):
             self.database_dir / f"test_pannuke"
         ).with_suffix(self.suffix)
 
-    @staticmethod
-    def get_classes() -> Dict[str, int]:
-        return {
+    @property
+    def class_dicts(self) -> Dict[str, int]:
+        classes = {
             "bg": 0, 
             "neoplastic": 1,
             "inflammatory": 2,
             "connective": 3, 
             "dead": 4,
-            "epithelial": 5}
+            "epithelial": 5
+        }
+
+        return classes, None # None for convenience (sem classes). 
     
     @staticmethod
     def download(

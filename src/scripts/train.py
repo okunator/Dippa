@@ -92,7 +92,10 @@ def main(conf, extra_params):
     # init trainer
     extra_callbacks = []
     if conf.runtime_args.wandb:
-        extra_callbacks.append(lightning.WandbImageCallback())
+        classes = datamodule.class_dicts
+        extra_callbacks.append(
+            lightning.WandbImageCallback(classes[0], classes[1])
+        )
 
     trainer = lightning.SegTrainer.from_conf(
         conf=conf, extra_callbacks=extra_callbacks

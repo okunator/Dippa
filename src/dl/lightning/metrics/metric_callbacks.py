@@ -1,12 +1,18 @@
 import torch
-import pytorch_lightning as pl
-from typing import Optional
+from torchmetrics import Metric
+from typing import Optional, Any, Callable
 
 from .functional import accuracy, iou
 
 
-class Accuracy(pl.metrics.Metric):
-    def __init__(self, dist_sync_on_step: bool=False) -> None:
+class Accuracy(Metric):
+    def __init__(
+            self,
+            compute_on_step: bool=True,
+            dist_sync_on_step: bool=False,
+            progress_grouo: Optional[Any]=None,
+            dist_sync_func: Optional[Callable]=None
+        ) -> None:
         """
         Simple pytorch lightning accuracy metric callback. 
         uses the custom accuracy func which utilizes the conf mat
@@ -14,10 +20,26 @@ class Accuracy(pl.metrics.Metric):
 
         Args:
         --------
+            compute_on_step (bool, default=True):
+                 Forward only calls update() and returns None if this is
+                  et to False. default: True
             dist_sync_on_step (bool, default=False):
                 Synchronize computed values in distributed setting
+            process_group (any, optional, default=None):
+                Specify the process group on which synchronization is
+                called. default: None (which selects the entire world)
+            dist_sync_func (Callable, optional, default=None):
+                Callback that performs the allgather operation on the
+                metric state. When None, DDP will be used to perform the
+                allgather.
         """
-        super().__init__(dist_sync_on_step=dist_sync_on_step)
+        super().__init__(
+            compute_on_step=compute_on_step,
+            dist_sync_on_step=dist_sync_on_step,
+            process_group=progress_grouo,
+            dist_sync_fn=dist_sync_func
+        )
+
         self.add_state(
             "batch_accuracies", 
             default=torch.tensor(0.), 
@@ -64,8 +86,14 @@ class Accuracy(pl.metrics.Metric):
         return self.batch_accuracies / self.n_batches
 
 
-class MeanIoU(pl.metrics.Metric):
-    def __init__(self, dist_sync_on_step: bool=False) -> None:
+class MeanIoU(Metric):
+    def __init__(
+            self,
+            compute_on_step: bool=True,
+            dist_sync_on_step: bool=False,
+            progress_grouo: Optional[Any]=None,
+            dist_sync_func: Optional[Callable]=None
+        ) -> None:
         """
         Simple pytorch lightning mIoU metric callback. 
         uses the custom accuracy func which utilizes the conf mat
@@ -73,10 +101,26 @@ class MeanIoU(pl.metrics.Metric):
 
         Args:
         --------
+            compute_on_step (bool, default=True):
+                 Forward only calls update() and returns None if this is
+                  et to False. default: True
             dist_sync_on_step (bool, default=False):
                 Synchronize computed values in distributed setting
+            process_group (any, optional, default=None):
+                Specify the process group on which synchronization is
+                called. default: None (which selects the entire world)
+            dist_sync_func (Callable, optional, default=None):
+                Callback that performs the allgather operation on the
+                metric state. When None, DDP will be used to perform the
+                allgather.
         """
-        super().__init__(dist_sync_on_step=dist_sync_on_step)
+        super().__init__(
+            compute_on_step=compute_on_step,
+            dist_sync_on_step=dist_sync_on_step,
+            process_group=progress_grouo,
+            dist_sync_fn=dist_sync_func
+        )
+
         self.add_state(
             "batch_ious",
             default=torch.tensor(0.),

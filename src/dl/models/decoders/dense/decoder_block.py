@@ -17,6 +17,7 @@ class DenseDecoderBlock(BaseDecoderBlock):
             activation: str="relu",
             weight_standardize: bool=False,
             up_sampling: str="fixed_unpool",
+            short_skip: str=None,
             long_skip: str="unet",
             long_skip_merge_policy: str="summation",
             n_layers: int=1,
@@ -54,8 +55,11 @@ class DenseDecoderBlock(BaseDecoderBlock):
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             up_sampling (str, default="fixed_unpool"):
-                up sampling method to be used. One of: "interp", 
+                up sampling method to be used. One of: "interp",
                 "max_unpool", "transconv", "fixed_unpool"
+            short_skip (str, default=None):
+                Use short skip connections inside the skip blocks.
+                One of ("resdidual", "dense", None)
             long_skip (str, default="unet"):
                 long skip connection style to be used.
                 One of ("unet", "unet++", "unet3+", None)
@@ -84,6 +88,7 @@ class DenseDecoderBlock(BaseDecoderBlock):
             out_channel_list=out_channel_list,
             skip_channel_list=skip_channel_list,
             up_sampling=up_sampling,
+            short_skip=short_skip,
             long_skip=long_skip,
             long_skip_merge_policy=long_skip_merge_policy,
             skip_index=skip_index,
@@ -127,7 +132,7 @@ class DenseDecoderBlock(BaseDecoderBlock):
     def forward(
             self,
             x: torch.Tensor,
-            idx: int,
+            ix: int,
             skips: Tuple[torch.Tensor],
             extra_skips: List[torch.Tensor]=None
         ) -> torch.Tensor:
@@ -136,7 +141,7 @@ class DenseDecoderBlock(BaseDecoderBlock):
         -----------
             x (torch.Tensor):
                 Input tensor. Shape (B, C, H, W).
-            idx (int):
+            ix (int):
                 runnning index used to get the right skip tensor(s) from
                 the skips tuple for the skip connection.
             skips (Tuple[torch.Tensor]):
@@ -150,17 +155,14 @@ class DenseDecoderBlock(BaseDecoderBlock):
         
         # long skip
         if self.skip is not None:
-            if self.long_skip == "unet":
-                x = self.skip(x, skips, idx=idx)
-            elif self.long_skip in ("unet++", "unet3+"):
-                x, extra = self.skip(
-                    x, idx=idx, skips=skips, extra_skips=extra_skips
-                )
-                extra_skips = extra
+            x, extra = self.skip(
+                x, ix=ix, skips=skips, extra_skips=extra_skips
+            )
+            extra_skips = extra
 
         # dense blocks and append to feature list
         features = [x]
-        for name, module in self.conv_modules.items():
+        for _, module in self.conv_modules.items():
             new_features = module(features)
             features.append(new_features)
 

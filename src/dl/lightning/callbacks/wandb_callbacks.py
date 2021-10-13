@@ -1,10 +1,24 @@
 import wandb
 import torch
+import torch.nn.functional as F
 import pytorch_lightning as pl
-from typing import Dict
+from typing import Dict, Optional
 
 
 class WandbImageCallback(pl.Callback):
+    def __init__(
+            self,
+            classes: Dict[str, int],
+            sem_classes: Optional[Dict[str, int]]
+        ) -> None:
+        """
+        Callback that logs prediction masks to wandb
+        """
+        super(WandbImageCallback, self).__init__()
+        self.classes = {v: k for k, v in classes.items()} # flip
+
+        if sem_classes is not None:
+            self.sem_classes = {v: k for k, v in sem_classes.items()}
 
     def on_validation_batch_end(
             self,
@@ -19,75 +33,59 @@ class WandbImageCallback(pl.Callback):
         Logs the inputs and outputs of the model
         at the first validation batch to weights and biases.
         """
-        if batch_idx == 0:
-            img = batch["image"].float().to(device="cpu")
-            soft_insts = outputs["instances"].to(device="cpu")
-            inst_target = batch["binary_map"].long().to(device="cpu")
-            insts = torch.argmax(soft_insts, dim=1)
-
+        if batch_idx in (0, 10):
             log_dict = {
-                "val/soft_insts": [
-                    wandb.Image(si[1, ...], caption="soft inst masks") 
-                    for si in soft_insts
-                ],
-                "val/inst_preds": [
-                    wandb.Image(pred.float(), caption="Predictions") 
-                    for pred in insts
-                ],
-                "val/inst_GT": [
-                    wandb.Image(gt.float(), caption="Inst ground truths") 
-                    for gt in inst_target
-                ],
-                "val/img": [wandb.Image(img, caption="Input img")],
-                "global_step": trainer.global_step
+                "global_step": trainer.global_step,
+                "epoch": trainer.current_epoch
             }
-
+            img = batch["image"].detach().to("cpu").numpy()
 
             if "type_map" in list(batch.keys()):
-                type_target = batch["type_map"].long().to(device="cpu")
-                soft_types = outputs["types"].to(device="cpu")
-                types = torch.argmax(soft_types, dim=1)
+                type_target = batch["type_map"].detach().to("cpu").numpy()
+                soft_types = outputs["types"].detach().to("cpu")
+                types = torch.argmax(F.softmax(soft_types, dim=1), dim=1).numpy()
 
-                log_dict["val/soft_types"] = [
-                    wandb.Image(st[i, ...], caption="Soft type masks") 
-                    for st in soft_types
-                    for i in range(st.shape[0])
+                log_dict["val/cell_types"] = [
+                    wandb.Image(
+                        im.transpose(1, 2, 0),
+                        masks = {
+                            "predictions": {
+                                "mask_data": t,
+                                "class_labels": self.classes
+                            },
+                            "ground_truth": {
+                                "mask_data": tt,
+                                "class_labels": self.classes
+                            }
+                        }
+                    )
+                    for im, t, tt in zip(img, types, type_target)
                 ]
-
-                log_dict["val/type_GT"] = [
-                    wandb.Image(gt.float(), caption="Type ground truths") 
-                    for gt in type_target
-                ]
-
-                log_dict["val/type_pred"] = [
-                    wandb.Image(pred.float(), caption="Type ground truths") 
-                    for pred in types
-                ]
-
+            
             if "sem_map" in list(batch.keys()):
-                sem_target = batch["sem_map"].long().to(device="cpu")
-                soft_sem = outputs["sem"].to(device="cpu")
-                sem = torch.argmax(soft_sem, dim=1)
+                sem_target = batch["sem_map"].detach().to("cpu").numpy()
+                soft_sem = outputs["sem"].detach().to(device="cpu")
+                sem = torch.argmax(F.softmax(soft_sem, dim=1), dim=1).numpy()
 
-                log_dict["val/soft_sem"] = [
-                    wandb.Image(ss[i, ...], caption="Soft semantic masks") 
-                    for ss in soft_sem
-                    for i in range(ss.shape[0])
+                log_dict["val/cell_areas"] = [
+                    wandb.Image(
+                        im.transpose(1, 2, 0),
+                        masks = {
+                            "predictions": {
+                                "mask_data": s,
+                                "class_labels": self.sem_classes
+                            },
+                            "ground_truth": {
+                                "mask_data": st,
+                                "class_labels": self.sem_classes
+                            }
+                        }
+                    )
+                    for im, s, st in zip(img, sem, sem_target)
                 ]
-
-                log_dict["val/sem_GT"] = [
-                    wandb.Image(gt.float(), caption="Semantic ground truths") 
-                    for gt in sem_target
-                ]
-
-                log_dict["val/sem_pred"] = [
-                    wandb.Image(pred.float(), caption="Sem ground truths") 
-                    for pred in sem
-                ]
-
 
             if "aux_map" in list(batch.keys()):
-                aux = outputs["aux"].to(device="cpu")
+                aux = outputs["aux"].detach().to(device="cpu")
                 log_dict["val/aux_maps"] = [
                     wandb.Image(a[i, ...], caption="Aux maps") 
                     for a in aux

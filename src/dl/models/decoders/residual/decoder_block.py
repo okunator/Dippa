@@ -17,6 +17,7 @@ class ResidualDecoderBlock(BaseDecoderBlock):
             activation: str="relu",
             weight_standardize: bool=False,
             up_sampling: str="fixed_unpool",
+            short_skip: str=None,
             long_skip: str="unet",
             long_skip_merge_policy: str="summation",
             n_layers: int=1,
@@ -56,6 +57,9 @@ class ResidualDecoderBlock(BaseDecoderBlock):
             up_sampling (str, default="fixed_unpool"):
                 up sampling method to be used. One of: "interp", 
                 "max_unpool", "transconv", "fixed_unpool" TODO
+            short_skip (str, default=None):
+                Use short skip connections inside the skip blocks.
+                One of ("resdidual", "dense", None)
             long_skip (str, default="unet"):
                 long skip connection style to be used. One of: "unet", 
                 "unet++", "unet3+", None
@@ -85,6 +89,7 @@ class ResidualDecoderBlock(BaseDecoderBlock):
             out_channel_list=out_channel_list,
             skip_channel_list=skip_channel_list,
             up_sampling=up_sampling,
+            short_skip=short_skip,
             long_skip=long_skip,
             long_skip_merge_policy=long_skip_merge_policy,
             skip_index=skip_index,
@@ -119,7 +124,7 @@ class ResidualDecoderBlock(BaseDecoderBlock):
     def forward(
             self,
             x: torch.Tensor,
-            idx: int,
+            ix: int,
             skips: Tuple[torch.Tensor],
             extra_skips: List[torch.Tensor]=None
         ) -> torch.Tensor:
@@ -128,7 +133,7 @@ class ResidualDecoderBlock(BaseDecoderBlock):
         ----------
             x (torch.Tensor):
                 Input tensor. Shape (B, C, H, W).
-            idx (int):
+            ix (int):
                 runnning index used to get the right skip tensor(s) 
                 from the skips tuple for the skip connection.
             skips (Tuple[torch.Tensor]):
@@ -140,15 +145,12 @@ class ResidualDecoderBlock(BaseDecoderBlock):
         # upsample
         x = self.upsample(x)
 
-        # Long skip
+        # long skip
         if self.skip is not None:
-            if self.long_skip == "unet":
-                x = self.skip(x, skips, idx=idx)
-            elif self.long_skip in ("unet++", "unet3+"):
-                x, extra = self.skip(
-                    x, idx=idx, skips=skips, extra_skips=extra_skips
-                )
-                extra_skips = extra
+            x, extra = self.skip(
+                x, ix=ix, skips=skips, extra_skips=extra_skips
+            )
+            extra_skips = extra
         
         # final residual conv blocks
         for _, module in self.conv_modules.items():

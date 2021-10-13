@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, Dataset
-from typing import Tuple, List, Iterable, Dict, Union, Optional, Iterable
+from typing import Callable, Tuple, List, Iterable, Dict, Union, Optional, Iterable
 from collections import OrderedDict
 from pathlib import Path
 from tqdm import tqdm
@@ -423,6 +423,59 @@ class Inferer(FileHandler):
         #   self.model.train_data.as_posix()
         # )
 
+    def _apply(
+            self,
+            var: Union[torch.Tensor, None],
+            op: Callable,
+            **kwargs
+        ) -> Union[torch.Tensor, None]:
+        """
+        Applies the given torch operation `op` to the given variable 
+        `var`. This exists to catch memory errors if you're wondering
+        why...
+
+        Basically, if some cumulative torch operation overflows the GPU 
+        memory, this catches the error, detaches the input tensor from 
+        gpu and continues executing the operation on the cpu side. If 
+        the `var` is None or an empty list/string etc. then this returns
+        None for convenience.
+
+        Args:
+        --------
+            var: (torch.Tensor or None):
+                The torch.Tensor or list of tensors that should be 
+                detached and moved to cpu before applying operations
+            op (Callable):
+                the torch function/callable that causes the mem error
+
+        Returns:
+        --------
+            torch.Tensor or None: the ouput tensor or None
+        """
+        if not isinstance(var, torch.Tensor) and not var:
+            return None
+
+        try:
+            var = op(var, **kwargs)
+        except RuntimeError as e:
+            if 'out of memory' in str(e):
+                if isinstance(var, list):
+                    new_var = []
+                    for elem in var:
+                        elem = elem.detach()
+                        if elem.is_cuda:
+                            elem = elem.cpu()
+                        new_var.append(elem)
+                elif isinstance(var, torch.Tensor):
+                    var = var.detach()
+                    if var.is_cuda:
+                        var = var.cpu()
+                    new_var = var
+
+                var = op(new_var, **kwargs)
+        
+        return var
+
     def _get_batch(
             self, 
             patches: torch.Tensor, 
@@ -551,12 +604,14 @@ class Inferer(FileHandler):
                     batch_loader.set_postfix(
                         patches=f"{self.n_batches_inferred}/{n_patches_total}"
                     )
-                
-            pred_inst = torch.cat(pred_inst, dim=0)
-            pred_type = torch.cat(pred_type, dim=0) if pred_type else None
-            pred_aux = torch.cat(pred_aux, dim=0) if pred_aux else None
-            pred_sem = torch.cat(pred_sem, dim=0) if pred_sem else None
             
+            # catch runtime error if preds take too much GPU mem and 
+            # move to cpu with the _apply method.
+            pred_inst = self._apply(var=pred_inst, op=torch.cat, dim=0)
+            pred_type = self._apply(var=pred_type, op=torch.cat, dim=0)            
+            pred_aux = self._apply(var=pred_aux, op=torch.cat, dim=0)
+            pred_sem = self._apply(var=pred_sem, op=torch.cat, dim=0)
+
             batch_instances.append(pred_inst)
             batch_types.append(pred_type)
             batch_aux.append(pred_aux)
@@ -564,25 +619,25 @@ class Inferer(FileHandler):
 
         # Stitch the patches back to the orig img size
         insts = torch.stack(batch_instances, dim=0).permute(0, 2, 1, 3, 4)
-        insts = tilertorch.stitch_batched_patches(insts)
+        insts = self._apply(insts, tilertorch.stitch_batched_patches)
         insts = zip(names, tensor_to_ndarray(insts))
 
         types = zip(names, [None]*len(names))
         if all(e is not None for e in batch_types):
             types = torch.stack(batch_types, dim=0).permute(0, 2, 1, 3, 4)
-            types = tilertorch.stitch_batched_patches(types)
+            types = self._apply(types, tilertorch.stitch_batched_patches)
             types = zip(names, tensor_to_ndarray(types))
 
         aux = zip(names, [None]*len(names))
         if all(e is not None for e in batch_aux):
             aux = torch.stack(batch_aux, dim=0).permute(0, 2, 1, 3, 4)
-            aux = tilertorch.stitch_batched_patches(aux)
+            aux = self._apply(aux, tilertorch.stitch_batched_patches)
             aux = zip(names, tensor_to_ndarray(aux))
 
         sem = zip(names, [None]*len(names))
         if all(e is not None for e in batch_sem):
             sem = torch.stack(batch_sem, dim=0).permute(0, 2, 1, 3, 4)
-            sem = tilertorch.stitch_batched_patches(sem)
+            sem = self._apply(sem, tilertorch.stitch_batched_patches)
             sem = zip(names, tensor_to_ndarray(sem))
 
         return insts, types, aux, sem

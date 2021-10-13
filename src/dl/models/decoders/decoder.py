@@ -114,6 +114,7 @@ class Decoder(nn.ModuleDict):
         kwargs.setdefault("long_skip", long_skip)
         kwargs.setdefault("long_skip_merge_policy", long_skip_merge_policy)
         kwargs.setdefault("out_dims", out_dims)
+        kwargs.setdefault("short_skip", short_skip)
 
         # Set decoder block type
         if short_skip == "dense":
@@ -139,7 +140,7 @@ class Decoder(nn.ModuleDict):
         
         x = head
         for i, (_, block) in enumerate(self.items()):
-            x, extra = block(x, idx=i, skips=skips, extra_skips=extra_skips)
+            x, extra = block(x, ix=i, skips=skips, extra_skips=extra_skips)
             extra_skips = extra
 
         return x

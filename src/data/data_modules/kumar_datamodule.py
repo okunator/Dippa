@@ -112,8 +112,8 @@ class KumarDataModule(pl.LightningDataModule, FileHandler):
             self.database_dir / f"test_kumar"
         ).with_suffix(self.suffix)
 
-    @staticmethod
-    def get_classes() -> Dict[str, int]:
+    @property
+    def class_dicts(self) -> Dict[str, int]:
         return {"bg":0, "fg":1}
 
     @staticmethod

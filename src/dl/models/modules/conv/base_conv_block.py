@@ -1,8 +1,8 @@
 import torch.nn as nn
 
-from ..modules import (
-    Mish, Swish, BCNorm, WSConv2d, GroupNorm
-)
+from ..activations import Mish, Swish
+from ..normalization import BCNorm, GroupNorm
+from ..conv import WSConv2d
 
 
 class BaseConvBlock(nn.Module):

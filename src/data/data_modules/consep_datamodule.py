@@ -123,15 +123,17 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
             self.database_dir / f"test_consep"
         ).with_suffix(self.suffix)
 
-    @staticmethod
-    def get_classes() -> Dict[str, int]:
-        return {
+    @property
+    def class_dicts(self) -> Tuple[Dict[str, int], None]:
+        classes = {
             "bg":0, 
             "miscellanous":1, 
             "inflammatory":2, 
             "epithelial":3, 
             "spindle":4
-        } 
+        }
+
+        return classes, None # None for convenience (sem classes). 
 
     @staticmethod
     def get_orig_classes() -> Dict[str, int]:

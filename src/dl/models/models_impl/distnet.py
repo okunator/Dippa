@@ -6,7 +6,7 @@ from src.dl.models import (
 )
 
 
-class Model(MultiTaskSegModel):
+class DistNet(MultiTaskSegModel):
     def __init__(
             self,
             encoder_name: str="resnet50",
@@ -15,8 +15,6 @@ class Model(MultiTaskSegModel):
             encoder_depth: int=5,
             encoder_freeze: bool=False,
             decoder_type_branch: bool=True,
-            decoder_sem_branch: bool=False,
-            decoder_aux_branch: str="hover",
             decoder_n_layers: int=1,
             decoder_n_blocks: int=2,
             decoder_preactivate: bool=False,
@@ -30,14 +28,19 @@ class Model(MultiTaskSegModel):
             long_skips: str="unet",
             long_skip_merge_policy: str="sum",
             n_classes_type: int=2,
-            n_classes_sem: int=2,
             model_input_size: int=256
         ) -> None: 
         """
-        Class which builds the model from the architectural design 
-        choices. 
-        
-        Encoders are from the segmentation_models_pytorch library.
+        A multi-task architecture which regresses distance transforms
+        as an auxilliary output.
+
+        Similar architectures: DRAN, DRFNS
+        papers:
+            - DFRNS: https://ieeexplore.ieee.org/document/8438559
+            - DRAN: https://arxiv.org/abs/1604.02677
+
+        Encoders are from the segmentation_models_pytorch library and 
+        timm library.
         
         Args:
         -----------
@@ -56,13 +59,6 @@ class Model(MultiTaskSegModel):
             decoder_type_branch (bool, default=True):
                 Flag whether to include a cell type segmentation 
                 branch to the network.
-            decoder_sem_branch (bool, default=False):
-                Flag whether to include a semantic area segmentation 
-                branch to the network.
-            decoder_aux_branch (str, default=True):
-                The auxiliary branch type. One of: "hover", "dist", 
-                "contour", None. If False, no aux branch is used.
-                auxiliary branch is included in the network.
             decoder_n_layers (int, default=1):
                 Number of multi-conv blocks inside each level of the
                 decoder
@@ -101,10 +97,6 @@ class Model(MultiTaskSegModel):
                 Number of cell type classes in the dataset. Type decoder
                 branch is set to output this number of classes. If 
                 `type_branch` is `False`, this is ignored.
-            n_classes_sem (int, default=2):
-                Number of semantic area classes in the dataset. Type 
-                decoder branch is set to output this number of classes. 
-                If `type_branch` is `False`, this is ignored.
             model_input_size (int, default=256):
                 The input image size of the model. Assumes that input 
                 images are square patches i.e. H == W.
@@ -114,7 +106,7 @@ class Model(MultiTaskSegModel):
                 f"encoder dept: {encoder_depth} != len(decoder_channels):",
                 f"{len(decoder_channels)}" 
             )
-        super(Model, self).__init__()
+        super(DistNet, self).__init__()
 
         # encoder args
         self.encoder_in_channels = encoder_in_channels
@@ -126,8 +118,6 @@ class Model(MultiTaskSegModel):
 
         # Decoder args
         self.decoder_type_branch = decoder_type_branch
-        self.decoder_sem_branch = decoder_sem_branch
-        self.decoder_aux_branch = decoder_aux_branch
         self.decoder_weight_init = decoder_weight_init
         self.decoder_n_layers = decoder_n_layers
         self.decoder_n_blocks = decoder_n_blocks
@@ -167,6 +157,7 @@ class Model(MultiTaskSegModel):
                 weights=self.encoder_weights
             )
 
+        # nuclei segmentation branch
         self.inst_decoder = Decoder(
             encoder_channels=list(self.encoder.out_channels),
             decoder_channels=self.decoder_channels,
@@ -190,6 +181,32 @@ class Model(MultiTaskSegModel):
             kernel_size=1
         )
 
+        # nuclei gradient map regeression branch 
+        aux_out_channels = 1
+        self.aux_decoder = Decoder(
+            encoder_channels=list(self.encoder.out_channels),
+            decoder_channels=self.decoder_channels,
+            same_padding=True,
+            batch_norm=self.normalization,
+            activation=self.activation,
+            weight_standardize=self.weight_standardize,
+            n_layers=self.decoder_n_layers,
+            n_blocks=self.decoder_n_blocks,
+            preactivate=self.decoder_preactivate,
+            up_sampling=self.decoder_upsampling,
+            short_skip=self.decoder_short_skips,
+            long_skip=self.long_skips,
+            long_skip_merge_policy=self.merge_policy,
+            model_input_size=self.model_input_size
+        )
+
+        self.aux_seg_head = SegHead(
+            in_channels=self.decoder_channels[-1],
+            out_channels=aux_out_channels,
+            kernel_size=1
+        )
+
+        # cell type classification branch
         self.type_decoder = None
         self.type_seg_head = None
         if self.decoder_type_branch:
@@ -216,60 +233,7 @@ class Model(MultiTaskSegModel):
                 kernel_size=1
             )
 
-        self.sem_decoder = None
-        self.sem_seg_head = None
-        if self.decoder_sem_branch:
-            self.sem_decoder = Decoder(
-                encoder_channels=list(self.encoder.out_channels),
-                decoder_channels=self.decoder_channels,
-                same_padding=True,
-                batch_norm=self.normalization,
-                activation=self.activation,
-                weight_standardize=self.weight_standardize,
-                n_layers=self.decoder_n_layers,
-                n_blocks=self.decoder_n_blocks,
-                preactivate=self.decoder_preactivate,
-                up_sampling=self.decoder_upsampling,
-                short_skip=self.decoder_short_skips,
-                long_skip=self.long_skips,
-                long_skip_merge_policy=self.merge_policy,
-                model_input_size=self.model_input_size
-            )
-
-            self.sem_seg_head = SegHead(
-                in_channels=self.decoder_channels[-1],
-                out_channels=n_classes_sem,
-                kernel_size=1
-            )
-
-        self.aux_decoder = None
-        self.aux_seg_head = None
-        if self.decoder_aux_branch is not None:
-            aux_out_channels = 2 if self.decoder_aux_branch == "hover" else 1
-            self.aux_decoder = Decoder(
-                encoder_channels=list(self.encoder.out_channels),
-                decoder_channels=self.decoder_channels,
-                same_padding=True,
-                batch_norm=self.normalization,
-                activation=self.activation,
-                weight_standardize=self.weight_standardize,
-                n_layers=self.decoder_n_layers,
-                n_blocks=self.decoder_n_blocks,
-                preactivate=self.decoder_preactivate,
-                up_sampling=self.decoder_upsampling,
-                short_skip=self.decoder_short_skips,
-                long_skip=self.long_skips,
-                long_skip_merge_policy=self.merge_policy,
-                model_input_size=self.model_input_size
-            )
-
-            self.aux_seg_head = SegHead(
-                in_channels=self.decoder_channels[-1],
-                out_channels=aux_out_channels,
-                kernel_size=1
-            )
-
-        self.name = "custom-multi-task-model-{}".format(self.encoder_name)
+        self.name = f"distnet-{self.encoder_name}"
         
         # init decoder weights
         self.initialize()
@@ -277,9 +241,3 @@ class Model(MultiTaskSegModel):
         # freeze encoder if specified
         if self.encoder_freeze:
             self.freeze_encoder()
-
-
-
-
-
-

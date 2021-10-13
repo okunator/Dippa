@@ -1,6 +1,7 @@
 from .decoders import Decoder
 from .base_model import MultiTaskSegModel
 from .heads import SegHead
+from .encoders import TimmUniversalEncoder
 
 
 MODEL_LOOKUP = {
