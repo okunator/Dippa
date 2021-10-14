@@ -21,6 +21,21 @@ KEY_COLORS = {
     "connective": (255., 0., 0.),
     "dead": (255., 0., 255.),
     "nuclei":(255., 255., 255.),
+    "squamous_epithel": (220., 220., 55.),
+    "glandular_epithel": (0., 110., 155.),
+}
+
+
+NUM_COLORS = {
+    0: (255., 0., 55.),
+    1: (255., 0., 0.),
+    2: (0., 200., 100.),
+    3: (220., 220., 55.),
+    4: (0., 110., 155.),
+    5: (50., 50., 155.),
+    6: (220., 220., 55.),
+    7: (200., 50., 55.),
+    8: (155., 110., 155.),
 }
 
 
@@ -62,7 +77,9 @@ def draw_contours(
     
     shape = inst_map.shape[:2]
     nuc_list = list(np.unique(inst_map))
-    nuc_list.remove(0) # 0 is background
+
+    if 0 in nuc_list:
+        nuc_list.remove(0) # 0 is background
     
     for idx, nuc_id in enumerate(nuc_list): 
         inst = np.array(inst_map == nuc_id, np.uint8)
@@ -87,7 +104,7 @@ def draw_contours(
             if class_name in KEY_COLORS.keys():
                 inst_color = KEY_COLORS[class_name]
             else:
-                inst_color = KEY_COLORS["nuclei"]
+                inst_color = NUM_COLORS[class_num]
 
         if fill_contours:
             contoured_rgb = cv2.drawContours(

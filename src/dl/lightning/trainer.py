@@ -37,11 +37,16 @@ class SegTrainer:
             wandb_logger (bool, default=False):
                 Flag to use also wandb logger.
         """
+        self.gpus = num_gpus
+        self.epochs = num_epochs
+        self.resume_training = resume_training
+
         # init paths
         exp_dir = FileHandler.get_experiment_dir(
             experiment=experiment_name,
             version=experiment_version
         )
+        self.ckpt_dir = exp_dir
 
         # set test tube logger
         self.loggers = []
@@ -58,12 +63,12 @@ class SegTrainer:
                 pl.loggers.WandbLogger(
                     save_dir=exp_dir,
                     project=experiment_name,
-                    name=experiment_version,
-                    log_model="all"
+                    name=f"{experiment_version}_to_epoch{self.epochs}",
+                    version=experiment_version,
+                    log_model=False, # do not log the checkpoints to wandb
                 )
             )
         
-        self.ckpt_dir = exp_dir
 
         # set checkpoint callback
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
@@ -78,13 +83,9 @@ class SegTrainer:
 
         # set attributes
         self.callbacks = [checkpoint_callback]
-
         if extra_callbacks is not None:
             self.callbacks += extra_callbacks
             
-        self.gpus = num_gpus
-        self.epochs = num_epochs
-        self.resume_training = resume_training
 
         self.last_ckpt = None
         if self.resume_training:

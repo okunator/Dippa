@@ -70,7 +70,7 @@ training_args:
 
 runtime_args:
   resume_training: True
-  num_epochs: 20
+  num_epochs: 23
   num_gpus: 1
   batch_size: 4
   num_workers: 4              # number workers for data loader

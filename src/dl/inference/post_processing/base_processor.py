@@ -4,9 +4,14 @@ from pathos.multiprocessing import ThreadPool as Pool
 from typing import Tuple, List, Dict
 from tqdm import tqdm
 from collections import OrderedDict
+from skimage.util import img_as_ubyte
+from skimage.morphology import disk
+from skimage.filters import rank
 
-from src.utils import remove_debris
 from .combine_type_inst import combine_inst_semantic
+from src.utils import (
+    remove_debris, remove_area_debris, fill_holes
+)
 from .thresholding import (
     argmax, sauvola_thresh, niblack_thresh, naive_thresh_prob
 )
@@ -75,10 +80,10 @@ class PostProcessor(ABC):
         maps["inst_map"] = self.threshold(maps["inst_probs"])
 
         if maps["type_probs"] is not None:
-            maps["type_map"] = np.argmax(maps["type_probs"], axis=2)
+            maps["type_map"] = np.argmax(maps["type_probs"], axis=-1)
 
         if maps["sem_probs"] is not None:
-            maps["sem_map"] = np.argmax(maps["sem_probs"], axis=2)
+            maps["sem_map"] = self._process_sem_map(maps["sem_probs"])
 
         return maps
 
@@ -175,3 +180,48 @@ class PostProcessor(ABC):
             result = niblack_thresh(**kwargs)
 
         return result
+
+
+    def _smoothen(self, prob_map: np.ndarray) -> np.ndarray:
+        """
+        Mean filter a probability map of shape (H, W, C)
+
+        Args:
+        ----------
+            prob_map (np.ndarray, np.float64): 
+                probability map from the any branch of the network. 
+                Shape (H, W, C).
+            
+        Returns:
+        ----------
+            np.ndarray: Smoothed prob map. Shape (H, W, C).
+        """
+        smoothed = np.zeros_like(prob_map)
+        for i in range(prob_map.shape[-1]):
+            smoothed[..., i] = rank.mean(
+                img_as_ubyte(prob_map[..., i]), selem=disk(25)
+            )
+        
+        return smoothed
+
+    def _process_sem_map(self, prob_map: np.ndarray) -> np.ndarray:
+        """
+        Post process the semantic probability map from the network. 
+
+        Args:
+        ----------
+            prob_map (np.ndarray, np.float64): 
+                probability map from the sem branch of the network. 
+                Shape (H, W, C_sem).
+            
+        Returns:
+        ----------
+            np.ndarray: Indice map. Integer valued mask of the semantic
+                        areas. Shape (H, W).
+        """
+        probs = self._smoothen(prob_map)
+        labels = np.argmax(probs, axis=-1)
+        labels = remove_area_debris(labels)
+        labels = fill_holes(labels)
+
+        return labels

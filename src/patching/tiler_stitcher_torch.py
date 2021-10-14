@@ -122,29 +122,14 @@ class TilerStitcherTorch:
             stride=self.stride_size
         )
 
-        # May require a lot of memory so copy data to cpu if gpu gets
-        # stuffed
-        try:
-            recovery_mask = F.fold(
-                torch.ones_like(patches), 
-                output_size=(self.H, self.W), 
-                kernel_size=ph, 
-                stride=self.stride_size
-            )
-            output = output/recovery_mask
-        except RuntimeError as e:
-            if 'out of memory' in str(e):
-                output = output.detach()
-                if output.is_cuda:
-                    output = output.cpu()
+        recovery_mask = F.fold(
+            torch.ones_like(patches), 
+            output_size=(self.H, self.W), 
+            kernel_size=ph, 
+            stride=self.stride_size
+        )
+        output = output/recovery_mask
 
-                recovery_mask = F.fold(
-                    torch.ones_like(patches, device="cpu"),
-                    output_size=(self.H, self.W), 
-                    kernel_size=ph, 
-                    stride=self.stride_size
-                )
-                output = output/recovery_mask
                 
         if self.padding:
             pad_x, pad_y = self.margins

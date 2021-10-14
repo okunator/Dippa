@@ -465,8 +465,8 @@ def type_map_flatten(type_map: np.ndarray) -> np.ndarray:
         I.e. (H, W, C) --> (H, W)
     """
     type_out = np.zeros([type_map.shape[0], type_map.shape[1]])
-    for t in np.unique(type_map):
-        type_tmp = type_map == t
+    for i, t in enumerate(np.unique(type_map)):
+        type_tmp = type_map[..., i] == t
         type_out += (type_tmp * t)
 
     return type_out
@@ -567,7 +567,7 @@ def remove_debris(inst_map: np.ndarray, min_size: int = 10):
     Args:
     ------------
         inst_map (np.ndarray): 
-            Instance map
+            Instance map. Shape (H, W)
         min_size (int, default=10): 
             Min size for the objects that are left untouched
 
@@ -596,3 +596,92 @@ def remove_debris(inst_map: np.ndarray, min_size: int = 10):
 
     return res
 
+
+def remove_area_debris(sem_map: np.ndarray, min_size: int=5000):
+    """
+    Remove small objects from a semantic area map
+
+    Args:
+    ------------
+        sem_map (np.ndarray): 
+            Semantic seg map. Shape (H, W)
+        min_size (int, default=5000): 
+            Min size for the objects that are left untouched
+
+    Returns:
+    -----------
+        np.ndarray: Cleaned np.ndarray of shape (H, W)
+    """
+    res = np.zeros(sem_map.shape, np.int32)
+    for i in np.unique(sem_map):
+        area = np.array(sem_map == i, np.uint32)
+        inst_map = ndi.label(area)[0]
+        area_res = np.zeros(inst_map.shape, np.int32)
+        for ix in np.unique(inst_map)[1:]:
+            area_map = np.copy(inst_map == ix)
+            
+            y1, y2, x1, x2 = bounding_box(area_map)
+            y1 = y1 - 2 if y1 - 2 >= 0 else y1
+            x1 = x1 - 2 if x1 - 2 >= 0 else x1
+            x2 = x2 + 2 if x2 + 2 <= sem_map.shape[1] - 1 else x2
+            y2 = y2 + 2 if y2 + 2 <= sem_map.shape[0] - 1 else y2
+            area_map_crop = area_map[y1:y2, x1:x2].astype("int32")
+
+            area_map_crop = remove_small_objects(
+                area_map_crop.astype(bool), 
+                min_size, connectivity=1
+            ).astype("int32")
+
+            area_map_crop[area_map_crop > 0] = i
+            area_res[y1:y2, x1:x2] = area_map_crop
+        
+        res += area_res
+
+    return res
+
+
+def fill_holes(sem_map: np.ndarray, min_size: int=5000):
+    """
+    Fill holes from a semantic area map
+
+    Args:
+    ------------
+        sem_map (np.ndarray): 
+            Semantic seg map. Shape (H, W)
+        min_size (int, default=5000): 
+            Min size for the objects that are left untouched
+
+    Returns:
+    -----------
+        np.ndarray: Cleaned np.ndarray of shape (H, W)
+    """
+    res = np.copy(sem_map)
+    bg = res == 0
+    bg_objs = ndi.label(bg)[0]
+
+    for i in np.unique(bg_objs)[1:]:
+        y1, y2, x1, x2 = bounding_box(bg_objs == i)
+        y1 = y1 - 2 if y1 - 2 >= 0 else y1
+        x1 = x1 - 2 if x1 - 2 >= 0 else x1
+        x2 = x2 + 2 if x2 + 2 <= res.shape[1] - 1 else x2
+        y2 = y2 + 2 if y2 + 2 <= res.shape[0] - 1 else y2
+        crop = res[y1:y2, x1:x2]
+
+        labels, counts = np.unique(crop, return_counts=True)
+        
+        if counts[0] > min_size:
+            continue
+
+        if len(counts) == 1:
+            continue
+
+        # skip 0 index
+        labels = labels[1:]
+        counts = counts[1:]
+        
+        # fill bg objs
+        fill_label = labels[np.argmax(counts)]
+        crop[crop == 0] = fill_label
+        res[y1:y2, x1:x2] = crop
+
+    return res
