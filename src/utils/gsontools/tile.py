@@ -1,9 +1,10 @@
+import re
 import warnings
 import shapely
 import pandas as pd
 import geopandas as gpd
 
-from typing import Union
+from typing import Union, Tuple
 from pathlib import Path
 
 
@@ -11,8 +12,8 @@ class GSONTile:
     def __init__(
             self, 
             fname: Union[Path, str], 
-            xmin: int, 
-            ymin: int, 
+            xmin: int=None, 
+            ymin: int=None, 
             tile_size: int=(1000, 1000)
         ) -> None:
         """
@@ -22,9 +23,9 @@ class GSONTile:
         ----------
             fname: (Path or str):
                 name of the gson file
-            xmin (int):
+            xmin (int, default=None):
                 the min-x coordinate of the tile
-            ymin (int):
+            ymin (int, default=None):
                 the min-y coordinate of the tile
             tile_size (Tuple[int, int], default=(1000, 1000)):
                 size of the input tile
@@ -32,10 +33,15 @@ class GSONTile:
         assert Path(fname).exists(), f"File {fname} not found."
         
         self.fname = Path(fname)
+
+        if None in (xmin, ymin):
+            xmin, ymin = self._get_xy_coords(self.fname)
+            
         self.xmin = xmin
         self.ymin = ymin
         self.xmax = xmin + tile_size[0]
         self.ymax = ymin + tile_size[1]
+
 
     def __len__(self):
         """
@@ -48,6 +54,21 @@ class GSONTile:
         del df
 
         return l
+
+    def _get_xy_coords(self, fname: str) -> Tuple[int, int]:
+        """
+        fname needs to contain x & y-coordinates in 
+        "x-[coord1]_y-[coord2]"-format
+        """
+        if isinstance(fname, Path):
+            fname = fname.as_posix()
+            
+        assert re.findall(r"(x-\d+_y-\d+)", fname), (
+            "fname not in 'x-[coord1]_y-[coord2]'-format"
+        )
+        xy_str = re.findall(r"(x-\d+_y-\d+)", fname)
+        x, y = (int(c) for c in re.findall(r"\d+", xy_str[0]))
+        return x, y
 
     @property
     def gdf(self) -> gpd.GeoDataFrame:
