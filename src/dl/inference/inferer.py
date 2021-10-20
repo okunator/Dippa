@@ -10,7 +10,7 @@ from collections import OrderedDict
 from pathlib import Path
 from tqdm import tqdm
 
-from src.utils import FileHandler, mask2geojson, mask2mat
+from src.utils import FileHandler, mask2geojson, mask2mat, label_sem_map
 from src.patching import TilerStitcherTorch
 from src.metrics import Benchmarker
 from src.dl.utils import tensor_to_ndarray
@@ -121,7 +121,7 @@ class FolderDataset(Dataset, FileHandler):
     def _get_auto_range(
             self, 
             coord: str="y", 
-            section_ix: int=0, 
+            section_ix: int=1, 
             section_length: int=6000
         ) -> Tuple[int, int]:
         """
@@ -136,7 +136,8 @@ class FolderDataset(Dataset, FileHandler):
                 specify the range in either x- or y direction
             section_ix (int, default=0):
                 the nth tissue section in the wsi in the direction of 
-                the coord param.
+                the `coord` param. Starts from 0th index. E.g. If
+                `coord='y'` the 0th index is the upmost tissue section.
             section_length (int, default=6000):
                 Threshold to concentrate only on tissue sections that
                 are larger than 6000 pixels
@@ -305,7 +306,7 @@ class Inferer(FileHandler):
                 y- coords (in xy- order) in the filename. Example tile 
                 filename: "x-45000_y-50000.png".
             auto_range (bool, optional, default=False):
-                Automatically filter tiles from a folder that contain 
+                Automatically filter tiles from a folder to contain 
                 only ONE tissue section rather than every redundant 
                 tissue section in the wsi. The tiles in the folder need 
                 to contain the x- and y-coords (in xy- order) in the 
@@ -571,7 +572,8 @@ class Inferer(FileHandler):
         patches = tilertorch.extract_patches_from_batched(batch)
 
         # (for tqdm logging)
-        n_patches_total = patches.shape[2]*(len(batch_loader)*self.loader_batch_size)
+        n_batches_inferred = 0
+        n_patches_total = patches.shape[2]*self.loader_batch_size
         
         batch_instances = []
         batch_types = []
@@ -599,10 +601,10 @@ class Inferer(FileHandler):
                 pred_aux.append(aux) if aux is not None else None
                 pred_sem.append(sem) if sem is not None else None
 
-                self.n_batches_inferred += batch.shape[0]
+                n_batches_inferred += batch.shape[0]
                 if batch_loader is not None:
                     batch_loader.set_postfix(
-                        patches=f"{self.n_batches_inferred}/{n_patches_total}"
+                        patches=f"{n_batches_inferred}/{n_patches_total}"
                     )
             
             # catch runtime error if preds take too much GPU mem and 
@@ -666,6 +668,7 @@ class Inferer(FileHandler):
         --------
             Tuple: of Zip objects containing (name, np.ndarray) pairs
         """
+        n_batches_inferred = 0
         pred_insts, pred_types, pred_aux, pred_sem = self._predict_batch(batch)
         insts = zip(names, tensor_to_ndarray(pred_insts))
 
@@ -681,10 +684,10 @@ class Inferer(FileHandler):
         if pred_sem is not None:
             sem = zip(names, tensor_to_ndarray(pred_sem))
         
-        self.n_batches_inferred += batch.shape[0]
+        n_batches_inferred += batch.shape[0]
         if batch_loader is not None:
             batch_loader.set_postfix(
-                patches=f"{self.n_batches_inferred}/{len(self.folderset.fnames)}"
+                patches=f"{n_batches_inferred}/{len(self.folderset.fnames)}"
             )
 
         return insts, types, aux, sem
@@ -719,7 +722,6 @@ class Inferer(FileHandler):
                 A chunked dataloader object
         """
         # Start pipeline
-        self.n_batches_inferred = 0
         soft_instances = []
         soft_types = []
         aux_maps = []
@@ -789,8 +791,10 @@ class Inferer(FileHandler):
     def run_inference(
             self, 
             save_dir: Union[Path, str]=None, 
-            fformat: str="geojson",
-            offsets: bool=False
+            fformat: str=None,
+            offsets: bool=False,
+            classes_type: Dict[str, int]=None,
+            classes_sem: Dict[str, int]=None,
         ) -> None:
         """
         Run inference and post processing in chunks
@@ -800,11 +804,34 @@ class Inferer(FileHandler):
             save_dir (Path or str, default=None):
                 directory where the .mat/geojson files are saved
             fformat (str, default="geojson")
-                file format for the masks. One of ".mat, "geojson"
+                file format for the masks. One of ".mat, "geojson", None
             offsets (bool, default=False):
                 If True, geojson coords are shifted by the offsets that 
                 are encoded in the filenames (e.g. "x-1000_y-4000.png")
+            classes_type (Dict[str, int], default=None):
+                class dict for the cell types.
+                e.g. {"inflam":1, "epithelial":2, "connec":3}
+                This is required if masks are saved to geojson.
+            classes_sem (Dict[str, int], default=None):
+                class dict for the area types.
+                e.g. {"inflam":1, "epithelial":2, "connec":3}
+                This is required if masks are saved to geojson.
         """
+        save_dir = Path(save_dir)
+
+        # assertions before lengthy processing
+        assert save_dir.exists(), f"{save_dir} not found"
+        assert fformat in ("geojson", ".mat", None)
+
+        if fformat == "geojson":
+            assert classes_type is not None, (
+                "cell type classes needed for geojson format."
+            )
+            if self.model.decoder_sem_branch:
+                assert classes_sem is not None, (
+                    "area classes needed for geojson format."
+                )
+
         n_images_real = int(np.ceil(self.n_images / self.loader_batch_size))
         n_chunks = int(np.ceil(len(self.folderset.fnames) / self.n_images))
         loader = self._chunks(iterable=self.dataloader, size=n_images_real)
@@ -827,13 +854,26 @@ class Inferer(FileHandler):
                             mask2geojson(
                                 inst_map=inst_map, 
                                 type_map=self.type_maps[name], 
-                                fname=name,
-                                save_dir=save_dir,
+                                fname=f"{name}_cells",
+                                save_dir=Path(save_dir / "cells"),
                                 x_offset=x_off,
-                                y_offset=y_off
+                                y_offset=y_off,
+                                classes=classes_type
                             )
 
+                            if self.model.decoder_sem_branch:
+                                mask2geojson(
+                                    inst_map=label_sem_map(self.sem_maps[name]), 
+                                    type_map=self.sem_maps[name], 
+                                    fname=f"{name}_areas",
+                                    save_dir=Path(save_dir / "areas"),
+                                    x_offset=x_off,
+                                    y_offset=y_off,
+                                    classes=classes_sem
+                                )
+
                         elif fformat == ".mat":
+                            # TODO add sem classes
                             mask2mat(
                                 inst_map=inst_map.astype("int32"),
                                 type_map=self.type_maps[name].astype("int32"),

@@ -13,6 +13,7 @@ from skimage.morphology import remove_small_objects
 from typing import Dict, Tuple, Union
 
 from .mask_utils import get_inst_centroid, get_inst_types, bounding_box
+from .file_manager import FileHandler
 
 
 def poly2mask(
@@ -186,7 +187,7 @@ def geojson2mat(
             pbar.set_description("processing nuclear annotations")
             class_num = classes[props["classification"]["name"]]
 
-            if isinstance(poly, shapely.geometry.multipolygon.MultiPolygon):
+            if isinstance(poly, shapely.geometry.MultiPolygon):
                 # handle multipolygons exceptions
                 for p in list(poly):
                     inst = poly2mask(
@@ -195,7 +196,7 @@ def geojson2mat(
                     inst = remove_small_objects(inst, 10)
                     inst_map[inst > 0] += (i + 1)
                     type_map[(inst > 0) & (type_map != class_num)] = class_num
-            elif isinstance(poly, shapely.geometry.linestring.LineString):
+            elif isinstance(poly, shapely.geometry.LineString):
                 # handle linestring exceptions
                 coords = poly.coords[:]
                 coords.append(coords[-1])
@@ -229,8 +230,8 @@ def geojson2mat(
 def mask2geojson(
         inst_map: np.ndarray, 
         type_map: np.ndarray, 
+        classes: Dict[str, int],
         fname: Union[str, Path]=None,
-        classes: Dict[str, int]=None,
         save_dir: Union[str, Path]=None,
         x_offset: int=0,
         y_offset: int=0
@@ -246,11 +247,11 @@ def mask2geojson(
         type_map (np.ndarray):
             cell type labelled semantic segmentation mask from the 
             segmentation model
+        classes (Dict[str, int]):
+            class dict e.g. {"inflam":1, "epithelial":2, "connec":3}
         fname (Path or str, default=None):
             File name for the annotation json file. If None, no file is 
             written.
-        classes (Dict[str, int], default=None):
-            class dict e.g. {"inflam":1, "epithelial":2, "connec":3}
         save_dir (Path or str, default=None):
             directory where the .mat/geojson files are saved
         x_offset (int, default=0):
@@ -262,17 +263,14 @@ def mask2geojson(
     ----------
         Dict: A dictionary with geojson fields or None
     """
-    inst_list = list(np.unique(inst_map))[1:]
+    if not Path(save_dir).exists():
+        FileHandler.create_dir(save_dir)
+
+    inst_list = list(np.unique(inst_map))
+    if 0 in inst_list:
+        inst_list.remove(0)
+
     geo_objs = []
-
-    # use pannuke classes if no classes are given
-    if classes is None:
-        classes = {
-            "background":0, "neoplastic":1, "inflammatory":2, 
-            "connective":3, "dead":4, "epithelial":5
-        }
-
-    # with tqdm(total=len(inst_list)) as pbar:
     for inst_id in inst_list:
         # set up the annotation geojson obj
         geo_obj = {}
@@ -303,12 +301,14 @@ def mask2geojson(
             inst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
         )
 
+        # got a line instead of a polygon
         if contours[0].shape[0] < 3:
             continue
         
         # shift coordinates based on the offsets
         if x_offset:
             contours[0][..., 0] += x_offset
+        if y_offset:
             contours[0][..., 1] += y_offset
 
         # add the info to the annotation obj

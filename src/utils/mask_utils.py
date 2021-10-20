@@ -685,3 +685,47 @@ def fill_holes(sem_map: np.ndarray, min_size: int=5000):
         res[y1:y2, x1:x2] = crop
 
     return res
+
+
+def label_sem_map(sem: np.ndarray, sort: bool=True) -> np.ndarray:
+    """
+    Labels a given semantic segmentation map
+
+    Args:
+    ---------
+        sem (np.ndarray):
+            semantic segmentation map. Shape (H, W)
+        sort (bool, default=True):
+            sort the semantic areas by size in descending order.
+    
+    Returns:
+    ---------
+        np.ndarray: The labelled segmentation map. Shape (H, W)
+    """
+    sem_inst = np.zeros_like(sem)
+
+    counter = 0
+    classes, counts = np.unique(sem, return_counts=True)
+
+    if 0 in classes:
+        classes = classes[1:]
+        counts = counts[1:]
+    
+    if sort:
+        classes = classes[np.argsort(-counts)]
+
+    # print(classes)
+    for c in classes:
+        obj_insts = ndi.label(sem == c)[0]
+        labels = np.unique(obj_insts)
+
+        # If all pixels belong to same (non bg) class, dont slice
+        if len(labels) > 1:
+            labels = labels[1:]
+
+        for l in labels:
+            counter += 1
+            obj = obj_insts == l
+            sem_inst[obj] += counter
+
+    return sem_inst
