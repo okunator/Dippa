@@ -55,10 +55,11 @@ class AreaMerger(BaseGSONMerger):
     @property
     def fullgdf(self) -> gpd.GeoDataFrame:
 
-        cols = self.tiles[0].gdf.columns
+        cols = None
         rows = []
         for tile in self.tiles:
             if tile.gdf is not None:
+                cols = tile.gdf.columns
                 for _, row in tile.gdf.iterrows():
                     rows.append(row)
 
