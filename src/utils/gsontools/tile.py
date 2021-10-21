@@ -31,7 +31,10 @@ class GSONTile:
                 size of the input tile
         """
         assert Path(fname).exists(), f"File {fname} not found."
-        
+        assert Path(fname).suffix in (".json", ".geojson"), (
+            f"Input File {fname} has wrong format. Expected '.json'."
+        )
+
         self.fname = Path(fname)
 
         if None in (xmin, ymin):
@@ -82,7 +85,7 @@ class GSONTile:
 
         if df.empty:
             warnings.warn(
-                f"No annotations detected in {self.fname}. Returning None.",                
+                f"No annotations detected in {self.fname.name}. Returning None.",                
                 RuntimeWarning
             )
 
@@ -90,8 +93,13 @@ class GSONTile:
 
         df["geometry"] = df["geometry"].apply(shapely.geometry.shape)
         gdf = gpd.GeoDataFrame(df).set_geometry('geometry')
-        gdf = gdf[~gdf.is_empty] # drop empty geometries
-        gdf = gdf[gdf.is_valid] # drop invalid geometries
+
+        # drop invalid geometries if there are any after buffer
+        gdf.geometry = gdf.geometry.buffer(0)
+        gdf = gdf[gdf.is_valid]
+
+        # drop empty geometries
+        gdf = gdf[~gdf.is_empty]
 
         try:
             # add bounding box coords of the polygons to the gdfs
@@ -102,7 +110,8 @@ class GSONTile:
             gdf["xmax"] = gdf.bounds["maxx"].astype(int) + 1
         except:
             warnings.warn(
-                "Could not create bounds cols to gdf", RuntimeWarning
+                f"Could not create bounds cols to {self.fname.name} gdf", 
+                RuntimeWarning
             )
 
         try:
@@ -112,7 +121,8 @@ class GSONTile:
             )
         except:
             warnings.warn(
-                "Could not create 'class_name' col to gdf.", RuntimeWarning
+                f"Could not create 'class_name' col for {self.fname.name} gdf.",
+                RuntimeWarning
             )
 
         return gdf

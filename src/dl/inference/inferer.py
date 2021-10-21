@@ -817,20 +817,21 @@ class Inferer(FileHandler):
                 e.g. {"inflam":1, "epithelial":2, "connec":3}
                 This is required if masks are saved to geojson.
         """
-        save_dir = Path(save_dir)
 
         # assertions before lengthy processing
-        assert save_dir.exists(), f"{save_dir} not found"
-        assert fformat in ("geojson", ".mat", None)
+        if save_dir is not None:
+            save_dir = Path(save_dir)
+            assert save_dir.exists(), f"{save_dir} not found"
+            assert fformat in ("geojson", ".mat", None)
 
-        if fformat == "geojson":
-            assert classes_type is not None, (
-                "cell type classes needed for geojson format."
-            )
-            if self.model.decoder_sem_branch:
-                assert classes_sem is not None, (
-                    "area classes needed for geojson format."
+            if fformat == "geojson":
+                assert classes_type is not None, (
+                    "cell type classes needed for geojson format."
                 )
+                if self.model.decoder_sem_branch:
+                    assert classes_sem is not None, (
+                        "area classes needed for geojson format."
+                    )
 
         n_images_real = int(np.ceil(self.n_images / self.loader_batch_size))
         n_chunks = int(np.ceil(len(self.folderset.fnames) / self.n_images))

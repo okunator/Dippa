@@ -613,11 +613,29 @@ def remove_area_debris(sem_map: np.ndarray, min_size: int=5000):
         np.ndarray: Cleaned np.ndarray of shape (H, W)
     """
     res = np.zeros(sem_map.shape, np.int32)
-    for i in np.unique(sem_map):
+
+    classes = np.unique(sem_map)
+
+    # skip bg
+    if 0 in classes:
+        classes = classes[1:]
+
+    for i in classes:
+
         area = np.array(sem_map == i, np.uint32)
         inst_map = ndi.label(area)[0]
+        labels = np.unique(inst_map)
+
+        # everything is intact, no debris..
+        if len(labels) < 1:
+            return sem_map
+
+        # skip bg
+        if 0 in labels:
+            labels = labels[1:]
+
         area_res = np.zeros(inst_map.shape, np.int32)
-        for ix in np.unique(inst_map)[1:]:
+        for ix in labels:
             area_map = np.copy(inst_map == ix)
             
             y1, y2, x1, x2 = bounding_box(area_map)

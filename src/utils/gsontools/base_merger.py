@@ -43,6 +43,7 @@ class BaseGSONMerger:
         self.ymin = ymin
         self.tile_size = tile_size
         self.files = sorted(Path(in_dir).glob("*"))
+        assert self.files, f"No files found in: {in_dir}"
         
     @property
     def _gsonobj(self) -> Dict:

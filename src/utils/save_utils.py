@@ -263,8 +263,10 @@ def mask2geojson(
     ----------
         Dict: A dictionary with geojson fields or None
     """
-    if not Path(save_dir).exists():
-        FileHandler.create_dir(save_dir)
+
+    if fname is not None:
+        if not Path(save_dir).exists():
+            FileHandler.create_dir(save_dir)
 
     inst_list = list(np.unique(inst_map))
     if 0 in inst_list:
