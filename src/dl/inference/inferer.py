@@ -121,7 +121,7 @@ class FolderDataset(Dataset, FileHandler):
     def _get_auto_range(
             self, 
             coord: str="y", 
-            section_ix: int=1, 
+            section_ix: int=0, 
             section_length: int=6000
         ) -> Tuple[int, int]:
         """
@@ -420,6 +420,7 @@ class Inferer(FileHandler):
 
         # input norm flag and train data stats
         self.norm = self.model.normalize_input
+
         # self.stats = self.get_dataset_stats(
         #   self.model.train_data.as_posix()
         # )
@@ -534,7 +535,9 @@ class Inferer(FileHandler):
 
         sem = None
         if pred["sem"] is not None:
-            sem = self.predictor.classify(pred["sem"], act="softmax")
+            sem = self.predictor.classify(
+                pred["sem"], act="softmax", apply_weights=False
+            )
 
         return insts, types, aux, sem
 

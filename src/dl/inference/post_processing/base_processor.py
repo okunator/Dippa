@@ -222,6 +222,6 @@ class PostProcessor(ABC):
         probs = self._smoothen(prob_map)
         labels = np.argmax(probs, axis=-1)
         labels = remove_area_debris(labels, min_size=10000)
-        labels = fill_holes(labels, min_size=10000)
+        # labels = fill_holes(labels, min_size=10000)
 
         return labels

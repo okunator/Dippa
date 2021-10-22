@@ -597,7 +597,7 @@ def remove_debris(inst_map: np.ndarray, min_size: int = 10):
     return res
 
 
-def remove_area_debris(sem_map: np.ndarray, min_size: int=5000):
+def remove_area_debris(sem_map: np.ndarray, min_size: int=10000):
     """
     Remove small objects from a semantic area map
 
@@ -612,8 +612,7 @@ def remove_area_debris(sem_map: np.ndarray, min_size: int=5000):
     -----------
         np.ndarray: Cleaned np.ndarray of shape (H, W)
     """
-    res = np.zeros(sem_map.shape, np.int32)
-
+    res = np.copy(sem_map)
     classes = np.unique(sem_map)
 
     # skip bg
@@ -622,41 +621,31 @@ def remove_area_debris(sem_map: np.ndarray, min_size: int=5000):
 
     for i in classes:
 
-        area = np.array(sem_map == i, np.uint32)
+        area = np.array(res == i, np.uint32)
         inst_map = ndi.label(area)[0]
-        labels = np.unique(inst_map)
+        labels, counts = np.unique(inst_map, return_counts=True)
 
-        # everything is intact, no debris..
-        if len(labels) < 1:
-            return sem_map
+        for label, npixls in zip(labels, counts):
 
-        # skip bg
-        if 0 in labels:
-            labels = labels[1:]
+            if npixls < min_size:
+                res[inst_map == label] = 0
 
-        area_res = np.zeros(inst_map.shape, np.int32)
-        for ix in labels:
-            area_map = np.copy(inst_map == ix)
-            
-            y1, y2, x1, x2 = bounding_box(area_map)
-            y1 = y1 - 2 if y1 - 2 >= 0 else y1
-            x1 = x1 - 2 if x1 - 2 >= 0 else x1
-            x2 = x2 + 2 if x2 + 2 <= sem_map.shape[1] - 1 else x2
-            y2 = y2 + 2 if y2 + 2 <= sem_map.shape[0] - 1 else y2
-            area_map_crop = area_map[y1:y2, x1:x2].astype("int32")
+                # get the fill label
+                y1, y2, x1, x2 = bounding_box(inst_map == label)
+                y1 = y1 - 2 if y1 - 2 >= 0 else y1
+                x1 = x1 - 2 if x1 - 2 >= 0 else x1
+                x2 = x2 + 2 if x2 + 2 <= res.shape[1] - 1 else x2
+                y2 = y2 + 2 if y2 + 2 <= res.shape[0] - 1 else y2
+                l, c = np.unique(res[y1:y2, x1:x2], return_counts=True)
 
-            area_map_crop = remove_small_objects(
-                area_map_crop.astype(bool), 
-                min_size, connectivity=1
-            ).astype("int32")
-
-            area_map_crop[area_map_crop > 0] = i
-            area_res[y1:y2, x1:x2] = area_map_crop
-        
-        res += area_res
+                if 0 in l and len(l) > 1:
+                    l = l[1:]
+                    c = c[1:]
+                
+                fill_label = l[np.argmax(c)]
+                res[inst_map == label] = fill_label
 
     return res
-
 
 def fill_holes(sem_map: np.ndarray, min_size: int=5000):
     """
@@ -732,7 +721,6 @@ def label_sem_map(sem: np.ndarray, sort: bool=True) -> np.ndarray:
     if sort:
         classes = classes[np.argsort(-counts)]
 
-    # print(classes)
     for c in classes:
         obj_insts = ndi.label(sem == c)[0]
         labels = np.unique(obj_insts)
