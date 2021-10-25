@@ -101,7 +101,7 @@ class FolderDataset(Dataset, FileHandler):
                 if ymin <= self._get_xy_coords(f.name)[1] <= ymax
             ]
 
-    def _get_xy_coords(self, fname: str) -> Tuple[int, int]:
+    def _get_xy_coords(self, fname: str) -> List[int]:
         """
         Extract xy-coords from files named with x- and y- coordinates 
         in their file name.
@@ -788,8 +788,17 @@ class Inferer(FileHandler):
         for res in maps:
             name = res[0]
             self.inst_maps[name] = res[1].astype("int32")
-            self.type_maps[name] = res[2].astype("int32")
-            self.sem_maps[name] = res[3].astype("int32")
+
+            tmap = None
+            if self.model.decoder_type_branch:
+                tmap = res[2].astype("int32")
+
+            smap = None
+            if self.model.decoder_sem_branch:
+                smap = res[3].astype("int32")
+
+            self.type_maps[name] = tmap
+            self.sem_maps[name] = smap
 
     def run_inference(
             self, 

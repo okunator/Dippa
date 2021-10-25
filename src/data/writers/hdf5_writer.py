@@ -180,7 +180,7 @@ class HDF5Writer(BaseWriter):
                 pbar.set_postfix(
                     info=(
                         f"Writing mask and image patches to hdf5 file", 
-                        f"{h5.root._v_attrs.file_name}.h5"
+                        f"{h5.root._v_attrs.file_name}"
                     )
                 )
                 pbar.update(1)
@@ -199,11 +199,13 @@ class HDF5Writer(BaseWriter):
 
 
     @classmethod
-    def add2db(cls,
-               fname: str,
-               img_dir: str,
-               mask_dir: str,
-               **kwargs) -> Path:
+    def add2db(
+            cls,
+            fname: str,
+            img_dir: str,
+            mask_dir: str,
+            **kwargs
+        ) -> Path:
         """
         Add data to a previously created hdf5 database. This uses the 
         metadata of the existing h5 db to sort out the required params 

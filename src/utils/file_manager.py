@@ -32,6 +32,22 @@ class FileHandler:
         return cv2.cvtColor(cv2.imread(path.as_posix()), cv2.COLOR_BGR2RGB)
 
     @staticmethod
+    def write_img(path: Union[str, Path], img: np.ndarray) -> None:
+        """
+        Write an image.
+
+        Args:
+        ---------
+            path (str | Path):
+                Path to the image file.
+            img (np.ndarray):
+                The image to be written.
+
+        """
+        path = Path(path)
+        cv2.imwrite(path.as_posix(), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+
+    @staticmethod
     def read_mask(path: Union[str, Path], key: str="inst_map") -> np.ndarray:
         """
         Read a mask from a .mat file.
