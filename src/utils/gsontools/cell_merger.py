@@ -10,6 +10,7 @@ from tqdm import tqdm
 from .tile import GSONTile
 from .base_merger import BaseGSONMerger
 
+
 class CellMerger(BaseGSONMerger):
     def __init__(
             self, 

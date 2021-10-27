@@ -1,5 +1,7 @@
-from .ws import WSConv2d, WSConv2dStaticSamePadding
-from .residual import ResidualConvBlock, ResidualConvBlockPreact
-from .dense import DenseConvBlock, DenseConvBlockPreact
-from .basic import BasicConvBlock, BasicConvBlockPreact
-# from .mbconv import MBConv
+from .ops import WSConv2d, WSConv2dStaticSamePadding
+
+from .blocks import (
+    BasicConvBlock, BasicConvBlockPreact,
+    DenseConvBlock, DenseConvBlockPreact,
+    ResidualConvBlock, ResidualConvBlockPreact,
+)

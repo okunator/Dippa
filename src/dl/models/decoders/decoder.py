@@ -11,7 +11,7 @@ class Decoder(nn.ModuleDict):
             encoder_channels: List[int],
             decoder_channels: List[int],
             same_padding: bool=True,
-            batch_norm: str="bn",
+            normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
             up_sampling: str="fixed_unpool",
@@ -36,12 +36,14 @@ class Decoder(nn.ModuleDict):
                 Number of channels in each decoder layer output
             same_padding (bool, default=True):
                 if True, performs same-covolution
-            batch_norm (str, default="bn"): 
-                Perform normalization. Methods:
-                Batch norm, batch channel norm, group norm, etc.
-                One of ("bn", "bcn", None)
-            activation (str, default="relu"):
-                Activation method. One of ("relu", "swish". "mish")
+            normalization (str): 
+                Normalization method to be used.
+                One of: "bn", "bcn", "gn", "in", "ln", "lrn", None
+            activation (str):
+                Activation method. One of: "mish", "swish", "relu",
+                "relu6", "rrelu", "selu", "celu", "gelu", "glu", "tanh",
+                "sigmoid", "silu", "prelu", "leaky-relu", "elu",
+                "hardshrink", "tanhshrink", "hardsigmoid"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             n_blocks (int, default=2):
@@ -104,7 +106,7 @@ class Decoder(nn.ModuleDict):
         # set up kwargs
         kwargs = kwargs.copy()
         kwargs.setdefault("same_padding", same_padding)
-        kwargs.setdefault("batch_norm", batch_norm)
+        kwargs.setdefault("normalization", normalization)
         kwargs.setdefault("activation", activation)
         kwargs.setdefault("weight_standardize", weight_standardize)
         kwargs.setdefault("n_layers", n_layers)

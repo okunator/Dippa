@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Tuple, List
 
-from .block import MultiBlockResidual
+from .multi_block import MultiBlockResidual
 from ..base_decoder_block import BaseDecoderBlock
 
 
@@ -13,7 +13,7 @@ class ResidualDecoderBlock(BaseDecoderBlock):
             out_channel_list: List[int],
             skip_channel_list: List[int],
             same_padding: bool=True,
-            batch_norm: str="bn",
+            normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
             up_sampling: str="fixed_unpool",
@@ -48,10 +48,14 @@ class ResidualDecoderBlock(BaseDecoderBlock):
                 tensors. Ignored if `long_skip` == None.
             same_padding (bool, default=True):
                 If True, performs same-covolution
-            batch_norm (str, default="bn"): 
-                Normalization method. One of: "bn", "bcn", None
-            activation (str, default="relu"):
-                Activation method. One of: "relu", "swish". "mish"
+            normalization (str): 
+                Normalization method to be used.
+                One of: "bn", "bcn", "gn", "in", "ln", "lrn", None
+            activation (str):
+                Activation method. One of: "mish", "swish", "relu",
+                "relu6", "rrelu", "selu", "celu", "gelu", "glu", "tanh",
+                "sigmoid", "silu", "prelu", "leaky-relu", "elu",
+                "hardshrink", "tanhshrink", "hardsigmoid"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             up_sampling (str, default="fixed_unpool"):
@@ -95,7 +99,7 @@ class ResidualDecoderBlock(BaseDecoderBlock):
             skip_index=skip_index,
             out_dims=out_dims,
             same_padding=same_padding,
-            batch_norm=batch_norm,
+            normalization=normalization,
             activation=activation,
             weight_standardize=weight_standardize,
             preactivate=preactivate,
@@ -114,7 +118,7 @@ class ResidualDecoderBlock(BaseDecoderBlock):
                 in_channels=num_in_features, 
                 out_channels=self.out_channels,
                 n_blocks=n_blocks,
-                batch_norm=batch_norm, 
+                normalization=normalization, 
                 activation=activation,
                 weight_standardize=weight_standardize,
                 preactivate=preactivate

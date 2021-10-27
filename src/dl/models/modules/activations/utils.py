@@ -1,36 +1,28 @@
 import torch.nn as nn
 
-from .mish import Mish
-from .swish import Swish
+from . import *
 
 
-def convert_relu_to_mish(model: nn.Module) -> None:
+act = vars()
+
+
+def act_func(name: str, **kwargs) -> nn.Module:
     """
-    Convert ReLU activations in a give model to Mish
+    Initialize the activation function. Can use all the torch.nn
+    activation functions and Swish and Mish 
 
     Args:
-    --------
-        model (nn.Module):
-            pytorch model specification
-    """
-    for child_name, child in model.named_children():
-        if isinstance(child, nn.ReLU):
-            setattr(model, child_name, Mish(inplace=False))
-        else:
-            convert_relu_to_mish(child)
+        name (str):
+            The name of the activation function. Use lowercase letters.
 
-
-def convert_relu_to_swish(model: nn.Module) -> None:
     """
-    Convert ReLU activations in a give model to Mish
+    assert name in act["ACT_LOOKUP"].keys(), (
+        f"Illegal act func given. Allowed ones: {list(act['ACT_LOOKUP'].keys())}"
+    )
 
-    Args:
-    ----------
-        model (nn.Module):
-            pytorch model specification
-    """
-    for child_name, child in model.named_children():
-        if isinstance(child, nn.ReLU):
-            setattr(model, child_name, Swish(inplace=False))
-        else:
-            convert_relu_to_swish(child)
+    kwargs = kwargs.copy()
+    kwargs["inplace"] = True
+    key = act["ACT_LOOKUP"][name]
+    act_func = act[key](**kwargs)
+
+    return act_func

@@ -781,7 +781,7 @@ class Inferer(FileHandler):
             aux_maps=self.aux_maps,
         )
 
-        # save to containers
+        # save results to dicts
         self.inst_maps = OrderedDict()
         self.type_maps = OrderedDict()
         self.sem_maps = OrderedDict()

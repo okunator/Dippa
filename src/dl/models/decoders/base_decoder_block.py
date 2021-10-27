@@ -25,7 +25,7 @@ class BaseDecoderBlock(nn.Module):
             skip_index: int=None,
             out_dims: List[int]=None,
             same_padding: bool=True,
-            batch_norm: str="bn",
+            normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
             n_blocks: int=2,
@@ -69,12 +69,14 @@ class BaseDecoderBlock(nn.Module):
                 blocks (unet3+, unet++)
             same_padding (bool, default=True):
                 if True, performs same-covolution
-            batch_norm (str, default="bn"): 
-                Perform normalization. Methods:
-                Batch norm, batch channel norm, group norm, etc.
-                One of ("bn", "bcn", None)
-            activation (str, default="relu"):
-                Activation method. One of: "relu", "swish". "mish"
+            normalization (str): 
+                Normalization method to be used.
+                One of: "bn", "bcn", "gn", "in", "ln", "lrn", None
+            activation (str):
+                Activation method. One of: "mish", "swish", "relu",
+                "relu6", "rrelu", "selu", "celu", "gelu", "glu", "tanh",
+                "sigmoid", "silu", "prelu", "leaky-relu", "elu",
+                "hardshrink", "tanhshrink", "hardsigmoid"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             up_sampling (str, default="fixed_unpool"):
@@ -136,7 +138,7 @@ class BaseDecoderBlock(nn.Module):
                 enc_out_channels=skip_channel_list,
                 dec_out_dims=out_dims,
                 short_skip=short_skip,
-                batch_norm=batch_norm,
+                normalization=normalization,
                 activation=activation,
                 weight_standardize=weight_standardize,
                 preactivate=preactivate,
@@ -166,7 +168,7 @@ class BaseDecoderBlock(nn.Module):
                 skip_index=skip_index,
                 merge_policy=long_skip_merge_policy,
                 same_padding=same_padding,
-                batch_norm=batch_norm,
+                normalization=normalization,
                 activation=activation,
                 weight_standardize=weight_standardize,
                 preactivate=preactivate,

@@ -11,7 +11,7 @@ class MultiBlockDense(nn.ModuleDict):
             in_channels: int,
             out_channels: int,
             same_padding: bool=True,
-            batch_norm: str="bn",
+            normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
             n_blocks: int=2,
@@ -30,10 +30,14 @@ class MultiBlockDense(nn.ModuleDict):
                 Number of output channels
             same_padding (bool, default=True):
                 If True, performs same-covolution
-            batch_norm (str, default="bn"): 
-                Normalization method. One of "bn", "bcn", None
-            activation (str, default="relu"):
-                Activation method. One of "relu", "swish", "mish"
+            normalization (str): 
+                Normalization method to be used.
+                One of: "bn", "bcn", "gn", "in", "ln", "lrn", None
+            activation (str):
+                Activation method. One of: "mish", "swish", "relu",
+                "relu6", "rrelu", "selu", "celu", "gelu", "glu", "tanh",
+                "sigmoid", "silu", "prelu", "leaky-relu", "elu",
+                "hardshrink", "tanhshrink", "hardsigmoid"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             n_blocks (int, default=2):
@@ -51,7 +55,7 @@ class MultiBlockDense(nn.ModuleDict):
             in_channels=in_channels, 
             out_channels=out_channels, 
             same_padding=same_padding,
-            batch_norm=batch_norm, 
+            normalization=normalization, 
             activation=activation, 
             weight_standardize=weight_standardize,
         )
@@ -61,7 +65,7 @@ class MultiBlockDense(nn.ModuleDict):
                 in_channels=out_channels, 
                 out_channels=out_channels, 
                 same_padding=same_padding, 
-                batch_norm=batch_norm, 
+                normalization=normalization, 
                 activation=activation, 
                 weight_standardize=weight_standardize,
             )
@@ -70,4 +74,5 @@ class MultiBlockDense(nn.ModuleDict):
     def forward(self, features: List[torch.Tensor]) -> torch.Tensor:
         for _, conv_block in self.items():
             features = conv_block(features)
+            
         return features

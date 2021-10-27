@@ -7,7 +7,6 @@ from copy import deepcopy
 from typing import List, Dict
 from pathlib import Path
 from omegaconf import DictConfig
-from torchmetrics.metric import Metric
 
 from src.settings import RESULT_DIR
 from src.dl.builders import LossBuilder, OptimizerBuilder, Model
@@ -125,10 +124,14 @@ class SegModel(pl.LightningModule):
                 decoder block. Length of the list has to be equal to 
                 encoder_depth to ensure symmetric encodedr-decoder 
                 architecture.
-            activation (str, default="relu"):
-                Activation method. One of ("mish", "swish", "relu")
-            normalization (str, default="bn"):
-                Normalization method. One of ("bn", "bcn" None)
+            normalization (str): 
+                Normalization method to be used.
+                One of: "bn", "bcn", "gn", "in", "ln", "lrn", None
+            activation (str):
+                Activation method. One of: "mish", "swish", "relu",
+                "relu6", "rrelu", "selu", "celu", "gelu", "glu", "tanh",
+                "sigmoid", "silu", "prelu", "leaky-relu", "elu",
+                "hardshrink", "tanhshrink", "hardsigmoid"
             weight_standardize (bool, default=False):
                 Apply weight standardization in conv layers
             long_skips (str, default="unet"):

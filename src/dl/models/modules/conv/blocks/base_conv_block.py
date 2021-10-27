@@ -1,8 +1,8 @@
 import torch.nn as nn
 
-from ..activations import Mish, Swish
-from ..normalization import BCNorm, GroupNorm
-from ..conv import WSConv2d
+from ..ops import WSConv2d
+from ...activations.utils import act_func
+from ...normalization.utils import norm_func
 
 
 class BaseConvBlock(nn.Module):
@@ -11,15 +11,17 @@ class BaseConvBlock(nn.Module):
             in_channels: int,
             out_channels: int,
             same_padding: bool=True,
-            batch_norm: str="bn",
+            normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
             preactivate: bool=False
         ) -> None:
         """
-        Base conv block that is used in all decoder blocks
-        This uses moduledicts which let you choose the different 
-        methods to use.
+        Base conv block that is used in all decoder blocks.
+        Inits the primitive conv block modules from the given arguments.
+
+        I.e. Inits the Conv module, Norm module (optional) and Act
+        module of any Conv block.
 
         Args:
         -----------
@@ -29,12 +31,14 @@ class BaseConvBlock(nn.Module):
                 Number of output channels
             same_padding (bool):
                 if True, performs same-covolution
-            batch_norm (str): 
-                Perform normalization. Methods:
-                Batch norm, batch channel norm, group norm, etc.
-                One of ("bn", "bcn", None)
+            normalization (str): 
+                Normalization method to be used.
+                One of: "bn", "bcn", "gn", "in", "ln", "lrn", None
             activation (str):
-                Activation method. One of (relu, swish. mish)
+                Activation method. One of: "mish", "swish", "relu",
+                "relu6", "rrelu", "selu", "celu", "gelu", "glu", "tanh",
+                "sigmoid", "silu", "prelu", "leaky-relu", "elu",
+                "hardshrink", "tanhshrink", "hardsigmoid"
             weight_standardize (bool):
                 If True, perform weight standardization
             preactivate (bool, default=False):
@@ -42,15 +46,13 @@ class BaseConvBlock(nn.Module):
                 applied before the convolution.
         """
         super(BaseConvBlock, self).__init__()
-        assert batch_norm in ("bn", "bcn", "gn", None)
-        assert activation in ("relu", "mish", "swish", "leaky-relu")
         
-        self.batch_norm = batch_norm
+        self.normalization = normalization
         self.activation = activation
         self.conv_choice = "wsconv" if weight_standardize else "conv"
 
         # set norm channel number for preactivation or normal 
-        bn_channels = in_channels if preactivate else out_channels
+        norm_channels = in_channels if preactivate else out_channels
         
         # set convolution module
         if self.conv_choice == "wsconv":
@@ -65,21 +67,7 @@ class BaseConvBlock(nn.Module):
             )
 
         # set normalization module
-        if self.batch_norm == "bn":
-            self.bn = nn.BatchNorm2d(num_features=bn_channels)
-        elif self.batch_norm == "bcn":
-            self.bn = BCNorm(num_features=bn_channels)
-        elif self.batch_norm == "gn":
-            self.bn = GroupNorm(num_features=bn_channels)
-        else:
-            self.bn = nn.Identity()
+        self.norm = norm_func(self.normalization, num_features=norm_channels)
             
         # set activation module
-        if self.activation == "relu":
-            self.act = nn.ReLU(inplace=True)
-        elif self.activation == "mish":
-            self.act = Mish()
-        elif self.activation == "swish":
-            self.act = Swish()
-        elif self.activation == "leaky-relu":
-            self.act = nn.LeakyReLU(inplace=True) # slope = 0.1
+        self.act = act_func(self.activation)
