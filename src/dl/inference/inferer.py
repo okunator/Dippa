@@ -197,7 +197,7 @@ class Inferer(FileHandler):
         in_data_dir: str,
         gt_mask_dir: str=None,
         tta: bool=False,
-        model_weights: str="last",
+        model_weights: int=-1,
         loader_batch_size: int=8,
         loader_num_workers: int=8,
         patch_size: Tuple[int, int]=(256, 256),
@@ -231,10 +231,9 @@ class Inferer(FileHandler):
             tta (bool, default=False):
                 If True, performs test time augmentation. Inference time
                 goes up with often marginal performance improvements.
-            model_weights (str, default="last"):
-                pytorch lightning saves the weights of the model for the
-                last epoch and best epoch (based on validation data). 
-                One of ("best", "last").
+            model_weights (int, default=-1):
+                The epoch number of the saved checkpoint. If -1, uses
+                the last epoch 
             loader_batch_size (int, default=8):
                 Number of images loaded from the input folder by the 
                 workers per dataloader iteration. This is the DataLoader
@@ -318,7 +317,6 @@ class Inferer(FileHandler):
         assert stride_size <= patch_size[0], (
             f"stride_size: {stride_size} > {patch_size[0]}"
         )
-        assert model_weights in ("best", "last")
 
         # set model to device and to inference mode
         self.model = model
@@ -339,8 +337,9 @@ class Inferer(FileHandler):
         )
         self.model.load_state_dict(
             checkpoint['state_dict'], 
-            strict=False
+            strict=True
         )
+        print(f"Using weights from: {ckpt_path.as_posix()}")
 
         self.patch_size = patch_size
         self.stride_size = stride_size

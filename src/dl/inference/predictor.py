@@ -173,6 +173,15 @@ class Predictor:
         """
         assert act in ("sigmoid", "softmax", None)
         
+
+        # apply classification activation
+        if act == "sigmoid":
+            pred = torch.sigmoid(patch)
+        elif act == "softmax":
+            pred = F.softmax(patch, dim=1)
+        else:
+            pred = patch
+            
         # Add weights to pred matrix 
         if apply_weights:
             # work out the tensor shape first for the weight mat
@@ -183,14 +192,6 @@ class Predictor:
                 repeats=C,
             ).repeat_interleave(repeats=B, dim=0)
             patch *= W
-
-        # apply classification activation
-        if act == "sigmoid":
-            pred = torch.sigmoid(patch)
-        elif act == "softmax":
-            pred = F.softmax(patch, dim=1)
-        else:
-            pred = patch
 
         # from gpu to cpu
         if to_cpu:

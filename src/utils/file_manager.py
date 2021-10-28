@@ -156,6 +156,7 @@ class FileHandler:
     @staticmethod
     def get_class_weights(
             path: Union[str, Path],
+            which: str="cells",
             binary: bool=False
         ) -> np.ndarray:
         """
@@ -167,6 +168,8 @@ class FileHandler:
         --------
             path (str):
                 Path to the hdf5 database
+            which (str, default="cells"):
+                Compute the weights for either area or cell type classes
             binary (bool, default=False):
                 If True, Computes only background vs. foregroung weights
 
@@ -174,13 +177,24 @@ class FileHandler:
         --------
             np.ndarray: class weights array. Shape (C, )
         """
+        assert which in ("cells", "areas")
+
         path = Path(path)
+
         if path.suffix == ".h5": 
             with tb.open_file(path.as_posix(), "r") as db:
-                npixels = db.root.npixels[:]
+                if which == "cells":
+                    npixels = db.root.npixels_cells[:]
+                else:
+                    npixels = db.root.npixels_areas[:]
+
         elif path.suffix == ".zarr":
             z = zarr.open(path.as_posix(), mode="r")
-            npixels = z["npixels"][:]
+            if which == "cells":
+                npixels = z["npixels_cells"][:]
+            else:
+                npixels = z["npixels_areas"][:]
+
 
         if binary:
             bixs = [False] + [True]*(npixels.shape[1]-1)
@@ -189,6 +203,7 @@ class FileHandler:
             npixels = np.array([[bg_npixels, fg_npixels]])
 
         class_weights = 1 - npixels / npixels.sum()
+
         return class_weights
 
     @staticmethod
@@ -255,6 +270,7 @@ class FileHandler:
                     z.extractall(path)
                 if rm:
                     f.unlink()
+
     @staticmethod
     def remove_existing_files(path: Union[str, Path]) -> None:
         """
@@ -302,7 +318,7 @@ class FileHandler:
     def get_model_checkpoint(
             experiment: str,
             version: str,
-            which: str="last"
+            which: int=-1
         ) -> Path:
         """
         Get the path to the model checkpoint/weights inside a specific
@@ -314,14 +330,15 @@ class FileHandler:
                 name of the experiment
             version (str):
                 version of the experiment
+            which (int, default=-1):
+                The epoch number of the saved checkpoint. If -1, uses
+                the last epoch 
 
         Returns:
         ---------
             Path: path to the checkpoint file
         """
-        assert which in ("best", "last"), (
-            f"param which: {which} not one of ('best', 'last')"
-        )
+        assert isinstance(which, int)
 
         experiment_dir = Path(f"{RESULT_DIR}/{experiment}/version_{version}")  
         assert experiment_dir.exists(), (
@@ -333,9 +350,9 @@ class FileHandler:
         cpt = None
         for it in experiment_dir.iterdir():
             if it.is_file() and it.suffix == ".ckpt":
-                if which == "last" and "last" in str(it) and cpt is None:
+                if which == -1 and "last" in str(it) and cpt is None:
                     cpt = it
-                elif which == "best" and "last" not in str(it) and cpt is None:
+                elif f"={which}-" in str(it) and cpt is None:
                     cpt = it
 
         assert cpt is not None, (

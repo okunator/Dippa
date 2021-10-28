@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Dict
 from abc import ABC, abstractmethod
 
 from src.utils import FileHandler
@@ -23,7 +23,7 @@ class BaseWriter(ABC, FileHandler):
             num_channels: int=3
         ) -> np.ndarray:
         """
-        Compute the number of pixels. Channel-wise sum and channel-wise 
+        Compute the number of pixels, channel-wise sum and channel-wise 
         squared sum for dataset mean & std computations.
 
         Args:
@@ -35,12 +35,13 @@ class BaseWriter(ABC, FileHandler):
 
         Returns: 
         ----------
-            Tuple[Union[int, np.ndarray]] : The computed statistics. 
+            Tuple[Union[int, np.ndarray]]: The computed statistics. 
             np.ndarrays have shape (3, ).
         """
         pixel_num = 0 
         channel_sum = np.zeros(num_channels)
         channel_sum_sq = np.zeros(num_channels)
+
         for i in range(patches_im.shape[0]):
             img = patches_im[i] / 255
             pixel_num += (img.size / num_channels)
@@ -73,7 +74,7 @@ class BaseWriter(ABC, FileHandler):
 
         Returns:
         ---------
-            A tuple of nd.arrays of the transformed patches.
+            Tuple: A tuple of nd.arrays of the transformed patches.
         """
         
         imgs, inst_maps, type_maps, sem_maps = [], [], [], []
@@ -101,24 +102,32 @@ class BaseWriter(ABC, FileHandler):
              axis=-1
         )
         return full_data
-        
 
-    def _pixels_per_classes(self, type_map: np.ndarray) -> np.ndarray:
+    def _mask_patch_stats(
+            self,
+            patches_mask: np.ndarray,
+            classes: Dict[str, int]
+        ) -> np.ndarray:
         """
-        Compute pixels belonging to each class
+        Compute the number of pixels for each of the classes in the 
+        input patches
 
         Args:
-        ---------
-        type_map (np.ndarray):
-            Type map of shape (H, W).
-        
-        Returns:
-        ---------
-            np.ndarray of shape (C, ). indices are classes, values the 
-            number of pixels per class
+        ----------
+            patches_mask (np.ndarray):
+                Image patches. Shape (n_patches, pH, pW)
+            classes (int):
+                The class dictionary. E.g. {"bg": 0, "fg": 1}
+
+        Returns: 
+        ----------
+            np.ndarray: The number of pixels per classes. Shape (C, )
         """
-        pixels = np.zeros(len(self.classes))
-        for j, val in enumerate(self.classes.values()):
-            pixels[j] += sum(sum(type_map == val))
+
+        pixels = np.zeros(len(classes))
+
+        for i in range(patches_mask.shape[0]):
+            for j, val in enumerate(classes.values()):
+                pixels[j] += sum(sum(patches_mask[i] == val))
             
         return pixels.astype("int32")

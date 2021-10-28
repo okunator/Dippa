@@ -128,9 +128,6 @@ class HDF5Writer(BaseWriter):
                 except:
                     areas = np.zeros_like(insts)
 
-                # add # of pixels per class to db for class weighting
-                root.npixels[:] += self._pixels_per_classes(types)
-
                 # workout shape inconsistencies that occur 
                 im = im[:-1, :] if im.shape[0] > insts.shape[0] else im
                 im = im[:, :-1] if im.shape[1] > insts.shape[1] else im
@@ -160,6 +157,14 @@ class HDF5Writer(BaseWriter):
                         patches_mask=patches[..., 3:],
                         crop_shape=self.crop_shape
                     )
+
+                # Compute class mask stats
+                root.npixels_cells[:] += self._mask_patch_stats(
+                    patches[..., 4], self.classes
+                )
+                root.npixels_areas[:] += self._mask_patch_stats(
+                    patches[..., 5], self.sem_classes
+                )
 
                 # Compute stats from the patches
                 pixel_stats = self._patch_stats(patches[..., :3])
@@ -289,6 +294,9 @@ class HDF5Writer(BaseWriter):
         if not self.rigid_augs_and_crop and self.patch_shape is not None:
             ph, pw = self.patch_shape
 
+        # Set a dummy list val for sem cls if they are not provided
+        sem_cls = self.sem_classes if self.sem_classes is not None else [1]
+            
         h5.create_earray(
             where=root, 
             name="imgs", 
@@ -325,13 +333,21 @@ class HDF5Writer(BaseWriter):
             filters=tb.Filters(complevel=5, complib="blosc:lz4")
         )
 
+        h5.create_carray(
+            where=root, 
+            name="npixels_areas", 
+            atom=tb.Int32Atom(), 
+            shape=(1, len(sem_cls))
+        )
+
         # pixels per classes
         h5.create_carray(
             where=root, 
-            name="npixels", 
+            name="npixels_cells", 
             atom=tb.Int32Atom(), 
             shape=(1, len(self.classes))
         )
+
 
         h5.create_carray(
             where=root, 
