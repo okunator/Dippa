@@ -92,7 +92,7 @@ class SegTrainer:
             self.last_ckpt = FileHandler.get_model_checkpoint(
                 experiment=experiment_name,
                 version=experiment_version,
-                which="last"
+                which=-1
             )
     
         # set logging dir

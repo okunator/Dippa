@@ -104,14 +104,12 @@ class Unet3pSkip(nn.Module):
         self.merge_policy = merge_policy
         self.dec_stage_ix = dec_stage_ix
 
-        # Set up the conv block type
         self.MultiConv = MultiBlockBasic
         if short_skip == "residual":
             self.MultiConv = MultiBlockResidual
         elif short_skip == "dense":
             self.MultiConv = MultiBlockDense
 
-        # Start wrangling the channel and spatial dims
         # spatial dims (H, W) at prev decoder stages below this stage
         prev_dec_out_dims = dec_out_dims[:dec_stage_ix]
         if prev_dec_out_dims:
@@ -221,12 +219,12 @@ class Unet3pSkip(nn.Module):
         for the convolutions in this module. If merge policy is to cat
         all the channels, the number of out channels is divided evenly
         such that it matches the decoder output channels. If the merge
-        policy is to sum, then ...
+        policy is to sum, then no need to divide.
 
         Args:
         ---------
             current_dec_out_chl (int):
-                The number of output channel from the current decoder
+                The number of output channels from the current decoder
                 stage.
             enc_out_channels (List[int]):
                 List of the number of channels for each encoder output
@@ -275,13 +273,13 @@ class Unet3pSkip(nn.Module):
         ) -> Tuple[nn.ModuleDict, nn.ModuleDict]:
         """
         Get the convolution and scaling operations needed for the skip
-        connection ate the current decoder stage
+        connection at the current decoder stage
     
         Args:
         ---------
             from_to (str):
                 Specifies the part of the network where the feature map
-                starts it's journey and where it will end it's journey
+                starts and where it propagates
             target_size (int):
                 The spatial dims (H, W) of the output feature map
             out_dims (List[int]):

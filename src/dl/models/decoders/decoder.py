@@ -97,9 +97,9 @@ class Decoder(nn.ModuleDict):
         # no skip connection at the last decoder layer
         skip_channels = encoder_channels[1:] + [0]
 
-        # Height/width of the encoder/decoder output feature maps
-        # assumes that the downscaling factor is 2 for every pooling op
-        # in the encoder. Used for skip connection arithmetics
+        # scaling factor assumed to be 2 for the spatial dims in the
+        # consecutive pooling and upsampling ops of the encoder/decoder 
+        # Used for skip connection arithmetics
         depth = len(skip_channels)
         out_dims = [model_input_size // 2**i for i in range(depth)][::-1]
 
@@ -141,7 +141,7 @@ class Decoder(nn.ModuleDict):
         skips = features[1:]
         
         x = head
-        for i, (_, block) in enumerate(self.items()):
+        for i, block in enumerate(self.values()):
             x, extra = block(x, ix=i, skips=skips, extra_skips=extra_skips)
             extra_skips = extra
 

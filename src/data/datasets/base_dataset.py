@@ -26,7 +26,7 @@ class BaseDataset(Dataset, FileHandler):
             rm_touching_nuc_borders: bool=False,
             edge_weights: bool=False,
             type_branch: bool=True,
-            semantic_branch: bool=False,
+            sem_branch: bool=False,
         ) -> None:
         """
         Base dataset class
@@ -52,7 +52,7 @@ class BaseDataset(Dataset, FileHandler):
                 signals that the cell type annotations are included per
                 each dataset iter. Given that these annotations exist in
                 db
-            semantic_branch (bool, default=False):
+            sem_branch (bool, default=False):
                 If the model contains a semnatic area branch, this arg 
                 signals that the area annotations are included per each 
                 dataset iter. Given that these annotations exist in db
@@ -67,7 +67,7 @@ class BaseDataset(Dataset, FileHandler):
         self.rm_touching_nuc_borders = rm_touching_nuc_borders
         self.edge_weights = edge_weights
         self.type_branch = type_branch
-        self.semantic_branch = semantic_branch
+        self.sem_branch = sem_branch
 
         self.suffix = Path(self.fname).suffix 
         assert self.suffix in (".h5", ".zarr"), (
@@ -150,7 +150,7 @@ class BaseDataset(Dataset, FileHandler):
         if self.type_branch:
             data["type_map"] = types
 
-        if self.semantic_branch:
+        if self.sem_branch:
             data["sem_map"] = areas
 
         return data

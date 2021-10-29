@@ -111,7 +111,7 @@ def main(conf, extra_params):
             ckpt_path=FileHandler.get_model_checkpoint(
                 experiment=conf.experiment_args.experiment_name,
                 version=conf.experiment_args.experiment_version,
-                which="last"
+                which=-1
             ),
         )
 
