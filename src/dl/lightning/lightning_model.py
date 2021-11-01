@@ -328,6 +328,7 @@ class SegModel(pl.LightningModule):
             metrics = nn.ModuleDict(
                 {k: v for m in self.metric_list for k, v in md[m].items()}
             )
+            
             self.train_metrics = deepcopy(metrics)
             self.val_metrics = deepcopy(metrics)
             self.test_metrics = deepcopy(metrics)

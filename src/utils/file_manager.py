@@ -48,9 +48,13 @@ class FileHandler:
         cv2.imwrite(path.as_posix(), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
     @staticmethod
-    def read_mask(path: Union[str, Path], key: str="inst_map") -> np.ndarray:
+    def read_mask(
+            path: Union[str, Path],
+            key: str="inst_map"
+        ) -> Union[np.ndarray, None]:
         """
-        Read a mask from a .mat file.
+        Read a mask from a .mat file. If a mask is not found with
+        return None
 
         Args:
         ---------
@@ -61,7 +65,7 @@ class FileHandler:
         
         Returns:
         ----------
-            np.ndarray: The mask indice matrix. Shape (H, W) 
+            np.ndarray or None: The mask indice matrix. Shape (H, W)
         """
         assert key in (
             "inst_map", "type_map", "inst_centroid", "inst_type", "sem_map"
@@ -76,7 +80,15 @@ class FileHandler:
         }
 
         path = Path(path)
-        return sio.loadmat(path.as_posix())[key].astype(dtypes[key])
+
+        assert path.exists(), f"{path} not found"
+
+        try:
+            mask = sio.loadmat(path.as_posix())[key].astype(dtypes[key])
+        except:
+            mask = None
+
+        return mask
     
     @staticmethod
     def read_zarr_patch(path: str, ix: int) -> Tuple[np.ndarray]:
@@ -125,8 +137,17 @@ class FileHandler:
         with tb.open_file(path, "r") as h5:
             im_patch = h5.root.imgs[ix, ...]
             inst_patch = h5.root.insts[ix, ...]
-            type_patch = h5.root.types[ix, ...]
-            sem_patch = h5.root.areas[ix, ...]
+
+            # These masks are not necessarily in the dset
+            try:
+                type_patch = h5.root.types[ix, ...]
+            except:
+                type_patch = None
+
+            try:
+                sem_patch = h5.root.areas[ix, ...]
+            except:
+                sem_patch = None
         
         return im_patch, inst_patch, type_patch, sem_patch
 

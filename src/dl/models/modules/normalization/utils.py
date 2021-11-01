@@ -6,14 +6,14 @@ from . import *
 norm = vars()
 
 
-def norm_func(name: str, **kwargs) -> nn.Module:
+def norm_func(name: str=None, **kwargs) -> nn.Module:
     """
-    Initialize the activation function. Can use all the torch.nn
-    activation functions and Swish and Mish 
+    Initialize the normalization function. Can use all the torch.nn
+    normalization functions plus batch channel norm
 
     Args:
-        name (str):
-            The name of the activation function. Use lowercase letters.
+        name (str, default=None):
+            The name of the norm function. Use lowercase letters.
 
     """
     allowed = [*norm['NORM_LOOKUP'].keys(), None]
@@ -25,8 +25,8 @@ def norm_func(name: str, **kwargs) -> nn.Module:
     if name is not None:
         kwargs = kwargs.copy()
         key = norm["NORM_LOOKUP"][name]
-        norm_func = norm[key](**kwargs)
+        norm_f = norm[key](**kwargs)
     else:
-        norm_func = nn.Identity()
+        norm_f = nn.Identity()
 
-    return norm_func
+    return norm_f

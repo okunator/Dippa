@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from ...activations.utils import act_func
+from ..activations.utils import act_func
 
 
 class SqueezeAndExcite(nn.Module):

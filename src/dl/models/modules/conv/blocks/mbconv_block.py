@@ -1,10 +1,8 @@
 import torch
 import torch.nn as nn
 
-from .base_conv_block import BaseConvBlock
 
-
-class MBConvBlock(BaseConvBlock):
+class MBConvBlock(nn.ModuleDict):
     def __init__(
             self,
             in_channels: int,
@@ -14,6 +12,7 @@ class MBConvBlock(BaseConvBlock):
             activation: str="relu",
             weight_standardize: bool=False,
             use_residual: bool=True,
+            expansion_factor: int=True,
             se_block: bool=True
         ) -> None:
         """
@@ -51,7 +50,24 @@ class MBConvBlock(BaseConvBlock):
                 If True, the identity is summed to the linear unit 
                 before the final activation. (This param is used by
                 the MultiMBBlock)
+            expansion_factor (int, default=1):
+                `in_channels` are expanded by this factor in the 
+                inverted bottleneck
             se_block (bool, default=True):
                 If True, a squeeze an SE-block is added
         """
-        raise NotImplementedError
+        super(MBConvBlock, self).__init__(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            same_padding=same_padding,
+            normalization=normalization,
+            activation=activation,
+            weight_standardize=weight_standardize,
+            preactivate=False
+        )
+
+        expansion_channels = expansion_factor*in_channels
+
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        pass

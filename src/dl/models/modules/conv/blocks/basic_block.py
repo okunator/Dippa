@@ -1,9 +1,10 @@
 import torch
+import torch.nn as nn
 
-from .base_conv_block import BaseConvBlock
+from ._base.basic import BasicConvBlockPreact, BasicConvBlock
 
 
-class BasicConvBlock(BaseConvBlock):
+class MultiConvBlock(nn.ModuleDict):
     def __init__(
             self,
             in_channels: int,
@@ -11,10 +12,15 @@ class BasicConvBlock(BaseConvBlock):
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
-            weight_standardize: bool=False
+            weight_standardize: bool=False,
+            n_blocks: int=2,
+            preactivate: bool=False,
+            attention: str=None
         ) -> None:
         """
-        Basic conv block that can be used in decoders
+        Stack basic conv blocks in a ModuleDict. These are used in the
+        full sized decoderblocks. The number of basic conv blocks can be 
+        adjusted. Default is 2.
 
         Args:
         ----------
@@ -23,7 +29,7 @@ class BasicConvBlock(BaseConvBlock):
             out_channels (int):
                 Number of output channels
             same_padding (bool, default=True):
-                if True, performs same-covolution
+                If True, performs same-covolution
             normalization (str): 
                 Normalization method to be used.
                 One of: "bn", "bcn", "gn", "in", "ln", "lrn", None
@@ -34,68 +40,46 @@ class BasicConvBlock(BaseConvBlock):
                 "hardshrink", "tanhshrink", "hardsigmoid"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
+            n_blocks (int, default=2):
+                Number of BasicConvBlocks used in this block
+            preactivate (bool, default=False)
+                If True, normalization and activation are applied before
+                convolution
+            attention (str, default=None):
+                Attention method. One of: "se", None
         """
-        super(BasicConvBlock, self).__init__(
-            in_channels=in_channels,
+        super(MultiConvBlock, self).__init__()
+
+        # use either preact or normal conv block
+        ConvBlock = BasicConvBlockPreact if preactivate else BasicConvBlock
+
+        use_attention = n_blocks == 1
+        self.conv1 = ConvBlock(
+            in_channels=in_channels, 
             out_channels=out_channels,
-            same_padding=same_padding,
-            normalization=normalization,
-            activation=activation,
+            same_padding=same_padding, 
+            normalization=normalization, 
+            activation=activation, 
             weight_standardize=weight_standardize,
-            preactivate=False
+            attention=use_attention if attention else False
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.conv(x)
-        x = self.norm(x)
-        x = self.act(x)
-        return x
-
-
-class BasicConvBlockPreact(BaseConvBlock):
-    def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            same_padding: bool=True,
-            normalization: str="bn",
-            activation: str="relu",
-            weight_standardize: bool=False
-        ) -> None:
-        """
-        Basic conv block that can be used in decoders
-
-        Args:
-        ----------
-            in_channels (int):
-                Number of input channels
-            out_channels (int):
-                Number of output channels
-            same_padding (bool, default=True):
-                if True, performs same-covolution
-            normalization (str): 
-                Normalization method to be used.
-                One of: "bn", "bcn", "gn", "in", "ln", "lrn", None
-            activation (str):
-                Activation method. One of: "mish", "swish", "relu",
-                "relu6", "rrelu", "selu", "celu", "gelu", "glu", "tanh",
-                "sigmoid", "silu", "prelu", "leaky-relu", "elu",
-                "hardshrink", "tanhshrink", "hardsigmoid"
-            weight_standardize (bool, default=False):
-                If True, perform weight standardization
-        """
-        super(BasicConvBlockPreact, self).__init__(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            same_padding=same_padding,
-            normalization=normalization,
-            activation=activation,
-            weight_standardize=weight_standardize,
-            preactivate=True
-        )
+        blocks = list(range(1, n_blocks))
+        for i in blocks:
+            use_attention = i == blocks[-1]
+            conv_block = ConvBlock(
+                in_channels=out_channels,
+                out_channels=out_channels,
+                same_padding=same_padding,
+                normalization=normalization,
+                activation=activation,
+                weight_standardize=weight_standardize,
+                attention=use_attention if attention else False
+            )
+            self.add_module('conv%d' % (i + 1), conv_block)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.norm(x)
-        x = self.act(x)
-        x = self.conv(x)
+        for _, conv_block in self.items():
+            x = conv_block(x)
+
         return x

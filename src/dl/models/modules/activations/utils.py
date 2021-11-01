@@ -6,23 +6,28 @@ from . import *
 act = vars()
 
 
-def act_func(name: str, **kwargs) -> nn.Module:
+def act_func(name: str=None, **kwargs) -> nn.Module:
     """
     Initialize the activation function. Can use all the torch.nn
     activation functions and Swish and Mish 
 
     Args:
-        name (str):
+        name (str, default=None):
             The name of the activation function. Use lowercase letters.
 
     """
-    assert name in act["ACT_LOOKUP"].keys(), (
-        f"Illegal act func given. Allowed ones: {list(act['ACT_LOOKUP'].keys())}"
+    allowed = [*act['ACT_LOOKUP'].keys(), None]
+
+    assert name in allowed, (
+        f"Illegal act func given. Allowed ones: {allowed}"
     )
 
-    kwargs = kwargs.copy()
-    kwargs["inplace"] = True
-    key = act["ACT_LOOKUP"][name]
-    act_func = act[key](**kwargs)
+    if name is not None:
+        kwargs = kwargs.copy()
+        kwargs["inplace"] = True
+        key = act["ACT_LOOKUP"][name]
+        act_f = act[key](**kwargs)
+    else:
+        act_f = nn.Identity()
 
-    return act_func
+    return act_f

@@ -1,8 +1,9 @@
 import torch.nn as nn
 
-from ..ops import WSConv2d
-from ...activations.utils import act_func
-from ...normalization.utils import norm_func
+from ...ops.utils import conv_func
+from ....activations.utils import act_func
+from ....normalization.utils import norm_func
+from ....attention.utils import att_func
 
 
 class BaseConvBlock(nn.Module):
@@ -14,7 +15,11 @@ class BaseConvBlock(nn.Module):
             normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
-            preactivate: bool=False
+            preactivate: bool=False,
+            kernel_size=3,
+            groups: int=1,
+            attention: str=None,
+            pre_attend: bool=False
         ) -> None:
         """
         Base conv block that is used in all decoder blocks.
@@ -44,30 +49,36 @@ class BaseConvBlock(nn.Module):
             preactivate (bool, default=False):
                 If True, inits batch norm such that it will be
                 applied before the convolution.
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
+            groups (int, default=1):
+                Number of groups the kernels are divided into. If 
+                `groups == 1` normal convolution is applied. If
+                `groups = in_channels` depthwise convolution is applied
+            attention (str, default=None):
+                Attention method. One of: "se", None
+            pre_attend (bool, default=False):
+                If True, Attention is applied at the beginning of
+                forwards.
         """
         super(BaseConvBlock, self).__init__()
-        
-        self.normalization = normalization
-        self.activation = activation
         self.conv_choice = "wsconv" if weight_standardize else "conv"
 
         # set norm channel number for preactivation or normal 
         norm_channels = in_channels if preactivate else out_channels
-        
-        # set convolution module
-        if self.conv_choice == "wsconv":
-            self.conv = WSConv2d(
-                in_channels, out_channels, 
-                kernel_size=3, padding=int(same_padding)
-            )
-        elif self.conv_choice == "conv":
-            self.conv = nn.Conv2d(
-                in_channels, out_channels, 
-                kernel_size=3, padding=int(same_padding)
-            )
 
-        # set normalization module
-        self.norm = norm_func(self.normalization, num_features=norm_channels)
-            
-        # set activation module
-        self.act = act_func(self.activation)
+        # set attention channels
+        att_channels = in_channels if pre_attend else in_channels
+
+        # set padding. Works if dilation or stride are not adjusted
+        padding = (kernel_size - 1) // 2 if same_padding else 0
+        
+        self.conv = conv_func(
+            name=self.conv_choice, in_channels=in_channels,
+            out_channels=out_channels, kernel_size=kernel_size, 
+            groups=groups, padding=padding
+        )
+
+        self.norm = norm_func(normalization, num_features=norm_channels)      
+        self.act = act_func(activation)
+        self.attend = att_func(attention, in_channels=att_channels)

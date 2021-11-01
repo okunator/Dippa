@@ -77,7 +77,7 @@ class BaseWriter(ABC, FileHandler):
             Tuple: A tuple of nd.arrays of the transformed patches.
         """
         
-        imgs, inst_maps, type_maps, sem_maps = [], [], [], []
+        imgs, masks = [], []
 
         patches_im = patches_im.astype("uint8")
         for i in range(patches_im.shape[0]):
@@ -87,21 +87,13 @@ class BaseWriter(ABC, FileHandler):
                 crop_shape=crop_shape
             )
             imgs.append(cropped_patches["image"])
-            inst_maps.append(cropped_patches["masks"][0][..., 0])
-            type_maps.append(cropped_patches["masks"][0][..., 1])
-            sem_maps.append(cropped_patches["masks"][0][..., 2])
+            masks.append(cropped_patches["masks"][0])
 
         imgs = np.array(imgs)
-        insts = np.array(inst_maps)
-        types = np.array(type_maps)
-        areas = np.array(sem_maps)
+        masks = np.array(masks)
 
-        # concat to one ndarray
-        full_data = np.concatenate(
-            (imgs, insts[..., None], types[..., None], areas[..., None]),
-             axis=-1
-        )
-        return full_data
+        return imgs, masks
+
 
     def _mask_patch_stats(
             self,

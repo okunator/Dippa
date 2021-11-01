@@ -93,7 +93,7 @@ class HDF5Writer(BaseWriter):
                 "If rigids_augs_and_crop is True, crop_shape can't be None"
             )
 
-
+    # TODO: Too kludgy, unkludge
     def _write_files(self, 
                      h5: BinaryIO, 
                      img_dir: str, 
@@ -121,21 +121,18 @@ class HDF5Writer(BaseWriter):
                 im = self.read_img(img_path)
                 insts = self.read_mask(mask_path, key="inst_map")
                 types = self.read_mask(mask_path, key="type_map")
+                areas = self.read_mask(mask_path, key="sem_map")
 
-                # most of the time there are no semantic maps
-                try:
-                    areas = self.read_mask(mask_path, key="sem_map")
-                except:
-                    areas = np.zeros_like(insts)
-
-                # workout shape inconsistencies that occur 
+                # workout shape inconsistencies that occur here and there
                 im = im[:-1, :] if im.shape[0] > insts.shape[0] else im
                 im = im[:, :-1] if im.shape[1] > insts.shape[1] else im
                 
-                full_data = np.concatenate(
-                    (im, insts[..., None], types[..., None], areas[..., None]), 
-                    axis=-1
+                labels = (
+                    d[..., None] 
+                    for d in (insts, types, areas) if d is not None
                 )
+                
+                full_data = np.concatenate((im, *labels), axis=-1)
 
                 # Do patching or create copies of input images
                 if self.patch_shape is not None:
@@ -150,37 +147,40 @@ class HDF5Writer(BaseWriter):
                 else:
                     patches = full_data[None, ...]
 
+                new_imgs = patches[..., :3]
+                new_masks = patches[..., 3:]
+
                 # apply rigid augmentations and center cropping
                 if self.rigid_augs_and_crop:
-                    patches = self._augment_patches(
-                        patches_im=patches[..., :3], 
-                        patches_mask=patches[..., 3:],
+                    new_imgs, new_masks = self._augment_patches(
+                        patches_im=new_imgs, 
+                        patches_mask=new_masks,
                         crop_shape=self.crop_shape
                     )
 
-                # Compute class mask stats
-                root.npixels_cells[:] += self._mask_patch_stats(
-                    patches[..., 4], self.classes
-                )
-                root.npixels_areas[:] += self._mask_patch_stats(
-                    patches[..., 5], self.sem_classes
-                )
-
-                # Compute stats from the patches
-                pixel_stats = self._patch_stats(patches[..., :3])
+                # Compute stats from the image patches and add to db
+                pixel_stats = self._patch_stats(new_imgs)
                 root.pixel_num[:] += pixel_stats[0]
                 root.channel_sum[:] += pixel_stats[1]
                 root.channel_sum_sq[:] += pixel_stats[2]
-                
-                im_p = patches[..., :3].astype("uint8")
-                inst_p = patches[..., 3].astype("int32")
-                type_p = patches[..., 4].astype("int32")
-                sem_p = patches[..., 5].astype("int32")
+                root.imgs.append(new_imgs.astype("uint8"))
 
-                root.imgs.append(im_p)
-                root.insts.append(inst_p)
-                root.types.append(type_p)
-                root.areas.append(sem_p)
+                # Compute mask stats and add to db
+                if insts is not None:
+                    root.insts.append(new_masks[..., 0].astype("int32"))
+
+                if types is not None:
+                    root.npixels_cells[:] += self._mask_patch_stats(
+                        new_masks[..., 1], self.classes
+                    )
+                    root.types.append(new_masks[..., 1].astype("int32"))
+
+                if areas is not None:
+                    root.npixels_areas[:] += self._mask_patch_stats(
+                        new_masks[..., 2], self.sem_classes
+                    )
+                    root.areas.append(new_masks[..., 2].astype("int32"))
+                
 
                 pbar.set_postfix(
                     info=(
@@ -324,6 +324,13 @@ class HDF5Writer(BaseWriter):
             filters=tb.Filters(complevel=5, complib="blosc:lz4")
         )
 
+        h5.create_carray(
+            where=root, 
+            name="npixels_cells", 
+            atom=tb.Int32Atom(), 
+            shape=(1, len(self.classes))
+        )
+
         h5.create_earray(
             where=root, 
             name="areas", 
@@ -339,15 +346,6 @@ class HDF5Writer(BaseWriter):
             atom=tb.Int32Atom(), 
             shape=(1, len(sem_cls))
         )
-
-        # pixels per classes
-        h5.create_carray(
-            where=root, 
-            name="npixels_cells", 
-            atom=tb.Int32Atom(), 
-            shape=(1, len(self.classes))
-        )
-
 
         h5.create_carray(
             where=root, 
