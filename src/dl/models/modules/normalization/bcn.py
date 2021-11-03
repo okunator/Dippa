@@ -49,6 +49,7 @@ class EstBN(nn.Module):
         weight = self.weight.view(1, -1, 1, 1)
         bias = self.bias.view(1, -1, 1, 1)
         out = weight * out + bias
+
         return out
 
 
@@ -111,4 +112,5 @@ class BCNorm(nn.Module):
         out = out.view(x.size(0), self.num_groups, -1)
         out = self.weight * out + self.bias
         out = out.view_as(x)
+        
         return out

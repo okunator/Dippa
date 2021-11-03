@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 
-from ._base.basic import BasicConvBlockPreact, BasicConvBlock
+from .basic import BasicConvBlockPreact, BasicConvBlock
 
 
-class MultiConvBlock(nn.ModuleDict):
+class BasicBlock(nn.ModuleDict):
     def __init__(
             self,
             in_channels: int,
@@ -48,12 +48,13 @@ class MultiConvBlock(nn.ModuleDict):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(MultiConvBlock, self).__init__()
+        super(BasicBlock, self).__init__()
 
         # use either preact or normal conv block
         ConvBlock = BasicConvBlockPreact if preactivate else BasicConvBlock
 
         use_attention = n_blocks == 1
+        att_method = attention if use_attention else None
         self.conv1 = ConvBlock(
             in_channels=in_channels, 
             out_channels=out_channels,
@@ -61,12 +62,12 @@ class MultiConvBlock(nn.ModuleDict):
             normalization=normalization, 
             activation=activation, 
             weight_standardize=weight_standardize,
-            attention=use_attention if attention else False
+            attention=att_method if attention is not None else None
         )
 
         blocks = list(range(1, n_blocks))
         for i in blocks:
-            use_attention = i == blocks[-1]
+            att_method = attention if i == blocks[-1] else None
             conv_block = ConvBlock(
                 in_channels=out_channels,
                 out_channels=out_channels,
@@ -74,9 +75,11 @@ class MultiConvBlock(nn.ModuleDict):
                 normalization=normalization,
                 activation=activation,
                 weight_standardize=weight_standardize,
-                attention=use_attention if attention else False
+                attention=att_method if attention is not None else None
             )
-            self.add_module('conv%d' % (i + 1), conv_block)
+            self.add_module(f"conv{i + 1}", conv_block)
+
+        self.out_channels = out_channels
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for _, conv_block in self.items():

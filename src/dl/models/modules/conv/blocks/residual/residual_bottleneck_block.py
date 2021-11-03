@@ -1,15 +1,15 @@
 import torch
 import torch.nn as nn
-from typing import List
 
-from ._base.dense import DenseConvBlock, DenseConvBlockPreact
+from .residual_bottleneck import BottleneckResidual, BottleneckResidualPreact
 
 
-class DenseBlock(nn.ModuleDict):
+class BottleneckResidualBlock(nn.ModuleDict):
     def __init__(
             self,
             in_channels: int,
             out_channels: int,
+            expand_ratio: float=4.0,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
@@ -19,9 +19,14 @@ class DenseBlock(nn.ModuleDict):
             attention: str=None
         ) -> None:
         """
-        Stacks dense conv blocks in a ModuleDict. These are used in the
-        full sized decoderblocks (stages). The number of dense conv 
-        blocks can be adjusted to add depth to the decoder. Default = 2.
+        Stack residual bottleneck blocks in a ModuleDict. These can be 
+        used in the full sized decoderblocks.
+
+        (Res-Net): Deep residual learning for image recognition:
+            - https://arxiv.org/abs/1512.03385
+
+        (Preact-ResNet): Identity Mappings in Deep Residual Networks:
+            - https://arxiv.org/abs/1603.05027
 
         Args:
         ----------
@@ -29,6 +34,8 @@ class DenseBlock(nn.ModuleDict):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            expand_ratio (float, default=1.0):
+                The ratio of channel expansion in the bottleneck
             same_padding (bool, default=True):
                 If True, performs same-covolution
             normalization (str): 
@@ -45,42 +52,33 @@ class DenseBlock(nn.ModuleDict):
                 Number of BasicConvBlocks used in this block
             preactivate (bool, default=False)
                 If True, normalization and activation are applied before
-                convolution
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(DenseBlock, self).__init__()
+        super(BottleneckResidualBlock, self).__init__()
+        
+        Bottleneck = BottleneckResidual
+        if preactivate:
+            Bottleneck = BottleneckResidualPreact
 
-        Dense = DenseConvBlockPreact if preactivate else DenseConvBlock
-
-        # apply cat at the beginning of the block
-        use_attention = n_blocks == 1
-        self.conv1 = Dense(
-            in_channels=in_channels, 
-            out_channels=out_channels, 
-            same_padding=same_padding,
-            normalization=normalization, 
-            activation=activation, 
-            weight_standardize=weight_standardize,
-            attention=use_attention if attention else False
-        )
-
-        blocks = list(range(1, n_blocks))
-        for i in blocks:
-            use_attention = i == blocks[-1]
-            conv_block = Dense(
-                in_channels=out_channels, 
-                out_channels=out_channels, 
-                same_padding=same_padding, 
-                normalization=normalization, 
-                activation=activation, 
+        for i in range(n_blocks):
+            conv_block = Bottleneck(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                expand_ratio=expand_ratio,
+                same_padding=same_padding,
+                normalization=normalization,
+                activation=activation,
                 weight_standardize=weight_standardize,
-                attention=use_attention if attention else False
+                attention=attention
             )
-            self.add_module(f"conv{i + 1}", conv_block)
+            self.add_module(f"bottleneck{i + 1}", conv_block)
+            in_channels = out_channels*conv_block.expansion
 
-    def forward(self, features: List[torch.Tensor]) -> torch.Tensor:
+        self.out_channels = in_channels
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         for _, conv_block in self.items():
-            features = conv_block(features)
+            x = conv_block(x)
             
-        return features
+        return x

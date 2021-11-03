@@ -1,21 +1,30 @@
 import torch
 
-from .base_conv import BaseConvBlock
+from .._base._base_bottleneck import BaseBottleneckConv
 
 
-class BasicConvBlock(BaseConvBlock):
+class BottleneckBasic(BaseBottleneckConv):
     def __init__(
             self,
             in_channels: int,
             out_channels: int,
+            expand_ratio: float=4.0,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
-            attention: str=None    
+            attention: str=None,
+            **kwargs
         ) -> None:
         """
-        Basic conv block that can be used in decoders
+        Bottleneck basic conv block that can be used to 
+        build deep basic bottleneck layers.
+
+        Bottleneck blocks are implemented w/o residual skip:
+
+        Bottleneck blocks introduced:
+            Deep residual learning for image recognition:
+                - https://arxiv.org/abs/1512.03385
 
         Args:
         ----------
@@ -23,6 +32,8 @@ class BasicConvBlock(BaseConvBlock):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            expand_ratio (float, default=4.0):
+                The ratio of channel expansion in the bottleneck
             same_padding (bool, default=True):
                 if True, performs same-covolution
             normalization (str): 
@@ -38,39 +49,63 @@ class BasicConvBlock(BaseConvBlock):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(BasicConvBlock, self).__init__(
+        super(BottleneckBasicPreact, self).__init__(
             in_channels=in_channels,
             out_channels=out_channels,
+            expand_ratio=expand_ratio,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
             weight_standardize=weight_standardize,
+            attention=attention,
             preactivate=False,
-            attention=attention
+            **kwargs
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.conv(x)
-        x = self.norm(x)
-        x = self.act(x)
-        x = self.attend(x)
+        out = self.conv1(x)
+        out = self.norm1(out)
+        out = self.act(out)
 
-        return x
+        out = self.conv2(out)
+        out = self.norm2(out)
+        out = self.act(out)
+
+        out = self.conv3(out)
+        out = self.norm3(out)
+
+        out = self.act(out)
+        out = self.attend(out)
+
+        return out
 
 
-class BasicConvBlockPreact(BaseConvBlock):
+class BottleneckBasicPreact(BaseBottleneckConv):
     def __init__(
             self,
             in_channels: int,
             out_channels: int,
+            expand_ratio: float=4.0,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
-            attention: str=None
+            attention: str=None,
+            **kwargs
         ) -> None:
         """
-        Basic conv block that can be used in decoders
+        Preactivated bottleneck basic conv block that can be used to 
+        build deep preactivated bottleneck layers.
+
+        Bottleneck blocks are implemented w/o residual skip:
+
+        Bottleneck blocks introduced:
+            Deep residual learning for image recognition:
+                - https://arxiv.org/abs/1512.03385
+
+        Preactivation introduced:
+            Identity Mappings in Deep Residual Networks:
+                - https://arxiv.org/abs/1603.05027
 
         Args:
         ----------
@@ -78,6 +113,8 @@ class BasicConvBlockPreact(BaseConvBlock):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            expand_ratio (float, default=1.0):
+                The ratio of channel expansion in the bottleneck
             same_padding (bool, default=True):
                 if True, performs same-covolution
             normalization (str): 
@@ -93,21 +130,32 @@ class BasicConvBlockPreact(BaseConvBlock):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(BasicConvBlockPreact, self).__init__(
+        super(BottleneckBasicPreact, self).__init__(
             in_channels=in_channels,
             out_channels=out_channels,
+            expand_ratio=expand_ratio,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
             weight_standardize=weight_standardize,
             attention=attention,
             preactivate=True,
+            **kwargs
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.norm(x)
-        x = self.act(x)
-        x = self.conv(x)
-        x = self.attend(x)
+        out = self.norm1(x)
+        out = self.act(out)
+        out = self.conv1(out)
 
-        return x
+        out = self.norm2(out)
+        out = self.act(out)
+        out = self.conv2(out)
+
+        out = self.norm3(out)
+        out = self.conv3(out)
+
+        out = self.act(out)
+        out = self.attend(out)
+
+        return out

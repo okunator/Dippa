@@ -1,14 +1,15 @@
 import torch
 import torch.nn as nn
 
-from ._base.residual import ResidualConvBlockPreact, ResidualConvBlock
+from .basic_bottleneck import BottleneckBasic, BottleneckBasicPreact
 
 
-class ResidualBlock(nn.ModuleDict):
+class BottleneckResidualBlock(nn.ModuleDict):
     def __init__(
             self,
             in_channels: int,
             out_channels: int,
+            expand_ratio: float=4.0,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
@@ -18,10 +19,14 @@ class ResidualBlock(nn.ModuleDict):
             attention: str=None
         ) -> None:
         """
-        Stack residual conv blocks in a ModuleDict. These are used in 
-        the full sized decoderblocks. The number of basic conv blocks 
-        can be adjusted. Default is 2. The residual connection is 
-        applied at the final conv block, before the last activation.
+        Stack residual bottleneck blocks in a ModuleDict. These can be 
+        used in the full sized decoderblocks.
+
+        Bottleneck blocks are implemented w/o residual skip:
+
+        Bottleneck blocks introduced:
+            Deep residual learning for image recognition:
+                - https://arxiv.org/abs/1512.03385
 
         Args:
         ----------
@@ -29,6 +34,8 @@ class ResidualBlock(nn.ModuleDict):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            expand_ratio (float, default=4.0):
+                The ratio of channel expansion in the bottleneck
             same_padding (bool, default=True):
                 If True, performs same-covolution
             normalization (str): 
@@ -48,43 +55,27 @@ class ResidualBlock(nn.ModuleDict):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(ResidualBlock, self).__init__()
+        super(BottleneckResidualBlock, self).__init__()
 
-        # use either preact or normal (original) resblock
-        Residual = ResidualConvBlock
+        Bottleneck = BottleneckBasic
         if preactivate:
-            Residual = ResidualConvBlockPreact
+            Bottleneck = BottleneckBasicPreact
 
-        # First res conv block. If n_blocks != 1 no residual skip 
-        # at the first conv block
-        use_residual = n_blocks == 1
-        self.conv1 = Residual(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            same_padding=same_padding,
-            normalization=normalization,
-            activation=activation,
-            weight_standardize=weight_standardize,
-            use_residual=use_residual,
-            attention=use_residual if attention else False
-        )
-
-        blocks = list(range(1, n_blocks))
-        for i in blocks:
-            # apply residual connection at the final conv block
-            use_residual = i == blocks[-1]
-            conv_block = Residual(
-                in_channels=out_channels,
+        for i in range(n_blocks):
+            conv_block = Bottleneck(
+                in_channels=in_channels,
                 out_channels=out_channels,
+                expand_ratio=expand_ratio,
                 same_padding=same_padding,
                 normalization=normalization,
                 activation=activation,
                 weight_standardize=weight_standardize,
-                use_residual=use_residual,
-                attention=use_residual if attention else False
+                attention=attention
             )
-            self.add_module('conv%d' % (i + 1), conv_block)
+            self.add_module(f"bottleneck{i + 1}", conv_block)
+            in_channels = out_channels*conv_block.expansion
 
+    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for _, conv_block in self.items():
             x = conv_block(x)

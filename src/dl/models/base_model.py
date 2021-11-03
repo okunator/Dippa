@@ -2,11 +2,6 @@ import torch
 import torch.nn as nn
 from typing import Dict
 
-from .modules import (
-    Mish, Swish, BCNorm, GroupNorm,
-    WSConv2d, WSConv2dStaticSamePadding
-)
-
 from .initialization import initialize_decoder, initialize_head
 
 

@@ -1,10 +1,10 @@
 import torch
 from typing import Union, List
 
-from .base_conv import BaseConvBlock
+from .._base._base_conv import BaseConv
 
 
-class DenseConvBlock(BaseConvBlock):
+class DenseConvBlock(BaseConv):
     def __init__(
             self,
             in_channels: int,
@@ -13,10 +13,15 @@ class DenseConvBlock(BaseConvBlock):
             normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
-            attention: str=None
+            attention: str=None,
+            **kwargs
         ) -> None:
         """
-        Dense conv block that can be used in decoders
+        A simplified Dense convolution block that can be used to build
+        deep dense layers
+
+        (DenseNet): Densely Connected Convolutional Networks
+            - https://arxiv.org/abs/1608.06993
 
         Args:
         ----------
@@ -47,7 +52,8 @@ class DenseConvBlock(BaseConvBlock):
             activation=activation,
             weight_standardize=weight_standardize,
             attention=attention,
-            preactivate=False
+            preactivate=False,
+            **kwargs
         )
 
     def forward(
@@ -66,7 +72,7 @@ class DenseConvBlock(BaseConvBlock):
         return x
 
     
-class DenseConvBlockPreact(BaseConvBlock):
+class DenseConvBlockPreact(BaseConv):
     def __init__(
             self,
             in_channels: int,
@@ -75,10 +81,19 @@ class DenseConvBlockPreact(BaseConvBlock):
             normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
-            attention: str=None
+            attention: str=None,
+            **kwargs
         ) -> None:
         """
-        Dense preact conv block that can be used in decoders
+        Simplified Dense preactivated conv block that can be used to
+        build deep preactivated dense conv layers.
+
+        (DenseNet): Densely Connected Convolutional Networks
+            - https://arxiv.org/abs/1608.06993
+
+        Preactivation introduced:
+            - Identity Mappings in Deep Residual Networks:
+                - https://arxiv.org/abs/1603.05027
 
         Args:
         ----------
@@ -109,7 +124,8 @@ class DenseConvBlockPreact(BaseConvBlock):
             activation=activation,
             weight_standardize=weight_standardize,
             attention=attention,
-            preactivate=True
+            preactivate=True,
+            **kwargs
         )
 
     def forward(

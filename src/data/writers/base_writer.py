@@ -120,6 +120,6 @@ class BaseWriter(ABC, FileHandler):
 
         for i in range(patches_mask.shape[0]):
             for j, val in enumerate(classes.values()):
-                pixels[j] += sum(sum(patches_mask[i] == val))
+                pixels[j] += np.sum(patches_mask[i] == val)
             
         return pixels.astype("int32")

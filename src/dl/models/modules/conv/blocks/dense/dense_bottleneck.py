@@ -1,10 +1,10 @@
 import torch
-import torch.nn as nn
+from typing import Union, List
 
-from .base_conv import BaseConvBlock
+from .._base._base_bottleneck import BaseBottleneckConv
 
 
-class ResidualConvBlock(BaseConvBlock):
+class BottleneckDense(BaseBottleneckConv):
     def __init__(
             self,
             in_channels: int,
@@ -14,18 +14,14 @@ class ResidualConvBlock(BaseConvBlock):
             activation: str="relu",
             weight_standardize: bool=False,
             attention: str=None,
-            use_residual: bool=True
+            **kwargs
         ) -> None:
         """
-        Residual conv block that can be used in decoders.
-        Residual connection applied before the final activation.
+        Bottleneck dense conv block that can be used to build deep
+        dense bottleneck layers.
 
-        The forward method follows the original implementation:
-        https://arxiv.org/abs/1512.03385
-        
-         ----------------------
-        |                      |
-        Input -> CONV -> BN -> + -> RELU -> OUTPUT
+        (DenseNet): Densely Connected Convolutional Networks
+            - https://arxiv.org/abs/1608.06993
 
         Args:
         ----------
@@ -47,12 +43,8 @@ class ResidualConvBlock(BaseConvBlock):
                 If True, perform weight standardization
             attention (str, default=None):
                 Attention method. One of: "se", None
-            use_residual (bool, default=True):
-                If True, the identity is summed to the linear unit 
-                before the final activation. (This param is used by
-                the MultiBlockResidual)
         """
-        super(ResidualConvBlock, self).__init__(
+        super(BottleneckDense, self).__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             same_padding=same_padding,
@@ -61,42 +53,39 @@ class ResidualConvBlock(BaseConvBlock):
             weight_standardize=weight_standardize,
             attention=attention,
             pre_attend=True,
-            preactivate=False
+            preactivate=False,
+            **kwargs
         )
 
-        self.use_residual = use_residual
-
-        # Use channel pooling if dims don't match
-        if in_channels != out_channels:
-            self.add_module(
-                "ch_pool", nn.Conv2d(
-                    in_channels, out_channels, 
-                    kernel_size=1, padding=0, bias=False
-                )
-            )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = x
+    def forward(
+            self,
+            x: Union[torch.Tensor, List[torch.Tensor]]
+        ) -> torch.Tensor:
+ 
+        # dense skip
+        prev_features = [x] if isinstance(x, torch.Tensor) else x
+        x = torch.cat(prev_features, dim=1)
 
         # pre-attention
-        x = self.attend(x)
+        out = self.attend(x)
 
-        # residual
-        x = self.conv(x)
-        x = self.norm(x)
+        # bottleneck
+        out = self.conv1(out)
+        out = self.norm1(out)
+        out = self.act(out)
 
-        if self.use_residual:
-            if identity.shape[1] != x.shape[1]:
-                # this shld be the other way around
-                identity = self.ch_pool(identity)
-            x += identity
+        out = self.conv2(out)
+        out = self.norm2(out)
+        out = self.act(out)
 
-        x = self.act(x)
+        out = self.conv3(out)
+        out = self.norm3(out)
+        out = self.act(out)
 
-        return x
+        return out
 
 
-class ResidualConvBlockPreact(BaseConvBlock):
+class BottleneckDensePreact(BaseBottleneckConv):
     def __init__(
             self,
             in_channels: int,
@@ -106,18 +95,18 @@ class ResidualConvBlockPreact(BaseConvBlock):
             activation: str="relu",
             weight_standardize: bool=False,
             attention: str=None,
-            use_residual: bool=True
+            **kwargs
         ) -> None:
         """
-        Preactivated Residual conv block that can be used in decoders.
-        Residual connection applied after the final conv.
+        Preactivated bottleneck dense conv block that can be used to
+        build deep preactivated dense bottleneck layers.
 
-        The forward method follows the preactivation implementation:
-        https://arxiv.org/abs/1603.05027
-        
-         ------------------------------
-        |                              |
-        Input -> BN -> RELU -> CONV -> + -> OUTPUT
+        (DenseNet): Densely Connected Convolutional Networks
+            - https://arxiv.org/abs/1608.06993
+
+        Preactivation introduced:
+            - Identity Mappings in Deep Residual Networks:
+                - https://arxiv.org/abs/1603.05027
 
         Args:
         ----------
@@ -139,11 +128,8 @@ class ResidualConvBlockPreact(BaseConvBlock):
                 If True, perform weight standardization
             attention (str, default=None):
                 Attention method. One of: "se", None
-            use_residual (bool, default=True):
-                If True, the identity is summed to the linear unit 
-                before the final activation
         """
-        super(ResidualConvBlockPreact, self).__init__(
+        super(BottleneckDensePreact, self).__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             same_padding=same_padding,
@@ -152,33 +138,33 @@ class ResidualConvBlockPreact(BaseConvBlock):
             weight_standardize=weight_standardize,
             attention=attention,
             pre_attend=True,
-            preactivate=True
+            preactivate=True,
+            **kwargs
         )
-        self.use_residual = use_residual
 
-        # Use channel pooling if dims don't match
-        if in_channels != out_channels:
-            self.add_module(
-                "ch_pool", nn.Conv2d(
-                    in_channels, out_channels, 
-                    kernel_size=1, padding=0, bias=False
-                )
-            )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = x
+    def forward(
+            self,
+            x: Union[torch.Tensor, List[torch.Tensor]]
+        ) -> torch.Tensor:
+ 
+        # dense skip
+        prev_features = [x] if isinstance(x, torch.Tensor) else x
+        x = torch.cat(prev_features, dim=1)
 
         # pre-attention
-        x = self.attend(x)
+        out = self.attend(x)
 
-        # preact residual
-        x = self.norm(x)
-        x = self.act(x)
-        x = self.conv(x)
+        # bottleneck
+        out = self.norm1(out)
+        out = self.act(out)
+        out = self.conv1(out)
 
-        if self.use_residual:
-            if identity.shape[1] != x.shape[1]:
-                identity = self.ch_pool(identity)
-            x += identity
+        out = self.norm2(out)
+        out = self.act(out)
+        out = self.conv2(out)
 
-        return x
+        out = self.norm3(out)
+        out = self.conv3(out)
+        out = self.act(out)
+
+        return out

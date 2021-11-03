@@ -29,8 +29,9 @@ class WSConv2d(nn.Conv2d):
             Refer to torch Convolution2D
         """
         super(WSConv2d, self).__init__(
-            in_channels, out_channels, kernel_size,
-            stride, padding, dilation, groups, bias
+            in_channels=in_channels, out_channels=out_channels, 
+            kernel_size=kernel_size, stride=stride, padding=padding, 
+            dilation=dilation, groups=groups, bias=bias
         )
         self.eps = eps
 
@@ -61,7 +62,7 @@ class WSConv2dStaticSamePadding(nn.Conv2d):
             out_channels: int,
             kernel_size: int,
             stride: int=1,
-            image_size: int=None,
+            image_size: int=256,
             padding: int=1,
             dilation: int=1,
             groups: int=1,

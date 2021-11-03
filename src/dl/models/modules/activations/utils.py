@@ -23,8 +23,10 @@ def act_func(name: str=None, **kwargs) -> nn.Module:
     )
 
     if name is not None:
-        kwargs = kwargs.copy()
-        kwargs["inplace"] = True
+        if name not in ("sigmoid"):
+            kwargs = kwargs.copy()
+            kwargs["inplace"] = True
+            
         key = act["ACT_LOOKUP"][name]
         act_f = act[key](**kwargs)
     else:

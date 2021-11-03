@@ -6,7 +6,7 @@ from ....normalization.utils import norm_func
 from ....attention.utils import att_func
 
 
-class BaseConvBlock(nn.Module):
+class BaseConv(nn.Module):
     def __init__(
             self,
             in_channels: int,
@@ -22,7 +22,7 @@ class BaseConvBlock(nn.Module):
             pre_attend: bool=False
         ) -> None:
         """
-        Base conv block that is used in all decoder blocks.
+        Lightweight base conv block that can be used in decoder blocks.
         Inits the primitive conv block modules from the given arguments.
 
         I.e. Inits the Conv module, Norm module (optional) and Act
@@ -61,10 +61,10 @@ class BaseConvBlock(nn.Module):
                 If True, Attention is applied at the beginning of
                 forwards.
         """
-        super(BaseConvBlock, self).__init__()
-        self.conv_choice = "wsconv" if weight_standardize else "conv"
+        super(BaseConv, self).__init__()
+        conv_choice = "wsconv" if weight_standardize else "conv"
 
-        # set norm channel number for preactivation or normal 
+        # set norm channel number for preactivation or normal
         norm_channels = in_channels if preactivate else out_channels
 
         # set attention channels
@@ -74,7 +74,7 @@ class BaseConvBlock(nn.Module):
         padding = (kernel_size - 1) // 2 if same_padding else 0
         
         self.conv = conv_func(
-            name=self.conv_choice, in_channels=in_channels,
+            name=conv_choice, in_channels=in_channels,
             out_channels=out_channels, kernel_size=kernel_size, 
             groups=groups, padding=padding
         )
