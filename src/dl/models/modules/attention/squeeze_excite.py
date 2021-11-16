@@ -7,7 +7,7 @@ class SqueezeAndExcite(nn.Module):
     def __init__(
             self,
             in_channels: int,
-            squeeze_ratio: int=0.25,
+            squeeze_ratio: float=0.25,
             activation: str="relu",
             gate_activation: str="sigmoid",
         ) -> None:
@@ -20,9 +20,9 @@ class SqueezeAndExcite(nn.Module):
         ---------
             in_channels (int): 
                 Number of input channels
-            squeeze_ratio (float): 
+            squeeze_ratio (float, dfault=0.25): 
                 Ratio of squeeze
-            activation (str): 
+            activation (str, default="relu"): 
                 Activation layer after squeeze
             gate_activation (str, default="sigmoid"): 
                 Attention gate function
@@ -31,6 +31,9 @@ class SqueezeAndExcite(nn.Module):
         super(SqueezeAndExcite, self).__init__()
 
         squeeze_channels = round(in_channels*squeeze_ratio)
+        
+        if squeeze_channels < 2:
+            squeeze_channels = 2 
 
         # squeeze channel pooling
         self.conv_squeeze = nn.Conv2d(

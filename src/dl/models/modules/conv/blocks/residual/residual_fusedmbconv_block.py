@@ -9,6 +9,7 @@ class FusedMobileInvertedResidualBlock(nn.ModuleDict):
         self,
         in_channels: int,
         out_channels: int,
+        kernel_size: int=3,
         expand_ratio: float=4.0,
         same_padding: bool=True,
         normalization: str="bn",
@@ -16,7 +17,8 @@ class FusedMobileInvertedResidualBlock(nn.ModuleDict):
         weight_standardize: bool=False,
         n_blocks: int=4,
         preactivate: bool=False,
-        attention: str=None
+        attention: str=None,
+        **kwargs
     ) -> None:
         """
         Stack fused inverted residual blocks in a ModuleDict. These can 
@@ -39,6 +41,8 @@ class FusedMobileInvertedResidualBlock(nn.ModuleDict):
                 Number of output channels
             expand_ratio (float, default=4.0):
                 The ratio of channel expansion in the bottleneck
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 If True, performs same-covolution
             normalization (str): 
@@ -68,6 +72,7 @@ class FusedMobileInvertedResidualBlock(nn.ModuleDict):
             conv_block = FusedMBConv(
                 in_channels=in_channels,
                 out_channels=out_channels,
+                kernel_size=kernel_size,
                 stride=1, # no need to downsample when i == 0. Blocks not used for cls tasks
                 expand_ratio=expand_ratio,
                 same_padding=same_padding,
@@ -77,7 +82,7 @@ class FusedMobileInvertedResidualBlock(nn.ModuleDict):
                 attention=attention
             )
             self.add_module(f"fused_inverted_residual{i + 1}", conv_block)
-            in_channels = out_channels
+            in_channels = conv_block.out_channels
 
         self.out_channels = in_channels
 

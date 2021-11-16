@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 from typing import List, Tuple
 
-from .. import MultiBlockBasic
-from ...modules import FixedUnpool
+from ...modules import FixedUnpool, BasicBlock
 
 
 class CatBlock(nn.ModuleDict):
@@ -41,7 +40,7 @@ class UnetppCatSkipBlock(nn.Module):
             self,
             skip_channel_list: List[int],
             skip_index: int,
-            batch_norm: str="bn",
+            normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
             preactivate: bool=False,
@@ -60,10 +59,14 @@ class UnetppCatSkipBlock(nn.Module):
                 skip tensors.
             skip_index (int):
                 index of the current skip channel in skip_channels_list.
-            batch_norm (str, default="bn"): 
-                Normalization method. One of: "bn", "bcn", None
-            activation (str, default="relu"):
-                Activation method. One of: "relu", "swish". "mish"
+            normalization (str): 
+                Normalization method to be used.
+                One of: "bn", "bcn", "gn", "in", "ln", "lrn", None
+            activation (str):
+                Activation method. One of: "mish", "swish", "relu",
+                "relu6", "rrelu", "selu", "celu", "gelu", "glu", "tanh",
+                "sigmoid", "silu", "prelu", "leaky-relu", "elu",
+                "hardshrink", "tanhshrink", "hardsigmoid"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             preactivate (bool, default=False)
@@ -106,11 +109,11 @@ class UnetppCatSkipBlock(nn.Module):
                 # conv blocks for the feature maps in the sub network
                 conv_in_chl += prev_enc_chl
                 
-                self.conv_blocks[f"x_{sub_block_idx0}_{i+1}"] = MultiBlockBasic(
+                self.conv_blocks[f"x_{sub_block_idx0}_{i+1}"] = BasicBlock(
                     in_channels=conv_in_chl,
                     out_channels=current_skip_chl,
                     n_blocks=n_conv_blocks,
-                    batch_norm=batch_norm,
+                    normalization=normalization,
                     activation=activation,
                     weight_standardize=weight_standardize,
                     preactivate=preactivate
@@ -179,7 +182,7 @@ class UnetppCatSkipBlockLight(nn.Module):
             out_channel_list: List[int],
             skip_channel_list: List[int],
             skip_index: int,
-            batch_norm: str="bn",
+            normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
             preactivate: bool=False,
@@ -210,10 +213,14 @@ class UnetppCatSkipBlockLight(nn.Module):
                 skip tensors.
             skip_index (int):
                 index of the current skip channel in skip_channels_list.
-            batch_norm (str, default="bn"): 
-                Normalization method. One of: "bn", "bcn", None
-            activation (str, default="relu"):
-                Activation method. One of: "relu", "swish". "mish"
+            normalization (str): 
+                Normalization method to be used.
+                One of: "bn", "bcn", "gn", "in", "ln", "lrn", None
+            activation (str):
+                Activation method. One of: "mish", "swish", "relu",
+                "relu6", "rrelu", "selu", "celu", "gelu", "glu", "tanh",
+                "sigmoid", "silu", "prelu", "leaky-relu", "elu",
+                "hardshrink", "tanhshrink", "hardsigmoid"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             preactivate (bool, default=False)
@@ -245,22 +252,22 @@ class UnetppCatSkipBlockLight(nn.Module):
             )
 
             # pre conv for the encoder skip
-            self.pre_conv = MultiBlockBasic(
+            self.pre_conv = BasicBlock(
                 in_channels=current_skip_chl,
                 out_channels=cat_channels,
                 n_blocks=n_conv_blocks,
-                batch_norm=batch_norm,
+                normalization=normalization,
                 activation=activation,
                 weight_standardize=weight_standardize,
                 preactivate=preactivate
             )
 
             # post conv for the in decoder feat map
-            self.post_conv = MultiBlockBasic(
+            self.post_conv = BasicBlock(
                 in_channels=in_channels,
                 out_channels=cat_channels + reminder,
                 n_blocks=n_conv_blocks,
-                batch_norm=batch_norm,
+                normalization=normalization,
                 activation=activation,
                 weight_standardize=weight_standardize,
                 preactivate=preactivate
@@ -279,11 +286,11 @@ class UnetppCatSkipBlockLight(nn.Module):
                 # conv blocks for the feature maps in the sub network
                 conv_in_chl += prev_enc_chl
                 
-                self.conv_blocks[f"x_{sub_block_idx0}_{i + 1}"] = MultiBlockBasic(
+                self.conv_blocks[f"x_{sub_block_idx0}_{i + 1}"] = BasicBlock(
                     in_channels=conv_in_chl,
                     out_channels=cat_channels,
                     n_blocks=n_conv_blocks,
-                    batch_norm=batch_norm, 
+                    normalization=normalization, 
                     activation=activation,
                     weight_standardize=weight_standardize,
                     preactivate=preactivate

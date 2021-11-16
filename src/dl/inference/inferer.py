@@ -432,9 +432,8 @@ class Inferer(FileHandler):
         ) -> Union[torch.Tensor, None]:
         """
         Applies the given torch operation `op` to the given variable 
-        `var`. This exists to catch memory errors if you're wondering
-        why...
-
+        `var`. This exists to catch memory errors
+        
         Basically, if some cumulative torch operation overflows the GPU 
         memory, this catches the error, detaches the input tensor from 
         gpu and continues executing the operation on the cpu side. If 

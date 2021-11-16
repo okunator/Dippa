@@ -29,7 +29,7 @@ def ssim(
 
     Returns:
     ----------
-        torch.Tensor: computed ssim loss and 
+        torch.Tensor: computed ssim loss and contrast sensitivity
     """
     
     if val_range is None:
@@ -96,7 +96,7 @@ class SSIM(nn.Module):
             return_cs (bool, default=False): 
                 Return also the the contrast sensitivity coeff
         """
-        super(SSIM, self).__init__()
+        super().__init__()
         self.window_size = window_size
         self.return_cs = return_cs
 
@@ -158,7 +158,7 @@ class MSSSIM(nn.Module):
             window_size (int, default=11): 
                 Size of the gaussian kernel
         """
-        super(MSSSIM, self).__init__()
+        super().__init__()
         self.window_size = window_size
         self.ssim = SSIM(window_size=window_size, return_cs=True)
 

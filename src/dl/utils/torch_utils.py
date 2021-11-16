@@ -222,3 +222,21 @@ def filter2D(
     out = F.conv2d(pad_tensor, kernel, groups=channel)
     return out
 
+
+def binarize(mask: torch.Tensor) -> torch.Tensor:
+    mask[mask > 0] = 1
+    
+    return mask.type("torch.ByteTensor")
+
+
+# def count_parameters(model):
+#     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+#     return total_params
+
+
+# def count_conv_flop(layer, x):
+#     out_h = int(x.size()[2] / layer.stride[0])
+#     out_w = int(x.size()[3] / layer.stride[1])
+#     delta_ops = layer.in_channels * layer.out_channels * layer.kernel_size[0] * layer.kernel_size[1] * \
+#                 out_h * out_w / layer.groups
+#     return delta_ops

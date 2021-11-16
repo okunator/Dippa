@@ -1,4 +1,13 @@
-from .unet_skip import UnetSkipBlock
+from .unet_skip import UnetSkip
 from .unet3p_skip import Unet3pSkip
-from .unetpp_cat_skip import UnetppCatSkipBlock, UnetppCatSkipBlockLight
-from .unetpp_sum_skip import UnetppSumSkipBlock, UnetppSumSkipBlockLight
+
+
+SKIP_LOOKUP = {
+    "unet": "UnetSkip",
+    "unet3+": "Unet3pSkip"
+}
+
+
+__all__ = [
+    "SKIP_LOOKUP", "UnetSkip", "Unet3pSkip"
+]

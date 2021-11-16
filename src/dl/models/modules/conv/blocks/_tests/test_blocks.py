@@ -19,7 +19,8 @@ def _get_sample(in_channels: int) -> torch.Tensor:
     "block", [
         ResidualBlock, DenseBlock, BasicBlock, BottleneckResidualBlock,
         DepthWiseSeparableResidualBlock, DepthWiseSeparableBasicBlock,
-        MobileInvertedResidualBlock, FusedMobileInvertedResidualBlock
+        MobileInvertedResidualBlock, FusedMobileInvertedResidualBlock,
+        FusedMobileInvertedBasicBlock, MobileInvertedBasicBlock
     ]
 )
 def test_forward(
@@ -66,7 +67,8 @@ def test_forward(
     "block", [
         ResidualBlock, DenseBlock, BasicBlock, BottleneckResidualBlock,
         DepthWiseSeparableResidualBlock, DepthWiseSeparableBasicBlock,
-        MobileInvertedResidualBlock, FusedMobileInvertedResidualBlock
+        MobileInvertedResidualBlock, FusedMobileInvertedResidualBlock,
+        FusedMobileInvertedBasicBlock, MobileInvertedBasicBlock
     ]
 )
 def test_forward_backward(

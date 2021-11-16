@@ -12,14 +12,18 @@ def act_func(name: str=None, **kwargs) -> nn.Module:
     activation functions and Swish and Mish 
 
     Args:
+    -----------
         name (str, default=None):
             The name of the activation function. Use lowercase letters.
 
+    Returns:
+    -----------
+        nn.Module: Initialized nn.Module.
     """
     allowed = [*act['ACT_LOOKUP'].keys(), None]
 
     assert name in allowed, (
-        f"Illegal act func given. Allowed ones: {allowed}"
+        f"Illegal act func given. Allowed ones: {allowed}. Goy {name}"
     )
 
     if name is not None:
@@ -33,3 +37,6 @@ def act_func(name: str=None, **kwargs) -> nn.Module:
         act_f = nn.Identity()
 
     return act_f
+
+
+__all__ = ["act_func"]

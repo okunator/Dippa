@@ -23,7 +23,7 @@ class BaseFusedMBConv(nn.Module):
             attention: str=None,
         ) -> None:
         """
-        Base MBconv block that is used in all decoder blocks.
+        Base FusedMBconv block that is used in all decoder blocks.
         Inits the primitive conv block modules from the given arguments.
 
         Efficientnet-edgetpu: Creating accelerator-optimized neural networks with automl.
@@ -63,6 +63,7 @@ class BaseFusedMBConv(nn.Module):
         super(BaseFusedMBConv, self).__init__()
         assert stride in (1, 2)
         self.conv_choice = "wsconv" if weight_standardize else "conv"
+        self.out_channels = out_channels
 
         mid_channels = make_divisible(in_channels*expand_ratio)
 
@@ -84,10 +85,10 @@ class BaseFusedMBConv(nn.Module):
 
         self.proj_conv = conv_func(
             name=self.conv_choice, in_channels=mid_channels, bias=False,
-            out_channels=out_channels, kernel_size=1, padding=0
+            out_channels=self.out_channels, kernel_size=1, padding=0
         )
 
-        norm_channels = mid_channels if preactivate else out_channels
+        norm_channels = mid_channels if preactivate else self.out_channels
         self.norm2 = norm_func(
             normalization, num_features=norm_channels
         )

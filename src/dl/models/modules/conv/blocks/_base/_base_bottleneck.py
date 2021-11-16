@@ -76,12 +76,11 @@ class BaseBottleneckConv(nn.Module):
         self.expansion = int(expand_ratio)
 
         width = int(out_channels*(base_width / 64.0))*groups
-        out_channels *= self.expansion
+        self.out_channels = out_channels*self.expansion
 
         # set attention channels
-        att_channels = in_channels if pre_attend else out_channels
+        att_channels = in_channels if pre_attend else self.out_channels
         self.attend = att_func(attention, in_channels=att_channels)
-
 
         self.conv1 = conv_func(
             name=self.conv_choice, in_channels=in_channels,
@@ -90,6 +89,7 @@ class BaseBottleneckConv(nn.Module):
 
         norm_channels = in_channels if preactivate else width
         self.norm1 = norm_func(normalization, num_features=norm_channels)
+        self.act1 = act_func(activation)     
 
         # set padding. Works if dilation or stride are not adjusted
         padding = (kernel_size - 1) // 2 if same_padding else 0
@@ -100,15 +100,16 @@ class BaseBottleneckConv(nn.Module):
         )
 
         self.norm2 = norm_func(normalization, num_features=width)
+        self.act2 = act_func(activation)     
 
         self.conv3 = conv_func(
             name=self.conv_choice, in_channels=width, bias=False,
-            out_channels=out_channels, kernel_size=1, padding=0
+            out_channels=self.out_channels, kernel_size=1, padding=0
         )
 
-        norm_channels = width if preactivate else out_channels
+        norm_channels = width if preactivate else self.out_channels
         self.norm3 = norm_func(
             normalization, num_features=norm_channels
         )
 
-        self.act = act_func(activation)     
+        self.act3 = act_func(activation)     

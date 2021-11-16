@@ -9,6 +9,7 @@ class FusedInvertedResidual(BaseFusedMBConv):
             in_channels: int,
             out_channels: int,
             expand_ratio: float=4.0,
+            kernel_size: int=3,
             stride: int=1,
             same_padding: bool=True,
             normalization: str="bn",
@@ -19,7 +20,7 @@ class FusedInvertedResidual(BaseFusedMBConv):
         ) -> None:
         """
         Fused mobile inverted residual conv block that can be used to 
-        build deep residual dws layers.
+        build deep residual FusedMBconv layers.
 
         Residual connection applied before the final activation.
 
@@ -41,6 +42,8 @@ class FusedInvertedResidual(BaseFusedMBConv):
                 Number of output channels
             expand_ratio (float, default=4.0):
                 The ratio of channel expansion in the bottleneck
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             stride (int, default=1):
                 Stride of the convolution operation
             same_padding (bool, default=True):
@@ -61,8 +64,9 @@ class FusedInvertedResidual(BaseFusedMBConv):
         super(FusedInvertedResidual, self).__init__(
             in_channels=in_channels,
             out_channels=out_channels,
-            stride=stride,
             expand_ratio=expand_ratio,
+            kernel_size=kernel_size,
+            stride=stride,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
@@ -101,6 +105,7 @@ class FusedInvertedResidualPreact(BaseFusedMBConv):
             self,
             in_channels: int,
             out_channels: int,
+            kernel_size: int=3,
             stride: int=1,
             expand_ratio: float=4.0,
             same_padding: bool=True,
@@ -112,7 +117,7 @@ class FusedInvertedResidualPreact(BaseFusedMBConv):
         ) -> None:
         """
         Preactivated fused mobile inverted residual conv block that can 
-        be used to build deep residual dws layers with preactivation.
+        be used to build deep residual FusedMBconv layers with preactivation.
 
         Residual connection applied before the final activation.
 
@@ -134,6 +139,8 @@ class FusedInvertedResidualPreact(BaseFusedMBConv):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             expand_ratio (float, default=1.0):
                 The ratio of channel expansion in the bottleneck
             same_padding (bool, default=True):
@@ -154,8 +161,9 @@ class FusedInvertedResidualPreact(BaseFusedMBConv):
         super(FusedInvertedResidualPreact, self).__init__(
             in_channels=in_channels,
             out_channels=out_channels,
-            stride=stride,
             expand_ratio=expand_ratio,
+            kernel_size=kernel_size,
+            stride=stride,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
@@ -187,4 +195,3 @@ class FusedInvertedResidualPreact(BaseFusedMBConv):
             out += identity
 
         return out
-        

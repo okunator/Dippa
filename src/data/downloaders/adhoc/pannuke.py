@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import scipy.io
+import scipy.io as sio
 from pathlib import Path 
 from tqdm import tqdm
 
@@ -180,7 +180,7 @@ def handle_pannuke(
 
                 # save results
                 fn_mask = Path(mask_dir / name).with_suffix(".mat")
-                scipy.io.savemat(
+                sio.savemat(
                     file_name=fn_mask, 
                     mdict={
                         "inst_map": inst_map,

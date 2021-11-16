@@ -203,6 +203,7 @@ def get_weight_map(
 
     if len(inst_list) <= 1: # 1 instance only
         return np.zeros(inst_map.shape[:2])
+    
     stacked_inst_bgd_dst = np.zeros(inst_map.shape[:2] + (len(inst_list),))
 
     for idx, inst_id in enumerate(inst_list):

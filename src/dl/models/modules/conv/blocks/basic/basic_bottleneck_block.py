@@ -4,29 +4,33 @@ import torch.nn as nn
 from .basic_bottleneck import BottleneckBasic, BottleneckBasicPreact
 
 
-class BottleneckResidualBlock(nn.ModuleDict):
+class BottleneckBasicBlock(nn.ModuleDict):
     def __init__(
             self,
             in_channels: int,
             out_channels: int,
             expand_ratio: float=4.0,
+            kernel_size: int=3,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
             n_blocks: int=2,
             preactivate: bool=False,
-            attention: str=None
+            attention: str=None,
+            **kwargs
         ) -> None:
         """
         Stack residual bottleneck blocks in a ModuleDict. These can be 
         used in the full sized decoderblocks.
 
-        Bottleneck blocks are implemented w/o residual skip:
-
         Bottleneck blocks introduced:
             Deep residual learning for image recognition:
                 - https://arxiv.org/abs/1512.03385
+
+        NOTE: 
+        Basic in the name here means that no dense or residual skip 
+        connections are applied in the forward method
 
         Args:
         ----------
@@ -36,6 +40,8 @@ class BottleneckResidualBlock(nn.ModuleDict):
                 Number of output channels
             expand_ratio (float, default=4.0):
                 The ratio of channel expansion in the bottleneck
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 If True, performs same-covolution
             normalization (str): 
@@ -55,7 +61,7 @@ class BottleneckResidualBlock(nn.ModuleDict):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(BottleneckResidualBlock, self).__init__()
+        super(BottleneckBasicBlock, self).__init__()
 
         Bottleneck = BottleneckBasic
         if preactivate:
@@ -66,6 +72,7 @@ class BottleneckResidualBlock(nn.ModuleDict):
                 in_channels=in_channels,
                 out_channels=out_channels,
                 expand_ratio=expand_ratio,
+                kernel_size=kernel_size,
                 same_padding=same_padding,
                 normalization=normalization,
                 activation=activation,
@@ -73,8 +80,9 @@ class BottleneckResidualBlock(nn.ModuleDict):
                 attention=attention
             )
             self.add_module(f"bottleneck{i + 1}", conv_block)
-            in_channels = out_channels*conv_block.expansion
+            in_channels = conv_block.out_channels
 
+        self.out_channels = in_channels
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for _, conv_block in self.items():

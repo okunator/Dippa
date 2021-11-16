@@ -51,7 +51,7 @@ class SegTrainer:
         # set test tube logger
         self.loggers = []
         self.loggers.append(
-            pl.loggers.TestTubeLogger(
+            pl.loggers.TensorBoardLogger(
                 save_dir=FileHandler.result_dir(),
                 name=experiment_name,
                 version=experiment_version
@@ -69,20 +69,21 @@ class SegTrainer:
                 )
             )
         
-
         # set checkpoint callback
-        checkpoint_callback = pl.callbacks.ModelCheckpoint(
+        ckpt_callback = pl.callbacks.ModelCheckpoint(
             dirpath=self.ckpt_dir,
             save_top_k=1,
             save_last=True,
             verbose=True, 
             monitor='val_loss',
             mode='min',
-            prefix=''
         )
+        
+        # set device stat monitor callback
+        dev_callback = pl.callbacks.DeviceStatsMonitor()
 
         # set attributes
-        self.callbacks = [checkpoint_callback]
+        self.callbacks = [ckpt_callback, dev_callback]
         if extra_callbacks is not None:
             self.callbacks += extra_callbacks
             
@@ -120,13 +121,13 @@ class SegTrainer:
         --------
             pl.Trainer: The SegTrainer instance.
         """
-        experiment_name = conf.experiment_args.experiment_name
-        experiment_version = conf.experiment_args.experiment_version
-        num_gpus = conf.runtime_args.num_gpus
-        num_epochs = conf.runtime_args.num_epochs
-        resume_training = conf.runtime_args.resume_training
-        wandb_logger = conf.runtime_args.wandb
-        metrics_to_cpu = conf.runtime_args.metrics_to_cpu
+        experiment_name = conf.experiment_name
+        experiment_version = conf.experiment_version
+        num_gpus = conf.training.num_gpus
+        num_epochs = conf.training.num_epochs
+        resume_training = conf.training.resume_training
+        wandb_logger = conf.training.wandb
+        metrics_to_cpu = conf.training.metrics_to_cpu
 
         c = cls(
             experiment_name,
@@ -144,7 +145,6 @@ class SegTrainer:
             logger=c.loggers,
             callbacks=c.callbacks,
             resume_from_checkpoint=c.last_ckpt,
-            log_gpu_memory=True,
             profiler=True,
             move_metrics_to_cpu=metrics_to_cpu,
             **kwargs

@@ -41,3 +41,9 @@ ACT_LOOKUP = {
     "tanhshrink": "Tanhshrink",
     "hardsigmoid": "Hardsigmoid",
 }
+
+__all__ = [
+    "ACT_LOOKUP", "Mish", "Swish", "ReLU", "ReLU6", "RReLU", "SELU", "CELU",
+    "GELU", "GLU", "Tanh", "Sigmoid", "SiLU", "PReLU", "LeakyReLU", "ELU",
+    "Hardshrink", "Tanhshrink", "Hardsigmoid"
+]

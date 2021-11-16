@@ -6,24 +6,24 @@ from torch.utils.data import DataLoader
 
 from src.utils import FileHandler
 from src.dl.utils import to_device
-from ..datasets.dataset_builder import DatasetBuilder
+from ..datasets.utils import prepare_dataset
 
 
 class CustomDataModule(pl.LightningDataModule, FileHandler):
     def __init__(
-        self,
-        train_db_path: str,
-        test_db_path: str,
-        augmentations: List[str]=["hue_sat", "non_rigid", "blur"],
-        normalize: bool=False,
-        aux_branch: str="hover",
-        type_branch: bool=True,
-        sem_branch: bool=False,
-        rm_touching_nuc_borders: bool=False,
-        edge_weights: bool=False,
-        batch_size: int=8,
-        num_workers: int=8
-    ) -> None:
+            self,
+            train_db_path: str,
+            test_db_path: str,
+            augmentations: List[str]=["hue_sat", "non_rigid", "blur"],
+            normalize: bool=False,
+            aux_branch: str="hover",
+            type_branch: bool=True,
+            sem_branch: bool=False,
+            rm_touching_nuc_borders: bool=False,
+            edge_weights: bool=False,
+            batch_size: int=8,
+            num_workers: int=8
+        ) -> None:
         """
         Sets up a datamodule for the given h5/zarr databases.
         The databases need to be written with the writers of this repo.
@@ -105,7 +105,7 @@ class CustomDataModule(pl.LightningDataModule, FileHandler):
 
 
     def setup(self, stage: Optional[str] = None) -> None:
-        self.trainset = DatasetBuilder.set_train_dataset(
+        self.trainset = prepare_dataset(
             fname=self.db_fname_train.as_posix(),
             decoder_aux_branch=self.aux_branch,
             augmentations=self.augs,
@@ -116,7 +116,7 @@ class CustomDataModule(pl.LightningDataModule, FileHandler):
             semantic_branch=self.sem_branch
 
         )
-        self.validset = DatasetBuilder.set_test_dataset(
+        self.validset = prepare_dataset(
             fname=self.db_fname_test.as_posix(),
             decoder_aux_branch=self.aux_branch,
             normalize_input=self.norm,
@@ -125,7 +125,7 @@ class CustomDataModule(pl.LightningDataModule, FileHandler):
             type_branch=self.type_branch,
             semantic_branch=self.sem_branch
         )
-        self.testset = DatasetBuilder.set_test_dataset(
+        self.testset = prepare_dataset(
             fname=self.db_fname_test.as_posix(),
             decoder_aux_branch=self.aux_branch,
             normalize_input=self.norm,

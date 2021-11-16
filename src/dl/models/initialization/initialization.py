@@ -1,12 +1,19 @@
-# ported from 
-# https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/base/initialization.py
 import torch.nn as nn
 
-def initialize_decoder(module: nn.Module):
+def initialize_decoder(module: nn.Module, activation: str) -> None:
     for m in module.modules():
         if isinstance(m, nn.Conv2d):
-            nn.init.kaiming_uniform_(
-                m.weight, mode="fan_in", nonlinearity="relu")
+            if activation == "leaky-relu":   
+                nn.init.kaiming_uniform_(
+                    m.weight, mode="fan_in", a=0.01, nonlinearity="leaky_relu"
+                )
+            elif activation == "relu":
+                nn.init.kaiming_uniform_(
+                    m.weight, mode="fan_in", nonlinearity="relu"
+                )
+            elif activation not in ("leaky-relu", "relu"):
+                nn.init.kaiming_normal_(m.weight, mode="fan_in")
+                
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 

@@ -1,0 +1,41 @@
+model:
+  input_size: 256
+  encoder:
+    name: tf_efficientnetv2_l
+    depth: 5
+    pretrain: True
+    freeze: False
+  decoder:
+    activation: leaky-relu
+    upsampling: fixed-unpool
+    preactivate: False
+    normalization: bcn
+    weight_standardize: True
+    short_skip: residual
+    long_skip: unet
+    long_skip_merge: concatenate
+    attention: se
+    n_layers: 1
+    conv_types:
+      - basic
+      - basic
+      - basic
+      - basic
+      - basic
+    n_blocks:
+      - 2
+      - 2
+      - 2
+      - 2
+      - 2
+    out_channels:
+      - 256
+      - 128
+      - 64
+      - 32
+      - 16
+    branches:
+      type: 4
+      sem: 5
+      aux: 2
+    

@@ -11,6 +11,7 @@ class DepthWiseSeparableResidual(BaseDepthWiseSeparableConv):
             self,
             in_channels: int,
             out_channels: int,
+            kernel_size: int=3,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
@@ -37,6 +38,8 @@ class DepthWiseSeparableResidual(BaseDepthWiseSeparableConv):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 if True, performs same-covolution
             normalization (str): 
@@ -55,6 +58,7 @@ class DepthWiseSeparableResidual(BaseDepthWiseSeparableConv):
         super(DepthWiseSeparableResidual, self).__init__(
             in_channels=in_channels,
             out_channels=out_channels,
+            kernel_size=kernel_size,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
@@ -87,7 +91,7 @@ class DepthWiseSeparableResidual(BaseDepthWiseSeparableConv):
         # depthwise conv
         out = self.depth_conv(x)
         out = self.norm1(out)
-        out = self.act(out)
+        out = self.act1(out)
 
         # attention
         out = self.attend(out)
@@ -97,7 +101,7 @@ class DepthWiseSeparableResidual(BaseDepthWiseSeparableConv):
         out = self.norm2(out)
 
         out += identity
-        out = self.act(out)
+        out = self.act2(out)
 
         return out
 
@@ -107,6 +111,7 @@ class DepthWiseSeparableResidualPreact(BaseDepthWiseSeparableConv):
             self,
             in_channels: int,
             out_channels: int,
+            kernel_size: int=3,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
@@ -136,6 +141,8 @@ class DepthWiseSeparableResidualPreact(BaseDepthWiseSeparableConv):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 if True, performs same-covolution
             normalization (str): 
@@ -155,6 +162,7 @@ class DepthWiseSeparableResidualPreact(BaseDepthWiseSeparableConv):
             in_channels=in_channels,
             out_channels=out_channels,
             same_padding=same_padding,
+            kernel_size=kernel_size,
             normalization=normalization,
             activation=activation,
             weight_standardize=weight_standardize,
@@ -185,7 +193,7 @@ class DepthWiseSeparableResidualPreact(BaseDepthWiseSeparableConv):
 
         # depthwise conv
         out = self.norm1(x)
-        out = self.act(out)
+        out = self.act1(out)
         out = self.depth_conv(out)
 
         # attention
@@ -196,7 +204,7 @@ class DepthWiseSeparableResidualPreact(BaseDepthWiseSeparableConv):
         out = self.ch_pool(out)
 
         out += identity
-        out = self.act(out)
+        out = self.act2(out)
 
         return out
         

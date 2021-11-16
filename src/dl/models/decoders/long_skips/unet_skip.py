@@ -2,91 +2,67 @@ import torch
 import torch.nn as nn
 from typing import Tuple, List
 
+from .merge_blocks.utils import merge_func
 
-class UnetSkipBlock(nn.ModuleDict):
+
+class UnetSkip(nn.ModuleDict):
     def __init__(
             self,
-            dec_stage_ix: int,
+            stage_ix: int,
             in_channels: int=None,
-            enc_out_channels: List[int]=None,
-            merge_policy: str="summation"
+            skip_channels: List[int]=None,
+            merge_policy: str="summation",
+            **kwargs
         ) -> None:
         """
-        Simple U-net like skip connection block
+        Simple U-net like skip connection block.
+
+        U-Net: Convolutional Networks for Biomedical Image Segmentation
+            - https://arxiv.org/abs/1505.04597#
+
+        Supports different summation and concatenation merging policies.
 
         Args:
         ----------
-            dec_stage_ix (int):
+            stage_ix (int):
                 Index number signalling the current decoder stage
             in_channels (int, default=None):
                 The number of channels in the tensor generated in the
                 previous decoder block that gets upsampled and merged
-                with the encoder generated tensor. If merge policy is 
-                "sum". The skip feature channel dim needs to be pooled
-                with 1x1 conv to match input size.
-            enc_out_channels (List[int]):
-                List of the number of channels in each of the encoder
+                with the encoder generated tensor.
+            skip_channels (List[int]):
+                List of the number of channels in the encoder
                 stages. Order is bottom up. This list does not include
                 the final bottleneck stage out channels since it is 
-                included in `dec_out_channels`. Also, the last element 
-                of the list is zero to avoid a skip at the final decoder
-                stage. e.g. [1024, 512, 256, 64, 0] 
+                included in `dec_channels`. e.g. [1024, 512, 256, 64] 
             merge_policy (str, default="summation"):
                 Sum or concatenate the features together.
                 One of ("summation", "concatenate")
         """
-        assert merge_policy in ("concatenate", "summation")
-        
-        super(UnetSkipBlock, self).__init__()
+        super(UnetSkip, self).__init__()
         self.merge_policy = merge_policy
-        self._in_channels = in_channels
-        skip_channels = enc_out_channels[dec_stage_ix]
+        self.in_channels = in_channels
+        self.stage_ix = stage_ix
 
-        # adjust input channel dim if "concatenate"
-        if merge_policy == "concatenate":
-            self._in_channels += skip_channels
+        self.skip_out_chl = 0
+        self.merge = nn.Identity()
+        if stage_ix < len(skip_channels):
+            self.skip_out_chl = skip_channels[stage_ix]
 
-        # channel pooling for skip features if "summation"
-        if self.merge_policy == "summation" and skip_channels > 0:
-            self.add_module(
-                "ch_pool", nn.Conv2d(
-                    skip_channels, in_channels, 
-                    kernel_size=1, padding=0, bias=False
-                )
+            self.merge = merge_func(
+                self.merge_policy,
+                out_channels=self.out_channels,
+                in_channels=self.in_channels,
+                skip_channels=[self.skip_out_chl]
             )
-
+        
     @property
     def out_channels(self) -> int:
-        return self._in_channels
-
-    def _merge(
-            self,
-            features: List[torch.Tensor],
-        ) -> torch.Tensor:
-        """
-        Merges all the feature maps of this module together
-
-        Args:
-        ---------
-            features (List[torch.Tensor]):
-
-        Returns:
-        ---------
-            torch.Tensor: The merged tensor
-        """
-        assert self.merge_policy in ("concatenate", "summation")
-
+        out_channels = self.in_channels
         if self.merge_policy == "concatenate":
-            x = torch.cat(features, dim=1)
-        else:
-            # do channel pooling if num of skip channels does not match 
-            # with the num of in channels  
-            if features[1].shape[1] != features[0].shape[1]:
-                features[1] = self.ch_pool(features[1])
+            out_channels += self.skip_out_chl
 
-            x = torch.stack(features, dim=0).sum(dim=0)
-
-        return x
+        return out_channels
 
     def forward(
             self,
@@ -113,6 +89,6 @@ class UnetSkipBlock(nn.ModuleDict):
         """
         if ix < len(skips):
             skip = skips[ix]
-            x = self._merge([x, skip])
+            x = self.merge(x, [skip])
 
         return x, None

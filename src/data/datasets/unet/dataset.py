@@ -2,7 +2,7 @@ import torch
 import albumentations as A
 from typing import List, Dict
 
-from ..base_dataset import BaseDataset 
+from .._base._base_dataset import BaseDataset
 
 
 class UnetDataset(BaseDataset):
@@ -10,44 +10,34 @@ class UnetDataset(BaseDataset):
             self,
             fname: str,
             transforms: A.Compose,
+            target_types: Dict[str, bool],
             normalize_input: bool=False,
-            type_branch: bool=True,
-            semantic_branch: bool=False,
             **kwargs
     ) -> None:
         """
         Dataset where masks are pre-processed similarly to the U-net 
         paper: https://arxiv.org/abs/1505.04597.
 
-        Overrides `rm_overalps` and `edge_weights` args in the 
-        `experiment.yml`-file. Both of these args are set to `True`.
-
         Args:
         -----------
             fname (str): 
                 Path to the pytables database
+            target_types (Dict[str, bool]):
+                A dictionary mapping target types to a boolean value.
+                Allowed keys: "inst", "type, "sem", "wmap".
             transforms (albu.Compose): 
                 Albumentations.Compose obj (a list of augmentations)
             normalize_input (bool, default=False):
                 apply minmax normalization to input images after 
                 transforms
-            type_branch (bool, default=False):
-                If cell type branch is included in the model, this arg
-                signals that the cell type annotations are included per
-                each dataset iter. Given that these annotations exist in
-                db
-            semantic_branch (bool, default=False):
-                If the model contains a semnatic area branch, this arg 
-                signals that the area annotations are included per each 
-                dataset iter. Given that these annotations exist in db
         """
+        target_types["wmap"] = True
+                
         super(UnetDataset, self).__init__(
             fname,
             transforms,
+            target_types,
             normalize_input,
-            type_branch,
-            semantic_branch,
-            edge_weights=True,
             rm_touching_nuc_borders=True,
         )
 
@@ -67,7 +57,7 @@ class UnetDataset(BaseDataset):
             Dict: A dictionary containing all the augmented data patches
                   (torch.Tensor) and the filename of the patches
         """
-        data = self._get_and_preprocess(ix)
+        data = self._read_and_preprocess(ix)
         aug_data = self._augment(data)
 
         return aug_data

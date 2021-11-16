@@ -167,7 +167,8 @@ class HDF5Writer(BaseWriter):
 
                 # Compute mask stats and add to db
                 if insts is not None:
-                    root.insts.append(new_masks[..., 0].astype("int32"))
+                    insts = self._fix_duplicates(new_masks[..., 0])
+                    root.insts.append(insts)
 
                 if types is not None:
                     root.npixels_cells[:] += self._mask_patch_stats(

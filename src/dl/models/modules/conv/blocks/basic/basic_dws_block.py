@@ -9,13 +9,15 @@ class DepthWiseSeparableBasicBlock(nn.ModuleDict):
         self,
         in_channels: int,
         out_channels: int,
+        kernel_size: int=3,
         same_padding: bool=True,
         normalization: str="bn",
         activation: str="relu",
         weight_standardize: bool=False,
         n_blocks: int=2,
         preactivate: bool=False,
-        attention: str=None
+        attention: str=None,
+        **kwargs
     ) -> None:
         """
         Stack dws basic blocks in a ModuleDict. These can be used
@@ -29,12 +31,18 @@ class DepthWiseSeparableBasicBlock(nn.ModuleDict):
             Identity Mappings in Deep Residual Networks:
                 - https://arxiv.org/abs/1603.05027
 
+        NOTE: 
+        Basic in the name here means that no dense or residual skip 
+        connections are applied in the forward method
+
         Args:
         ----------
             in_channels (int):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 If True, performs same-covolution
             normalization (str): 
@@ -64,6 +72,7 @@ class DepthWiseSeparableBasicBlock(nn.ModuleDict):
             conv_block = DWS(
                 in_channels=in_channels,
                 out_channels=out_channels,
+                kernel_size=kernel_size,
                 same_padding=same_padding,
                 normalization=normalization,
                 activation=activation,
@@ -71,7 +80,7 @@ class DepthWiseSeparableBasicBlock(nn.ModuleDict):
                 attention=attention
             )
             self.add_module(f"depthwiseseparable{i + 1}", conv_block)
-            in_channels = out_channels
+            in_channels = conv_block.out_channels
 
         self.out_channels = in_channels
     

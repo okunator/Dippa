@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 from typing import List, Tuple
 
-from .. import MultiBlockBasic
-from ...modules import FixedUnpool
+from ...modules import FixedUnpool, BasicBlock
 
 
 class SumBlock(nn.ModuleDict):
@@ -71,14 +70,13 @@ class SumBlock(nn.ModuleDict):
         return prev_feat
 
 
-
 class UnetppSumSkipBlock(nn.Module):
     def __init__(
             self,
             in_channels: int,
             skip_channel_list: List[int],
             skip_index: int,
-            batch_norm: str="bn",
+            normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
             preactivate: bool=False,
@@ -102,10 +100,14 @@ class UnetppSumSkipBlock(nn.Module):
                 skip tensors.
             skip_index (int):
                 index of the current skip channel in skip_channels_list.
-            batch_norm (str, default="bn"): 
-                Normalization method. One of: "bn", "bcn", None.
-            activation (str, default="relu"):
-                Activation method. One of "relu", "swish". "mish"
+            normalization (str): 
+                Normalization method to be used.
+                One of: "bn", "bcn", "gn", "in", "ln", "lrn", None
+            activation (str):
+                Activation method. One of: "mish", "swish", "relu",
+                "relu6", "rrelu", "selu", "celu", "gelu", "glu", "tanh",
+                "sigmoid", "silu", "prelu", "leaky-relu", "elu",
+                "hardshrink", "tanhshrink", "hardsigmoid"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             preactivate (bool, default=False)
@@ -146,11 +148,11 @@ class UnetppSumSkipBlock(nn.Module):
                     current_channels=current_skip_chl,
                 )
                                 
-                self.conv_blocks[f"x_{sub_block_idx0}_{i+1}"]=MultiBlockBasic(
+                self.conv_blocks[f"x_{sub_block_idx0}_{i+1}"]=BasicBlock(
                     in_channels=conv_in_chl,
                     out_channels=current_skip_chl,
                     n_blocks=n_conv_blocks,
-                    batch_norm=batch_norm, 
+                    normalization=normalization, 
                     activation=activation,
                     weight_standardize=weight_standardize,
                     preactivate=preactivate
@@ -222,7 +224,7 @@ class UnetppSumSkipBlockLight(nn.Module):
             out_channel_list: List[int],
             skip_channel_list: List[int],
             skip_index: int,
-            batch_norm: str="bn",
+            normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
             preactivate: bool=False,
@@ -255,10 +257,14 @@ class UnetppSumSkipBlockLight(nn.Module):
                 skip tensors.
             skip_index (int):
                 index of the current skip channel in skip_channels_list.
-            batch_norm (str, default="bn"): 
-                Normalization method. One of: "bn", "bcn", None
-            activation (str, default="relu"):
-                Activation method. One of: "relu", "swish". "mish"
+            normalization (str): 
+                Normalization method to be used.
+                One of: "bn", "bcn", "gn", "in", "ln", "lrn", None
+            activation (str):
+                Activation method. One of: "mish", "swish", "relu",
+                "relu6", "rrelu", "selu", "celu", "gelu", "glu", "tanh",
+                "sigmoid", "silu", "prelu", "leaky-relu", "elu",
+                "hardshrink", "tanhshrink", "hardsigmoid"
             weight_standardize (bool, default=False):
                 If True, perform weight standardization
             preactivate (bool, default=False)
@@ -287,11 +293,11 @@ class UnetppSumSkipBlockLight(nn.Module):
             current_skip_chl = skip_channel_list[skip_index]
             
             # pre conv for the encoder skip
-            self.pre_conv = MultiBlockBasic(
+            self.pre_conv = BasicBlock(
                 in_channels=current_skip_chl,
                 out_channels=out_channel_list[skip_index],
                 n_blocks=n_conv_blocks,
-                batch_norm=batch_norm, 
+                normalization=normalization, 
                 activation=activation,
                 weight_standardize=weight_standardize,
                 preactivate=preactivate
@@ -314,11 +320,11 @@ class UnetppSumSkipBlockLight(nn.Module):
                     current_channels=current_skip_chl,
                 )
                                 
-                self.conv_blocks[f"x_{sub_block_idx0}_{i+1}"]=MultiBlockBasic(
+                self.conv_blocks[f"x_{sub_block_idx0}_{i+1}"]=BasicBlock(
                     in_channels=conv_in_chl,
                     out_channels=current_skip_chl,
                     n_blocks=n_conv_blocks,
-                    batch_norm=batch_norm,
+                    normalization=normalization,
                     activation=activation,
                     weight_standardize=weight_standardize,
                     preactivate=preactivate

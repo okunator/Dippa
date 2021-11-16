@@ -10,13 +10,15 @@ class MobileInvertedResidualBlock(nn.ModuleDict):
         in_channels: int,
         out_channels: int,
         expand_ratio: float=4.0,
+        kernel_size: int=3,
         same_padding: bool=True,
         normalization: str="bn",
         activation: str="relu",
         weight_standardize: bool=False,
         n_blocks: int=2,
         preactivate: bool=False,
-        attention: str="se"
+        attention: str="se",
+        **kwargs
     ) -> None:
         """
         Stack inverted residual blocks in a ModuleDict. These can be 
@@ -69,6 +71,7 @@ class MobileInvertedResidualBlock(nn.ModuleDict):
                 in_channels=in_channels,
                 out_channels=out_channels,
                 expand_ratio=expand_ratio,
+                kernel_size=kernel_size,
                 same_padding=same_padding,
                 normalization=normalization,
                 activation=activation,
@@ -76,7 +79,7 @@ class MobileInvertedResidualBlock(nn.ModuleDict):
                 attention=attention
             )
             self.add_module(f"inverted_residual{i + 1}", conv_block)
-            in_channels = out_channels
+            in_channels = conv_block.out_channels
 
         self.out_channels = in_channels
     

@@ -9,18 +9,23 @@ class BasicBlock(nn.ModuleDict):
             self,
             in_channels: int,
             out_channels: int,
+            kernel_size: int=3,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
             n_blocks: int=2,
             preactivate: bool=False,
-            attention: str=None
+            attention: str=None,
+            **kwargs
         ) -> None:
         """
-        Stack basic conv blocks in a ModuleDict. These are used in the
-        full sized decoderblocks. The number of basic conv blocks can be 
-        adjusted. Default is 2.
+        Stack basic conv blocks in a ModuleDict. These can be used in 
+        the full sized decoderblocks. 
+
+        NOTE: 
+        Basic in the name here means that no dense or residual skip 
+        connections are applied in the forward method
 
         Args:
         ----------
@@ -28,6 +33,8 @@ class BasicBlock(nn.ModuleDict):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 If True, performs same-covolution
             normalization (str): 
@@ -56,21 +63,24 @@ class BasicBlock(nn.ModuleDict):
         use_attention = n_blocks == 1
         att_method = attention if use_attention else None
         self.conv1 = ConvBlock(
-            in_channels=in_channels, 
+            in_channels=in_channels,
             out_channels=out_channels,
-            same_padding=same_padding, 
-            normalization=normalization, 
-            activation=activation, 
+            kernel_size=kernel_size,
+            same_padding=same_padding,
+            normalization=normalization,
+            activation=activation,
             weight_standardize=weight_standardize,
             attention=att_method if attention is not None else None
         )
 
+        in_channels = self.conv1.out_channels
         blocks = list(range(1, n_blocks))
         for i in blocks:
             att_method = attention if i == blocks[-1] else None
             conv_block = ConvBlock(
-                in_channels=out_channels,
+                in_channels=in_channels,
                 out_channels=out_channels,
+                kernel_size=kernel_size,
                 same_padding=same_padding,
                 normalization=normalization,
                 activation=activation,
@@ -78,8 +88,9 @@ class BasicBlock(nn.ModuleDict):
                 attention=att_method if attention is not None else None
             )
             self.add_module(f"conv{i + 1}", conv_block)
+            in_channels = conv_block.out_channels
 
-        self.out_channels = out_channels
+        self.out_channels = in_channels
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for _, conv_block in self.items():

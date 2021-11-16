@@ -1,79 +1,24 @@
-from .criterions import *
-from .joint_losses import MultiTaskLoss, JointLoss
+from itertools import permutations
+from .criterions import SEG_LOSS_LOOKUP, REG_LOSS_LOOKUP
+
+from ._base._joint_loss import JointLoss
+from ._base._multitask_loss import MultiTaskLoss
 
 
-LOSS_LOOKUP = {
-    "iou": "IoULoss",
-    "dice": "DiceLoss",
-    "tversky": "TverskyLoss",
-    "ce": "WeightedCELoss",
-    "sce": "WeightedSCELoss",
-    "focal": "WeightedFocalLoss",
-    "mse": "MSE",
-    "gmse": "GradMSE",
-    "ssim": "SSIM",
-    "msssim": "MSSSIM"
-}
 
-JOINT_SEG_LOSSES = [
-    "iou",
-    "dice",
-    "tversky",
-    "ce",
-    "sce",
-    "focal",
-    "iou_ce",
-    "iou_sce",
-    "iou_focal",
-    "dice_ce",
-    "dice_sce",
-    "dice_focal",
-    "tversky_ce",
-    "tversky_sce",
-    "tversky_focal",
-    "iou_ce_ssim",
-    "iou_sce_ssim",
-    "iou_focal_ssim",
-    "dice_ce_ssim",
-    "dice_sce_ssim",
-    "dice_focal_ssim",
-    "tversky_ce_ssim",
-    "tversky_sce_ssim",
-    "tversky_focal_ssim",
-    "iou_ce_msssim",
-    "iou_sce_msssim",
-    "iou_focal_msssim",
-    "dice_ce_msssim",
-    "dice_sce_msssim",
-    "dice_focal_msssim",
-    "tversky_ce_msssim",
-    "tversky_sce_msssim",
-    "tversky_focal_msssim",
-]
+JOINT_SEG_LOSSES = []
+for i in range(1, 5):
+    JOINT_SEG_LOSSES.extend(
+        ["_".join(t) for t in permutations(SEG_LOSS_LOOKUP.keys(), i)]
+    )
+    
+JOINT_AUX_LOSSES = []
+for i in range(1, 5):
+    JOINT_AUX_LOSSES.extend(
+        ["_".join(t) for t in permutations(REG_LOSS_LOOKUP.keys(), i)]
+    )
 
-JOINT_AUX_LOSSES = [
-    "ce",
-    "mse",
-    "gmse",
-    "ssim",
-    "msssim",
-    "ce_ssim",
-    "ce_mssim",
-    "ce_mse",
-    "ce_gmse",
-    "mse_ce",
-    "mse_ssim",
-    "mse_gmse",
-    "mse_msssim",
-    "gmse_mse",
-    "gmse_ce",
-    "gmse_ssim",
-    "gmse_msssim",
-    "ssim_ce",
-    "ssim_mse",
-    "ssim_gmse",
-    "ssim_msssim",
-    "mse_ce_ssim",
-    "mse_gmse_ssim",
-    "mse_gmse_msssim"
+
+__all__ = [
+    "JOINT_AUX_LOSSES", "JOINT_SEG_LOSSES", "JointLoss", "MultiTaskLoss"
 ]

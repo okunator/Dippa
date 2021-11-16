@@ -8,6 +8,7 @@ class InvertedResidual(BaseMBConv):
             self,
             in_channels: int,
             out_channels: int,
+            kernel_size: int=3,
             expand_ratio: float=4.0,
             same_padding: bool=True,
             normalization: str="bn",
@@ -37,6 +38,8 @@ class InvertedResidual(BaseMBConv):
                 Number of output channels
             expand_ratio (float, default=1.0):
                 The ratio of channel expansion in the bottleneck
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 if True, performs same-covolution
             normalization (str): 
@@ -56,6 +59,7 @@ class InvertedResidual(BaseMBConv):
             in_channels=in_channels,
             out_channels=out_channels,
             expand_ratio=expand_ratio,
+            kernel_size=kernel_size,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
@@ -74,12 +78,12 @@ class InvertedResidual(BaseMBConv):
         # pointwise channel pooling conv
         out = self.ch_pool(x)
         out = self.norm1(out)
-        out = self.act(out)
+        out = self.act1(out)
 
         # depthwise conv
         out = self.depth_conv(out)
         out = self.norm2(out)
-        out = self.act(out)
+        out = self.act2(out)
 
         # attention
         out = self.attend(out)
@@ -99,6 +103,7 @@ class InvertedResidualPreact(BaseMBConv):
             self,
             in_channels: int,
             out_channels: int,
+            kernel_size: int=3,
             expand_ratio: float=4.0,
             same_padding: bool=True,
             normalization: str="bn",
@@ -124,6 +129,8 @@ class InvertedResidualPreact(BaseMBConv):
                 Number of output channels
             expand_ratio (float, default=1.0):
                 The ratio of channel expansion in the bottleneck
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 if True, performs same-covolution
             normalization (str): 
@@ -143,6 +150,7 @@ class InvertedResidualPreact(BaseMBConv):
             in_channels=in_channels,
             out_channels=out_channels,
             expand_ratio=expand_ratio,
+            kernel_size=kernel_size,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
@@ -160,12 +168,12 @@ class InvertedResidualPreact(BaseMBConv):
 
         # pointwise channel pooling conv
         out = self.norm1(x)
-        out = self.act(out)
+        out = self.act1(out)
         out = self.ch_pool(out)
 
         # depthwise conv
         out = self.norm2(out)
-        out = self.act(out)
+        out = self.act2(out)
         out = self.depth_conv(out)
 
         # attention

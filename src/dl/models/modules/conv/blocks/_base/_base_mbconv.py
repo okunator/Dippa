@@ -58,9 +58,9 @@ class BaseMBConv(nn.Module):
         """
         super(BaseMBConv, self).__init__()
         self.conv_choice = "wsconv" if weight_standardize else "conv"
+        self.out_channels = out_channels
 
         mid_channels = make_divisible(in_channels*expand_ratio)
-
 
         self.ch_pool = conv_func(
             name=self.conv_choice, in_channels=in_channels, padding=0,
@@ -69,6 +69,7 @@ class BaseMBConv(nn.Module):
 
         norm_channels = in_channels if preactivate else mid_channels
         self.norm1 = norm_func(normalization, num_features=norm_channels)
+        self.act1 = act_func(activation)
 
         # set padding. Works if dilation or stride are not adjusted
         padding = (kernel_size - 1) // 2 if same_padding else 0
@@ -78,6 +79,7 @@ class BaseMBConv(nn.Module):
             groups=mid_channels, padding=padding, bias=False
         )
         self.norm2 = norm_func(normalization, num_features=mid_channels)
+        self.act2 = act_func(activation)
         
         # set attention
         self.attend = att_func(
@@ -86,12 +88,11 @@ class BaseMBConv(nn.Module):
 
         self.proj_conv = conv_func(
             name=self.conv_choice, in_channels=mid_channels, bias=False,
-            out_channels=out_channels, kernel_size=1, padding=0
+            out_channels=self.out_channels, kernel_size=1, padding=0
         )
 
-        norm_channels = mid_channels if preactivate else out_channels
+        norm_channels = mid_channels if preactivate else self.out_channels
         self.norm3 = norm_func(
             normalization, num_features=norm_channels
         )
 
-        self.act = act_func(activation)

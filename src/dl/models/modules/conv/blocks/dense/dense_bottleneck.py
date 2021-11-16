@@ -9,6 +9,7 @@ class BottleneckDense(BaseBottleneckConv):
             self,
             in_channels: int,
             out_channels: int,
+            kernel_size: int=3,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
@@ -29,6 +30,8 @@ class BottleneckDense(BaseBottleneckConv):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 if True, performs same-covolution
             normalization (str): 
@@ -47,6 +50,7 @@ class BottleneckDense(BaseBottleneckConv):
         super(BottleneckDense, self).__init__(
             in_channels=in_channels,
             out_channels=out_channels,
+            kernel_size=kernel_size,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
@@ -72,15 +76,15 @@ class BottleneckDense(BaseBottleneckConv):
         # bottleneck
         out = self.conv1(out)
         out = self.norm1(out)
-        out = self.act(out)
+        out = self.act1(out)
 
         out = self.conv2(out)
         out = self.norm2(out)
-        out = self.act(out)
+        out = self.act2(out)
 
         out = self.conv3(out)
         out = self.norm3(out)
-        out = self.act(out)
+        out = self.act3(out)
 
         return out
 
@@ -90,6 +94,7 @@ class BottleneckDensePreact(BaseBottleneckConv):
             self,
             in_channels: int,
             out_channels: int,
+            kernel_size: int=3,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
@@ -114,6 +119,8 @@ class BottleneckDensePreact(BaseBottleneckConv):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 if True, performs same-covolution
             normalization (str): 
@@ -132,6 +139,7 @@ class BottleneckDensePreact(BaseBottleneckConv):
         super(BottleneckDensePreact, self).__init__(
             in_channels=in_channels,
             out_channels=out_channels,
+            kernel_size=kernel_size,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
@@ -156,15 +164,15 @@ class BottleneckDensePreact(BaseBottleneckConv):
 
         # bottleneck
         out = self.norm1(out)
-        out = self.act(out)
+        out = self.act1(out)
         out = self.conv1(out)
 
         out = self.norm2(out)
-        out = self.act(out)
+        out = self.act2(out)
         out = self.conv2(out)
 
         out = self.norm3(out)
         out = self.conv3(out)
-        out = self.act(out)
+        out = self.act3(out)
 
         return out

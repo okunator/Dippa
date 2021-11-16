@@ -19,7 +19,8 @@ class BaseConv(nn.Module):
             kernel_size=3,
             groups: int=1,
             attention: str=None,
-            pre_attend: bool=False
+            pre_attend: bool=False,
+            **kwargs
         ) -> None:
         """
         Lightweight base conv block that can be used in decoder blocks.
@@ -63,12 +64,11 @@ class BaseConv(nn.Module):
         """
         super(BaseConv, self).__init__()
         conv_choice = "wsconv" if weight_standardize else "conv"
+        self.out_channels = out_channels
 
         # set norm channel number for preactivation or normal
-        norm_channels = in_channels if preactivate else out_channels
+        norm_channels = in_channels if preactivate else self.out_channels
 
-        # set attention channels
-        att_channels = in_channels if pre_attend else in_channels
 
         # set padding. Works if dilation or stride are not adjusted
         padding = (kernel_size - 1) // 2 if same_padding else 0
@@ -81,4 +81,7 @@ class BaseConv(nn.Module):
 
         self.norm = norm_func(normalization, num_features=norm_channels)      
         self.act = act_func(activation)
+        
+        # set attention channels
+        att_channels = in_channels if pre_attend else self.out_channels
         self.attend = att_func(attention, in_channels=att_channels)

@@ -1,0 +1,7 @@
+dataset:
+  name: custom
+  targets:
+    aux: hover
+    type: True
+    inst: False
+    sem: True

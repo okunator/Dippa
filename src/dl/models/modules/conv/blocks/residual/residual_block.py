@@ -9,13 +9,15 @@ class ResidualBlock(nn.ModuleDict):
             self,
             in_channels: int,
             out_channels: int,
+            kernel_size: int=3,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
             weight_standardize: bool=False,
             n_blocks: int=2,
             preactivate: bool=False,
-            attention: str=None
+            attention: str=None,
+            **kwargs
         ) -> None:
         """
         Stack residual conv blocks in a ModuleDict. These are used in 
@@ -33,6 +35,8 @@ class ResidualBlock(nn.ModuleDict):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 If True, performs same-covolution
             normalization (str): 
@@ -66,6 +70,7 @@ class ResidualBlock(nn.ModuleDict):
         self.conv1 = Residual(
             in_channels=in_channels,
             out_channels=out_channels,
+            kernel_size=kernel_size,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
@@ -74,14 +79,16 @@ class ResidualBlock(nn.ModuleDict):
             attention=att_method if attention is not None else None
         )
 
+        in_channels = self.conv1.out_channels
         blocks = list(range(1, n_blocks))
         for i in blocks:
             # apply residual connection at the final conv block
             use_residual = i == blocks[-1]
             att_method = attention if use_residual else None
             conv_block = Residual(
-                in_channels=out_channels,
+                in_channels=in_channels,
                 out_channels=out_channels,
+                kernel_size=kernel_size,
                 same_padding=same_padding,
                 normalization=normalization,
                 activation=activation,
@@ -90,8 +97,9 @@ class ResidualBlock(nn.ModuleDict):
                 attention=att_method if attention is not None else None
             )
             self.add_module(f"conv{i + 1}", conv_block)
+            in_channels = conv_block.out_channels
 
-        self.out_channels = out_channels
+        self.out_channels = in_channels
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for _, conv_block in self.items():

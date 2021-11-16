@@ -1,0 +1,54 @@
+experiment_name: test
+experiment_version: test
+training:
+  resume_training: False
+  num_epochs: 1
+  num_gpus: 1
+  batch_size: 1
+  num_workers: 1
+  wandb: False
+  metrics_to_cpu: True
+
+  metrics:
+    type: 
+      - miou
+    sem:
+      - miou
+    aux:
+      - null
+  
+  input:
+    normalize_input: False
+    rm_overlaps: False
+    augmentations:
+      - hue_sat
+      - non_rigid
+      - blur
+
+  optimizer:
+    name: adam
+    decoder_lr: 0.0005
+    decoder_weight_decay: 0.0003
+    encoder_lr: 0.00005
+    encoder_weight_decay: 0.00003
+    lookahead: False
+    bias_weight_decay: False
+    scheduler_factor: 0.25
+    scheduler_patience: 3
+
+  loss:
+    class_weights:
+      type: null
+      sem: null
+      aux: null
+    edge_weights:
+      type: null
+      sem: null
+      aux: null 
+    branch_losses:
+      type: tversky_focal_ssim
+      sem: tversky_focal_ssim
+      aux: mse_ssim
+
+
+

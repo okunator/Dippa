@@ -1,0 +1,14 @@
+dataset:
+  name: custom
+  aux: hover
+  targets:
+    type: True
+    inst: False
+    sem: True
+    wmap: False
+  normalize_input: False
+  rm_overlaps: False
+  augmentations:
+    - hue_sat
+    - non_rigid
+    - blur

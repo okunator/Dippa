@@ -35,14 +35,14 @@ class GradMSE(nn.Module):
         Computes the gradient MSE loss for horizontal and vertical
         branch from HoVer-Net. See: https://arxiv.org/abs/1812.06499
         """
-        super(GradMSE, self).__init__()
+        super().__init__()
         self.eps = 1e-6
 
     def forward(
             self,
             yhat: torch.Tensor,
             target: torch.Tensor,
-            target_inst: torch.Tensor,
+            target_inst: torch.Tensor=None,
             **kwargs
         ) -> torch.Tensor:
         """

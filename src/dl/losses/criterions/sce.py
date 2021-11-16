@@ -3,11 +3,10 @@ import torch.nn.functional as F
 from typing import Optional
 
 from src.dl.utils import one_hot
-from ..weighted_base_loss import WeightedBaseLoss
+from .._base._weighted_base_loss import WeightedBaseLoss
 
 
-# This is adapted from: Catalyst package
-class WeightedSCELoss(WeightedBaseLoss):
+class SCELoss(WeightedBaseLoss):
     def __init__(
             self,
             alpha: float=0.5,
@@ -32,7 +31,7 @@ class WeightedSCELoss(WeightedBaseLoss):
             class_weights (torch.Tensor, optional, None): 
                 Optional tensor of size (n_classes,) for class weights
         """
-        super(WeightedSCELoss, self).__init__(class_weights, edge_weight)
+        super().__init__(class_weights, edge_weight)
         self.alpha = alpha
         self.beta = beta
         self.eps = 1e-6
@@ -63,8 +62,6 @@ class WeightedSCELoss(WeightedBaseLoss):
         ----------
             torch.Tensor: computed SCE loss (scalar)
         """
-        H = yhat.shape[2]
-        W = yhat.shape[3]
         num_classes = yhat.shape[1]
         target_one_hot = one_hot(target, num_classes)
         yhat_soft = F.softmax(yhat, dim=1) + self.eps
@@ -76,8 +73,8 @@ class WeightedSCELoss(WeightedBaseLoss):
         forward = target_one_hot * torch.log(yhat_soft)
         reverse = yhat_soft * torch.log(target_one_hot)
 
-        cross_entropy = (-torch.sum(forward, dim=1))
-        reverse_cross_entropy = (-torch.sum(reverse, dim=1))
+        cross_entropy = (-torch.sum(forward, dim=1)) # to (B, H, W)
+        reverse_cross_entropy = (-torch.sum(reverse, dim=1)) # to (B, H, W)
 
         if self.class_weights is not None:
             cross_entropy = self.apply_class_weights(cross_entropy, target)

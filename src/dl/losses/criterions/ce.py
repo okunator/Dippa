@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 from typing import Optional
 
-from ..weighted_base_loss import WeightedBaseLoss
+from .._base._weighted_base_loss import WeightedBaseLoss
 
 
-class WeightedCELoss(WeightedBaseLoss):
+class CELoss(WeightedBaseLoss):
     def __init__(
             self,
             edge_weight: Optional[float]=None,
@@ -25,6 +25,7 @@ class WeightedCELoss(WeightedBaseLoss):
                 Optional tensor of size (n_classes,) for class weights
         """
         super().__init__(class_weights, edge_weight)
+        
         self.loss = nn.CrossEntropyLoss(
             reduction="none",
             weight=class_weights
@@ -54,7 +55,7 @@ class WeightedCELoss(WeightedBaseLoss):
         ----------
             torch.Tensor: computed CE loss (scalar)
         """
-        loss = self.loss(yhat, target)
+        loss = self.loss(yhat, target) # (B, H, W)
 
         if self.edge_weight is not None:
             loss = self.apply_edge_weights(loss, target_weight)

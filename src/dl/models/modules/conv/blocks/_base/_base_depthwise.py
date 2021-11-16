@@ -16,7 +16,7 @@ class BaseDepthWiseSeparableConv(nn.Module):
             activation: str="relu",
             weight_standardize: bool=False,
             preactivate: bool=False,
-            kernel_size=3,
+            kernel_size: int=3,
             attention: str=None,
             **kwargs
         ) -> None:
@@ -63,6 +63,7 @@ class BaseDepthWiseSeparableConv(nn.Module):
         """
         super(BaseDepthWiseSeparableConv, self).__init__()
         self.conv_choice = "wsconv" if weight_standardize else "conv"
+        self.out_channels = out_channels
 
         # set padding. Works if dilation or stride are not adjusted
         padding = (kernel_size - 1) // 2 if same_padding else 0
@@ -74,13 +75,14 @@ class BaseDepthWiseSeparableConv(nn.Module):
         )
 
         self.norm1 = norm_func(normalization, num_features=in_channels)
-        self.act = act_func(activation)
+        self.act1 = act_func(activation)
         self.attend = att_func(attention, in_channels=in_channels)
 
         self.ch_pool = conv_func(
             name=self.conv_choice, in_channels=in_channels, padding=0,
-            out_channels=out_channels, kernel_size=1, bias=False,
+            out_channels=self.out_channels, kernel_size=1, bias=False,
         )
 
-        norm_channels = in_channels if preactivate else out_channels
+        norm_channels = in_channels if preactivate else self.out_channels
         self.norm2 = norm_func(normalization, num_features=norm_channels)
+        self.act2 = act_func(activation)

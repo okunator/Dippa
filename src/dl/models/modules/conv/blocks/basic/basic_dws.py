@@ -8,6 +8,7 @@ class DepthWiseSeparableBasic(BaseDepthWiseSeparableConv):
             self,
             in_channels: int,
             out_channels: int,
+            kernel_size: int=1,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
@@ -23,6 +24,9 @@ class DepthWiseSeparableBasic(BaseDepthWiseSeparableConv):
             MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications:
                 - https://arxiv.org/abs/1704.04861
 
+        NOTE: 
+        Basic in the name here means that no dense or residual skip 
+        connections are applied in the forward method
 
         Args:
         ----------
@@ -30,6 +34,8 @@ class DepthWiseSeparableBasic(BaseDepthWiseSeparableConv):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 if True, performs same-covolution
             normalization (str): 
@@ -48,6 +54,7 @@ class DepthWiseSeparableBasic(BaseDepthWiseSeparableConv):
         super(DepthWiseSeparableBasic, self).__init__(
             in_channels=in_channels,
             out_channels=out_channels,
+            kernel_size=kernel_size,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
@@ -61,7 +68,7 @@ class DepthWiseSeparableBasic(BaseDepthWiseSeparableConv):
         # depthwise conv
         out = self.depth_conv(x)
         out = self.norm1(out)
-        out = self.act(out)
+        out = self.act1(out)
 
         # attention
         out = self.attend(out)
@@ -69,7 +76,7 @@ class DepthWiseSeparableBasic(BaseDepthWiseSeparableConv):
         # pointwise channel pool
         out = self.ch_pool(out)
         out = self.norm2(out)
-        out = self.act(out)
+        out = self.act2(out)
 
         return out
 
@@ -79,6 +86,7 @@ class DepthWiseSeparableBasicPreact(BaseDepthWiseSeparableConv):
             self,
             in_channels: int,
             out_channels: int,
+            kernel_size: int=3,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
@@ -94,6 +102,9 @@ class DepthWiseSeparableBasicPreact(BaseDepthWiseSeparableConv):
             MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications:
                 - https://arxiv.org/abs/1704.04861
 
+        NOTE: 
+        Basic in the name here means that no dense or residual skip 
+        connections are applied in the forward method
 
         Args:
         ----------
@@ -101,6 +112,8 @@ class DepthWiseSeparableBasicPreact(BaseDepthWiseSeparableConv):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            kernel_size (int, default=3):
+                The size of the convolution kernel.
             same_padding (bool, default=True):
                 if True, performs same-covolution
             normalization (str): 
@@ -119,6 +132,7 @@ class DepthWiseSeparableBasicPreact(BaseDepthWiseSeparableConv):
         super(DepthWiseSeparableBasicPreact, self).__init__(
             in_channels=in_channels,
             out_channels=out_channels,
+            kernel_size=kernel_size,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
@@ -131,7 +145,7 @@ class DepthWiseSeparableBasicPreact(BaseDepthWiseSeparableConv):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # depthwise conv
         out = self.norm1(x)
-        out = self.act(out)
+        out = self.act1(out)
         out = self.depth_conv(out)
 
         # attention
@@ -140,7 +154,7 @@ class DepthWiseSeparableBasicPreact(BaseDepthWiseSeparableConv):
         # pointwise channel pool
         out = self.norm2(out)
         out = self.ch_pool(out)
-        out = self.act(out)
+        out = self.act2(out)
 
         return out
         

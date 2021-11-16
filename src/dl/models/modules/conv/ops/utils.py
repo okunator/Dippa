@@ -12,9 +12,13 @@ def conv_func(name: str, **kwargs) -> nn.Module:
     conv functions + WSConv2d and DepthWiseSeparableConv
 
     Args:
+    -----------
         name (str):
             The name of the conv function. Use lowercase letters.
 
+    Returns:
+    -----------
+        nn.Module: Initialized nn.Module.
     """
     assert name in conv["CONV_LOOKUP"].keys(), (
         f"Illegal conv func given. Allowed ones: {list(conv['CONV_LOOKUP'].keys())}"
@@ -25,3 +29,6 @@ def conv_func(name: str, **kwargs) -> nn.Module:
     conv_func = conv[key](**kwargs)
 
     return conv_func
+
+
+__all__ = ["conv_func"]

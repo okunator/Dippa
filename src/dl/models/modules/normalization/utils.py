@@ -12,8 +12,13 @@ def norm_func(name: str=None, **kwargs) -> nn.Module:
     normalization functions plus batch channel norm
 
     Args:
+    -----------
         name (str, default=None):
             The name of the norm function. Use lowercase letters.
+
+    Returns:
+    -----------
+        nn.Module: Initialized nn.Module.
 
     """
     allowed = [*norm['NORM_LOOKUP'].keys(), None]
@@ -30,3 +35,6 @@ def norm_func(name: str=None, **kwargs) -> nn.Module:
         norm_f = nn.Identity()
 
     return norm_f
+
+
+__all__ = ["norm_func"]

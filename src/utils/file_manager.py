@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Tuple, Union, Dict
 
 from src.settings import RESULT_DIR
+from .mask_utils import (
+    get_inst_centroid, get_inst_types, bounding_box, fix_duplicates
+)
 
 
 class FileHandler:
@@ -46,7 +49,51 @@ class FileHandler:
         """
         path = Path(path)
         cv2.imwrite(path.as_posix(), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        
+    @staticmethod
+    def write_mask(
+            path: Union[str, Path],
+            inst_map: np.ndarray,
+            type_map: np.ndarray,
+            sem_map: np.ndarray,
+        ) -> None:
+        """
+        Write multiple masks to .mat file.
 
+        Args:
+        ---------
+            path (str | Path):
+                Path to the .mat file.
+            inst_map (np.ndarray):
+                The inst_map to be written.
+            type_map (np.ndarray):
+                The inst_map to be written.
+            sem_map (np.ndarray, default=None):
+                The inst_map to be written.
+        """
+        assert Path(path).suffix == ".mat"
+        
+        inst_map = fix_duplicates(inst_map)
+        centroids = get_inst_centroid(inst_map)
+        inst_types = get_inst_types(inst_map, type_map)
+        inst_ids = list(np.unique(inst_map)[1:])
+        bboxes = np.array(
+            [bounding_box(np.array(inst_map == id_, np.uint8)) 
+            for id_ in inst_ids]
+        )
+        
+        sio.savemat(
+            file_name=path, 
+            mdict={
+                "inst_map": inst_map,
+                "type_map":type_map,
+                "sem_map": sem_map,
+                "inst_type":inst_types,
+                "inst_centroid":centroids,
+                "inst_bbox":bboxes
+            }
+        )
+    
     @staticmethod
     def read_mask(
             path: Union[str, Path],

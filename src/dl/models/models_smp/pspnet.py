@@ -27,10 +27,10 @@ from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.base import SegmentationHead
 from segmentation_models_pytorch.pspnet.decoder import PSPDecoder
 
-from ..base_model import MultiTaskSegModel
+from .._base._base_model import BaseMultiTaskSegModel
 
 
-class PSPNetSmpMulti(MultiTaskSegModel):
+class PSPNetSmpMulti(BaseMultiTaskSegModel):
     def __init__(
             self,
             encoder_name: str="resnet34",

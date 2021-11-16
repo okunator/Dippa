@@ -2,7 +2,7 @@ import numpy as np
 from typing import Tuple, Dict
 from abc import ABC, abstractmethod
 
-from src.utils import FileHandler
+from src.utils import FileHandler, fix_duplicates
 from ..datasets import rigid_augs_and_crop
 
 
@@ -107,7 +107,7 @@ class BaseWriter(ABC, FileHandler):
         Args:
         ----------
             patches_mask (np.ndarray):
-                Image patches. Shape (n_patches, pH, pW)
+                Mask patches. Shape (n_patches, pH, pW)
             classes (int):
                 The class dictionary. E.g. {"bg": 0, "fg": 1}
 
@@ -123,3 +123,27 @@ class BaseWriter(ABC, FileHandler):
                 pixels[j] += np.sum(patches_mask[i] == val)
             
         return pixels.astype("int32")
+    
+    def _fix_duplicates(self, patches_inst: np.ndarray) -> np.ndarray:
+        """
+        Fix repeatded inst map labels in a instance labelled mask
+
+        Args:
+        ----------
+            patches_inst (np.ndarray):
+                Inst labelled masks. Shape (n_patches, pH, pW)
+            classes (int):
+                The class dictionary. E.g. {"bg": 0, "fg": 1}
+
+        Returns: 
+        ----------
+            np.ndarray: The number of pixels per classes. Shape (C, )
+        """
+        insts = []
+
+        for i in range(patches_inst.shape[0]):
+            insts.append(fix_duplicates(patches_inst[i]))
+
+        insts = np.array(insts)
+            
+        return insts.astype("int32")

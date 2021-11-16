@@ -42,7 +42,7 @@ OPTIM_LOOKUP = {
     "adagrad": "Adagrad",
     "adamax": "Adamax",
     "adamw": "AdamW",
-    "asdg": "ASDG",
+    "asgd": "ASGD",
     "accsgd": "AccSGD",
     "adabound": "AdaBound",
     "adamod": "AdaMod",
@@ -59,3 +59,11 @@ OPTIM_LOOKUP = {
     "rangerqh": "RangerQH",
     "rangerva": "RangerVA",
 }
+
+
+__all__ = [
+    "OPTIM_LOOKUP", "Adam", "RMSprop", "SGD", "Adadelta", "Adagrad", "Adamax",
+    "AdamW", "ASGD", "AccSGD", "AdaBound", "AdaBelief", "AdamP", "Apollo",
+    "AdaMod", "DiffGrad", "Lamb", "NovoGrad", "PID", "QHAdam", "QHM", "RAdam",
+    "SGDW", "Yogi", "Ranger", "RangerQH", "RangerVA", "Lookahead"
+]

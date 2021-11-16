@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
-from typing import Dict, Tuple, Optional
-from matplotlib import pyplot as plt
+from typing import Dict, Optional
 
 from .mask_utils import bounding_box
 
@@ -198,67 +197,3 @@ def draw_stuff_contours(
         bg = cv2.addWeighted(image, 1-alpha, bg, alpha, 0)
 
     return bg
-
-
-def viz_patches(patches: np.ndarray) -> Tuple[int]:
-    """
-    patches is assumed to be of shape (n_patches, H, W, n_channels)
-    This function vizualizes those patches. Don't put too many patches
-    in or everything willl crash.
-
-    Args:
-    ----------
-        patches (np.ndarray): 
-            numpy array of stacked image patches. Shape: 
-            (n_patches, H, W, C)
-
-    Returns:
-    ----------
-        Tuple: Shape of the patches array
-    """
-    fignum = 200
-    low=0
-    high=len(patches)
-
-    # Visualize
-    fig_patches = plt.figure(fignum, figsize=(35,35))
-    pmin, pmax = patches.min(), patches.max()
-    dims = np.ceil(np.sqrt(high - low))
-    for idx in range(high - low):
-        spl = plt.subplot(dims, dims, idx + 1)
-        ax = plt.axis("off")
-        imm = plt.imshow(patches[idx].astype("uint8"))
-        cl = plt.clim(pmin, pmax)
-    plt.show()
-    return patches.shape
-
-
-def viz_instance(inst_map: np.ndarray, ix: int = 1) -> Tuple[int]:
-    """
-    This function will visualize a single instance with id 'ix' from the
-    'inst_map'
-
-    Args:
-    ----------
-        inst_map (np.ndarray): 
-            the instance map
-        ix (int): 
-            the index/id of an instance
-
-    Returns:
-    -----------
-        Shape of the patches array
-    """
-
-    nuc_map = np.copy(inst_map == ix)
-    y1, y2, x1, x2 = bounding_box(nuc_map)
-    y1 = y1 - 2 if y1 - 2 >= 0 else y1
-    x1 = x1 - 2 if x1 - 2 >= 0 else x1
-    x2 = x2 + 2 if x2 + 2 <= inst_map.shape[1] - 1 else x2
-    y2 = y2 + 2 if y2 + 2 <= inst_map.shape[0] - 1 else y2
-    nuc_map_crop = nuc_map[y1:y2, x1:x2].astype("int32")
-
-    fig, ax = plt.subplots(1, 1, figsize=(5, 5))
-    ax.imshow(nuc_map_crop)
-
-    return nuc_map_crop.shape

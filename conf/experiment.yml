@@ -1,0 +1,94 @@
+experiment_args:
+  experiment_name: panoptic
+  experiment_version: nfnet_1try
+
+model_args:
+  architecture_design:
+    module_args:
+      activation: leaky-relu    # One of (relu, mish, swish, leaky-relu)
+      normalization: bcn        # norm method, torch.nn methods + bcn
+      weight_standardize: True  # Weight standardization
+      weight_init: he           # One of (he, TODO: eoc) (only for decoder if pretrain)
+    encoder_args:
+      in_channels: 3            # RGB input images
+      encoder: tf_efficientnetv2_l   # https://github.com/qubvel/segmentation_models.pytorch
+      pretrain: True            # Use imagenet pre-trained encoder
+      depth: 5                  # Number of layers in encoder
+    decoder_args:
+      preactivate: False        # If True, BN & RELU applied before CONV
+      short_skips: residual     # One of (residual, dense, null) (for decoder branch only)
+      long_skips: unet        # One of (unet, unet++, unet3+, null)
+      merge_policy: concatenate # One of (summation, concatenate) (for long skips)
+      upsampling: fixed_unpool  # One of (interp, max_unpool, transconv, fixed_unpool)
+      n_layers: 1               # Number multi conv blocks inside one decoder stage 
+      n_blocks:                 # Number of convolution blocks in each multi conv block
+        - 2
+        - 2
+        - 2
+        - 2
+        - 2
+      conv_types:        # Allwed: (basic, bottleneck, dws, mbocnv, fusedmbconv)
+        - basic
+        - basic
+        - basic
+        - basic
+        - basic
+      decoder_channels:         # Number of out channels for every decoder layer
+        - 256
+        - 128
+        - 64
+        - 32
+        - 16 
+
+  decoder_branches: # allowed branches (inst, sem, type, aux)
+    - inst
+    - type
+    - sem
+    - aux
+ 
+training_args:
+  freeze_encoder: False          # freeze the weights in the encoder (for fine tuning)
+  weight_balancing: null         # One of (gradnorm, uncertainty, null)
+
+  input_args:
+    normalize_input: False       # minmax normalize input images after augs
+    rm_overlaps: False           # Remove overlapping nuclei borders from masks
+    edge_weights: False          # Compute nuclei border weight maps for each input
+    model_input_size: 256       # size of the model input (input_size, input_size)
+    n_classes_type: 7            # num classes for cell types
+    n_classes_sem: 5             # num classes for area types
+    augmentations:
+      - hue_sat
+      - non_rigid
+      - blur
+
+  optimizer_args:
+    optimizer: adam              # One of https://github.com/jettify/pytorch-optimizer 
+    lr: 0.0005
+    encoder_lr: 0.00005
+    weight_decay: 0.0003
+    encoder_weight_decay: 0.00003
+    lookahead: False
+    bias_weight_decay: False
+    scheduler_factor: 0.25
+    scheduler_patience: 3
+
+  loss_args:
+
+    inst_branch_loss: tversky_focal
+    type_branch_loss: tversky_focal
+    aux_branch_loss: mse_ssim
+    sem_branch_loss: tversky_focal
+    edge_weight: null            # (float|null)
+
+runtime_args:
+  resume_training: False
+  num_epochs: 2
+  num_gpus: 1
+  batch_size: 4
+  num_workers: 4              # number workers for data loader
+  db_type: hdf5               # The type of the input data db. One of (hdf5, zarr).
+  wandb: False                 # Wandb logging
+  metrics_to_cpu: True        # Lowers GPU memory but training gets slower.
+  metrics:
+    - miou
