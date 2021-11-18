@@ -1,33 +1,30 @@
 import torch
-import pytorch_lightning as pl
 from pathlib import Path
-from typing import Union, List, Optional, Dict, Tuple
-from torch.utils.data import DataLoader
+from typing import Union, List, Dict, Tuple
 
 from src.settings import DATA_DIR, PATCH_DIR
-from src.utils import FileHandler
 from src.dl.utils import to_device
-from ..writers import HDF5Writer, ZarrWriter
+from ._base._base_datamodule import BaseDataModule
+from ..writers import HDF5Writer
 from ..downloaders import CONSEP
-from ..datasets.dataset_builder import DatasetBuilder
 
 
-
-class ConsepDataModule(pl.LightningDataModule, FileHandler):
+class ConsepDataModule(BaseDataModule):
     def __init__(
             self, 
-            database_type: str,
-            augmentations: List[str]=["hue_sat", "non_rigid", "blur"],
+            target_types: List[str],
+            database_type: str="hdf5",
+            dataset_type: str="hover",
+            augs: List[str]=["hue_sat", "non_rigid", "blur"],
             normalize: bool=False,
-            aux_branch: str="hover",
-            type_branch: bool=True,
+            return_weight_map: bool=False,
             rm_touching_nuc_borders: bool=False,
-            edge_weights: bool=False,
             batch_size: int=8,
             num_workers: int=8,
             download_dir: Union[str, Path]=None, 
             database_dir: Union[str, Path]=None,
-            convert_classes: bool=True
+            convert_classes: bool=True,
+            **kwargs
         ) -> None:
         """
         CoNSeP dataset lightning datamodule
@@ -41,34 +38,31 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
 
         Args:
         -----------
-            database_type (str):
+            target_types (List[str]):
+                A list of the targets that are loaded during dataloading
+                process. Allowed values: "inst", "type".
+            database_type (str, default="hdf5"):
                 One of ("zarr", "hdf5"). The files are written in either
                 zarr or hdf5 files that is used by the torch dataloader 
                 during training.
-            augmentations (List, default=["hue_sat","non_rigid","blur"])
-                List of augmentations. Allowed augs: "hue_sat", "rigid",
+            dataset_type (str, default="hover"):
+                The dataset type. One of: "hover", "dist", "contour",
+                "basic", "unet"
+            dataset_type (str, default="hover"):
+                The dataset type. One of: "hover", "dist", "contour",
+                "basic", "unet"
+            augs (List, default=["hue_sat","non_rigid","blur"])
+                List of augs. Allowed augs: "hue_sat", "rigid",
                 "non_rigid", "blur", "non_spatial", "normalize"
             normalize (bool, default=False):
                 If True, channel-wise min-max normalization is applied 
                 to input imgs in the dataloading process
-            aux_branch (str, default="hover"):
-                Signals that the dataset needs to prepare an input for 
-                an auxiliary branch in the __getitem__ method. One of: 
-                "hover", "dist", "contour", None. If None, assumes that
-                the network does not contain auxiliary branch and the
-                unet style dataset (edge weights) is used as the dataset 
-            type_branch (bool, default=False):
-                If cell type branch is included in the model, this arg
-                signals that the cell type annotations are included per
-                each dataset iter. Given that these annotations exist in
-                db
+            return_weight_map (bool, default=False):
+                Include a nuclear border weight map in the dataloading
+                process
             rm_touching_nuc_borders (bool, default=False):
                 If True, the pixels that are touching between distinct
                 nuclear objects are removed from the masks.
-            edge_weights (bool, default=False):
-                If True, each dataset iteration will create weight maps
-                for the nuclear edges. This can be used to penalize
-                nuclei edges in cross-entropy based loss functions.
             batch_size (int, default=8):
                 Batch size for the dataloader
             num_workers (int, default=8):
@@ -77,17 +71,18 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
             download_dir (str, or Path obj, default=None):
                 directory where the downloaded data is located. If None, 
                 and downloading is required, will be downloaded in 
-                .../Dippa/data/consep/ folders.
+                Dippa/data/consep/ folders.
             database_dir (str or Path, default=None):
                 The directory where the db is located. If None, and
                 writing is required, will be downloaded in 
-                .../Dippa/patches/consep/ folders
+                Dippa/patches/consep/ folders
             convert_classes (bool, default=True):
                 Convert the original classes to the reduced set of 
                 classes. More info in their github and their paper.
             
         """
-        super(ConsepDataModule, self).__init__()
+        self.database_type = database_type
+        self.suffix = ".h5" if self.database_type == "hdf5" else ".zarr"
 
         self.database_dir = Path(PATCH_DIR  / f"{database_type}" / "consep")
         if database_dir is not None:
@@ -102,26 +97,34 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
         self.download_dir.mkdir(exist_ok=True)
         self.convert_classes = convert_classes
         
-        # Variables for torch DataLoader
-        self.database_type = database_type
-        self.augs = augmentations
-        self.norm = normalize
-        self.aux_branch = aux_branch
-        self.type_branch = type_branch
-        self.edge_weights = edge_weights
-        self.rm_touching_nuc_borders = rm_touching_nuc_borders
-        self.batch_size = batch_size
-        self.num_workers = num_workers
-        self.suffix = ".h5" if self.database_type == "hdf5" else ".zarr"
-
         # set up generic db names
-        self.db_fname_train = Path(
+        db_train = Path(
             self.database_dir / f"train_consep"
         ).with_suffix(self.suffix)
 
-        self.db_fname_test = Path(
+        db_test = Path(
             self.database_dir / f"test_consep"
         ).with_suffix(self.suffix)
+        
+        allowed_targets = ("type", "inst")
+        if not all(t in allowed_targets for t in target_types):
+            raise ValueError(f"""
+                Allowed targets for CoNSeP dataset: {allowed_targets}. Got:
+                {target_types}."""
+            )
+                    
+        super().__init__(
+            db_train,
+            db_test,
+            target_types,
+            dataset_type,
+            augs,
+            normalize,
+            return_weight_map,
+            rm_touching_nuc_borders,
+            batch_size,
+            num_workers
+        )
 
     @property
     def class_dicts(self) -> Tuple[Dict[str, int], None]:
@@ -229,7 +232,7 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
                 center crop.
         """
         assert database_type in ("zarr", "hdf5")
-        writerobj = HDF5Writer if database_type == "hdf5" else ZarrWriter 
+        writerobj = HDF5Writer # if database_type == "hdf5" else ZarrWriter 
 
         writer = writerobj(
             img_dir=img_dir,
@@ -296,63 +299,3 @@ class ConsepDataModule(pl.LightningDataModule, FileHandler):
                 patch_shape=(256, 256),
                 stride_size=256,
             )
-    
-    def setup(self, stage: Optional[str] = None) -> None:
-        self.trainset = DatasetBuilder.set_train_dataset(
-            fname=self.db_fname_train.as_posix(),
-            decoder_aux_branch=self.aux_branch,
-            augmentations=self.augs,
-            normalize_input=self.norm,
-            rm_touching_nuc_borders=self.rm_touching_nuc_borders,
-            edge_weights=self.edge_weights,
-            type_branch=self.type_branch,
-            semantic_branch=False
-
-        )
-        self.validset = DatasetBuilder.set_test_dataset(
-            fname=self.db_fname_test.as_posix(),
-            decoder_aux_branch=self.aux_branch,
-            augmentations=None,
-            normalize_input=self.norm,
-            rm_touching_nuc_borders=self.rm_touching_nuc_borders,
-            edge_weights=self.edge_weights,
-            type_branch=self.type_branch,
-            semantic_branch=False
-        )
-        self.testset = DatasetBuilder.set_test_dataset(
-            fname=self.db_fname_test.as_posix(),
-            decoder_aux_branch=self.aux_branch,
-            augmentations=None,
-            normalize_input=self.norm,
-            rm_touching_nuc_borders=self.rm_touching_nuc_borders,
-            edge_weights=self.edge_weights,
-            type_branch=self.type_branch,
-            semantic_branch=False
-        )
-
-    def train_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self.trainset, 
-            batch_size=self.batch_size, 
-            shuffle=True, 
-            pin_memory=True, 
-            num_workers=self.num_workers,
-        )
-
-    def val_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self.validset, 
-            batch_size=self.batch_size,
-            shuffle=False,
-            pin_memory=True, 
-            num_workers=self.num_workers
-        )
-    
-    def test_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self.testset,
-            batch_size=self.batch_size, 
-            shuffle=False, 
-            pin_memory=True, 
-            num_workers=self.num_workers
-        )

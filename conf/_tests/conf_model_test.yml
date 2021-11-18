@@ -1,5 +1,5 @@
 model:
-  input_size: 64
+  input_size: 256
   encoder:
     name: tf_efficientnetv2_s
     depth: 5
@@ -35,7 +35,7 @@ model:
       - 16
       - 8
     branches:
-      type: 4
+      type: 7
       sem: 5
       aux: 2
     

@@ -5,7 +5,7 @@ import tables as tb
 import albumentations as A
 from pathlib import Path
 from torch.utils.data import Dataset
-from typing import Callable, Dict
+from typing import Callable, List, Dict
 
 from src.utils import (
     FileHandler,
@@ -22,8 +22,9 @@ class BaseDataset(Dataset, FileHandler):
             self,
             fname: str,
             transforms: A.Compose,
-            target_types: Dict[str, bool],
+            target_types: List[str],
             normalize_input: bool=False,
+            return_weight_map: bool=False,
             rm_touching_nuc_borders: bool=False,
         ) -> None:
         """
@@ -35,12 +36,15 @@ class BaseDataset(Dataset, FileHandler):
                 path to the zarr/hdf5 database
             transforms (albu.Compose): 
                 Albumentations.Compose obj (a list of augmentations)
-            target_types (Dict[str, bool]):
-                A dictionary mapping target types to a boolean value.
-                Allowed keys: "inst", "type, "sem", "wmap".
+            target_types (List[str]):
+                A list of the targets that are loaded during dataloading
+                process. Allowed values: "inst", "type", "sem".
             normalize_input (bool, default=False):
                 apply minmax normalization to input images after 
                 transforms
+            return_weight_map (bool, default=False):
+                Include a nuclear border weight map in the dataloading
+                process
             rm_touching_nuc_borders (bool, default=False):
                 If True, the pixels that are touching between distinct
                 nuclear objects are removed from the masks.
@@ -51,17 +55,11 @@ class BaseDataset(Dataset, FileHandler):
                 the input data needs to be in either hdf5 or zarr db.
                 Got: {self.suffix}. Allowed: {(".h5", ".zarr")}"""
             )
-        
-        allowed = ("inst", "type", "sem", "wmap")
-        if not all(k for k in target_types.keys()):
-            raise ValueError(f"""
-                `target_types` need to contain keys: {allowed}. Got:
-                {tuple(target_types.keys())}"""
-            )
             
         self.fname = fname
         self.transforms = transforms
         self.normalize_input = normalize_input
+        self.return_weight_map = return_weight_map
         self.rm_touching_nuc_borders = rm_touching_nuc_borders
         self.target_types = target_types
  
@@ -114,7 +112,7 @@ class BaseDataset(Dataset, FileHandler):
 
         data = {"image": im}
         
-        if self.target_types["wmap"]:
+        if self.return_weight_map:
             weight_map = self._generate_weight_map(insts)
             data["weight_map"] = weight_map
             
@@ -123,13 +121,13 @@ class BaseDataset(Dataset, FileHandler):
             
         data["inst_map"] = insts
         
-        if self.target_types["inst"]:
+        if "inst" in self.target_types:
             data["binary_map"] = binarize(insts)
 
-        if self.target_types["type"]:
+        if "type" in self.target_types:
             data["type_map"] = types
 
-        if self.target_types["sem"]:
+        if "sem" in self.target_types:
             data["sem_map"] = areas
 
         return data

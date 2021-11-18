@@ -11,12 +11,12 @@ from ..encoders import TimmUniversalEncoder
 class MultiTaskSegModel(BaseMultiTaskSegModel):
     def __init__(
             self,
+            dec_branches: Dict[str, int],
             model_input_size: int=256,
             enc_name: str="resnet50",
             enc_pretrain: bool=True,
             enc_depth: int=5,
             enc_freeze: bool=False,
-            dec_branches: Dict[str, int]={"inst": 2},
             dec_n_blocks: List[int]=None,
             dec_conv_types: List[str]=None,
             dec_channels: List[int]=None,
@@ -30,6 +30,7 @@ class MultiTaskSegModel(BaseMultiTaskSegModel):
             dec_normalization: str="bn",
             dec_weight_standardize: bool=False,
             dec_attention: str=None,
+            **kwargs
         ) -> None: 
         """
         Abstraction of a hard parameter sharing multi-task segmentation 
@@ -47,6 +48,11 @@ class MultiTaskSegModel(BaseMultiTaskSegModel):
         
         Args:
         -----------
+            dec_branches (Dict[str]):
+                The types of decoders that are used for this multi-task
+                seg model mapped to the number of output classes from
+                that branch. The keys need to be unique in the dict.
+                Allowed keys: "inst", "type", "aux", "sem"
             model_input_size (int, default=256):
                 The input image size of the model. Assumes that input 
                 images are square patches i.e. H == W.
@@ -59,11 +65,6 @@ class MultiTaskSegModel(BaseMultiTaskSegModel):
                 Number of encoder blocks.
             enc_freeze (bool, default=False):
                 freeze the encoder for training
-            dec_branches (Dict[str], default={"inst": 2}):
-                The types of decoders that are used for this multi-task
-                seg model mapped to the number of output classes from
-                that branch. The keys need to be unique in the dict.
-                Allowed keys: "inst", "type", "aux", "sem"
             dec_n_blocks (List[int], default=None):
                 Number of conv blocks inside multi-conv-blocks for each 
                 stage of the decoder
@@ -195,8 +196,10 @@ class MultiTaskSegModel(BaseMultiTaskSegModel):
         Args:
         ----------
             conf (DictConfig):
-                The experiment.yml file. (File is read by omegaconf)
+                A config .yml file specifying all the different parts of
+                the model.
         """
+        
         return cls(
             model_input_size=conf.model.input_size,
             enc_name=conf.model.encoder.name,

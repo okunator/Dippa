@@ -13,11 +13,10 @@ from src.dl.utils import binarize
 @pytest.mark.parametrize("phase", ["train", "test", "valid"])
 @pytest.mark.parametrize("normalize_input", [True, False])
 @pytest.mark.parametrize("rm_touching_nuc_borders", [True, False])
+@pytest.mark.parametrize("return_weight_map", [True, False])
 @pytest.mark.parametrize("target_types", [
-    {"inst": True, "type": True, "sem": False, "wmap": False},
-    {"inst": True, "type": False, "sem": False, "wmap": True},
-    {"inst": True, "type": True, "sem": True, "wmap": True},
-    {"inst": False, "type": True, "sem": True, "wmap": False},
+    ["inst"], ["inst", "type"], ["inst", "type", "sem"],
+    ["type"], ["type", "sem"], ["sem"], ["sem", "inst"] 
 ])
 @pytest.mark.parametrize("augs", [
     ["hue_sat", "non_rigid", "rigid"], [],
@@ -29,8 +28,9 @@ def test_dataset_build_load(
         name: str,
         phase: str,
         augs: List[str],
-        target_types: Dict[str, bool],
+        target_types: List[str],
         normalize_input: bool,
+        return_weight_map: bool,
         rm_touching_nuc_borders: bool,
     ) -> None:
     """
@@ -43,31 +43,31 @@ def test_dataset_build_load(
     
     dataset = prepare_dataset(
         fname, name, phase, augs, input_size, target_types,
-        normalize_input, rm_touching_nuc_borders
+        normalize_input, return_weight_map, rm_touching_nuc_borders
     )
     
     dat = next(iter(dataset))
     
     # check that the borders get removed if specified
     if rm_touching_nuc_borders:
-        if target_types["type"] and target_types["inst"]:
+        if "type" in target_types and "inst" in target_types:
             tmap = binarize(dat["type_map"])
             assert not torch.all(torch.isclose(dat["binary_map"], tmap))
     
-    # check that binary map gets loaded
-    if target_types["inst"]:
-        assert "binary_map" in dat.keys()
-        
     # check that weight map gets loaded
-    if target_types["wmap"]:
+    if return_weight_map:
         assert "weight_map" in dat.keys()
         
+    # check that binary map gets loaded
+    if "inst" in target_types:
+        assert "binary_map" in dat.keys()
+        
     # check that sem map gets loaded
-    if target_types["sem"]:
+    if "sem" in target_types:
         assert "sem_map" in dat.keys()
         
     # check that type map gets loaded
-    if target_types["type"]:
+    if "type" in target_types:
         assert "type_map" in dat.keys()
         
     # check that aux map is loaded

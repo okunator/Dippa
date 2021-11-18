@@ -1,11 +1,11 @@
-dataset:
-  name: custom
-  aux: hover
+datamodule:
+  batch_size: 1
+  num_workers: 1
+  dataset_type: hover
   targets:
-    type: True
-    inst: False
-    sem: True
-    wmap: False
+    - sem
+    - type
+  weight_map: False
   normalize_input: False
   rm_overlaps: False
   augmentations:

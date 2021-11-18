@@ -35,7 +35,7 @@ model:
       - 32
       - 16
     branches:
-      type: 4
+      type: 7
       sem: 5
       aux: 2
     

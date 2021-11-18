@@ -1,31 +1,30 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import pandas as pd
 import pytorch_lightning as pl
 from copy import deepcopy
 from typing import List, Dict
-from pathlib import Path
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from src.settings import RESULT_DIR
+from src.dl.models import MultiTaskSegModel
 from src.dl.losses.utils import multitaskloss_func
 from src.dl.optimizers.utils import OptimizerBuilder
 
 from .metrics.utils import metric_func
-from ..models import MultiTaskSegModel
 
 
-class SegModel(pl.LightningModule):
+class SegExperiment(pl.LightningModule):
     def __init__(
             self,
             model: nn.Module,
             experiment_name: str,
             experiment_version: str,
+            branch_losses: Dict[str, int],
+            metrics: Dict[str, List[str]],
             optimizer_name: str="adam",
             edge_weights: Dict[str, float]=None,
             class_weights: Dict[str, bool]=None,
-            dec_branch_losses: Dict[str, int]={"inst": "ce_dice"},
             dec_learning_rate: float=0.0005,
             enc_learning_rate: float=0.00005, 
             dec_weight_decay: float=0.0003, 
@@ -34,12 +33,8 @@ class SegModel(pl.LightningModule):
             scheduler_patience: int=3,
             lookahead: bool=False,
             bias_weight_decay: bool=True,
-            augmentations: List[str]=None,
-            normalize_input: bool=True,
-            rm_overlaps: bool=False,
-            batch_size: int=8,
-            metrics: Dict[str, List[str]]={"inst": ["miou"]},
             inference_mode: bool=False,
+            hparams_to_yaml: bool=True,
             **kwargs
         ) -> None:
         """
@@ -48,10 +43,16 @@ class SegModel(pl.LightningModule):
 
         Args:
         ------------
+            model (nn.Module):
+                A pytorch model specification
             experiment_name (str):
-                Name of the experiment. Example "Skip connection test"
+                Name of the experiment.
             experiment_version (str):
-                Name of the experiment version. Example: "dense"
+                Name of the experiment version.
+            branch_losses (Dict[str, int], default={"inst": "ce_dice"})
+                dictionary mapping multi-loss functions to the decoder
+                branches. Allowed losses: "ce", "dice", "iou", "focal",
+                "gmse", "mse", "sce", "tversky", "ssim"
             edge_weights (Dict[str, float], optional, default=None):
                 A dictionary of baranch names mapped to floats that are used
                 to weight nuclei edges in CE-based losses. e.g.
@@ -70,10 +71,6 @@ class SegModel(pl.LightningModule):
                 "ranger","rangerqh","rangerva"
             lookahead (bool, default=False):
                 Flag whether the optimizer uses lookahead.
-            dec_branch_losses (Dict[str, int], default={"inst": "ce_dice"})
-                dictionary mapping multi-loss functions to the decoder
-                branches. Allowed losses: "ce", "dice", "iou", "focal",
-                "gmse", "mse", "sce", "tversky", "ssim"
             dec_learning_rate (float, default=0.0005):
                 Decoder learning rate.
             dec_weight_decay (float, defauilt=0.0003):
@@ -82,18 +79,6 @@ class SegModel(pl.LightningModule):
                 Encoder weight decay
             bias_weight_decay (bool):
                 Flag whether to apply weight decay for biases.
-            augmentations (List[str], default=None): 
-                List of augmentations to be used for training One of: 
-                "rigid", "non_rigid", "hue_sat", "blur", "non_spatial",
-                "random_crop", "center_crop","resize"
-            normalize_input (bool, default=True):
-                If True, channel-wise min-max normalization for the 
-                input images is applied.
-            rm_overlaps (bool, default=False):
-                If True, then the object borders are removed from the
-                target masks while training.
-            batch_size (int, default=8):
-                Batch size for the model at training time
             metrics (Dict[str, List[str]], default={"inst":["miou"]}):
                 Dictionary of branch name mapped to a List of metrics
                 The metrics are computed during training and
@@ -103,11 +88,14 @@ class SegModel(pl.LightningModule):
                 Flag to signal that model is initialized for inference. 
                 This is only used in the Inferer class so no need to 
                 touch this argument.
+            hparams_to_yaml (bool, default=True):
+                If True, all the config params are saved to a .yml file
+                in the RESULT_DIR (Dippa/results/{exp_name}/{exp_vers})
         """
         super().__init__()
         
         # check that dict args have matching keys
-        lk = dec_branch_losses.keys()
+        lk = branch_losses.keys()
         dk = model.dec_branches.keys()
         mk = metrics.keys()
         has_same_keys = (lk == dk == mk)
@@ -131,12 +119,12 @@ class SegModel(pl.LightningModule):
             )
              
         # Save hparms   
-        self.experiment_name = experiment_name
-        self.experiment_version = experiment_version
+        self.name = experiment_name
+        self.version = experiment_version
         self.metric_dict = metrics
         
         # Loss args
-        self.decoder_branch_losses = dec_branch_losses
+        self.decoder_branch_losses = branch_losses
         self.edge_weights = edge_weights
         self.class_weights = class_weights
 
@@ -151,12 +139,6 @@ class SegModel(pl.LightningModule):
         self.lookahead = lookahead
         self.bias_weight_decay = bias_weight_decay
 
-        # Dataset & Dataloader args
-        self.augmentations = augmentations
-        self.normalize_input = normalize_input
-        self.batch_size = batch_size
-        self.rm_overlaps = rm_overlaps
-        
         # init model
         self.model = model
         self.save_hyperparameters(ignore=["model"])
@@ -181,6 +163,9 @@ class SegModel(pl.LightningModule):
         self.hparams["dec_activation"] = model.dec_activation
         self.hparams["dec_normalization"] = model.dec_normalization
         self.hparams["dec_weight_standardize"] = model.dec_weight_standardize
+        
+        if hparams_to_yaml:
+            self._hparams_to_yaml()
 
         if not inference_mode:
             self.criterion = self.configure_loss()
@@ -190,25 +175,33 @@ class SegModel(pl.LightningModule):
             self.test_metrics = deepcopy(metrics)
 
     @classmethod
-    def from_conf(cls, conf: DictConfig, **kwargs):
+    def from_conf(
+            cls,
+            model: nn.Module,
+            conf: DictConfig,
+            **kwargs
+        ):
         """
         Construct SegModel from experiment.yml
 
         Args:
         ---------
+            model (nn.Module):
+                A pytorch model specification
             conf (omegaconf.DictConfig):
-                The experiment.yml file. (File is read by omegaconf)
+                A config .yml file specifying metrics, optimizers,
+                losses etc. (File is read by omegaconf)
         """
-        model = MultiTaskSegModel.from_conf(conf)
         train_kwds = conf.training
+        data_kwds = conf.datamodule
         
         return cls(
             model=model,
-            experiment_name=conf.expriment_name,
+            experiment_name=conf.experiment_name,
             experiment_version=conf.experiment_version,
             edge_weights=train_kwds.edge_weights,
             class_weights=train_kwds.class_weights,
-            dec_branch_losses=train_kwds.loss.branch_losses,
+            branch_losses=train_kwds.loss.branch_losses,
             optimizer_name=train_kwds.optimizer.name,
             lookahed=train_kwds.optimizer.lookahead,
             dec_learning_rate=train_kwds.optimizer.decoder_lr,
@@ -216,12 +209,15 @@ class SegModel(pl.LightningModule):
             enc_learning_rate=train_kwds.optimizer.encoder_lr,
             enc_weight_decay=train_kwds.optimizer.encoder_weight_decay,
             bias_weight_decay=train_kwds.optimizer.bias_weight_decay,
-            augmentations=train_kwds.input.augmentations,
-            normalize_input=train_kwds.input.normalize_input,
-            rm_overlaps=train_kwds.input.rm_overlaps,
-            num_workers=train_kwds.num_workers,
-            batch_size=train_kwds.batch_size,
             metrics=train_kwds.metrics,
+            num_epochs=train_kwds.num_epochs,
+            batch_size=data_kwds.batch_size,
+            dataset_type=data_kwds.dataset_type,
+            weight_map=data_kwds.weight_map,
+            normalize_input=data_kwds.normalize_input,
+            rm_overlaps=data_kwds.rm_overlaps,
+            augmentations=data_kwds.augmentations,
+            **kwargs
         )
         
     @classmethod
@@ -232,42 +228,28 @@ class SegModel(pl.LightningModule):
         inference_mode: bool=False
     ):
         """
-        Construct SegModel from experiment name and version
+        Construct SegExperiment from experiment name and version
         """
-        experiment_dir = Path(f"{RESULT_DIR}/{name}/version_{version}")
-        assert experiment_dir.exists(), (
-            f"experiment dir: {experiment_dir} does not exist"
+        exp_dir = RESULT_DIR / name / f"version_{version}"
+        assert exp_dir.exists(), (
+            f"experiment dir: {exp_dir} does not exist"
         )
-
-        # open meta_tags.csv
-        for obj in experiment_dir.iterdir():
-            if obj.name == "meta_tags.csv":
-                df = pd.read_csv(obj)
-
-        # set kwargs
-        records = df.to_dict("records")
-        kwargs = dict((d["key"], d["value"]) for d in records)
-
-        # Convert lists, bools, and ints from str
-        for k, v in kwargs.items():
-            try:
-                kwargs[k] = eval(v)
-            except:
-                pass
-            
-            try:
-                kwargs[k] = int(v)
-            except:
-                pass
-
-            if kwargs[k] == "TRUE" or kwargs[k] == "FALSE":
-                kwargs[k] = kwargs[k] == "TRUE"
-
-        kwargs["experiment_name"] = name
-        kwargs["experiment_version"] = version
+        
+        hparams = exp_dir / "hparams.yml"
+        kwargs = OmegaConf.load(hparams)
         kwargs["inference_mode"] = inference_mode
-        return cls(**kwargs)
-
+        
+        model = MultiTaskSegModel(**kwargs)
+        return cls(model, **kwargs)
+    
+    def _hparams_to_yaml(self) -> None:
+        """
+        Save hparams to yaml
+        """
+        f = RESULT_DIR / self.name / f"version_{self.version}" / "hparams.yml"
+        f.parents[0].mkdir(exist_ok=True)
+        conf = OmegaConf.create(dict(self.hparams.items()))
+        OmegaConf.save(conf, f=f)
 
     def _compute_metrics(
             self,
@@ -367,11 +349,13 @@ class SegModel(pl.LightningModule):
 
         # log all the metrics
         self.log(
-            "train_loss", loss, prog_bar=True, on_epoch=False, on_step=True
+            "train_loss", loss, prog_bar=True,
+            on_epoch=False, on_step=True
         )
         for k, val in res.items():
             self.log(
-                f"train_{k}", val, prog_bar=True, on_epoch=False, on_step=True
+                f"train_{k}", val, prog_bar=True,
+                on_epoch=False, on_step=True
             )
 
         return loss
@@ -392,15 +376,17 @@ class SegModel(pl.LightningModule):
 
         # log all the metrics
         self.log(
-            "val_loss", loss, prog_bar=False, on_epoch=True, on_step=False
+            "val_loss", loss, prog_bar=False,
+            on_epoch=True, on_step=False
         )
         for k, val in res.items():
             self.log(
-                f"val_{k}", val, prog_bar=False, on_epoch=True, on_step=False
+                f"val_{k}", val, prog_bar=False,
+                on_epoch=True, on_step=False
             )
         
         # If batch_idx = 0, sends outputs to wandb logger
-        if batch_idx in (0, 10):
+        if batch_idx in (0, 1, 2):
             return soft_masks
         
     def test_step(
@@ -418,13 +404,14 @@ class SegModel(pl.LightningModule):
         
         # log all the metrics
         self.log(
-            "val_loss", loss, prog_bar=False, on_epoch=True, on_step=False
+            "val_loss", loss, prog_bar=False,
+            on_epoch=True, on_step=False
         )
         for k, val in res.items():
             self.log(
-                f"val_{k}", val, prog_bar=False, on_epoch=True, on_step=False
+                f"val_{k}", val, prog_bar=False,
+                on_epoch=True, on_step=False
             )
-
     
     def configure_optimizers(self):
         optimizer = OptimizerBuilder.set_optimizer(

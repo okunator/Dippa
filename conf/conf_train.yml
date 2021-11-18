@@ -1,13 +1,12 @@
 experiment_name: panoptic
-experiment_version: effnetv2_1st
+experiment_version: testi2
 training:
   resume_training: False
   num_epochs: 2
   num_gpus: 1
-  batch_size: 4
-  num_workers: 4
-  wandb: False
+  wandb: True
   metrics_to_cpu: True
+  device_stats: False
 
   metrics:
     type: 
@@ -17,16 +16,8 @@ training:
     aux:
       - null
 
-  input:
-    normalize_input: False
-    rm_overlaps: False
-    augmentations:
-      - hue_sat
-      - non_rigid
-      - blur
-
   optimizer:
-    name: adam
+    name: adamp
     decoder_lr: 0.0005
     decoder_weight_decay: 0.0003
     encoder_lr: 0.00005

@@ -87,12 +87,12 @@ def test_forward(
 @pytest.mark.parametrize("dec_n_blocks", [[1, 1, 1, 1, 1]])
 @pytest.mark.parametrize("dec_n_layers", [1, 2])
 @pytest.mark.parametrize("dec_short_skip", ["residual", None])
-@pytest.mark.parametrize("long_skip", ["unet", "unet3+"])
-@pytest.mark.parametrize("merge_policy", ["summation", "concatenate"])
-@pytest.mark.parametrize("normalization", ["bcn"])
-@pytest.mark.parametrize("activation", ["leaky-relu"])
-@pytest.mark.parametrize("weight_standardize", [True, False])
-@pytest.mark.parametrize("attention", [None, "se"])
+@pytest.mark.parametrize("dec_long_skip", ["unet", "unet3+"])
+@pytest.mark.parametrize("dec_merge_policy", ["summation", "concatenate"])
+@pytest.mark.parametrize("dec_normalization", ["bcn"])
+@pytest.mark.parametrize("dec_activation", ["leaky-relu"])
+@pytest.mark.parametrize("dec_weight_standardize", [True, False])
+@pytest.mark.parametrize("dec_attention", [None, "se"])
 def test_forward_backward(
         enc_name: str,
         enc_depth: int,
@@ -103,12 +103,12 @@ def test_forward_backward(
         dec_n_layers: int,
         model_input_size: int,
         dec_short_skip: str,
-        long_skip: str,
-        merge_policy: str,
-        normalization: str,
-        activation: str,
-        weight_standardize: bool,
-        attention: str
+        dec_long_skip: str,
+        dec_merge_policy: str,
+        dec_normalization: str,
+        dec_activation: str,
+        dec_weight_standardize: bool,
+        dec_attention: str
     ) -> None:
     """
     Test the forward and backward method of a multi-task seg model.
@@ -126,16 +126,17 @@ def test_forward_backward(
         dec_conv_types=dec_conv_types,
         dec_n_blocks=dec_n_blocks,
         dec_n_layers=dec_n_layers,
-        long_skip=long_skip,
-        long_skip_merge_policy=merge_policy,
-        normalization=normalization,
-        activation=activation,
-        weight_standardize=weight_standardize,
-        attention=attention
+        dec_long_skip=dec_long_skip,
+        dec_long_skip_merge_policy=dec_merge_policy,
+        dec_normalization=dec_normalization,
+        dec_activation=dec_activation,
+        dec_weight_standardize=dec_weight_standardize,
+        dec_attention=dec_attention
     )
 
     out = model(img)
     
+    # retain the graph here
     for map in out.values():
-        map.mean().backward()
+        map.mean().backward(retain_graph=True)
     

@@ -10,7 +10,7 @@ class UnetDataset(BaseDataset):
             self,
             fname: str,
             transforms: A.Compose,
-            target_types: Dict[str, bool],
+            target_types: List[str],
             normalize_input: bool=False,
             **kwargs
     ) -> None:
@@ -22,23 +22,22 @@ class UnetDataset(BaseDataset):
         -----------
             fname (str): 
                 Path to the pytables database
-            target_types (Dict[str, bool]):
-                A dictionary mapping target types to a boolean value.
-                Allowed keys: "inst", "type, "sem", "wmap".
+            target_types (List[str]):
+                A list of the targets that are loaded during dataloading
+                process. Allowed values: "inst", "type", "sem".
             transforms (albu.Compose): 
                 Albumentations.Compose obj (a list of augmentations)
             normalize_input (bool, default=False):
                 apply minmax normalization to input images after 
                 transforms
         """
-        target_types["wmap"] = True
-                
         super(UnetDataset, self).__init__(
             fname,
             transforms,
             target_types,
             normalize_input,
             rm_touching_nuc_borders=True,
+            return_weight_map=True
         )
 
     def __getitem__(self, ix: int) -> Dict[str, torch.Tensor]:

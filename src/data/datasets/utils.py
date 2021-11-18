@@ -14,8 +14,9 @@ def prepare_dataset(
         phase: str,
         augs: List[str],
         input_size: int,
-        target_types: Dict[str, bool],
+        target_types: List[str],
         normalize_input: bool,
+        return_weight_map: bool,
         rm_touching_nuc_borders: bool,
     ) -> Dataset:
     """
@@ -37,12 +38,15 @@ def prepare_dataset(
             "center_crop", "resize"
         input_size (int):
             Size of the height and width of the input images
-        target_types (Dict[str, bool]):
-            A dictionary mapping target types to a boolean value.
-            Allowed keys: "inst", "type, "sem", "wmap".
+        target_types (List[str]):
+            A list of the targets that are loaded during dataloading
+            process. Allowed values: "inst", "type", "sem".
         normalize_input (bool, default=False):
             apply minmax normalization to input images after 
             transforms
+        return_weight_map (bool, default=False):
+            Include a nuclear border weight map in the dataloading
+            process
         rm_touching_nuc_borders (bool, default=False):
             If True, the pixels that are touching between distinct
             nuclear objects are removed from the masks.
@@ -87,5 +91,6 @@ def prepare_dataset(
         transforms=aug_list,
         target_types=target_types,
         normalize_input=normalize_input,
+        return_weight_map=return_weight_map,
         rm_touching_nuc_borders=rm_touching_nuc_borders
     )

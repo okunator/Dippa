@@ -33,7 +33,7 @@ class WandbImageCallback(pl.Callback):
         Logs the inputs and outputs of the model
         at the first validation batch to weights and biases.
         """
-        if batch_idx in (0, 10):
+        if batch_idx in (0, 1, 2):
             log_dict = {
                 "global_step": trainer.global_step,
                 "epoch": trainer.current_epoch
@@ -42,7 +42,7 @@ class WandbImageCallback(pl.Callback):
 
             if "type_map" in list(batch.keys()):
                 type_target = batch["type_map"].detach().to("cpu").numpy()
-                soft_types = outputs["types"].detach().to("cpu")
+                soft_types = outputs["type_map"].detach().to("cpu")
                 types = torch.argmax(F.softmax(soft_types, dim=1), dim=1).numpy()
 
                 log_dict["val/cell_types"] = [
@@ -64,7 +64,7 @@ class WandbImageCallback(pl.Callback):
             
             if "sem_map" in list(batch.keys()):
                 sem_target = batch["sem_map"].detach().to("cpu").numpy()
-                soft_sem = outputs["sem"].detach().to(device="cpu")
+                soft_sem = outputs["sem_map"].detach().to(device="cpu")
                 sem = torch.argmax(F.softmax(soft_sem, dim=1), dim=1).numpy()
 
                 log_dict["val/cell_areas"] = [
@@ -85,7 +85,7 @@ class WandbImageCallback(pl.Callback):
                 ]
 
             if "aux_map" in list(batch.keys()):
-                aux = outputs["aux"].detach().to(device="cpu")
+                aux = outputs["aux_map"].detach().to(device="cpu")
                 log_dict["val/aux_maps"] = [
                     wandb.Image(a[i, ...], caption="Aux maps") 
                     for a in aux

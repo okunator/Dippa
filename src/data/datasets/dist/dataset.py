@@ -1,6 +1,6 @@
 import torch
 import albumentations as A
-from typing import Dict
+from typing import Dict, List
 
 from .pre_proc import gen_dist_maps
 from .._base._base_dataset import BaseDataset
@@ -11,8 +11,9 @@ class DistDataset(BaseDataset):
             self,
             fname: str,
             transforms: A.Compose,
-            target_types: Dict[str, bool],
+            target_types: List[str],
             normalize_input: bool=False,
+            return_weight_map: bool=False,
             rm_touching_nuc_borders: bool=False,
         ) -> None:
         """
@@ -25,12 +26,15 @@ class DistDataset(BaseDataset):
                 Path to the pytables database
             transforms (albu.Compose): 
                 Albumentations.Compose obj (a list of augmentations)
-            target_types (Dict[str, bool]):
-                A dictionary mapping target types to a boolean value.
-                Allowed keys: "inst", "type, "sem", "wmap".
+            target_types (List[str]):
+                A list of the targets that are loaded during dataloading
+                process. Allowed values: "inst", "type", "sem".
             normalize_input (bool, default=False):
                 apply minmax normalization to input images after 
                 transforms
+            return_weight_map (bool, default=False):
+                Include a nuclear border weight map in the dataloading
+                process
             rm_touching_nuc_borders (bool, default=False):
                 If True, the pixels that are touching between distinct
                 nuclear objects are removed from the masks.
@@ -40,6 +44,7 @@ class DistDataset(BaseDataset):
             transforms,
             target_types,
             normalize_input,
+            return_weight_map,
             rm_touching_nuc_borders,
         )
 

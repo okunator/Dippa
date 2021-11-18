@@ -3,11 +3,10 @@ experiment_version: test
 training:
   resume_training: False
   num_epochs: 1
-  num_gpus: 1
-  batch_size: 1
-  num_workers: 1
+  num_gpus: 0
   wandb: False
   metrics_to_cpu: True
+  device_stats: False
 
   metrics:
     type: 
@@ -16,17 +15,9 @@ training:
       - miou
     aux:
       - null
-  
-  input:
-    normalize_input: False
-    rm_overlaps: False
-    augmentations:
-      - hue_sat
-      - non_rigid
-      - blur
 
   optimizer:
-    name: adam
+    name: adamp
     decoder_lr: 0.0005
     decoder_weight_decay: 0.0003
     encoder_lr: 0.00005

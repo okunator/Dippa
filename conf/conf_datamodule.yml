@@ -1,0 +1,14 @@
+datamodule:
+  batch_size: 4
+  num_workers: 4
+  dataset_type: hover
+  targets:
+    - sem
+    - type
+  weight_map: False
+  normalize_input: False
+  rm_overlaps: False
+  augmentations:
+    - hue_sat
+    - non_rigid
+    - blur

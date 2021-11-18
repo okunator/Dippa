@@ -14,6 +14,7 @@ class SegTrainer:
             num_gpus: int,
             num_epochs: int,
             resume_training: bool,
+            device_stats: bool=False,
             extra_callbacks: List[pl.Callback]=None,
             wandb_logger: bool=False
         ) -> None:
@@ -32,6 +33,8 @@ class SegTrainer:
                 Number of training epochs
             resume_training (bool):
                 resume training where you left off
+            device_stats (bool, default=False):
+                Monitor device stats.
             extra_callbacks (List[pl.CallBack], default=None):
                 List of extra callbacks to add to the Trainer
             wandb_logger (bool, default=False):
@@ -40,6 +43,7 @@ class SegTrainer:
         self.gpus = num_gpus
         self.epochs = num_epochs
         self.resume_training = resume_training
+        self.device_stats = device_stats
 
         # init paths
         exp_dir = FileHandler.get_experiment_dir(
@@ -63,7 +67,7 @@ class SegTrainer:
                 pl.loggers.WandbLogger(
                     save_dir=exp_dir,
                     project=experiment_name,
-                    name=f"{experiment_version}_to_epoch{self.epochs}",
+                    name=experiment_version,
                     version=experiment_version,
                     log_model=False, # do not log the checkpoints to wandb
                 )
@@ -79,14 +83,15 @@ class SegTrainer:
             mode='min',
         )
         
-        # set device stat monitor callback
-        dev_callback = pl.callbacks.DeviceStatsMonitor()
 
         # set attributes
-        self.callbacks = [ckpt_callback, dev_callback]
+        self.callbacks = [ckpt_callback]
         if extra_callbacks is not None:
             self.callbacks += extra_callbacks
             
+        # set device stat monitor callback
+        if self.device_stats:
+            self.callbacks = pl.callbacks.DeviceStatsMonitor()
 
         self.last_ckpt = None
         if self.resume_training:
@@ -107,8 +112,7 @@ class SegTrainer:
             **kwargs
         ) -> pl.Trainer:
         """
-        Class method to initialize the class from experiment.yml config 
-        file
+        Class method to initialize the class from a config .yml file.
 
         Args:
         --------
@@ -128,6 +132,7 @@ class SegTrainer:
         resume_training = conf.training.resume_training
         wandb_logger = conf.training.wandb
         metrics_to_cpu = conf.training.metrics_to_cpu
+        device_stats = conf.training.device_stats
 
         c = cls(
             experiment_name,
@@ -135,6 +140,7 @@ class SegTrainer:
             num_gpus,
             num_epochs,
             resume_training,
+            device_stats,
             extra_callbacks,
             wandb_logger
         )
@@ -145,7 +151,7 @@ class SegTrainer:
             logger=c.loggers,
             callbacks=c.callbacks,
             resume_from_checkpoint=c.last_ckpt,
-            profiler=True,
+            profiler="simple",
             move_metrics_to_cpu=metrics_to_cpu,
             **kwargs
         )

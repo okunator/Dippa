@@ -1,4 +1,5 @@
-from .lightning_model import SegModel
+from .lightning_experiment import SegExperiment
 from .trainer import SegTrainer
 
-__all__ = ["SegTrainer", "SegModel"]
+
+__all__ = ["SegTrainer", "SegExperiment"]
