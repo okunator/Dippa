@@ -1,119 +1,82 @@
 import argparse
 from pathlib import Path
-from omegaconf import OmegaConf
+from omegaconf import DictConfig
+from typing import Dict, Any
 
-import src.dl.lightning as lightning
-from src.config import CONFIG
-from src.utils import FileHandler
-from src.data import (
-    CustomDataModule, PannukeDataModule, ConsepDataModule
-)
+from src.dl.lightning import SegExperiment, SegTrainer
+from src.config import get_conf, merge_conf, CONFIG
+from src.data.data_modules.utils import prepare_datamodule
+from src.dl.models import MultiTaskSegModel
 
 
-def main(conf, extra_params):
-    # get conf
-    conf = OmegaConf.load(extra_params.yml) if extra_params.yml else CONFIG
-    
-    # set the datamodule
-    if extra_params.dataset == "custom":
-        assert extra_params, (
-            "If dataset == 'custom', the train/test db paths are required"
-        )
+def main(conf: DictConfig, params: Dict[str, Any]) -> None:
+    """
+    CLI training script
 
-        datamodule = CustomDataModule(
-            train_db_path=extra_params.train_db,
-            test_db_path=extra_params.test_db,
-            augmentations=conf.training_args.input_args.augmentations,
-            normalize=conf.training_args.input_args.normalize_input,
-            aux_branch=conf.model_args.decoder_branches.aux_branch,
-            type_branch=conf.model_args.decoder_branches.type_branch,
-            sem_branch=conf.model_args.decoder_branches.sem_branch,
-            edge_weights=conf.training_args.input_args.edge_weights,
-            rm_touching_nuc_borders=conf.training_args.input_args.rm_overlaps,
-            batch_size=conf.runtime_args.batch_size,
-            num_workers=conf.runtime_args.num_workers
-        )
-    elif extra_params.dataset == "pannuke":
-        db_dir = None
-        if extra_params.train_db:
-            db_dir = Path(extra_params.train_db).parent
-
-        download_dir = None
-        if extra_params.download_dir:
-            download_dir = extra_params.download_dir
-
-        datamodule = PannukeDataModule(
-            database_type=conf.runtime_args.db_type,
-            augmentations=conf.training_args.input_args.augmentations,
-            normalize=conf.training_args.input_args.normalize_input,
-            aux_branch=conf.model_args.decoder_branches.aux_branch,
-            type_branch=conf.model_args.decoder_branches.type_branch,
-            edge_weights=conf.training_args.input_args.edge_weights,
-            rm_touching_nuc_borders=conf.training_args.input_args.rm_overlaps,
-            batch_size=conf.runtime_args.batch_size,
-            num_workers=conf.runtime_args.num_workers,
-            database_dir=db_dir,
-            download_dir=download_dir
-        )
-    elif extra_params.dataset == "consep":
-        db_dir = None
-        if extra_params.train_db:
-            db_dir = Path(extra_params.train_db).parent
+    Args:
+    ---------
+        conf (DictConfig):
+            Config dictionary
+        params (Dict[str, Any]):
+            Other params not defined in the config dict.
+    """
+    conf = CONFIG
+    if params.dataconf and params.trainconf and params.modelconf:
+        trainconf = get_conf(params.trainconf)
+        dataconf = get_conf(params.dataconf)
+        modelconf = get_conf(params.modelconf)
+        conf = merge_conf(trainconf, dataconf, modelconf)
         
+    data_kwargs = {}
+    data_kwargs["name"] = params.dataset
+    if params.dataset == "custom":
+        if not (params.train_db or params.test_db):
+            raise ValueError(f"""
+                `--test_db` and `--train_db` args are required, when
+                `--dataset` is set to "custom". """
+            )
+        data_kwargs["train_db_path"] = params.train_db
+        data_kwargs["test_db_path"] = params.test_db
+        
+    elif params.dataset in ("consep", "pannuke"):
+        db_dir = None
+        if params.train_db:
+            db_dir = Path(params.train_db).parent
+
         download_dir = None
-        if extra_params.download_dir:
-            download_dir = extra_params.download_dir
-
-        datamodule = ConsepDataModule(
-            database_type=conf.runtime_args.db_type,
-            augmentations=conf.training_args.input_args.augmentations,
-            normalize=conf.training_args.input_args.normalize_input,
-            aux_branch=conf.model_args.decoder_branches.aux_branch,
-            type_branch=conf.model_args.decoder_branches.type_branch,
-            edge_weights=conf.training_args.input_args.edge_weights,
-            rm_touching_nuc_borders=conf.training_args.input_args.rm_overlaps,
-            batch_size=conf.runtime_args.batch_size,
-            num_workers=conf.runtime_args.num_workers,
-            database_dir=db_dir,
-            download_dir=download_dir
-        )
-
-
-    if conf.runtime_args.resume_training:
-        lightning_model = lightning.SegModel.from_experiment(
-            name=conf.experiment_args.experiment_name,
-            version=conf.experiment_args.experiment_version,
+        if params.download_dir:
+            download_dir = params.download_dir
+            
+        data_kwargs["download_dir"] = download_dir
+        data_kwargs["database_dir"] = db_dir
+        
+    datamodule = prepare_datamodule(**data_kwargs, conf=conf)
+        
+    if conf.training.resume_training:
+        lit_model = SegExperiment.from_experiment(
+            name=conf.experiment_name,
+            version=conf.experiment_version,
         )
     else:
-        # init model
-        lightning_model = lightning.SegModel.from_conf(conf)
+        model = MultiTaskSegModel.from_conf(conf)
+        lit_model = SegExperiment.from_conf(model, conf)
         
-
     # init trainer
     extra_callbacks = []
-    if conf.runtime_args.wandb:
+    if conf.training.wandb:
+        from src.dl.lightning.callbacks import WandbImageCallback
+
         classes = datamodule.class_dicts
         extra_callbacks.append(
-            lightning.WandbImageCallback(classes[0], classes[1])
+            WandbImageCallback(classes[0], classes[1])
         )
 
-    trainer = lightning.SegTrainer.from_conf(
+    trainer = SegTrainer.from_conf(
         conf=conf, extra_callbacks=extra_callbacks
     )
 
     # train
-    trainer.fit(lightning_model, datamodule=datamodule)
-
-    # run tests
-    if extra_params.run_testing:
-        trainer.test(
-            model=lightning_model,
-            ckpt_path=FileHandler.get_model_checkpoint(
-                experiment=conf.experiment_args.experiment_name,
-                version=conf.experiment_args.experiment_version,
-                which=-1
-            ),
-        )
+    trainer.fit(lit_model, datamodule=datamodule)
 
 
 if __name__ == '__main__':
@@ -150,20 +113,25 @@ if __name__ == '__main__':
         )
     )
     parser.add_argument(
-        '--yml',
+        '--dataconf',
         type=str,
         default=None,
-        help=(
-            "File path to train an experiment.yml file.",
-            "Use if you want to train many models at the same time."
-        )
+        help="File path to .yml conf file specifying datamodule args."       
     )
     parser.add_argument(
-        '--run_testing',
-        help="Run metrics against the test set.",
-        type=bool,
-        default=False
+        '--trainconf',
+        type=str,
+        default=None,
+        help="File path to .yml file specifying training arguments."
     )
+    parser.add_argument(
+        '--modelconf',
+        type=str,
+        default=None,
+        help="File path to .yml file specifying model spec."
+        
+    )
+
     args = parser.parse_args()
     main(CONFIG, args)
     

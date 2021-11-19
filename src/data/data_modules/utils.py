@@ -1,5 +1,5 @@
 import pytorch_lightning as pl
-from omegaconf import OmegaConf
+from omegaconf import DictConfig
 from typing import List
 
 from . import *
@@ -10,7 +10,7 @@ dat_modules = vars()
 
 def prepare_datamodule(
         name: str,
-        conf: OmegaConf=None,
+        conf: DictConfig=None,
         target_types: List[str]=None,
         dataset_type: str="hover",
         augs: List[str]=["hue_sat", "non_rigid", "blur"],
@@ -53,8 +53,7 @@ def prepare_datamodule(
             Batch size for the dataloader
         num_workers (int, default=8):
             number of cpu cores/threads used in the dataloading 
-            process.    
-        
+            process.
             
     Returns:
     ---------

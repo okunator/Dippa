@@ -37,3 +37,4 @@ wandb
 Dockerfile
 .dockerignore
 docker-compose.yml
+.github

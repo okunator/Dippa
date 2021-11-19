@@ -20,7 +20,8 @@ def datamodule() -> pl.LightningDataModule:
         test_db_path=test_db_path,
         conf=TEST_CONFIG
     )
-    
+
+
 @pytest.fixture
 def model() -> pl.LightningModule:
     model = MultiTaskSegModel.from_conf(TEST_CONFIG)
@@ -30,6 +31,9 @@ def model() -> pl.LightningModule:
     
     return lightning_model
 
+
+@pytest.mark.required
+@pytest.mark.filterwarnings("ignore::UserWarning")
 def test_lightning_steps(datamodule, model) -> None:
     extra_callbacks = []
     trainer = SegTrainer.from_conf(

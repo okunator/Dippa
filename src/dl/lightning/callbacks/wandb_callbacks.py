@@ -1,8 +1,12 @@
-import wandb
 import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
 from typing import Dict, Optional
+
+try:
+    import wandb
+except ImportError as e:
+    raise ImportError("wandb required. `pip install wandb`")
 
 
 class WandbImageCallback(pl.Callback):

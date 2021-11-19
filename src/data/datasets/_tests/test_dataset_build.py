@@ -1,7 +1,7 @@
 import pytest
 import torch
 from albumentations.pytorch import ToTensorV2
-from typing import List, Dict
+from typing import List
 from pathlib import Path
 
 from src.data.datasets.utils import prepare_dataset

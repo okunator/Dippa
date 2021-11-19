@@ -29,6 +29,7 @@ def _get_enc_feature_samples(
     return feats, enc.out_channels
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("encoder_name", ["tf_efficientnetv2_s", "resnet50"])
 @pytest.mark.parametrize("model_input_size", [64])
 @pytest.mark.parametrize("dec_channels", [[96, 64, 32, 16, 8]])
@@ -86,6 +87,7 @@ def test_forward(
     assert tuple(out.shape[2:]) == (model_input_size, model_input_size)
     
     
+@pytest.mark.slow
 @pytest.mark.parametrize("encoder_name", ["tf_efficientnetv2_s", "resnet50"])
 @pytest.mark.parametrize("model_input_size", [64])
 @pytest.mark.parametrize("dec_channels", [None])

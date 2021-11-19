@@ -16,6 +16,5 @@ segmentation-models-pytorch==0.2.0
 pytorch-lightning==1.5.1
 albumentations==1.1.0
 pathos==0.2.7
-wandb==0.12.2
 torchmetrics==0.6.0
 -e ./

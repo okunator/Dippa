@@ -45,7 +45,7 @@ def _get_extra_skip_samples(
     """
     if long_skip == "unet3+":
         dec_dims = dims[:-1]
-        # dec_dims[0] *= 2
+        dec_dims[0] *= 2
         dec_channels = channels[:-1]
         extra_skips = [torch.ones([1, dec_channels[i], dec_dims[i], dec_dims[i]]) for i in range(ix)]
     elif long_skip == "unet++":
@@ -56,6 +56,7 @@ def _get_extra_skip_samples(
     return extra_skips
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("stage_ix", [0, 1, 2, 3, 4])
 @pytest.mark.parametrize("dec_channels", [[64, 32, 16, 8, 8, 2]])
 @pytest.mark.parametrize("dec_out_dims", [[8, 16, 32, 64, 128, 256]])
@@ -124,8 +125,9 @@ def test_forward(
 
     if extras:
         assert all([s.shape == t.shape for s, t in zip(extra_skips, extras)])
+
         
-        
+@pytest.mark.slow 
 @pytest.mark.parametrize("stage_ix", [0, 1, 2, 3, 4])
 @pytest.mark.parametrize("dec_channels", [[64, 32, 16, 8, 8, 2]])
 @pytest.mark.parametrize("dec_out_dims", [[8, 16, 32, 64, 128, 256]])
