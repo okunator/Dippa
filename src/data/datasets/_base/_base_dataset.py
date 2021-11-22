@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-import zarr
 import tables as tb
 import albumentations as A
 from pathlib import Path
@@ -33,7 +32,7 @@ class BaseDataset(Dataset, FileHandler):
         Args:
         ----------
             fname (str): 
-                path to the zarr/hdf5 database
+                path to the hdf5 database
             transforms (albu.Compose): 
                 Albumentations.Compose obj (a list of augmentations)
             target_types (List[str]):
@@ -50,10 +49,10 @@ class BaseDataset(Dataset, FileHandler):
                 nuclear objects are removed from the masks.
         """
         self.suffix = Path(fname).suffix 
-        if not self.suffix in (".h5", ".zarr"):
+        if not self.suffix in (".h5"):
             raise ValueError(f"""
-                the input data needs to be in either hdf5 or zarr db.
-                Got: {self.suffix}. Allowed: {(".h5", ".zarr")}"""
+                the input data needs to be in hdf5 database.
+                Got: {self.suffix}. Allowed: {(".h5")}"""
             )
             
         self.fname = fname
@@ -67,9 +66,6 @@ class BaseDataset(Dataset, FileHandler):
         if self.suffix == ".h5":
             with tb.open_file(self.fname) as h5:
                 self.n_items = h5.root._v_attrs["n_items"]
-        else:
-            z = zarr.open(self.fname, mode="r")
-            self.n_items = z.attrs["n_items"]
 
         # Get the dataset stats
         self.stats = self.get_dataset_stats(self.fname)
@@ -81,13 +77,12 @@ class BaseDataset(Dataset, FileHandler):
     def read_patch(self) -> Callable:
         """
         Property function which determines which db type is being used
-        (either Zarr/hdf5)
+        (hdf5)
 
         Returns:
         ---------
-            Callable. Either h5 or zarr read method 
+            Callable. Either h5 or read method 
         """
-        read_func = self.read_zarr_patch
         if self.suffix == ".h5":
             read_func = self.read_h5_patch
 

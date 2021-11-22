@@ -1,5 +1,5 @@
-experiment_name: panoptic
-experiment_version: testi2
+experiment_name: panopticc
+experiment_version: ggg
 training:
   resume_training: False
   num_epochs: 2
@@ -40,6 +40,3 @@ training:
       type: tversky_focal_ssim
       sem: tversky_focal_ssim
       aux: mse_ssim
-
-
-

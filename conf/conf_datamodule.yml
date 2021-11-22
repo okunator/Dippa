@@ -12,3 +12,4 @@ datamodule:
     - hue_sat
     - non_rigid
     - blur
+    

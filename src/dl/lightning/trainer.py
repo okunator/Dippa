@@ -55,11 +55,7 @@ class SegTrainer:
         # set test tube logger
         self.loggers = []
         self.loggers.append(
-            pl.loggers.TensorBoardLogger(
-                save_dir=FileHandler.result_dir(),
-                name=experiment_name,
-                version=experiment_version
-            )
+            pl.loggers.TensorBoardLogger(save_dir=exp_dir)
         )
 
         if wandb_logger:
@@ -83,7 +79,6 @@ class SegTrainer:
             mode='min',
         )
         
-
         # set attributes
         self.callbacks = [ckpt_callback]
         if extra_callbacks is not None:

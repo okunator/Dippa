@@ -14,7 +14,7 @@ setuptools.setup(
     url="https://pypi.org/project/sfo/",
     packages=setuptools.find_packages(),
     classifiers=[
-        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: ",
         "Operating System :: OS Independent",
     ],
 )

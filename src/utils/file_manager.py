@@ -1,5 +1,4 @@
 import zipfile
-import zarr
 import cv2
 import scipy.io as sio
 import numpy as np
@@ -138,32 +137,6 @@ class FileHandler:
         return mask
     
     @staticmethod
-    def read_zarr_patch(path: str, ix: int) -> Tuple[np.ndarray]:
-        """
-        Read img & mask patches at index `ix` from zarr db-arrays
-
-        Args:
-        --------
-            path (str):
-                Path to the hdf5 database
-            ix (int):
-                Index for the hdf5 db-arrays
-
-        Returns:
-        --------
-            Tuple[np.ndarray]: Tuple of numpy matrices. Img is of shape
-            (H, W, 3) & masks are of shape (H, W). the order of the
-            returned matrices is img, inst, type, area.
-        """
-        d = zarr.open(path, mode="r")
-        im_patch = d["imgs"][ix, ...]
-        inst_patch = d["insts"][ix, ...]
-        type_patch = d["types"][ix, ...]
-        sem_patch = d["areas"][ix, ...]
-
-        return im_patch, inst_patch, type_patch , sem_patch
-
-    @staticmethod
     def read_h5_patch(path: str, ix: int) -> Tuple[np.ndarray]:
         """
         Read img & mask patches at index `ix` from hdf5 db-arrays
@@ -228,9 +201,9 @@ class FileHandler:
             binary: bool=False
         ) -> np.ndarray:
         """
-        Read class weight arrays that are saved in h5 or zarr db.
-        h5 or zarr dbs need to be written with the db-writers in this
-        repo for this to work
+        Read class weight arrays that are saved in h5 database.
+        h5 db need to be written with the db-writers in this repo for
+        this to work
 
         Args:
         --------
@@ -256,14 +229,6 @@ class FileHandler:
                 else:
                     npixels = db.root.npixels_areas[:]
 
-        elif path.suffix == ".zarr":
-            z = zarr.open(path.as_posix(), mode="r")
-            if which == "cells":
-                npixels = z["npixels_cells"][:]
-            else:
-                npixels = z["npixels_areas"][:]
-
-
         if binary:
             bixs = [False] + [True]*(npixels.shape[1]-1)
             fg_npixels = np.sum(npixels, where=bixs)
@@ -277,8 +242,8 @@ class FileHandler:
     @staticmethod
     def get_dataset_stats(path: Union[str, Path]) -> Tuple[np.ndarray]:
         """
-        Read dataset statistics arrays that are saved in h5 or zarr db.
-        h5 or zarr dbs need to be written with the db-writers in this
+        Read dataset statistics arrays that are saved in h5 db.
+        h5 db need to be written with the db-writers in this
         repo for this to work
 
         Args:
@@ -296,11 +261,6 @@ class FileHandler:
             with tb.open_file(path.as_posix(), "r") as db:
                 mean = db.root.dataset_mean[:]
                 std = db.root.dataset_std[:]
-
-        elif path.suffix == ".zarr":
-            z = zarr.open(path.as_posix(), mode="r")
-            mean = z["dataset_mean"][:]
-            std = z["dataset_std"][:]
         
         return mean, std
 

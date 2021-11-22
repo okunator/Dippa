@@ -1,6 +1,10 @@
+[build-system]
+requires = [ "setuptools >= 50.0.0", "wheel >= 0.35.0"]
+build-backend = "setuptools.build_meta"
+
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q -v"
+addopts = "-ra -v"
 testpaths = [
     "src/data/datasets/_tests",
     "src/dl/losses/_tests",
@@ -9,8 +13,24 @@ testpaths = [
     "src/dl/models/_tests",
     "src/dl/lightning/_tests"
 ]
-
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "required"
 ]
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+minversion = 3.24.0
+envlist = py36,py37
+
+[testenv]
+platform = linux
+deps =
+    pytest >= 6.0.0, < 6.3.0
+
+commands = 
+    pip install -U pip
+    pip install -r requirements.txt
+    pytest
+"""

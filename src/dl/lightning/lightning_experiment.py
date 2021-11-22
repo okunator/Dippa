@@ -95,40 +95,18 @@ class SegExperiment(pl.LightningModule):
         super().__init__()
         
         # check that dict args have matching keys
-        lk = branch_losses.keys()
-        dk = model.dec_branches.keys()
-        mk = metrics.keys()
-        has_same_keys = (lk == dk == mk)
-              
-        ek = None
-        if isinstance(edge_weights, dict):
-            ek = edge_weights.keys()
-            has_same_keys = has_same_keys == ek
-
-        ck = None
-        if isinstance(class_weights, dict):
-            ck = class_weights.keys()
-            has_same_keys = has_same_keys == ck
-            
-        if not has_same_keys:
-            raise ValueError(f"""
-                Got mismatching keys for dict args. Branch losses: {lk}.
-                Decoder branches: {dk}. Metrics: {mk}. Edge weights {ek}.
-                Class weights: {ck}. Edge weights and class weights can be
-                None"""
-            )
              
         # Save hparms   
         self.name = experiment_name
         self.version = experiment_version
         self.metric_dict = metrics
-        
+
         # Loss args
-        self.decoder_branch_losses = branch_losses
+        self.branch_losses = branch_losses
         self.edge_weights = edge_weights
         self.class_weights = class_weights
 
-        # Optimizer args
+        # # Optimizer args
         self.optimizer_name = optimizer_name
         self.decoder_learning_rate = dec_learning_rate
         self.encoder_learning_rate = enc_learning_rate 
@@ -139,9 +117,28 @@ class SegExperiment(pl.LightningModule):
         self.lookahead = lookahead
         self.bias_weight_decay = bias_weight_decay
 
+        self.save_hyperparameters(
+            "experiment_name",
+            "experiment_version",
+            "branch_losses",
+            "metrics",
+            "optimizer_name",
+            "edge_weights",
+            "class_weights",
+            "dec_learning_rate",
+            "enc_learning_rate",
+            "dec_weight_decay",
+            "enc_weight_decay",
+            "scheduler_factor",
+            "scheduler_patience",
+            "lookahead",
+            "bias_weight_decay",
+        )
+        
         # init model
         self.model = model
-        self.save_hyperparameters(ignore=["model"])
+        self._validate_branch_args()
+        # self.save_hyperparameters(ignore=["model"])
         
         # add model hparams
         self.hparams["model_input_size"] = model.model_input_size
@@ -173,6 +170,33 @@ class SegExperiment(pl.LightningModule):
             self.train_metrics = deepcopy(metrics)
             self.val_metrics = deepcopy(metrics)
             self.test_metrics = deepcopy(metrics)
+            
+    def _validate_branch_args(self) -> None:
+        """
+        Check that there are no conflicting decoder branch args
+        """
+        lk = self.branch_losses.keys()
+        dk = self.model.dec_branches.keys()
+        mk = self.metric_dict.keys()
+        has_same_keys = (lk == dk == mk)
+              
+        ek = None
+        if isinstance(self.edge_weights, dict):
+            ek = self.edge_weights.keys()
+            has_same_keys = has_same_keys == ek
+
+        ck = None
+        if isinstance(self.class_weights, dict):
+            ck = self.class_weights.keys()
+            has_same_keys = has_same_keys == ck
+            
+        if not has_same_keys:
+            raise ValueError(f"""
+                Got mismatching keys for branch dict args. Branch losses: {lk}.
+                Decoder branches: {dk}. Metrics: {mk}. Edge weights {ek}.
+                Class weights: {ck}. Edge weights and class weights can be
+                None"""
+            )
 
     @classmethod
     def from_conf(
@@ -235,7 +259,7 @@ class SegExperiment(pl.LightningModule):
             f"experiment dir: {exp_dir} does not exist"
         )
         
-        hparams = exp_dir / "hparams.yml"
+        hparams = exp_dir / "hparams_all.yml"
         kwargs = OmegaConf.load(hparams)
         kwargs["inference_mode"] = inference_mode
         
@@ -247,7 +271,7 @@ class SegExperiment(pl.LightningModule):
         Save hparams to yaml
         """
         f = RESULT_DIR / self.name / f"version_{self.version}" / "hparams.yml"
-        f.parents[0].mkdir(exist_ok=True)
+        f.parents[0].mkdir(exist_ok=True, parents=True)
         conf = OmegaConf.create(dict(self.hparams.items()))
         OmegaConf.save(conf, f=f)
 
@@ -440,7 +464,7 @@ class SegExperiment(pl.LightningModule):
 
     def configure_loss(self):
         loss = multitaskloss_func(
-            self.decoder_branch_losses,
+            self.branch_losses,
             self.edge_weights,
             # self.class_weights TODO: fix this
         )

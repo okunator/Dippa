@@ -21,6 +21,7 @@ datasets/data/pannuke/train/*
 datasets/data/pannuke/orig/*
 datasets/data/pannuke/original/*
 datasets/data/monusac/*
+datasets/data/sartorius/*
 results/tests/*
 results/*
 src/tests/
@@ -38,3 +39,5 @@ Dockerfile
 .dockerignore
 docker-compose.yml
 .github
+.tox
+train.sh
