@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 
 from .._base._base_conv import BaseConv
+from ...ops.utils import conv_func
+from ....normalization.utils import norm_func
 
 
 class ResidualConvBlock(BaseConv):
@@ -15,7 +17,6 @@ class ResidualConvBlock(BaseConv):
             activation: str="relu",
             weight_standardize: bool=False,
             attention: str=None,
-            use_residual: bool=True,
             **kwargs
         ) -> None:
         """
@@ -53,12 +54,8 @@ class ResidualConvBlock(BaseConv):
                 If True, perform weight standardization
             attention (str, default=None):
                 Attention method. One of: "se", None
-            use_residual (bool, default=True):
-                If True, the identity is summed to the linear unit 
-                before the final activation. (This param is used by
-                the ResidualBlock)
         """
-        super(ResidualConvBlock, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,
@@ -72,19 +69,24 @@ class ResidualConvBlock(BaseConv):
             **kwargs
         )
 
-        self.use_residual = use_residual
-
-        # Use channel pooling if dims don't match
-        if in_channels != out_channels and use_residual:
-            self.add_module(
-                "ch_pool", nn.Conv2d(
-                    in_channels, out_channels, 
-                    kernel_size=1, padding=0, bias=False
+        # Set downsampling to enable residual summation
+        self.downsample = None
+        if in_channels != out_channels:
+            self.downsample = nn.Sequential(
+                conv_func(
+                    self.conv_choice, in_channels=in_channels,
+                    bias=False, out_channels=out_channels,
+                    kernel_size=1, padding=0
+                ),
+                norm_func(
+                    normalization, num_features=out_channels
                 )
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         identity = x
+        if self.downsample is not None:
+            identity = self.downsample(x)
 
         # pre-attention
         x = self.attend(x)
@@ -93,12 +95,7 @@ class ResidualConvBlock(BaseConv):
         x = self.conv(x)
         x = self.norm(x)
 
-        if self.use_residual:
-            if identity.shape[1] != x.shape[1]:
-                # this shld be the other way around
-                identity = self.ch_pool(identity)
-            x += identity
-
+        x += identity
         x = self.act(x)
 
         return x
@@ -115,7 +112,6 @@ class ResidualConvBlockPreact(BaseConv):
             activation: str="relu",
             weight_standardize: bool=False,
             attention: str=None,
-            use_residual: bool=True
         ) -> None:
         """
         A simplified Preactivated Residual conv block that can be used
@@ -155,11 +151,8 @@ class ResidualConvBlockPreact(BaseConv):
                 If True, perform weight standardization
             attention (str, default=None):
                 Attention method. One of: "se", None
-            use_residual (bool, default=True):
-                If True, the identity is summed to the linear unit 
-                before the final activation
         """
-        super(ResidualConvBlockPreact, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,
@@ -171,19 +164,25 @@ class ResidualConvBlockPreact(BaseConv):
             pre_attend=True,
             preactivate=True
         )
-        self.use_residual = use_residual
 
-        # Use channel pooling if dims don't match
+        # Set downsampling to enable residual summation
+        self.downsample = None
         if in_channels != out_channels:
-            self.add_module(
-                "ch_pool", nn.Conv2d(
-                    in_channels, out_channels, 
-                    kernel_size=1, padding=0, bias=False
+            self.downsample = nn.Sequential(
+                conv_func(
+                    self.conv_choice, in_channels=in_channels,
+                    bias=False, out_channels=out_channels,
+                    kernel_size=1, padding=0
+                ),
+                norm_func(
+                    normalization, num_features=out_channels
                 )
             )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         identity = x
+        if self.downsample is not None:
+            identity = self.downsample(x)
 
         # pre-attention
         x = self.attend(x)
@@ -193,9 +192,7 @@ class ResidualConvBlockPreact(BaseConv):
         x = self.act(x)
         x = self.conv(x)
 
-        if self.use_residual:
-            if identity.shape[1] != x.shape[1]:
-                identity = self.ch_pool(identity)
-            x += identity
+        x += identity
+        x = self.act(x)
 
         return x

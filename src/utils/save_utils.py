@@ -120,13 +120,13 @@ def geojson2mat(
     -----------
         fname (str):
             File path to the annotation file
+        target_shape (Tuple[int, int]):
+            Height and width of the numpy array that the geojson is 
+            converted into
         classes (Dict[str, int], default=None):
             class dict e.g. {"inflam":1, "epithelial":2, "connec":3}
         save_dir (str):
             directory where the .mat files are saved
-        target_shape (Tuple[int, int]):
-            Height and width of the numpy array that the geojson is 
-            converted into
         classes (Dict[str, int], default=None):
             class dict e.g. {"inflam":1, "epithelial":2, "connec":3}
         x_off (int):
@@ -219,7 +219,7 @@ def geojson2mat(
             type_map[type_map > cls_max] = class_num
             pbar.update(1)
 
-        pbar.set_postfix(saving=f"Save results to file: {fname}.mat")
+        pbar.set_postfix(saving=f"Save results to file: {fname[:-4]}.mat")
 
         if save_dir is not None:
             mask2mat(inst_map, type_map, fname, save_dir)

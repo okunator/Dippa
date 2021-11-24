@@ -1,6 +1,9 @@
 import torch
+import torch.nn as nn
 
 from .._base._base_fused_mbconv import BaseFusedMBConv
+from ...ops.utils import conv_func
+from ....normalization.utils import norm_func
 
 
 class FusedInvertedResidual(BaseFusedMBConv):
@@ -24,7 +27,7 @@ class FusedInvertedResidual(BaseFusedMBConv):
 
         Residual connection applied before the final activation.
 
-        (Res-Net): Deep residual learning for image recognition:
+        Res-Net: Deep residual learning for image recognition:
             - https://arxiv.org/abs/1512.03385
 
         Efficientnet-edgetpu: Creating accelerator-optimized neural networks with automl.
@@ -61,7 +64,7 @@ class FusedInvertedResidual(BaseFusedMBConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(FusedInvertedResidual, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             expand_ratio=expand_ratio,
@@ -76,11 +79,25 @@ class FusedInvertedResidual(BaseFusedMBConv):
             **kwargs
         )
 
-        self.use_residual = (in_channels == out_channels) and (stride == 1)
+        # Set downsampling to enable residual summation
+        self.downsample = None
+        if in_channels != out_channels:
+            self.downsample = nn.Sequential(
+                conv_func(
+                    self.conv_choice, in_channels=in_channels,
+                    bias=False, out_channels=out_channels,
+                    kernel_size=1, padding=0
+                ),
+                norm_func(
+                    normalization, num_features=out_channels
+                )
+            ) 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # shortcut
         identity = x
+        if self.downsample is not None:
+            identity = self.downsample(x)
 
         # pointwise channel pooling conv
         out = self.conv1(x)
@@ -94,8 +111,7 @@ class FusedInvertedResidual(BaseFusedMBConv):
         out = self.proj_conv(out)
         out = self.norm2(out)
 
-        if self.use_residual:
-            out += identity
+        out += identity
 
         return out
 
@@ -158,7 +174,7 @@ class FusedInvertedResidualPreact(BaseFusedMBConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(FusedInvertedResidualPreact, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             expand_ratio=expand_ratio,
@@ -172,12 +188,26 @@ class FusedInvertedResidualPreact(BaseFusedMBConv):
             preactivate=True,
             **kwargs
         )
-
-        self.use_residual = (in_channels == out_channels) and (stride == 1)
+        
+        # Set downsampling to enable residual summation
+        self.downsample = None
+        if in_channels != out_channels:
+            self.downsample = nn.Sequential(
+                conv_func(
+                    self.conv_choice, in_channels=in_channels,
+                    bias=False, out_channels=out_channels,
+                    kernel_size=1, padding=0
+                ),
+                norm_func(
+                    normalization, num_features=out_channels
+                )
+            ) 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # shortcut
         identity = x
+        if self.downsample is not None:
+            identity = self.downsample(x)
 
         # pointwise channel pooling conv
         out = self.norm1(x)
@@ -191,7 +221,6 @@ class FusedInvertedResidualPreact(BaseFusedMBConv):
         out = self.norm2(out)
         out = self.proj_conv(out)
 
-        if self.use_residual:
-            out += identity
+        out += identity
 
         return out

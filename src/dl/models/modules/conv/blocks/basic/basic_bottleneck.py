@@ -56,7 +56,7 @@ class BottleneckBasic(BaseBottleneckConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(BottleneckBasic, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             expand_ratio=expand_ratio,
@@ -144,7 +144,7 @@ class BottleneckBasicPreact(BaseBottleneckConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(BottleneckBasicPreact, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             expand_ratio=expand_ratio,

@@ -1,16 +1,16 @@
 import torch
+from typing import Union, List
 
 from .._base._base_fused_mbconv import BaseFusedMBConv
 
 
-class FusedInvertedBasic(BaseFusedMBConv):
+class FusedInvertedDense(BaseFusedMBConv):
     def __init__(
             self,
             in_channels: int,
             out_channels: int,
             expand_ratio: float=4.0,
             kernel_size: int=3,
-            stride: int=1,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
@@ -19,8 +19,8 @@ class FusedInvertedBasic(BaseFusedMBConv):
             **kwargs
         ) -> None:
         """
-        Fused mobile inverted basic conv block that can be used to 
-        build deep residual basic FMBConv layers.
+        Fused Mobile inverted dense conv block that can be used to 
+        build deep dense fused mbconv layers.
 
         Efficientnet-edgetpu: Creating accelerator-optimized neural networks with automl.
             - https://ai.googleblog.com/2019/08/efficientnet-edgetpu-creating.html
@@ -28,9 +28,8 @@ class FusedInvertedBasic(BaseFusedMBConv):
         EfficientNetV2: Smaller Models and Faster Training
             - https://arxiv.org/abs/2104.00298
 
-        NOTE: 
-        Basic in the name here means that no dense or residual skip 
-        connections are applied in the forward method
+        DenseNet: Densely Connected Convolutional Networks
+            - https://arxiv.org/abs/1608.06993
 
         Args:
         ----------
@@ -42,8 +41,6 @@ class FusedInvertedBasic(BaseFusedMBConv):
                 The ratio of channel expansion in the bottleneck
             kernel_size (int, default=3):
                 The size of the convolution kernel.
-            stride (int, default=1):
-                Stride of the convolution operation
             same_padding (bool, default=True):
                 if True, performs same-covolution
             normalization (str): 
@@ -62,9 +59,8 @@ class FusedInvertedBasic(BaseFusedMBConv):
         super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
             expand_ratio=expand_ratio,
+            kernel_size=kernel_size,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
@@ -74,7 +70,15 @@ class FusedInvertedBasic(BaseFusedMBConv):
             **kwargs
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+            self,
+            x: Union[torch.Tensor, List[torch.Tensor]]
+        ) -> torch.Tensor:
+ 
+        # dense skip
+        prev_features = [x] if isinstance(x, torch.Tensor) else x
+        x = torch.cat(prev_features, dim=1)
+
         # pointwise channel pooling conv
         out = self.conv1(x)
         out = self.norm1(out)
@@ -86,18 +90,17 @@ class FusedInvertedBasic(BaseFusedMBConv):
         # Pointwise linear projection
         out = self.proj_conv(out)
         out = self.norm2(out)
-
+        
         return out
 
 
-class FusedInvertedBasicPreact(BaseFusedMBConv):
+class FusedInvertedDensePreact(BaseFusedMBConv):
     def __init__(
             self,
             in_channels: int,
             out_channels: int,
-            kernel_size: int=3,
-            stride: int=1,
             expand_ratio: float=4.0,
+            kernel_size: int=3,
             same_padding: bool=True,
             normalization: str="bn",
             activation: str="relu",
@@ -106,22 +109,17 @@ class FusedInvertedBasicPreact(BaseFusedMBConv):
             **kwargs
         ) -> None:
         """
-        Preactivated fused mobile inverted basic conv block that can 
-        be used to build deep FMBconv basic layers with preactivation.
-
-
-        (Preact-ResNet): Identity Mappings in Deep Residual Networks:
-            - https://arxiv.org/abs/1603.05027
-
+        preactivated fused mobile inverted dense conv block that can be
+        used to build deep dense preactivated fused mbconv layers.
+            
         Efficientnet-edgetpu: Creating accelerator-optimized neural networks with automl.
             - https://ai.googleblog.com/2019/08/efficientnet-edgetpu-creating.html
 
         EfficientNetV2: Smaller Models and Faster Training
             - https://arxiv.org/abs/2104.00298
 
-        NOTE: 
-        Basic in the name here means that no dense or residual skip 
-        connections are applied in the forward method
+        DenseNet: Densely Connected Convolutional Networks
+            - https://arxiv.org/abs/1608.06993
 
         Args:
         ----------
@@ -129,10 +127,10 @@ class FusedInvertedBasicPreact(BaseFusedMBConv):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            expand_ratio (float, default=4.0):
+                The ratio of channel expansion in the bottleneck
             kernel_size (int, default=3):
                 The size of the convolution kernel.
-            expand_ratio (float, default=1.0):
-                The ratio of channel expansion in the bottleneck
             same_padding (bool, default=True):
                 if True, performs same-covolution
             normalization (str): 
@@ -151,9 +149,8 @@ class FusedInvertedBasicPreact(BaseFusedMBConv):
         super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
             expand_ratio=expand_ratio,
+            kernel_size=kernel_size,
             same_padding=same_padding,
             normalization=normalization,
             activation=activation,
@@ -163,7 +160,15 @@ class FusedInvertedBasicPreact(BaseFusedMBConv):
             **kwargs
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+            self,
+            x: Union[torch.Tensor, List[torch.Tensor]]
+        ) -> torch.Tensor:
+ 
+        # dense skip
+        prev_features = [x] if isinstance(x, torch.Tensor) else x
+        x = torch.cat(prev_features, dim=1)
+
         # pointwise channel pooling conv
         out = self.norm1(x)
         out = self.act(out)
@@ -177,4 +182,3 @@ class FusedInvertedBasicPreact(BaseFusedMBConv):
         out = self.proj_conv(out)
 
         return out
-        

@@ -53,7 +53,7 @@ class InvertedBottleneck(BaseMBConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(InvertedBottleneck, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             expand_ratio=expand_ratio,
@@ -138,7 +138,7 @@ class InvertedBottleneckPreact(BaseMBConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(InvertedBottleneckPreact, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,

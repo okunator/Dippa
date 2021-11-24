@@ -2,17 +2,18 @@ import torch
 import torch.nn as nn
 from typing import List
 
-from .dense_dws import DepthWiseSeparableDense, DepthWiseSeparableDensePreact
+from .dense_mbconv import MobileInvertedDense, MobileInvertedDensePreact
 from ...ops.utils import conv_func
 from ....activations.utils import act_func
 from ....normalization.utils import norm_func
 
 
-class DepthWiseSeparableDenseBlock(nn.ModuleDict):
+class MobileInvertedDenseBlock(nn.ModuleDict):
     def __init__(
             self,
             in_channels: int,
             out_channels: int,
+            expand_ratio: float=4.0,
             kernel_size: int=3,
             same_padding: bool=True,
             normalization: str="bn",
@@ -24,14 +25,14 @@ class DepthWiseSeparableDenseBlock(nn.ModuleDict):
             **kwargs
         ) -> None:
         """
-        Stacks dense dws conv blocks in a ModuleDict. These can be used
+        Stacks dense mbconv blocks in a ModuleDict. These can be used
         in the full sized decoder stages.
 
         DenseNet: Densely Connected Convolutional Networks
             - https://arxiv.org/abs/1608.06993
         
-        MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications:
-            - https://arxiv.org/abs/1704.04861
+        MobileNetV2: Inverted Residuals and Linear Bottlenecks
+            - https://arxiv.org/abs/1801.04381
 
         Args:
         ----------
@@ -39,6 +40,8 @@ class DepthWiseSeparableDenseBlock(nn.ModuleDict):
                 Number of input channels
             out_channels (int):
                 Number of output channels
+            expand_ratio (float, default=4.0):
+                The ratio of channel expansion in the bottleneck
             kernel_size (int, default=3):
                 The size of the convolution kernel.
             expand_ratio (float, default=1.0):
@@ -65,9 +68,9 @@ class DepthWiseSeparableDenseBlock(nn.ModuleDict):
         """
         super().__init__()
         
-        Dense = DepthWiseSeparableDense
+        Dense = MobileInvertedDense
         if preactivate:
-            Dense = DepthWiseSeparableDensePreact
+            Dense = MobileInvertedDensePreact
 
         blocks = list(range(n_blocks))
         for i in blocks:
@@ -75,6 +78,7 @@ class DepthWiseSeparableDenseBlock(nn.ModuleDict):
             conv_block = Dense(
                 in_channels=in_channels,
                 out_channels=out_channels,
+                expand_ratio=expand_ratio,
                 kernel_size=kernel_size,
                 same_padding=same_padding,
                 normalization=normalization,
@@ -82,7 +86,7 @@ class DepthWiseSeparableDenseBlock(nn.ModuleDict):
                 weight_standardize=weight_standardize,
                 attention=att_method if attention is not None else None
             )
-            self.add_module(f"dense_dws{i + 1}", conv_block)
+            self.add_module(f"dense_mbconv{i + 1}", conv_block)
             in_channels += conv_block.out_channels
 
         self.transition = nn.Sequential(

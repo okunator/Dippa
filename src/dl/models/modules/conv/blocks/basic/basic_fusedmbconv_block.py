@@ -66,13 +66,15 @@ class FusedMobileInvertedBasicBlock(nn.ModuleDict):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(FusedMobileInvertedBasicBlock, self).__init__()
+        super().__init__()
 
         FusedMBConv = FusedInvertedBasic
         if preactivate:
             FusedMBConv = FusedInvertedBasicPreact
 
-        for i in range(n_blocks):
+        blocks = list(range(n_blocks))
+        for i in blocks:
+            att_method = attention if i == blocks[-1] else None
             conv_block = FusedMBConv(
                 in_channels=in_channels,
                 out_channels=out_channels,
@@ -83,7 +85,7 @@ class FusedMobileInvertedBasicBlock(nn.ModuleDict):
                 normalization=normalization,
                 activation=activation,
                 weight_standardize=weight_standardize,
-                attention=attention
+                attention=att_method if attention is not None else None
             )
             self.add_module(f"fused_inverted_basic{i + 1}", conv_block)
             in_channels = conv_block.out_channels

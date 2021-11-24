@@ -55,26 +55,12 @@ class BasicBlock(nn.ModuleDict):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(BasicBlock, self).__init__()
+        super().__init__()
 
         # use either preact or normal conv block
         ConvBlock = BasicConvBlockPreact if preactivate else BasicConvBlock
 
-        use_attention = n_blocks == 1
-        att_method = attention if use_attention else None
-        self.conv1 = ConvBlock(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            same_padding=same_padding,
-            normalization=normalization,
-            activation=activation,
-            weight_standardize=weight_standardize,
-            attention=att_method if attention is not None else None
-        )
-
-        in_channels = self.conv1.out_channels
-        blocks = list(range(1, n_blocks))
+        blocks = list(range(n_blocks))
         for i in blocks:
             att_method = attention if i == blocks[-1] else None
             conv_block = ConvBlock(

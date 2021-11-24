@@ -56,6 +56,7 @@ def _get_extra_skip_samples(
     return extra_skips
 
 
+# @pytest.mark.parametrize("short_skip", ["dense", "residual", None])
 @pytest.mark.slow
 @pytest.mark.parametrize("stage_ix", [0, 1, 2, 3, 4])
 @pytest.mark.parametrize("dec_channels", [[64, 32, 16, 8, 8, 2]])
@@ -63,7 +64,7 @@ def _get_extra_skip_samples(
 @pytest.mark.parametrize("skip_channels", [[224, 96, 64, 32]])
 @pytest.mark.parametrize("n_blocks", [1, 2])
 @pytest.mark.parametrize("n_layers", [1, 2])
-@pytest.mark.parametrize("short_skip", ["residual", None])
+@pytest.mark.parametrize("short_skip", ["dense"])
 @pytest.mark.parametrize("conv_block_type", ["basic", "dws", "mbconv", "fusedmbconv", "bottleneck"])
 @pytest.mark.parametrize("long_skip", ["unet", "unet3+"])
 @pytest.mark.parametrize("merge_policy", ["summation", "concatenate"])
@@ -127,6 +128,7 @@ def test_forward(
         assert all([s.shape == t.shape for s, t in zip(extra_skips, extras)])
 
         
+# @pytest.mark.parametrize("short_skip", ["dense", "residual", None])
 @pytest.mark.slow 
 @pytest.mark.parametrize("stage_ix", [0, 1, 2, 3, 4])
 @pytest.mark.parametrize("dec_channels", [[64, 32, 16, 8, 8, 2]])
@@ -134,7 +136,7 @@ def test_forward(
 @pytest.mark.parametrize("skip_channels", [[224, 96, 64, 32]])
 @pytest.mark.parametrize("n_blocks", [1, 2])
 @pytest.mark.parametrize("n_layers", [1, 2])
-@pytest.mark.parametrize("short_skip", ["residual", None])
+@pytest.mark.parametrize("short_skip", ["dense"])
 @pytest.mark.parametrize("conv_block_type", ["basic", "dws", "mbconv", "fusedmbconv", "bottleneck"])
 @pytest.mark.parametrize("long_skip", ["unet", "unet3+"])
 @pytest.mark.parametrize("merge_policy", ["summation", "concatenate"])

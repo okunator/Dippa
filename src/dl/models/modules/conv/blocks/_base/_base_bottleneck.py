@@ -71,7 +71,7 @@ class BaseBottleneckConv(nn.Module):
                 If True, Attention is applied at the beginning of
                 forwards.
         """
-        super(BaseBottleneckConv, self).__init__()
+        super().__init__()
         self.conv_choice = "wsconv" if weight_standardize else "conv"
         self.expansion = int(expand_ratio)
 

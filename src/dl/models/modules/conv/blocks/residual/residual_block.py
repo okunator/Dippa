@@ -56,35 +56,16 @@ class ResidualBlock(nn.ModuleDict):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(ResidualBlock, self).__init__()
+        super().__init__()
 
         # use either preact or normal (original) resblock
         Residual = ResidualConvBlock
         if preactivate:
             Residual = ResidualConvBlockPreact
 
-        # First res conv block. If n_blocks != 1 no residual skip 
-        # at the first conv block
-        use_residual = n_blocks == 1
-        att_method = attention if use_residual else None
-        self.conv1 = Residual(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            same_padding=same_padding,
-            normalization=normalization,
-            activation=activation,
-            weight_standardize=weight_standardize,
-            use_residual=use_residual,
-            attention=att_method if attention is not None else None
-        )
-
-        in_channels = self.conv1.out_channels
-        blocks = list(range(1, n_blocks))
+        blocks = list(range(n_blocks))
         for i in blocks:
-            # apply residual connection at the final conv block
-            use_residual = i == blocks[-1]
-            att_method = attention if use_residual else None
+            att_method = attention if i == blocks[-1] else None
             conv_block = Residual(
                 in_channels=in_channels,
                 out_channels=out_channels,
@@ -93,7 +74,6 @@ class ResidualBlock(nn.ModuleDict):
                 normalization=normalization,
                 activation=activation,
                 weight_standardize=weight_standardize,
-                use_residual=use_residual,
                 attention=att_method if attention is not None else None
             )
             self.add_module(f"conv{i + 1}", conv_block)

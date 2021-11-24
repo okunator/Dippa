@@ -58,7 +58,7 @@ class BottleneckResidual(BaseBottleneckConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(BottleneckResidual, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             expand_ratio=expand_ratio,
@@ -171,7 +171,7 @@ class BottleneckResidualPreact(BaseBottleneckConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(BottleneckResidualPreact, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             expand_ratio=expand_ratio,

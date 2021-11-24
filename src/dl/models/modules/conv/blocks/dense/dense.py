@@ -47,7 +47,7 @@ class DenseConvBlock(BaseConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(DenseConvBlock, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,
@@ -93,7 +93,7 @@ class DenseConvBlockPreact(BaseConv):
         Simplified Dense preactivated conv block that can be used to
         build deep preactivated dense conv layers.
 
-        (DenseNet): Densely Connected Convolutional Networks
+        DenseNet: Densely Connected Convolutional Networks
             - https://arxiv.org/abs/1608.06993
 
         Preactivation introduced:
@@ -123,7 +123,7 @@ class DenseConvBlockPreact(BaseConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(DenseConvBlockPreact, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,

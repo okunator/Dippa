@@ -60,13 +60,15 @@ class MobileInvertedResidualBlock(nn.ModuleDict):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(MobileInvertedResidualBlock, self).__init__()
+        super().__init__()
 
         MBConv = InvertedResidual
         if preactivate:
             MBConv = InvertedResidualPreact
 
-        for i in range(n_blocks):
+        blocks = list(range(n_blocks))
+        for i in blocks:
+            att_method = attention if i == blocks[-1] else None
             conv_block = MBConv(
                 in_channels=in_channels,
                 out_channels=out_channels,
@@ -76,7 +78,7 @@ class MobileInvertedResidualBlock(nn.ModuleDict):
                 normalization=normalization,
                 activation=activation,
                 weight_standardize=weight_standardize,
-                attention=attention
+                attention=att_method if attention is not None else None
             )
             self.add_module(f"inverted_residual{i + 1}", conv_block)
             in_channels = conv_block.out_channels

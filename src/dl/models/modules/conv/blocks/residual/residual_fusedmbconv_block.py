@@ -24,14 +24,14 @@ class FusedMobileInvertedResidualBlock(nn.ModuleDict):
         Stack fused inverted residual blocks in a ModuleDict. These can 
         be used in the full sized decoderblocks.
 
-        (Res-Net): Deep residual learning for image recognition:
+        Res-Net: Deep residual learning for image recognition:
             - https://arxiv.org/abs/1512.03385
 
-        (Preact-ResNet): Identity Mappings in Deep Residual Networks:
-            - https://arxiv.org/abs/1603.05027
+        Efficientnet-edgetpu: Creating accelerator-optimized neural networks with automl.
+            - https://ai.googleblog.com/2019/08/efficientnet-edgetpu-creating.html
 
-        MobileNetV2: Inverted Residuals and Linear Bottlenecks
-            - https://arxiv.org/abs/1801.04381
+        EfficientNetV2: Smaller Models and Faster Training
+            - https://arxiv.org/abs/2104.00298
 
         Args:
         ----------
@@ -62,24 +62,25 @@ class FusedMobileInvertedResidualBlock(nn.ModuleDict):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(FusedMobileInvertedResidualBlock, self).__init__()
+        super().__init__()
 
         FusedMBConv = FusedInvertedResidual
         if preactivate:
             FusedMBConv = FusedInvertedResidualPreact
 
-        for i in range(n_blocks):
+        blocks = list(range(n_blocks))
+        for i in blocks:
+            att_method = attention if i == blocks[-1] else None
             conv_block = FusedMBConv(
                 in_channels=in_channels,
                 out_channels=out_channels,
                 kernel_size=kernel_size,
-                stride=1, # no need to downsample when i == 0. Blocks not used for cls tasks
                 expand_ratio=expand_ratio,
                 same_padding=same_padding,
                 normalization=normalization,
                 activation=activation,
                 weight_standardize=weight_standardize,
-                attention=attention
+                attention=att_method if attention is not None else None
             )
             self.add_module(f"fused_inverted_residual{i + 1}", conv_block)
             in_channels = conv_block.out_channels

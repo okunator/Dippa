@@ -47,7 +47,7 @@ class BottleneckDense(BaseBottleneckConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(BottleneckDense, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,
@@ -136,7 +136,7 @@ class BottleneckDensePreact(BaseBottleneckConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(BottleneckDensePreact, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,

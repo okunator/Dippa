@@ -2,7 +2,10 @@ import torch
 import torch.nn as nn
 from typing import List
 
-from .dense import DenseConvBlock, DenseConvBlockPreact
+from .dense import DenseConvBlock, DenseConvBlockPreact 
+from ...ops.utils import conv_func
+from ....activations.utils import act_func
+from ....normalization.utils import norm_func
 
 
 class DenseBlock(nn.ModuleDict):
@@ -55,26 +58,11 @@ class DenseBlock(nn.ModuleDict):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(DenseBlock, self).__init__()
+        super().__init__()
 
         Dense = DenseConvBlockPreact if preactivate else DenseConvBlock
 
-        # apply cat at the beginning of the block
-        use_attention = n_blocks == 1
-        att_method = attention if use_attention else None
-        self.conv1 = Dense(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            same_padding=same_padding,
-            normalization=normalization,
-            activation=activation,
-            weight_standardize=weight_standardize,
-            attention=att_method if attention is not None else None
-        )
-
-        in_channels = self.conv1.out_channels
-        blocks = list(range(1, n_blocks))
+        blocks = list(range(n_blocks))
         for i in blocks:
             att_method = attention if i == blocks[-1] else None
             conv_block = Dense(
@@ -87,13 +75,31 @@ class DenseBlock(nn.ModuleDict):
                 weight_standardize=weight_standardize,
                 attention=att_method if attention is not None else None
             )
-            self.add_module(f"conv{i + 1}", conv_block)
-            in_channels = conv_block.out_channels
-
-        self.out_channels = in_channels
-
-    def forward(self, features: List[torch.Tensor]) -> torch.Tensor:
-        for _, conv_block in self.items():
-            features = conv_block(features)
+            self.add_module(f"dense_conv{i + 1}", conv_block)
+            in_channels += conv_block.out_channels
             
-        return features
+        self.transition = nn.Sequential(
+            conv_func(
+                conv_block.conv_choice, in_channels=in_channels,
+                bias=False, out_channels=out_channels,
+                kernel_size=1, padding=0
+            ),
+            norm_func(
+                normalization, num_features=out_channels
+            ),
+            act_func(activation) 
+        )
+            
+        self.out_channels = out_channels
+
+    def forward(self, init_features: List[torch.Tensor]) -> torch.Tensor:
+        features = [init_features]
+        for name, conv_block  in self.items():
+            if name is not "transition":            
+                new_features = conv_block(features)
+                features.append(new_features)
+            
+        out = torch.cat(features, 1)
+        out = self.transition(out)
+        
+        return out

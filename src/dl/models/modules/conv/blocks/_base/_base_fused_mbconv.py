@@ -60,7 +60,7 @@ class BaseFusedMBConv(nn.Module):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(BaseFusedMBConv, self).__init__()
+        super().__init__()
         assert stride in (1, 2)
         self.conv_choice = "wsconv" if weight_standardize else "conv"
         self.out_channels = out_channels

@@ -61,7 +61,7 @@ class BaseDepthWiseSeparableConv(nn.Module):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(BaseDepthWiseSeparableConv, self).__init__()
+        super().__init__()
         self.conv_choice = "wsconv" if weight_standardize else "conv"
         self.out_channels = out_channels
 

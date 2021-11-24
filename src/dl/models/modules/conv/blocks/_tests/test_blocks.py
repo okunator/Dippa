@@ -11,18 +11,19 @@ def _get_sample(in_channels: int) -> torch.Tensor:
 
 @pytest.mark.parametrize("preactivate", [True, False])
 @pytest.mark.parametrize("weight_standardize", [True, False])
+@pytest.mark.parametrize("attention", [None, "se"])
 @pytest.mark.parametrize("normalization", ["bn", "bcn"])
 @pytest.mark.parametrize("in_channels", [32, 64, 32])
 @pytest.mark.parametrize("out_channels", [64, 32, 32])
 @pytest.mark.parametrize("n_blocks", [1, 2, 3])
-@pytest.mark.parametrize(
-    "block", [
-        ResidualBlock, DenseBlock, BasicBlock, BottleneckResidualBlock,
-        DepthWiseSeparableResidualBlock, DepthWiseSeparableBasicBlock,
-        MobileInvertedResidualBlock, FusedMobileInvertedResidualBlock,
-        FusedMobileInvertedBasicBlock, MobileInvertedBasicBlock
-    ]
-)
+@pytest.mark.parametrize("block", [
+    DenseBlock, DenseBottleneckBlock, DepthWiseSeparableDenseBlock,
+    MobileInvertedDenseBlock, FusedMobileInvertedDenseBlock,
+    ResidualBlock, BottleneckResidualBlock, DepthWiseSeparableResidualBlock,
+    MobileInvertedResidualBlock, FusedMobileInvertedResidualBlock,
+    BasicBlock, DepthWiseSeparableBasicBlock, FusedMobileInvertedBasicBlock,
+    MobileInvertedBasicBlock,
+])
 def test_forward(
         block: nn.Module,
         in_channels: int,
@@ -31,6 +32,7 @@ def test_forward(
         preactivate: bool,
         weight_standardize: bool,
         normalization: str,
+        attention: str,
         **kwargs
     ) -> None:
     """
@@ -45,6 +47,7 @@ def test_forward(
         preactivate=preactivate,
         weight_standardize=weight_standardize,
         normalization=normalization,
+        attention=attention,
         **kwargs
     )
 
@@ -59,18 +62,19 @@ def test_forward(
 
 @pytest.mark.parametrize("preactivate", [True, False])
 @pytest.mark.parametrize("weight_standardize", [True, False])
+@pytest.mark.parametrize("attention", [None, "se"])
 @pytest.mark.parametrize("normalization", ["bn", "bcn"])
 @pytest.mark.parametrize("in_channels", [32, 64, 32])
 @pytest.mark.parametrize("out_channels", [64, 32, 32])
 @pytest.mark.parametrize("n_blocks", [1, 2, 3])
-@pytest.mark.parametrize(
-    "block", [
-        ResidualBlock, DenseBlock, BasicBlock, BottleneckResidualBlock,
-        DepthWiseSeparableResidualBlock, DepthWiseSeparableBasicBlock,
-        MobileInvertedResidualBlock, FusedMobileInvertedResidualBlock,
-        FusedMobileInvertedBasicBlock, MobileInvertedBasicBlock
-    ]
-)
+@pytest.mark.parametrize("block", [
+    DenseBlock, DenseBottleneckBlock, DepthWiseSeparableDenseBlock,
+    MobileInvertedDenseBlock, FusedMobileInvertedDenseBlock,
+    ResidualBlock, BottleneckResidualBlock, DepthWiseSeparableResidualBlock,
+    MobileInvertedResidualBlock, FusedMobileInvertedResidualBlock,
+    BasicBlock, DepthWiseSeparableBasicBlock, FusedMobileInvertedBasicBlock,
+    MobileInvertedBasicBlock,
+])
 def test_forward_backward(
         block: nn.Module,
         in_channels: int,
@@ -79,6 +83,7 @@ def test_forward_backward(
         preactivate: bool,
         weight_standardize: bool,
         normalization: str,
+        attention: str,
         **kwargs
     ) -> None:
     """
@@ -93,6 +98,7 @@ def test_forward_backward(
         preactivate=preactivate,
         weight_standardize=weight_standardize,
         normalization=normalization,
+        attention=attention,
         **kwargs
     )
 

@@ -122,7 +122,6 @@ class Decoder(nn.ModuleDict):
         else:
             n_blocks = [2]*len(enc_channels)
             
-            
         skip_channels = enc_channels[1:]
 
         # scaling factor assumed to be 2 for the spatial dims in the

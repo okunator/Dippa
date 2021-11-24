@@ -4,6 +4,10 @@ from .basic.basic_dws_block import DepthWiseSeparableBasicBlock
 from .basic.basic_mbconv_block import MobileInvertedBasicBlock
 from .basic.basic_fusedmbconv_block import FusedMobileInvertedBasicBlock
 from .dense.dense_block import DenseBlock
+from .dense.dense_bottleneck_block import DenseBottleneckBlock
+from .dense.dense_dws_block import DepthWiseSeparableDenseBlock
+from .dense.dense_mbconv_block import MobileInvertedDenseBlock
+from .dense.dense_fusedmbconv_block import FusedMobileInvertedDenseBlock
 from .residual.residual_block import ResidualBlock
 from .residual.residual_bottleneck_block import BottleneckResidualBlock
 from .residual.residual_dws_block import DepthWiseSeparableResidualBlock
@@ -15,19 +19,23 @@ CONV_LOOKUP = {
     "basic": {
         "basic": "BasicBlock",
         "bottleneck": "BottleneckBasicBlock",
+        "dws": "DepthWiseSeparableBasicBlock",
         "mbconv": "MobileInvertedBasicBlock",
         "fusedmbconv": "FusedMobileInvertedBasicBlock",
-        "dws": "DepthWiseSeparableBasicBlock"
     },
     "residual": {
         "basic": "ResidualBlock",
         "bottleneck": "BottleneckResidualBlock",
+        "dws": "DepthWiseSeparableResidualBlock",
         "mbconv": "MobileInvertedResidualBlock",
         "fusedmbconv": "FusedMobileInvertedResidualBlock",
-        "dws": "DepthWiseSeparableResidualBlock"
     },
     "dense": {
-        "basic": "DenseBlock"
+        "basic": "DenseBlock",
+        "bottleneck": "DenseBottleneckBlock",
+        "dws": "DepthWiseSeparableDenseBlock",
+        "mbconv": "MobileInvertedDenseBlock",
+        "fusedmbconv": "FusedMobileInvertedDenseBlock",
     }
 }
 
@@ -37,5 +45,7 @@ __all__ = [
     "DenseBlock", "ResidualBlock", "BottleneckResidualBlock",
     "DepthWiseSeparableResidualBlock", "MobileInvertedResidualBlock",
     "FusedMobileInvertedResidualBlock", "FusedMobileInvertedBasicBlock",
-    "MobileInvertedBasicBlock", "CONV_LOOKUP"
+    "MobileInvertedBasicBlock", "CONV_LOOKUP", "DenseBottleneckBlock",
+    "DepthWiseSeparableDenseBlock", "MobileInvertedDenseBlock",
+    "FusedMobileInvertedDenseBlock"
 ]

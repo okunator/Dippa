@@ -62,19 +62,18 @@ class BaseConv(nn.Module):
                 If True, Attention is applied at the beginning of
                 forwards.
         """
-        super(BaseConv, self).__init__()
-        conv_choice = "wsconv" if weight_standardize else "conv"
+        super().__init__()
+        self.conv_choice = "wsconv" if weight_standardize else "conv"
         self.out_channels = out_channels
 
         # set norm channel number for preactivation or normal
         norm_channels = in_channels if preactivate else self.out_channels
 
-
         # set padding. Works if dilation or stride are not adjusted
         padding = (kernel_size - 1) // 2 if same_padding else 0
         
         self.conv = conv_func(
-            name=conv_choice, in_channels=in_channels,
+            name=self.conv_choice, in_channels=in_channels,
             out_channels=out_channels, kernel_size=kernel_size, 
             groups=groups, padding=padding
         )

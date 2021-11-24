@@ -1,6 +1,9 @@
 import torch
+import torch.nn as nn
 
 from .._base._base_mbconv import BaseMBConv
+from ...ops.utils import conv_func
+from ....normalization.utils import norm_func
 
 
 class InvertedResidual(BaseMBConv):
@@ -55,7 +58,7 @@ class InvertedResidual(BaseMBConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(InvertedResidual, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             expand_ratio=expand_ratio,
@@ -69,11 +72,25 @@ class InvertedResidual(BaseMBConv):
             **kwargs
         )
 
-        self.use_residual = in_channels == out_channels
+        # Set downsampling to enable residual summation
+        self.downsample = None
+        if in_channels != out_channels:
+            self.downsample = nn.Sequential(
+                conv_func(
+                    self.conv_choice, in_channels=in_channels,
+                    bias=False, out_channels=out_channels,
+                    kernel_size=1, padding=0
+                ),
+                norm_func(
+                    normalization, num_features=out_channels
+                )
+            ) 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # shortcut
         identity = x
+        if self.downsample is not None:
+            identity = self.downsample(x)
 
         # pointwise channel pooling conv
         out = self.ch_pool(x)
@@ -92,8 +109,7 @@ class InvertedResidual(BaseMBConv):
         out = self.proj_conv(out)
         out = self.norm3(out)
 
-        if self.use_residual:
-            out += identity
+        out += identity
 
         return out
 
@@ -146,7 +162,7 @@ class InvertedResidualPreact(BaseMBConv):
             attention (str, default=None):
                 Attention method. One of: "se", None
         """
-        super(InvertedResidualPreact, self).__init__(
+        super().__init__(
             in_channels=in_channels,
             out_channels=out_channels,
             expand_ratio=expand_ratio,
@@ -160,11 +176,24 @@ class InvertedResidualPreact(BaseMBConv):
             **kwargs
         )
 
-        self.use_residual = in_channels == out_channels
+        self.downsample = None
+        if in_channels != out_channels:
+            self.downsample = nn.Sequential(
+                conv_func(
+                    self.conv_choice, in_channels=in_channels,
+                    bias=False, out_channels=out_channels,
+                    kernel_size=1, padding=0
+                ),
+                norm_func(
+                    normalization, num_features=out_channels
+                )
+            )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # shortcut
         identity = x
+        if self.downsample is not None:
+            identity = self.downsample(x)
 
         # pointwise channel pooling conv
         out = self.norm1(x)
@@ -183,8 +212,7 @@ class InvertedResidualPreact(BaseMBConv):
         out = self.norm3(out)
         out = self.proj_conv(out)
 
-        if self.use_residual:
-            out += identity
+        out += identity
 
         return out
         

@@ -60,7 +60,7 @@ class SumBlock(nn.ModuleDict):
         ------------
             torch.Tensor: The summed out tensor. Shape (B, in_channels, H, W)
         """
-
+        # print("skips shapes: ", [s.shape for s in skips])
         if self.values():
             for i, ch_pool in enumerate(self.values()):
                 if self.pool[i]:
