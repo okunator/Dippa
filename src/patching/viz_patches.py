@@ -1,7 +1,11 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from typing import Tuple
 from skimage.color import label2rgb
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError:
+    raise ImportError("matplotlib required. `pip install matplotlib`")
 
 
 def viz_patches(patches: np.ndarray) -> Tuple[int]:

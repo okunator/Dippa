@@ -23,7 +23,7 @@ class BaseMultiTaskSegModel(nn.ModuleDict):
     def forward(self, x) -> Dict[str, torch.Tensor]:
         features = self.encoder(x)
         
-        results = {}    
+        results = {}
         decoders = [k for k in self.keys() if "decoder" in k]
         heads = [k for k in self.keys() if "head" in k]
         

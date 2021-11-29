@@ -130,7 +130,6 @@ class TilerStitcherTorch:
         )
         output = output/recovery_mask
 
-                
         if self.padding:
             pad_x, pad_y = self.margins
             output = output[:, :, pad_y:-pad_y, pad_x:-pad_x]

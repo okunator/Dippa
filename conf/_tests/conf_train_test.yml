@@ -31,12 +31,15 @@ training:
     class_weights:
       type: null
       sem: null
+      inst: null
       aux: null
     edge_weights:
       type: null
       sem: null
-      aux: null 
+      aux: null
+      inst: null
     branch_losses:
       type: tversky_focal_ssim
       sem: tversky_focal_ssim
+      inst: ce
       aux: mse_ssim

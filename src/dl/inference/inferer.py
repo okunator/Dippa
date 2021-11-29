@@ -4,6 +4,7 @@ import itertools
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
+from copy import deepcopy
 from torch.utils.data import DataLoader, Dataset
 from typing import Callable, Tuple, List, Iterable, Dict, Union, Optional, Iterable
 from collections import OrderedDict
@@ -19,6 +20,9 @@ from .predictor import Predictor
 
 
 SUFFIXES = (".jpeg", ".jpg", ".tif", ".tiff", ".png")
+
+
+__all__ = ["FolderDataset", "Inferer"]
 
 
 class FolderDataset(Dataset, FileHandler):
@@ -195,23 +199,25 @@ class Inferer(FileHandler):
         self,
         model: pl.LightningModule,
         in_data_dir: str,
+        branch_weights: Dict[str, bool],
+        branch_acts: Dict[str, str],
+        post_proc_method: str,
         gt_mask_dir: str=None,
         tta: bool=False,
         model_weights: int=-1,
-        loader_batch_size: int=8,
-        loader_num_workers: int=8,
+        loader_batch_size: int=1,
+        loader_num_workers: int=1,
         patch_size: Tuple[int, int]=(256, 256),
         stride_size: int=128,
         model_batch_size: int=None,
         thresh_method: str="naive",
         thresh: float=0.5,
-        apply_weights: bool=False,
-        post_proc_method: str=None,
         n_images: int=None,
         fn_pattern: str="*",
         xmax: Optional[int]=None,
         ymax: Optional[int]=None,
         auto_range: Optional[bool]=False,
+        test_mode: bool=False,
         **kwargs
     ) -> None:
         """
@@ -228,18 +234,35 @@ class Inferer(FileHandler):
             gt_mask_dir (str, default=None):
                 The directory of the test ground truth masks. Needed for 
                 benchmarking only. The GT-masks need to be in .mat files
-            tta (bool, default=False):
+            branch_weights (bool, default=Dict[str, bool]):
+                Dictionary of branch names mapped to a boolean value.
+                If the value is True, after a prediction, a weight
+                matrix is applied that assigns bigger weight on pixels
+                in center and less weight to pixels on prediction
+                boundaries. helps dealing with prediction artefacts on
+                tile/patch boundaries.
+            branch_acts (bool, default=Dict[str, str]):
+                Dictionary of branch names mapped to a str value that
+                specifies the activation function applied for that
+                branch. Allowed values: "softmax", "sigmoid", None
+            post_proc_method (str, default=None):
+                Defines the post-processing pipeline.The post-processing
+                method is always specific to the auxiliary maps of the
+                model. E.g. model.dec_branches == "hover", then the
+                HoVer-Net or CellPose pipelines can be used. One of:
+                "hover", "cellpose", "drfns", "dcan", "dran". 
+            TODO: tta (bool, default=False):
                 If True, performs test time augmentation. Inference time
                 goes up with often marginal performance improvements.
             model_weights (int, default=-1):
                 The epoch number of the saved checkpoint. If -1, uses
-                the last epoch 
-            loader_batch_size (int, default=8):
+                the last epoch
+            loader_batch_size (int, default=1):
                 Number of images loaded from the input folder by the 
                 workers per dataloader iteration. This is the DataLoader
                 batch size, NOT the batch size that is used during the 
                 forward pass of the model.
-            loader_num_workers (int, default=8):
+            loader_num_workers (int, default=1):
                 Number of threads/workers for torch dataloader
             patch_size (Tuple[int, int], default=(256, 256)):
                 The size of the input patches that are fed to the 
@@ -265,24 +288,6 @@ class Inferer(FileHandler):
                 branch.One of ("naive", "argmax", "sauvola", "niblack").
             thresh (float, default = 0.5): 
                 threshold probability value. Only used if method="naive"
-            apply_weights (bool, default=True):
-                After a prediction, apply a weight matrix that assigns 
-                bigger weight on pixels in center and less weight to 
-                pixels on prediction boundaries. helps dealing with 
-                prediction artefacts on tile/patch boundaries. NOTE: 
-                This is only applied at the auxiliary branch prediction 
-                since there tiling effect has the most impact. 
-                (Especially, in HoVer-maps)
-            post_proc_method (str, default=None):
-                Defines the post-processing pipeline. If this is None, 
-                then the post-processing pipeline is defined by the 
-                aux_type of the model. If the aux_type of the model is 
-                None, then the basic watershed post-processing pipeline
-                is used. The post-processing method is always specific 
-                to the auxiliary maps that the model outputs so if the 
-                aux_type == "hover", then the HoVer-Net and CellPose 
-                pipelines can be used. One of: None, "hover","cellpose",
-                "drfns", "dcan", "dran". 
             n_images (int, default=None):
                 Number of images inferred before clearing the memory. 
                 Useful if there is a large number of images in a folder.
@@ -310,13 +315,21 @@ class Inferer(FileHandler):
                 tissue section in the wsi. The tiles in the folder need 
                 to contain the x- and y-coords (in xy- order) in the 
                 filename. Example tile filename: "x-45000_y-50000.png".
+            test_mode (bool, default=False):
+                Flag for test runs
         """
-        assert isinstance(model, pl.LightningModule), (
-            "Input model needs to be a lightning model"
-        )
-        assert stride_size <= patch_size[0], (
-            f"stride_size: {stride_size} > {patch_size[0]}"
-        )
+        if not isinstance(model, pl.LightningModule): 
+            raise ValueError(f"""
+                Input model needs to be pl.LightningModule. Got: {type(model)}.
+                Use the SegExperiment class to construct the model.
+                """
+            )
+        if not stride_size <= patch_size[0]: 
+            raise ValueError(f"""
+                `stride_size` needs to be less or equal to `patch_size`.
+                Got: stride_size: {stride_size} and patch_size {patch_size}.
+                """
+            )
 
         # set model to device and to inference mode
         self.model = model
@@ -325,25 +338,19 @@ class Inferer(FileHandler):
         torch.no_grad()
 
         # Load trained weights for the model 
-        self.exp_name = self.model.experiment_name
-        self.exp_version = self.model.experiment_version
-        ckpt_path = self.get_model_checkpoint(
-            experiment=self.exp_name,
-            version=self.exp_version,
-            which=model_weights
-        )
-        checkpoint = torch.load(
-            ckpt_path, map_location = lambda storage, loc: storage
-        )
-        self.model.load_state_dict(
-            checkpoint['state_dict'], 
-            strict=True
-        )
-        print(f"Using weights from: {ckpt_path.as_posix()}")
-
-        self.patch_size = patch_size
-        self.stride_size = stride_size
-
+        self.exp_name = self.model.hparams["experiment_name"]
+        self.exp_version = self.model.hparams["experiment_version"]
+        
+        if not test_mode:
+            ckpt_path = self.get_model_checkpoint(
+                experiment=self.exp_name,
+                version=self.exp_version,
+                which=model_weights
+            )
+            checkpoint = torch.load(
+                ckpt_path, map_location = lambda storage, loc: storage
+            )
+            self.model.load_state_dict(checkpoint['state_dict'], strict=True)
 
         # Set input data folder
         self.in_data_dir = in_data_dir
@@ -361,11 +368,13 @@ class Inferer(FileHandler):
                 Path(gt_mask_dir).glob(fn_pattern)
             )
 
-        # Batch sizes
+        # Batch and tiling sizes
+        self.patch_size = patch_size
+        self.stride_size = stride_size
         self.model_batch_size = model_batch_size
         self.loader_batch_size = loader_batch_size
 
-        # Set dataset dataloader
+        # Set dataset & dataloader.
         self.folderset = FolderDataset(
             self.in_data_dir, 
             pattern=fn_pattern, 
@@ -382,33 +391,12 @@ class Inferer(FileHandler):
         )
 
         # set apply weights flag for aux branch and prdeictor class
-        self.apply_weights = apply_weights
         self.predictor = Predictor(self.model, self.patch_size)
 
         # set the post-processing pipeline. Defaults to 
         # model.aux_type if model has an auxiliary branch
         self.post_proc_method = post_proc_method
-        if self.post_proc_method is None:
-            self.post_proc_method = "basic"
-            if self.model.aux_branch:
-                self.post_proc_method = self.model.aux_type
-
-        # Quick checks that a valid post-proc-method is used
-        msg = (
-            "post_proc_method does not match to model config. ", 
-            f"set to: {self.post_proc_method} while the model ",
-            f"decoder_aux_branch is: {self.model.decoder_aux_branch}"
-        )
-
-        if self.model.decoder_aux_branch:
-            if self.model.decoder_aux_branch == "hover":
-                allowed = ("hover", "cellpose", "basic")
-            elif self.model.decoder_aux_branch == "dist":
-                allowed = ("drfns", "basic")
-            elif self.model.decoder_aux_branch == "contour":
-                allowed = ("dcan", "dran", "basic")
-
-            assert self.post_proc_method in allowed, msg
+        self._validate_postproc_method()
         
         # init the post-processor
         self.post_processor = PostProcBuilder.set_postprocessor(
@@ -418,11 +406,64 @@ class Inferer(FileHandler):
         )
 
         # input norm flag and train data stats
-        self.norm = self.model.normalize_input
+        self.norm = self.model.hparams["normalize_input"]
 
         # self.stats = self.get_dataset_stats(
         #   self.model.train_data.as_posix()
         # )
+        
+        # set up tha branch args
+        self.branch_acts = branch_acts
+        self.branch_weights = branch_weights
+        self._validate_branch_args()
+        self.branch_args = {
+            f"{k}_map": {"act": a, "apply_weights": w}
+            for (k, a), w in zip(branch_acts.items(), branch_weights.values())
+        }
+           
+    def _get_map_dict(self, val: str=None):
+        return {
+            f"{k}_map": deepcopy(val)
+            for k in self.model.hparams["dec_branches"].keys()
+        }
+        
+    def _validate_branch_args(self) -> None:
+        """
+        Check that the branch args match in the model and inferer
+        """
+        mbranches = sorted(self.model.hparams["dec_branches"].keys())
+        abranches = sorted(self.branch_acts.keys())
+        wbranches = sorted(self.branch_weights.keys())
+        
+        if not mbranches == abranches == wbranches:
+            raise ValueError(f"""
+                Got mismatching keys for branch dict args. Model decoder
+                branches: {mbranches}. `branch_weights`: {wbranches}.
+                `branch_acts`: {abranches}."""
+            )
+        
+        
+    def _validate_postproc_method(self) -> None:
+        """
+        Check that post proc method can be used with current settings
+        """
+        allowed = ("basic")
+        if "aux" in self.model.hparams["dec_branches"].keys():
+            if self.model.hparams["dataset_type"] == "hover":
+                allowed = ("hover", "cellpose", "basic")
+            elif self.model.hparams["dataset_type"] == "dist":
+                allowed = ("drfns", "basic")
+            elif self.model.hparams["dataset_type"] == "contour":
+                allowed = ("dcan", "dran", "basic")
+            
+        if not self.post_proc_method in allowed:
+            raise ValueError(f"""
+                Illegal arg: `post_proc_method`. Got: {self.post_proc_method}.
+                Allowed methods: {allowed}. The allowed methods depend on
+                the dataset type the model was trained with. Check the 
+                `dataset_type` argument of the SegExperiment class.              
+                """
+            )
 
     def _apply(
             self,
@@ -452,9 +493,8 @@ class Inferer(FileHandler):
         --------
             torch.Tensor or None: the ouput tensor or None
         """
-        if not isinstance(var, torch.Tensor) and not var:
-            return None
-
+        
+        
         try:
             var = op(var, **kwargs)
         except RuntimeError as e:
@@ -473,6 +513,9 @@ class Inferer(FileHandler):
                     new_var = var
 
                 var = op(new_var, **kwargs)
+        except BaseException as e:
+            print(f"{e}")
+            
         
         return var
 
@@ -502,7 +545,7 @@ class Inferer(FileHandler):
     def _predict_batch(
             self, 
             batch: torch.Tensor
-        ) -> Tuple[Union[torch.Tensor, None]]:
+        ) -> Dict[str, torch.Tensor]:
         """
         Forward pass + classify. Handles missing branches in the model.
 
@@ -513,31 +556,18 @@ class Inferer(FileHandler):
 
         Returns:
         ---------
-            A tuple of tensors containing the predictions. If network 
-            does no contain aux or type branch the predictions are None
+            A Dict of names mapped to tensors containing the predictions
         """
-        # TODO: tta
+        # TODO: tta        
         # pred = self.predictor.forward_pass(batch, norm=self.norm, mean=self.stats[0], std=self.stats[1])
         pred = self.predictor.forward_pass(batch, norm=self.norm)
-        insts = self.predictor.classify(pred["instances"], act="softmax")
-
-        types = None
-        if pred["types"] is not None:
-            types = self.predictor.classify(pred["types"], act="softmax")
-
-        aux = None
-        if pred["aux"] is not None:
-            aux = self.predictor.classify(
-                pred["aux"], act=None, apply_weights=self.apply_weights
-            )
-
-        sem = None
-        if pred["sem"] is not None:
-            sem = self.predictor.classify(
-                pred["sem"], act="softmax", apply_weights=False
-            )
-
-        return insts, types, aux, sem
+        
+        maps = self._get_map_dict()
+        for k, pred_map in pred.items():
+            map = self.predictor.classify(pred_map, **self.branch_args[k])
+            maps[k] = map
+    
+        return maps
 
     def _infer_large_img_batch(
             self, 
@@ -571,79 +601,47 @@ class Inferer(FileHandler):
             padding=True
         )
         patches = tilertorch.extract_patches_from_batched(batch)
-
+        
         # (for tqdm logging)
         n_batches_inferred = 0
         n_patches_total = patches.shape[2]*self.loader_batch_size
         
-        batch_instances = []
-        batch_types = []
-        batch_aux = []
-        batch_sem = []
-
+        batch_maps = self._get_map_dict([])
+        
         # model batch size
-        batch_size = self.model.batch_size
+        batch_size = self.model.hparams["batch_size"]
         if self.model_batch_size is not None:
             batch_size = self.model_batch_size 
 
         # Loop the B in batched patches (B, C, n_patches, patch_h, patch_w)
         for j in range(patches.shape[0]):
-
-            pred_inst = []
-            pred_type = []
-            pred_aux = []
-            pred_sem = []
-
-            # Divide patches into batches that can be used as input to model
+            
+            # Divide patches into batches and predict
+            pred_patches = self._get_map_dict([])
             for batch in self._get_batch(patches[j, ...], batch_size):
-                insts, types, aux, sem = self._predict_batch(batch)
-                pred_inst.append(insts)
-                pred_type.append(types) if types is not None else None
-                pred_aux.append(aux) if aux is not None else None
-                pred_sem.append(sem) if sem is not None else None
+                soft_patches = self._predict_batch(batch)
+                
+                for k, map in soft_patches.items():
+                    pred_patches[k].append(map)
 
                 n_batches_inferred += batch.shape[0]
                 if batch_loader is not None:
                     batch_loader.set_postfix(
                         patches=f"{n_batches_inferred}/{n_patches_total}"
                     )
-            
+
             # catch runtime error if preds take too much GPU mem and 
             # move to cpu with the _apply method.
-            pred_inst = self._apply(var=pred_inst, op=torch.cat, dim=0)
-            pred_type = self._apply(var=pred_type, op=torch.cat, dim=0)            
-            pred_aux = self._apply(var=pred_aux, op=torch.cat, dim=0)
-            pred_sem = self._apply(var=pred_sem, op=torch.cat, dim=0)
-
-            batch_instances.append(pred_inst)
-            batch_types.append(pred_type)
-            batch_aux.append(pred_aux)
-            batch_sem.append(pred_sem)
-
-        # Stitch the patches back to the orig img size
-        insts = torch.stack(batch_instances, dim=0).permute(0, 2, 1, 3, 4)
-        insts = self._apply(insts, tilertorch.stitch_batched_patches)
-        insts = zip(names, tensor_to_ndarray(insts))
-
-        types = zip(names, [None]*len(names))
-        if all(e is not None for e in batch_types):
-            types = torch.stack(batch_types, dim=0).permute(0, 2, 1, 3, 4)
-            types = self._apply(types, tilertorch.stitch_batched_patches)
-            types = zip(names, tensor_to_ndarray(types))
-
-        aux = zip(names, [None]*len(names))
-        if all(e is not None for e in batch_aux):
-            aux = torch.stack(batch_aux, dim=0).permute(0, 2, 1, 3, 4)
-            aux = self._apply(aux, tilertorch.stitch_batched_patches)
-            aux = zip(names, tensor_to_ndarray(aux))
-
-        sem = zip(names, [None]*len(names))
-        if all(e is not None for e in batch_sem):
-            sem = torch.stack(batch_sem, dim=0).permute(0, 2, 1, 3, 4)
-            sem = self._apply(sem, tilertorch.stitch_batched_patches)
-            sem = zip(names, tensor_to_ndarray(sem))
-
-        return insts, types, aux, sem
+            for k, pred_list in pred_patches.items():
+                preds = self._apply(var=pred_list, op=torch.cat, dim=0) # (n_patches, C, pH, pW)
+                batch_maps[k].append(preds)
+        
+        for k, preds in batch_maps.items():
+            out_map = self._apply(preds, torch.stack, dim=0).permute(0, 2, 1, 3, 4) # (B, C, n_patches, pH, pW)
+            out_map = self._apply(out_map, tilertorch.stitch_batched_patches) # (B, C, H, W)
+            batch_maps[k] = zip(names, tensor_to_ndarray(out_map))
+            
+        return batch_maps
 
     def _infer_img_batch(
             self, 
@@ -670,29 +668,21 @@ class Inferer(FileHandler):
             Tuple: of Zip objects containing (name, np.ndarray) pairs
         """
         n_batches_inferred = 0
-        pred_insts, pred_types, pred_aux, pred_sem = self._predict_batch(batch)
-        insts = zip(names, tensor_to_ndarray(pred_insts))
-
-        types = zip(names, [None]*len(names))
-        if pred_types is not None:
-            types = zip(names, tensor_to_ndarray(pred_types))
-
-        aux = zip(names, [None]*len(names))
-        if pred_aux is not None:
-            aux = zip(names, tensor_to_ndarray(pred_aux))
-
-        sem = zip(names, [None]*len(names))
-        if pred_sem is not None:
-            sem = zip(names, tensor_to_ndarray(pred_sem))
+        soft_patches = self._predict_batch(batch)
+        
+        batch_maps = self._get_map_dict([])
+        for k, soft_mask in soft_patches.items():
+            out_map = tuple(zip(names, tensor_to_ndarray(soft_mask)))
+            batch_maps[k].extend([*out_map])
         
         n_batches_inferred += batch.shape[0]
         if batch_loader is not None:
             batch_loader.set_postfix(
                 patches=f"{n_batches_inferred}/{len(self.folderset.fnames)}"
             )
-
-        return insts, types, aux, sem
-
+        
+        return batch_maps
+            
     def _chunks(self, iterable: Iterable, size: int) -> Iterable:
         """
         Generate adjacent chunks of an iterable 
@@ -723,46 +713,36 @@ class Inferer(FileHandler):
                 A chunked dataloader object
         """
         # Start pipeline
-        soft_instances = []
-        soft_types = []
-        aux_maps = []
-        soft_areas = []
+        self.soft_masks = self._get_map_dict([])
 
-        with tqdm(chunked_dataloader, unit="batch") as batch_loader:
-            for data in batch_loader:
-                
-                # Get data
-                batch = data["im"]
-                names = data["file"]
+        with tqdm(chunked_dataloader, unit="batch") as loader:
+            with torch.no_grad():
+                for data in loader:
+                    
+                    # Get data
+                    batch = data["im"]
+                    names = data["file"]
 
-                batch_loader.set_description(f"Running inference for {names}")
+                    loader.set_description(f"Running inference for {names}")
 
-                # Set patching flag (most datasets require patching), 
-                # Assumes square patches
-                requires_patching = False
-                if batch.shape[-1] > self.patch_size[0]:
-                    requires_patching = True
+                    # Set patching flag (most datasets require patching), 
+                    # Assumes square patches
+                    requires_patching = False
+                    if batch.shape[-1] > self.patch_size[0]:
+                        requires_patching = True
 
-                # predict soft maps
-                if requires_patching:
-                    insts, types, aux, sem = self._infer_large_img_batch(
-                        batch, names, batch_loader
-                    )
-                else:
-                    insts, types, aux, sem = self._infer_img_batch(
-                        batch, names, batch_loader
-                    )
+                    # predict soft maps
+                    if requires_patching:
+                        soft_mask = self._infer_large_img_batch(batch, names, loader)
+                    else:
+                        soft_mask = self._infer_img_batch(batch, names, loader)
 
-                soft_instances.extend(insts)
-                soft_types.extend(types)
-                aux_maps.extend(aux)
-                soft_areas.extend(sem)
+                    for k in self.soft_masks.keys():
+                        self.soft_masks[k].extend([*soft_mask[k]])
 
-        # save intermediate results to mem if save_dir not specified
-        self.soft_insts = OrderedDict(soft_instances)
-        self.soft_types = OrderedDict(soft_types)
-        self.aux_maps = OrderedDict(aux_maps)
-        self.soft_areas = OrderedDict(soft_areas)
+        # save intermediate results
+        for k, mask in self.soft_masks.items():
+            self.soft_masks[k] = OrderedDict(mask)
 
     def _post_process(self):
         """
@@ -785,16 +765,20 @@ class Inferer(FileHandler):
         self.sem_maps = OrderedDict()
         for res in maps:
             name = res[0]
-            self.inst_maps[name] = res[1].astype("int32")
+            
+            imap = None
+            if "inst" in self.model.dec_branches.keys():
+                imap = res[1].astype("int32")
 
             tmap = None
-            if self.model.decoder_type_branch:
+            if "type" in self.model.dec_branches.keys():
                 tmap = res[2].astype("int32")
 
             smap = None
-            if self.model.decoder_sem_branch:
+            if "sem" in self.model.dec_branches.keys():
                 smap = res[3].astype("int32")
 
+            self.inst_maps[name] = imap
             self.type_maps[name] = tmap
             self.sem_maps[name] = smap
 
@@ -831,74 +815,87 @@ class Inferer(FileHandler):
         # assertions before lengthy processing
         if save_dir is not None:
             save_dir = Path(save_dir)
-            assert save_dir.exists(), f"{save_dir} not found"
-            assert fformat in ("geojson", ".mat", None)
+            
+            if not save_dir.exists():
+                raise ValueError(f"{save_dir} not found")
+            
+            allowed = ("geojson", ".mat", None)
+            if fformat not in allowed:
+                raise ValueError(f"""
+                    Illegal `fformat`. Got {fformat}. Allowed: {allowed}
+                    """
+                )
 
             if fformat == "geojson":
-                assert classes_type is not None, (
-                    "cell type classes needed for geojson format."
-                )
-                if self.model.decoder_sem_branch:
-                    assert classes_sem is not None, (
-                        "area classes needed for geojson format."
+                if classes_type is None:
+                    raise ValueError(f"""
+                        `classes_type` is None. Cell type classes Dict
+                        is needed for the geojson format.
+                        """
                     )
+                if "sem" in self.model.hparams["dec_branches"].keys():
+                    if classes_sem is None: 
+                        raise ValueError("""
+                            `area_classes` is None. Area classes Dict is
+                            needed for geojson format.
+                            """
+                        )
 
         n_images_real = int(np.ceil(self.n_images / self.loader_batch_size))
         n_chunks = int(np.ceil(len(self.folderset.fnames) / self.n_images))
         loader = self._chunks(iterable=self.dataloader, size=n_images_real)
 
-        with torch.no_grad():
-            for _ in range(n_chunks):
-                self._infer(next(loader))
-                self._post_process()
+        for _ in range(n_chunks):
+            self._infer(next(loader))
+            self._post_process()
 
-                # save results to files
-                if save_dir is not None:
-                    for name, inst_map in self.inst_maps.items():
-                        if fformat == "geojson":
-                            
-                            # parse the offset coords from the inst key
-                            x_off, y_off = (
-                                int(c) for c in re.findall(r"\d+", name)
-                            ) if offsets else (0, 0)
+            # save results to files
+            if save_dir is not None:
+                for name, inst_map in self.inst_maps.items():
+                    if fformat == "geojson":
+                        
+                        # parse the offset coords from the inst key
+                        x_off, y_off = (
+                            int(c) for c in re.findall(r"\d+", name)
+                        ) if offsets else (0, 0)
 
+                        mask2geojson(
+                            inst_map=inst_map, 
+                            type_map=self.type_maps[name], 
+                            fname=f"{name}_cells",
+                            save_dir=Path(save_dir / "cells"),
+                            x_offset=x_off,
+                            y_offset=y_off,
+                            classes=classes_type
+                        )
+
+                        if self.model.decoder_sem_branch:
                             mask2geojson(
-                                inst_map=inst_map, 
-                                type_map=self.type_maps[name], 
-                                fname=f"{name}_cells",
-                                save_dir=Path(save_dir / "cells"),
+                                inst_map=label_sem_map(self.sem_maps[name]), 
+                                type_map=self.sem_maps[name], 
+                                fname=f"{name}_areas",
+                                save_dir=Path(save_dir / "areas"),
                                 x_offset=x_off,
                                 y_offset=y_off,
-                                classes=classes_type
+                                classes=classes_sem
                             )
 
-                            if self.model.decoder_sem_branch:
-                                mask2geojson(
-                                    inst_map=label_sem_map(self.sem_maps[name]), 
-                                    type_map=self.sem_maps[name], 
-                                    fname=f"{name}_areas",
-                                    save_dir=Path(save_dir / "areas"),
-                                    x_offset=x_off,
-                                    y_offset=y_off,
-                                    classes=classes_sem
-                                )
+                    elif fformat == ".mat":
+                        # TODO add sem classes
+                        mask2mat(
+                            inst_map=inst_map.astype("int32"),
+                            type_map=self.type_maps[name].astype("int32"),
+                            fname=name,
+                            save_dir=save_dir
+                        )
 
-                        elif fformat == ".mat":
-                            # TODO add sem classes
-                            mask2mat(
-                                inst_map=inst_map.astype("int32"),
-                                type_map=self.type_maps[name].astype("int32"),
-                                fname=name,
-                                save_dir=save_dir
-                            )
-
-                    # clear memory
-                    self.soft_insts.clear()
-                    self.soft_types.clear()
-                    self.aux_maps.clear()
-                    self.inst_maps.clear()
-                    self.type_maps.clear()
-                    torch.cuda.empty_cache()
+                # clear memory
+                for k in self.soft_masks.keys():
+                    self.soft_masks[k].clear()
+                
+                self.inst_maps.clear()
+                self.type_maps.clear()
+                torch.cuda.empty_cache()
 
     def benchmark_insts(
             self, 

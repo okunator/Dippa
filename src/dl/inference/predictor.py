@@ -60,8 +60,8 @@ def compute_pyramid_patch_weight_loss(
 
 class Predictor:
     def __init__(
-            self, 
-            model: nn.Module, 
+            self,
+            model: nn.Module,
             patch_size: Tuple[int]=(256, 256)
         ) -> None:
         """
@@ -79,6 +79,7 @@ class Predictor:
                 The shape of the input patch
         """
         self.model = model
+        self.model.eval()
         weight_mat = compute_pyramid_patch_weight_loss(
             patch_size[0], patch_size[1]
         )
@@ -89,7 +90,7 @@ class Predictor:
 
 
     def forward_pass(
-            self, 
+            self,
             patch: Union[np.ndarray, torch.Tensor],
             norm: bool=False,
             mean: np.ndarray=None,
@@ -135,14 +136,17 @@ class Predictor:
                 patch[i] = util.minmax_normalize_torch(patch[i])
             
         input_tensor = util.to_device(patch) # to cpu|gpu
-        return self.model(input_tensor) # {[(B, 2, H, W), (B, C, H, W)]}
+        
+        with torch.no_grad():
+            out = self.model(input_tensor) # {[(B, 2, H, W), (B, C, H, W)]}
+
+        return out
 
     def classify(
-            self, 
-            patch: torch.Tensor, 
-            act: Union[str, None]="softmax", 
-            apply_weights: bool=False,
-            to_cpu: bool=False
+            self,
+            patch: torch.Tensor,
+            act: Union[str, None]="softmax",
+            apply_weights: bool=False
         ) -> np.ndarray:
         """
         Take in a patch or a batch of patches of logits produced by the
@@ -192,12 +196,6 @@ class Predictor:
                 repeats=C,
             ).repeat_interleave(repeats=B, dim=0)
             patch *= W
-
-        # from gpu to cpu
-        if to_cpu:
-            pred = pred.detach()
-            if pred.is_cuda:
-                pred = pred.cpu()
 
         return pred 
 

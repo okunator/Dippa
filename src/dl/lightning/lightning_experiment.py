@@ -20,8 +20,8 @@ class SegExperiment(pl.LightningModule):
             model: nn.Module,
             experiment_name: str,
             experiment_version: str,
-            branch_losses: Dict[str, int],
-            metrics: Dict[str, List[str]],
+            branch_losses: Dict[str, int]=None,
+            metrics: Dict[str, List[str]]=None,
             optimizer_name: str="adam",
             edge_weights: Dict[str, float]=None,
             class_weights: Dict[str, bool]=None,
@@ -33,6 +33,9 @@ class SegExperiment(pl.LightningModule):
             scheduler_patience: int=3,
             lookahead: bool=False,
             bias_weight_decay: bool=True,
+            dataset_type: str="hover",
+            batch_size: int=8,
+            normalize_input: bool=False,
             inference_mode: bool=False,
             hparams_to_yaml: bool=True,
             **kwargs
@@ -49,10 +52,15 @@ class SegExperiment(pl.LightningModule):
                 Name of the experiment.
             experiment_version (str):
                 Name of the experiment version.
-            branch_losses (Dict[str, int], default={"inst": "ce_dice"})
+            branch_losses (Dict[str, int], default=None)
                 dictionary mapping multi-loss functions to the decoder
                 branches. Allowed losses: "ce", "dice", "iou", "focal",
                 "gmse", "mse", "sce", "tversky", "ssim"
+            metrics (Dict[str, List[str]], default=None):
+                Dictionary of branch name mapped to a List of metrics
+                The metrics are computed during training and
+                validation. Allowed metrics for now: accuracy ("acc"),
+                mean-iou ("miou").
             edge_weights (Dict[str, float], optional, default=None):
                 A dictionary of baranch names mapped to floats that are used
                 to weight nuclei edges in CE-based losses. e.g.
@@ -79,11 +87,15 @@ class SegExperiment(pl.LightningModule):
                 Encoder weight decay
             bias_weight_decay (bool):
                 Flag whether to apply weight decay for biases.
-            metrics (Dict[str, List[str]], default={"inst":["miou"]}):
-                Dictionary of branch name mapped to a List of metrics
-                The metrics are computed during training and
-                validation. Allowed metrics for now: accuracy ("acc"),
-                mean-iou ("miou").
+            dataset_type (str, default="hover"):
+                The dataset type that is used to train the model.
+                Specifies the auxilliary branch type if there is one.
+                One of: "hover", "dist", "contour", "basic", "unet"
+            batch_size (int, default=8):
+                Batch size for the dataloader during training
+            normalize_input (bool, default=False):
+                If True, channel-wise min-max normalization is applied 
+                to input imgs in the dataloading process during training
             inference_mode (bool, default=False):
                 Flag to signal that model is initialized for inference. 
                 This is only used in the Inferer class so no need to 
@@ -94,19 +106,11 @@ class SegExperiment(pl.LightningModule):
         """
         super().__init__()
         
-        # check that dict args have matching keys
-             
         # Save hparms   
         self.name = experiment_name
         self.version = experiment_version
-        self.metric_dict = metrics
-
-        # Loss args
-        self.branch_losses = branch_losses
-        self.edge_weights = edge_weights
-        self.class_weights = class_weights
-
-        # # Optimizer args
+        
+        # Optimizer args
         self.optimizer_name = optimizer_name
         self.decoder_learning_rate = dec_learning_rate
         self.encoder_learning_rate = enc_learning_rate 
@@ -116,6 +120,9 @@ class SegExperiment(pl.LightningModule):
         self.scheduler_patience = scheduler_patience
         self.lookahead = lookahead
         self.bias_weight_decay = bias_weight_decay
+        self.dataset_type = dataset_type
+        self.batch_size = batch_size,
+        self.normalize_input = normalize_input,
 
         self.save_hyperparameters(
             "experiment_name",
@@ -133,11 +140,13 @@ class SegExperiment(pl.LightningModule):
             "scheduler_patience",
             "lookahead",
             "bias_weight_decay",
+            "dataset_type",
+            "batch_size",
+            "normalize_input"
         )
         
         # init model
         self.model = model
-        self._validate_branch_args()
         # self.save_hyperparameters(ignore=["model"])
         
         # add model hparams
@@ -160,16 +169,24 @@ class SegExperiment(pl.LightningModule):
         self.hparams["dec_activation"] = model.dec_activation
         self.hparams["dec_normalization"] = model.dec_normalization
         self.hparams["dec_weight_standardize"] = model.dec_weight_standardize
+        self.hparams["dec_attention"] = model.dec_attention
         
-        if hparams_to_yaml:
-            self._hparams_to_yaml()
 
         if not inference_mode:
+            self.metric_dict = metrics
+            self.branch_losses = branch_losses
+            self.edge_weights = edge_weights
+            self.class_weights = class_weights
+            self._validate_branch_args()
+            
             self.criterion = self.configure_loss()
             metrics = self.configure_metrics()
             self.train_metrics = deepcopy(metrics)
             self.val_metrics = deepcopy(metrics)
             self.test_metrics = deepcopy(metrics)
+            
+        if hparams_to_yaml:
+            self._hparams_to_yaml()
             
     def _validate_branch_args(self) -> None:
         """
@@ -234,13 +251,9 @@ class SegExperiment(pl.LightningModule):
             enc_weight_decay=train_kwds.optimizer.encoder_weight_decay,
             bias_weight_decay=train_kwds.optimizer.bias_weight_decay,
             metrics=train_kwds.metrics,
-            num_epochs=train_kwds.num_epochs,
             batch_size=data_kwds.batch_size,
             dataset_type=data_kwds.dataset_type,
-            weight_map=data_kwds.weight_map,
             normalize_input=data_kwds.normalize_input,
-            rm_overlaps=data_kwds.rm_overlaps,
-            augmentations=data_kwds.augmentations,
             **kwargs
         )
         
@@ -255,22 +268,26 @@ class SegExperiment(pl.LightningModule):
         Construct SegExperiment from experiment name and version
         """
         exp_dir = RESULT_DIR / name / f"version_{version}"
-        assert exp_dir.exists(), (
-            f"experiment dir: {exp_dir} does not exist"
-        )
+        if not exp_dir.exists():
+            raise ValueError(f"experiment dir: {exp_dir} does not exist")
         
         hparams = exp_dir / "hparams_all.yml"
-        kwargs = OmegaConf.load(hparams)
-        kwargs["inference_mode"] = inference_mode
+        conf = OmegaConf.load(hparams)
         
-        model = MultiTaskSegModel(**kwargs)
-        return cls(model, **kwargs)
+        model = MultiTaskSegModel(**conf)
+
+        return cls(
+            model=model, 
+            inference_mode=inference_mode,
+            hparams_to_yaml=False,
+            **conf
+        )
     
     def _hparams_to_yaml(self) -> None:
         """
         Save hparams to yaml
         """
-        f = RESULT_DIR / self.name / f"version_{self.version}" / "hparams.yml"
+        f = RESULT_DIR / self.name / f"version_{self.version}" / "hparams_all.yml"
         f.parents[0].mkdir(exist_ok=True, parents=True)
         conf = OmegaConf.create(dict(self.hparams.items()))
         OmegaConf.save(conf, f=f)
@@ -295,7 +312,7 @@ class SegExperiment(pl.LightningModule):
         for k, metric in metrics_dict.items():
             branch = k.split("_")[0]
             if metric is not None:
-                act = None if branch == "aux" else "softmax"
+                act = None if "aux" in branch else "softmax"
                 ret[k] = metric(
                     preds[f"{branch}_map"], targets[f"{branch}_map"], act
                 )

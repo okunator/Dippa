@@ -77,6 +77,7 @@ class PostProcessor(ABC):
         # TODO: this will fail if the order of maps
         keys = ["fn", "inst_probs", "type_probs", "sem_probs", "aux_map"]
         maps = OrderedDict({k: v for k, v in zip(keys, maps)})
+        
         maps["inst_map"] = self.threshold(maps["inst_probs"])
 
         if maps["type_probs"] is not None:
@@ -118,7 +119,7 @@ class PostProcessor(ABC):
 
     def _parallel_pipeline(
             self,
-            maps: List[Tuple[np.ndarray]]
+            maps: List[Tuple[str, np.ndarray]]
         ) -> List[Tuple[str, np.ndarray]]:
         """
         Run post proc pipeline in parallel for each set of predictions
@@ -154,7 +155,7 @@ class PostProcessor(ABC):
 
     def threshold(self, prob_map: np.ndarray) -> np.ndarray:
         """
-        Thresholds the probability map from the network. 
+        Thresholds the probability map. 
 
         Args:
         ----------

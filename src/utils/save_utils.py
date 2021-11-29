@@ -75,7 +75,7 @@ def mask2mat(
             cell type labelled semantic segmentation mask from the
             segmentation model
         fname (str, default=None):
-            File name for the annotation json file. If None, no file is
+            File name for the annotation .mat file. If None, no file is
             written.
         save_dir (str):
             directory where the .mat files are saved

@@ -13,6 +13,7 @@ def _get_sample(input_size: int) -> torch.Tensor:
     return torch.ones([1, 3, input_size, input_size])
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("enc_name", ["tf_efficientnetv2_s", "resnet50"])
 @pytest.mark.parametrize("enc_depth", [5])
 @pytest.mark.parametrize("model_input_size", [64])
@@ -21,7 +22,7 @@ def _get_sample(input_size: int) -> torch.Tensor:
 @pytest.mark.parametrize("dec_channels", [[64, 64, 64, 64, 64]])
 @pytest.mark.parametrize("dec_n_blocks", [[1, 1, 1, 1, 1]])
 @pytest.mark.parametrize("dec_n_layers", [1, 2])
-@pytest.mark.parametrize("dec_short_skip", ["residual", None])
+@pytest.mark.parametrize("dec_short_skip", ["dense", "residual", None])
 @pytest.mark.parametrize("long_skip", ["unet", "unet3+"])
 @pytest.mark.parametrize("merge_policy", ["summation", "concatenate"])
 @pytest.mark.parametrize("normalization", ["bcn"])
@@ -77,7 +78,8 @@ def test_forward(
         assert map.shape[1] == dec_branches[key]
         assert tuple(map.shape[2:]) == (model_input_size, model_input_size)
         
-        
+   
+@pytest.mark.slow     
 @pytest.mark.parametrize("enc_name", ["tf_efficientnetv2_s", "resnet50"])
 @pytest.mark.parametrize("enc_depth", [5])
 @pytest.mark.parametrize("model_input_size", [64])
@@ -86,7 +88,7 @@ def test_forward(
 @pytest.mark.parametrize("dec_channels", [[64, 64, 64, 64, 64]])
 @pytest.mark.parametrize("dec_n_blocks", [[1, 1, 1, 1, 1]])
 @pytest.mark.parametrize("dec_n_layers", [1, 2])
-@pytest.mark.parametrize("dec_short_skip", ["residual", None])
+@pytest.mark.parametrize("dec_short_skip", ["dense", "residual", None])
 @pytest.mark.parametrize("dec_long_skip", ["unet", "unet3+"])
 @pytest.mark.parametrize("dec_merge_policy", ["summation", "concatenate"])
 @pytest.mark.parametrize("dec_normalization", ["bcn"])

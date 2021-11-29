@@ -27,6 +27,7 @@ def _get_dummy_target(
     return dummy_target
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("lookahead", [True, False])
 @pytest.mark.parametrize("bias_wd", [True, False])
 @pytest.mark.parametrize(
