@@ -4,7 +4,7 @@ import scipy.ndimage as ndi
 import skimage.morphology as morph
 
 from src.utils import percentile_normalize_and_clamp
-from ..thresholding import naive_thresh_prob
+from .._base._thresholding import naive_thresh_prob
 
 
 # Adapted from https://github.com/vqdang/hover_net/blob/tensorflow-final/src/postproc/other.py

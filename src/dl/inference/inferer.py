@@ -15,7 +15,7 @@ from src.utils import FileHandler, mask2geojson, mask2mat, label_sem_map
 from src.patching import TilerStitcherTorch
 from src.metrics import Benchmarker
 from src.dl.utils import tensor_to_ndarray
-from .post_processing.processor_builder import PostProcBuilder
+from .post_processing.utils import post_processor
 from .predictor import Predictor
 
 
@@ -399,8 +399,8 @@ class Inferer(FileHandler):
         self._validate_postproc_method()
         
         # init the post-processor
-        self.post_processor = PostProcBuilder.set_postprocessor(
-            post_proc_method=self.post_proc_method,
+        self.post_processor = post_processor(
+            self.post_proc_method,
             thresh_method=thresh_method,
             thresh=thresh
         )
@@ -416,6 +416,7 @@ class Inferer(FileHandler):
         self.branch_acts = branch_acts
         self.branch_weights = branch_weights
         self._validate_branch_args()
+        
         self.branch_args = {
             f"{k}_map": {"act": a, "apply_weights": w}
             for (k, a), w in zip(branch_acts.items(), branch_weights.values())
@@ -748,39 +749,26 @@ class Inferer(FileHandler):
         """
         Run the post processing pipeline
         """
-        assert "soft_insts" in self.__dict__.keys(), (
-            "No predictions found, run inference first."
-        )
+        if "soft_masks" not in self.__dict__.keys():
+            raise RuntimeError("""
+                No soft masks found. Inference need to be run before
+                post-processing.
+                """
+            )
 
-        maps = self.post_processor.run_post_processing(
-            inst_probs=self.soft_insts,
-            type_probs=self.soft_types,
-            sem_probs=self.soft_areas,
-            aux_maps=self.aux_maps,
-        )
+        maps = self.post_processor.run_post_processing(self.soft_masks)
+        
+        self.out_maps = {
+            k: deepcopy({})
+            for k in maps[0].keys() if k is not "fn"
+        }
 
-        # save results to dicts
-        self.inst_maps = OrderedDict()
-        self.type_maps = OrderedDict()
-        self.sem_maps = OrderedDict()
-        for res in maps:
-            name = res[0]
-            
-            imap = None
-            if "inst" in self.model.dec_branches.keys():
-                imap = res[1].astype("int32")
-
-            tmap = None
-            if "type" in self.model.dec_branches.keys():
-                tmap = res[2].astype("int32")
-
-            smap = None
-            if "sem" in self.model.dec_branches.keys():
-                smap = res[3].astype("int32")
-
-            self.inst_maps[name] = imap
-            self.type_maps[name] = tmap
-            self.sem_maps[name] = smap
+        for out_dict in maps:
+            name = out_dict["fn"]
+            for k in self.out_maps.keys():
+                if k in out_dict.keys():
+                    map = out_dict[k]
+                    self.out_maps[k][name] = map
 
     def run_inference(
             self, 

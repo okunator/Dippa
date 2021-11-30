@@ -31,7 +31,6 @@ from ..cellpose.post_proc import enhance_hover
 from src.utils.mask_utils import (
     remap_label,
     remove_debris,
-    binarize,
     remove_small_objects
 )
 
@@ -50,7 +49,7 @@ def post_proc_hover(
     Args:
     ----------
         inst_map (np.ndarray): 
-            Soft inst map. Shape: (H, W, 2)
+            Soft inst map. Shape: (H, W)
         aux_map (np.ndarray): 
             auxiliary map Shape: (H, W, 2). 
             aux_map[..., 0] = xmap, aux_map[..., 1] = ymap
@@ -63,8 +62,6 @@ def post_proc_hover(
     -----------
         np.ndarray: post-processed inst map. Shape (H, W)
     """
-
-    inst_map = binarize(inst_map)
     h_dir = cv2.normalize(
         aux_map[..., 0], None, alpha=0, beta=1,
         norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F

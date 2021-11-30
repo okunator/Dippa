@@ -4,7 +4,7 @@ import scipy.ndimage as ndi
 import skimage.morphology as morph
 import skimage.segmentation as segm
 
-from ..thresholding import naive_thresh_prob
+from .._base._thresholding import naive_thresh_prob
 from src.utils import (
     binarize, remove_small_objects, percentile_normalize_and_clamp
 )
@@ -39,7 +39,7 @@ def post_proc_dran(
     cnt_binary = cv2.dilate(cnt_binary, morph.disk(3), iterations=1)
 
     # thresh the binary map and remove artefacts
-    binary = binarize(naive_thresh_prob(prob_map))
+    binary = naive_thresh_prob(prob_map)
     binary = remove_small_objects(
         binary.astype(bool), min_size=10
     ).astype("uint8")

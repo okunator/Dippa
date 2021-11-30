@@ -37,6 +37,5 @@ model:
     branches:
       type: 7
       sem: 5
-      inst: 2
       aux: 2
     

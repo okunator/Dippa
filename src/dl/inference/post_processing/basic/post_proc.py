@@ -7,7 +7,7 @@ import skimage.filters as filters
 import skimage.util as util
 import scipy.ndimage as ndi
 
-from ..thresholding import niblack_thresh
+from .._base._thresholding import niblack_thresh
 
 from src.utils.mask_utils import (
     bounding_box, 
@@ -21,7 +21,6 @@ from src.utils.mask_utils import (
 
 def shape_index_watershed(
         prob_map: np.ndarray,
-        inst_map: np.ndarray,
         sigma: float=3.0,
         **kwargs
     ) -> np.ndarray:
@@ -35,8 +34,6 @@ def shape_index_watershed(
     ----------
         prob_map (np.ndarray): 
             The soft mask outputted from the network. Shape (H, W)
-        inst_map (np.ndarray): 
-            The instance map to be segmented. Shape (H, W)
         sigma (float, default=3.0): 
             Std for gaussian kernel before computing shape index
 
@@ -44,6 +41,7 @@ def shape_index_watershed(
     ----------
         np.ndarray: post-processed labelled inst_map
     """
+    inst_map = binarize(prob_map).astype("u4")
     s = feat.shape_index(prob_map, sigma=sigma)
     
     # Spherical cap

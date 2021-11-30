@@ -14,7 +14,10 @@ testpaths = [
     "src/dl/models/decoders/_tests",
     "src/dl/models/decoders/long_skips/_tests",
     "src/dl/models/modules/conv/blocks/_tests",
-    "src/dl/lightning/_tests"
+    "src/dl/lightning/_tests",
+    "src/dl/inference/_tests",
+    "src/dl/inference/post_processing/_tests",
+
 ]
 markers = [
     "slow: slow tests (deselect with '-m \"not slow\"')",

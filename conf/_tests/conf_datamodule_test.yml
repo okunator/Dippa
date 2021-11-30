@@ -5,7 +5,6 @@ datamodule:
   targets:
     - sem
     - type
-    - inst
   weight_map: False
   normalize_input: False
   rm_overlaps: False

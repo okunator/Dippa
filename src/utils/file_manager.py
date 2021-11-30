@@ -96,7 +96,9 @@ class FileHandler:
     @staticmethod
     def read_mask(
             path: Union[str, Path],
-            key: str="inst_map"
+            key: str="inst_map",
+            retype: bool=True,
+            return_all: bool=False,
         ) -> Union[np.ndarray, None]:
         """
         Read a mask from a .mat file. If a mask is not found with
@@ -106,33 +108,44 @@ class FileHandler:
         ---------
             path (str | Path):
                 Path to the image file.
-            key (str):
+            key (str, default="inst_map"):
                 name/key of the mask type that is being read from .mat
-        
+            retype (bool, default=True)
+                Convert the matrix type.
+            return_all (bool, default=False):
+                return the whole dict. Overrides the `key` arg
+            
         Returns:
         ----------
             np.ndarray or None: The mask indice matrix. Shape (H, W)
         """
-        assert key in (
-            "inst_map", "type_map", "inst_centroid", "inst_type", "sem_map"
-        )
-
         dtypes = {
-            "inst_map":"int32", 
-            "type_map":"int32", 
-            "sem_map":"int32",
-            "inst_centroid":"float64", 
-            "inst_type":"int32"
+            "inst_map": "int32", 
+            "type_map": "int32", 
+            "sem_map": "int32",
+            "inst_centroid": "float64", 
+            "inst_type": "int32"
         }
 
         path = Path(path)
-
-        assert path.exists(), f"{path} not found"
-
+        if not path.exists():
+            raise ValueError(f"{path} not found")
+        
         try:
-            mask = sio.loadmat(path.as_posix())[key].astype(dtypes[key])
+            mask = sio.loadmat(path.as_posix())
         except:
             mask = None
+        
+        if not return_all:
+            allowed = ("inst_map", "type_map", "inst_centroid", "inst_type", "sem_map")
+            if not key in allowed:
+                raise ValueError(f"""
+                    Illegal key given. Got {key}. Allowed: {allowed}"""
+                )
+            mask = mask[key]
+                
+            if retype:
+                mask = mask.astype(dtypes[key])
 
         return mask
     

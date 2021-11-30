@@ -113,7 +113,7 @@ def binarize(inst_map: np.ndarray) -> np.ndarray:
 
     Returns:
     -----------
-        np.ndarray: Binary mask. Shape (H, W).
+        np.ndarray: Binary mask. Shape (H, W). Type: uint8.
     """
     binary = np.copy(inst_map > 0)
     return binary.astype("uint8")
@@ -473,12 +473,32 @@ def type_map_flatten(type_map: np.ndarray) -> np.ndarray:
     return type_out
 
 
-def to_inst_map(binary_mask: np.ndarray) -> np.ndarray:
+def soft_type_flatten(type_map: np.ndarray) -> np.ndarray:
+    """
+    Flatten a one hot soft mask of shape (H, W, C).
+    
+    Args:
+    ---------
+        type_map (np.ndarray):
+            Soft mask of shape (H, W, C)
+        
+    Returns:
+    ---------
+        np.ndarray: Flattened soft mask of shape (H, W)
+    """
+    type_out = np.zeros([type_map.shape[0], type_map.shape[1]])
+    for i in range(1, type_map.shape[-1]):
+        type_tmp = type_map[..., i]
+        type_out += type_tmp
+    
+    return type_out
+
+
+def polish_mask(binary_mask: np.ndarray) -> np.ndarray:
     """
     Takes in a binary mask -> fill holes -> removes small objects -> 
-    label connected components. If class channel is included this 
-    assumes that binary_mask[..., 0] is the bg channel and 
-    binary_mask[..., 1] the foreground.
+    If class channel is included this assumes that binary_mask[..., 0]
+    is the bg channel and binary_mask[..., 1] the foreground.
 
     Args:
     -----------
@@ -487,16 +507,15 @@ def to_inst_map(binary_mask: np.ndarray) -> np.ndarray:
     
     Returns:
     -----------
-        np.ndarray: labelled instances np.ndarray of shape (H, W)
+        np.ndarray:  np.ndarray of shape (H, W) and type.
     """
     if len(binary_mask.shape) == 3:
         binary_mask = binary_mask[..., 1]
 
-    mask = ndi.binary_fill_holes(binary_mask)
-    mask = remove_small_objects(binary_mask.astype(bool), min_size=10)
-    inst_map = ndi.label(mask)[0]
+    out_mask = ndi.binary_fill_holes(binary_mask)
+    out_mask = remove_small_objects(binary_mask.astype(bool), min_size=10)
 
-    return inst_map
+    return out_mask.astype("u4")
 
 
 def cv2_opening(
@@ -576,7 +595,7 @@ def remove_debris(inst_map: np.ndarray, min_size: int = 10):
     -----------
         np.ndarray: Cleaned np.ndarray of shape (H, W)
     """
-    res = np.zeros(inst_map.shape, np.int32)
+    res = np.zeros(inst_map.shape, np.uint32)
     for ix in np.unique(inst_map)[1:]:
         nuc_map = np.copy(inst_map == ix)
         
@@ -585,12 +604,12 @@ def remove_debris(inst_map: np.ndarray, min_size: int = 10):
         x1 = x1 - 2 if x1 - 2 >= 0 else x1
         x2 = x2 + 2 if x2 + 2 <= inst_map.shape[1] - 1 else x2
         y2 = y2 + 2 if y2 + 2 <= inst_map.shape[0] - 1 else y2
-        nuc_map_crop = nuc_map[y1:y2, x1:x2].astype("int32")
+        nuc_map_crop = nuc_map[y1:y2, x1:x2].astype("u4")
 
         nuc_map_crop = remove_small_objects(
             nuc_map_crop.astype(bool), 
             min_size, connectivity=1
-        ).astype("int32")
+        ).astype("u4")
 
         nuc_map_crop[nuc_map_crop > 0] = ix
         res[y1:y2, x1:x2] += nuc_map_crop

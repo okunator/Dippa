@@ -1,9 +1,9 @@
 import numpy as np
 from collections import OrderedDict
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple
 
 from .post_proc import post_proc_cellpose
-from ..base_processor import PostProcessor
+from .._base._base_processor import PostProcessor
 
 
 class CellposePostProcessor(PostProcessor):
@@ -29,93 +29,46 @@ class CellposePostProcessor(PostProcessor):
             thresh (float, default = 0.5): 
                 threshold prob value. Used if `thresh_method` == "naive"
         """
-        super(CellposePostProcessor, self).__init__(thresh_method, thresh)
+        super().__init__(thresh_method, thresh)
         self.flows = OrderedDict()
 
     def post_proc_pipeline(
             self,
-            maps: List[np.ndarray]
-        ) -> Tuple[str, np.ndarray, np.ndarray]:
+            maps: Tuple[Dict[str, np.ndarray]],
+            save_flows: bool=False,
+        ) -> Dict[str, np.ndarray]:
         """
-        1. Threshold
-        2. Post process instance map
-        3. Combine type map and instance map
+        Run the Cellpose post-poc pipeline + additional refining
 
         Args:
         -----------
-            maps (List[np.ndarray]):
-                A list of the name of the file, soft masks, and hover
-                maps from the network
-
+            maps (Tuple[Dict[str, np.ndarray]]):
+                List of the post processing input values.
+            save_flows (bool, default=False):
+                Save flows to a class attribute
+            
+                
+        Example of `maps`:
+        -----------
+        ({"fn": "sample1"}, {"aux_map": np.ndarray}, {"inst_map": np.ndarray})
+                
         Returns:
         ----------
-            Tuple: the filename (str), instance segmentation mask (H, W)
-            and semantic segmentation mask (H, W).
+            Dict[str, np.ndarray]: A dictionary of the out type mapped
+                                   to a numpy array
         """
         maps = self._threshold_probs(maps)
-        cellpose_dict = post_proc_cellpose(maps["aux_map"], maps["inst_map"])
-        maps["inst_map"] = cellpose_dict["inst_map"]
-        maps["inst_map"], maps["type_map"] = self._finalize_inst_seg(maps)
+        cellpose_out = post_proc_cellpose(maps["aux_map"], maps["inst_map"])
+        maps["inst_map"] = cellpose_out["inst_map"]
+        maps = self._finalize(maps)
 
-        res = [
-            map for key, map in maps.items() 
+        res = {
+            key: map for key, map in maps.items() 
             if not any([l in key for l in ("probs", "aux")])
-        ]
+        }
 
-        # save the flows here to avoid complicating the inferer code
-        self.flows[maps["fn"]] = cellpose_dict["flows"]["flow"]
+        if save_flows:
+            self.flows[maps["fn"]] = cellpose_out["flows"]["flow"]
 
         return res
-
-    def run_post_processing(
-            self,
-            inst_probs: Dict[str, np.ndarray],
-            type_probs: Dict[str, np.ndarray],
-            sem_probs: Dict[str, np.ndarray],
-            aux_maps: Dict[str, np.ndarray],
-        ) -> List[Tuple[str, np.ndarray, np.ndarray]]:
-        """
-        Run post processing for all predictions
-
-        Args:
-        ------------
-            inst_probs (OrderedDict[str, np.ndarray]):
-                Ordered dict of (file name, soft instance map) pairs
-                inst_map shapes are (H, W, 2) 
-            type_probs (OrderedDict[str, np.ndarray]):
-                Ordered dict of (file name, type map) pairs.
-                type maps are in one hot format (H, W, n_classes).
-            sem_probs (Dict[str, np.ndarray]):
-                Dictionary of (file name, sem map) pairs.
-                sem maps are in one hot format (H, W, n_classes).
-            aux_maps (OrderedDict[str, np.ndarray]):
-                Ordered dict of (file name, hover map) pairs.
-                aux_map[..., 0] = horizontal map
-                aux_map[..., 1] = vertical map
-
-        Returns:
-        -----------
-           List: A list of tuples containing filename (str), 
-                  post-processed inst, aux, sem, and type map (ndarray).
-                  
-                  The output maps depend on the outputs of the network.
-                  If the network does not output type or sem maps,
-                  these are not contained in the result list.
-            
-            Output example:
-            [("filename1", aux_map, inst_map, type_map, sem_map),
-             ("filename2", aux_map, inst_map, type_map, sem_map)]
-        """
-        # Set arguments for threading pool
-        maps = list(
-            zip(
-                inst_probs.keys(), 
-                inst_probs.values(), 
-                type_probs.values(),
-                sem_probs.values(),
-                aux_maps.values(), 
-            )
-        )
-        seg_results = self._parallel_pipeline(maps)
-        
-        return seg_results
+    
