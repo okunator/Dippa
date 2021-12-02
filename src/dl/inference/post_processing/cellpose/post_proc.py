@@ -204,7 +204,7 @@ def follow_flows(dP: np.ndarray, niter: int=200) -> np.ndarray:
 
     p = np.array(p).astype(np.float32)
     
-    # run dynamics on subset of pixels. NOTE: Uses only xmap (dP[0])
+    # run dynamics on subset of pixels. NOTE: Uses only xmap or ymap (dP[0|1])
     inds = np.array(np.nonzero(np.abs(dP[1]) > 1e-3)).astype(np.int32).T
 
     # Interpolation mode

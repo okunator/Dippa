@@ -39,7 +39,7 @@ class HoverDataset(BaseDataset):
                 If True, the pixels that are touching between distinct
                 nuclear objects are removed from the masks.
         """
-        super(HoverDataset, self).__init__(
+        super().__init__(
             fname,
             transforms,
             target_types,

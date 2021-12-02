@@ -379,14 +379,17 @@ class FileHandler:
         ---------
             Path: path to the checkpoint file
         """
-        assert isinstance(which, int)
+        if not isinstance(which, int):
+            raise ValueError(f"arg `which` not an integer. Got: {which}")
 
         experiment_dir = Path(f"{RESULT_DIR}/{experiment}/version_{version}")  
-        assert experiment_dir.exists(), (
-            f"Experiment dir: {experiment_dir.as_posix()} does not exist.",
-            "It might be that you have `resume_training` set to True",
-            "but you are trying to run the experiment for the first time."
-        )
+        
+        if not experiment_dir.exists():
+            raise ValueError(f"""
+                Experiment dir: {experiment_dir.as_posix()} does not exist.
+                It might be that you have `resume_training` set to True
+                but you are trying to run the experiment for the first time."""
+            )
 
         cpt = None
         for it in experiment_dir.iterdir():
@@ -396,9 +399,12 @@ class FileHandler:
                 elif f"={which}-" in str(it) and cpt is None:
                     cpt = it
 
-        assert cpt is not None, (
-            f"ckpt: {cpt}. Checkpoint is None. Make sure that a .ckpt file",
-            f"exists in {experiment_dir}. If you dont want to resume training,"
-             "check that resume_training = False in experiment.yml"
-        )
+        if cpt is None:
+            raise ValueError(f"""
+                ckpt epoch #{which} is None. Make sure that a .ckpt file
+                exists in {experiment_dir}.
+                If you dont want to resume training check that 
+                `resume_training` = False in experiment.yml
+                """
+            )
         return cpt

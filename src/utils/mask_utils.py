@@ -390,7 +390,10 @@ def get_inst_types(
                    [1]], dtype=int32)
     """
     inst_ids = list(np.unique(inst_map))
-    inst_ids.remove(0)
+    
+    if 0 in inst_ids:
+        inst_ids.remove(0)
+    
     inst_types = np.full((len(inst_ids), 1), 0, dtype=np.int32)
     for j, id_ in enumerate(inst_ids):
         inst_type = np.unique(type_map[inst_map == id_])[0]

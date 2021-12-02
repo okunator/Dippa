@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -v -m required"
+addopts = "-ra -v"
 testpaths = [
     "src/data/datasets/_tests",
     "src/dl/losses/_tests",

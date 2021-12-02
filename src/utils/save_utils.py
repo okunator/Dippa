@@ -55,8 +55,8 @@ def poly2mask(
 
 
 def mask2mat(
-        inst_map: np.ndarray, 
-        type_map: np.ndarray, 
+        inst_map: np.ndarray,
+        type_map: np.ndarray,
         fname: Union[str, Path]=None,
         save_dir: Union[str, Path]=None
     ) -> None:
@@ -80,6 +80,14 @@ def mask2mat(
         save_dir (str):
             directory where the .mat files are saved
     """
+    save_dir = Path(save_dir)
+    fname = Path(fname).with_suffix(".mat").name
+    fn_mask = Path(save_dir / fname)
+    
+    if fname is not None:
+        if not Path(save_dir).exists():
+            FileHandler.create_dir(save_dir)
+    
     centroids = get_inst_centroid(inst_map)
     inst_types = get_inst_types(inst_map, type_map)
     inst_ids = list(np.unique(inst_map)[1:])
@@ -88,18 +96,14 @@ def mask2mat(
         for id_ in inst_ids]
     )
 
-    save_dir = Path(save_dir)
-    new_fname = Path(fname).with_suffix(".mat").name
-    fn_mask = Path(save_dir / new_fname)
-    
     scipy.io.savemat(
-        file_name=fn_mask,
+        file_name=fn_mask.as_posix(),
         mdict={
             "inst_map": inst_map,
-            "type_map":type_map,
-            "inst_type":inst_types,
-            "inst_centroid":centroids,
-            "inst_bbox":bboxes
+            "type_map": type_map,
+            "inst_type": inst_types,
+            "inst_centroid": centroids,
+            "inst_bbox": bboxes
         }
     )
 
@@ -271,7 +275,7 @@ def mask2geojson(
     inst_list = list(np.unique(inst_map))
     if 0 in inst_list:
         inst_list.remove(0)
-
+    
     geo_objs = []
     for inst_id in inst_list:
         # set up the annotation geojson obj
@@ -294,6 +298,7 @@ def mask2geojson(
         inst = np.array(inst_map == inst_id, np.uint8)
         inst_type = type_map[inst_map == inst_id].astype("uint8")
         inst_type = np.unique(inst_type)[0]
+        
         inst_type = [
             key for key in classes.keys() if classes[key] == inst_type
         ][0]

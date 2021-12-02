@@ -155,11 +155,12 @@ class BaseDataset(Dataset, FileHandler):
 
         # gather the augmented data to a dictionary
         res = {
-            k: torch.from_numpy(mask) 
+            k: torch.from_numpy(mask).long()
             for k, mask in aug_data.items()
-            if k != "image"
+            if k not in ("image")
         }
-        res["image"] = img # this is already a torch tensor so add here
+        
+        res["image"] = img.float()
         res["filename"] = self.fname
 
         return res

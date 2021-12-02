@@ -8,18 +8,9 @@ datasets/patches/npy/consep/*
 datasets/patches/npy/pannuke/*
 datasets/patches/zarr/*
 datasets/patches/tests/*
-datasets/data/kumar/test/*
-datasets/data/kumar/train/*
-datasets/data/kumar/orig/*
-datasets/data/kumar/original/*
-datasets/data/consep/test/*
-datasets/data/consep/train/*
-datasets/data/consep/orig/*
-datasets/data/consep/original/*
-datasets/data/pannuke/test/*
-datasets/data/pannuke/train/*
-datasets/data/pannuke/orig/*
-datasets/data/pannuke/original/*
+datasets/data/kumar/*
+datasets/data/consep/*
+datasets/data/pannuke/*
 datasets/data/monusac/*
 datasets/data/sartorius/*
 results/tests/*
@@ -41,3 +32,4 @@ docker-compose.yml
 .github
 .tox
 train.sh
+infer.sh

@@ -135,10 +135,8 @@ class Predictor:
             for i in range(patch.shape[0]):
                 patch[i] = util.minmax_normalize_torch(patch[i])
             
-        input_tensor = util.to_device(patch) # to cpu|gpu
-        
         with torch.no_grad():
-            out = self.model(input_tensor) # {[(B, 2, H, W), (B, C, H, W)]}
+            out = self.model(patch) # {[(B, 2, H, W), (B, C, H, W)]}
 
         return out
 

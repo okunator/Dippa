@@ -24,6 +24,7 @@ from ._thresholding import (
     naive_thresh_prob
 )
 
+
 class PostProcessor(ABC):
     def __init__(
             self,
@@ -82,8 +83,8 @@ class PostProcessor(ABC):
 
         Returns:
         -----------
-            List: A list of tuples containing filename (str), 
-                  post-processed segmentation and auxilliary maps
+            List: A list of dicts containing filename and map type keys, 
+                  mapped to post-processed seg and aux maps
                   
                   The output maps depend on the outputs of the network.
                   If the network does not output aux, type or sem maps,
@@ -92,10 +93,9 @@ class PostProcessor(ABC):
             Output example:
             
             [
-                ("filename1", aux_map, inst_map, type_map, sem_map),
-                ("filename2", aux_map, inst_map, type_map, sem_map)
-            ]
                 ({"fn": "sample1"}, {"aux": aux_map}, {"inst": inst_map}...)
+                ({"fn": "sample1"}, {"aux": aux_map}, {"inst": inst_map}...)
+            ]
         """
         map_types = list(out_maps.keys())
         fnames = out_maps[map_types[0]].keys()

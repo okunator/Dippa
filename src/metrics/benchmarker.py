@@ -7,13 +7,14 @@ from pathos.multiprocessing import ThreadPool as Pool
 from tqdm import tqdm
 
 from src.utils import remap_label, get_type_instances
-from .metrics import PQ, AJI, AJI_plus, DICE2, split_and_merge
+from .utils import benchmark_metric
 
 
 class Benchmarker:
     def compute_metrics(
-            self, 
-            true_pred: List[np.ndarray]
+            self,
+            true_pred: List[np.ndarray],
+            metrics: List[str]=["pq", "aji"],
         ) -> Dict[str, float]:
         """
         Computes metrics for one (inst_map, gt_mask) pair.
@@ -29,7 +30,6 @@ class Benchmarker:
         -----------
             A Dict[str, float] of the metrics
         """
-
         name = true_pred[0]
         true = true_pred[1]
         pred = true_pred[2]
@@ -38,27 +38,24 @@ class Benchmarker:
         if len(np.unique(true)) > 1:
             true = remap_label(true)
             pred = remap_label(pred)
-            pq = PQ(true, pred)
-            aji = AJI(true, pred)
-            aji_p = AJI_plus(true, pred)
-            dice2 = DICE2(true, pred)
-            splits, merges = split_and_merge(true, pred)
+            
+            met = {}
+            for m in metrics:
+                met[m] = benchmark_metric(m)               
 
-            result = {
-                "name":name,
-                "AJI": aji,
-                "AJI_plus": aji_p,
-                "DICE2": dice2,
-                "PQ": pq["pq"],
-                "SQ": pq["sq"],
-                "DQ": pq["dq"],
-                "inst_recall": pq["recall"],
-                "inst_precision": pq["precision"],
-                "splits": splits,
-                "merges": merges
-            }
-
-            return result
+            res = {}
+            for k, m in met.items():
+                score =  m(true, pred)
+                
+                if isinstance(score, dict):
+                    for n, v in score.items():
+                        res[n] = v
+                else:
+                    res[k] = score
+    
+            res["name"] = name
+            
+            return res
 
     def benchmark_insts(
             self,
@@ -77,18 +74,17 @@ class Benchmarker:
         Args:
         -----------
             inst_maps (OrderedDict[str, np.ndarray]): 
-                A dict of file_name:inst_map key vals in order
+                A dict of {file_name: inst_map} key vals in order
             gt_masks (OrderedDict[str, np.ndarray]): 
-                A dict of file_name:gt_inst_map key vals in order
+                A dict of {file_name: gt_inst_map} key vals in order
             pattern_list (List[str], default=None):
-                A list of patterns contained in the gt_mask and inst_map
+                A list of patterns in the gt_mask and inst_map
                 names. Averages for the masks containing these patterns 
                 will be added to the result df.
             save_dir (str or Path):
                 directory where to save the result .csv
             prefix (str, default=""):
                 adds a prefix to the .csv file name
-
 
         Returns:
         ----------
@@ -100,20 +96,26 @@ class Benchmarker:
             |img2  |.5|.4|.6|.6 |
             
         """
-        assert isinstance(inst_maps, dict), (
-            f"inst_maps: {type(inst_maps)} is not a dict of inst_maps"
-        )
-        assert isinstance(gt_masks, dict), (
-            f"inst_maps: {type(gt_masks)} is not a dict of inst_maps"
-        )
+        if not isinstance(inst_maps, dict):
+            raise ValueError(
+                f"`inst_maps`: {type(inst_maps)} is not a dict."
+            )
+        if not isinstance(gt_masks, dict):
+            raise ValueError(
+                f"`gt_masks`: {type(gt_masks)} is not a dict."
+            )
 
         # Sort by file name
         inst_maps = OrderedDict(sorted(inst_maps.items()))
         gt_masks = OrderedDict(sorted(gt_masks.items()))
-        assert inst_maps.keys() == gt_masks.keys(), (
-            "inst_maps have different names as gt masks. insts: ",
-            f"{inst_maps.keys()}. gt's: {gt_masks.keys()}"
-        )
+        
+        if inst_maps.keys() != gt_masks.keys():
+            raise ValueError(f"""
+                Mismatching keys in `inst_maps` and `gt_masks`. 
+                `inst_maps`: {inst_maps.keys()}.
+                `gt_masks`: {gt_masks.keys()}
+                """
+            )
 
         masks = list(
             zip(inst_maps.keys(), gt_masks.values(), inst_maps.values())
@@ -203,18 +205,22 @@ class Benchmarker:
             |img2_type2  |.5|.4|.6|.6 |
 
         """
-        assert isinstance(inst_maps, dict), (
-            f"inst_maps: {type(inst_maps)} is not a dict of inst_maps"
-        )
-        assert isinstance(type_maps, dict), (
-            f"inst_maps: {type(type_maps)} is not a dict of panoptic_maps"
-        )
-        assert isinstance(gt_mask_insts, dict), (
-            f"inst_maps: {type(gt_mask_insts)} is not a dict of inst_maps"
-        )
-        assert isinstance(gt_mask_types, dict), (
-            f"inst_maps: {type(gt_mask_types)} is not a dict of inst_maps"
-        )
+        if not isinstance(inst_maps, dict):
+            raise ValueError(
+                f"`inst_map`s: {type(inst_maps)} is not a dict."
+            )
+        if not isinstance(type_maps, dict):
+            raise ValueError(
+                f"`type_map`s: {type(type_maps)} is not a dict."
+            )
+        if not isinstance(gt_mask_insts, dict):
+            raise ValueError(
+                f"`gt_mask_insts`: {type(gt_mask_insts)} is not a dict."
+            )
+        if not isinstance(gt_mask_types, dict):
+            raise ValueError(
+                f"`gt_mask_types`: {type(gt_mask_types)} is not a dict."
+            )
 
         # sort by name
         inst_maps = OrderedDict(sorted(inst_maps.items()))
@@ -222,10 +228,13 @@ class Benchmarker:
         gt_mask_insts = OrderedDict(sorted(gt_mask_insts.items()))
         gt_mask_types = OrderedDict(sorted(gt_mask_types.items()))
 
-        assert inst_maps.keys() == gt_mask_insts.keys(), (
-            "inst_maps have different names as gt masks. insts: ",
-            f"{inst_maps.keys()}. gt's: {gt_mask_insts.keys()}"
-        )
+        if inst_maps.keys() != gt_mask_insts.keys():
+            raise ValueError(f"""
+                Mismatching keys in `inst_maps` and `gt_masks`. 
+                `inst_maps`: {inst_maps.keys()}.
+                `gt_masks_insts`: {gt_mask_insts.keys()}
+                """
+            )
 
         # Loop masks per class
         df_total = pd.DataFrame()

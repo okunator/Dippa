@@ -24,7 +24,6 @@ SOFTWARE.
 
 import numpy as np
 from typing import Dict
-from scipy import ndimage as ndi
 from scipy.optimize import linear_sum_assignment
 from skimage.metrics import variation_of_information
 
@@ -458,10 +457,10 @@ def conventional_metrics(
     specificity = TN/(TN+FP)
 
     return {
-        "dice":DICE1, 
-        "iou":JACCARD, 
-        "sensitivity":sensitivity, 
-        "specificity":specificity
+        "dice": DICE1, 
+        "iou": JACCARD, 
+        "sensitivity": sensitivity, 
+        "specificity": specificity
     }
 
 

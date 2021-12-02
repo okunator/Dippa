@@ -5,7 +5,6 @@ import pytorch_lightning as pl
 from typing import Dict, Tuple
 
 from src.settings import MODULE_DIR
-
 from src.dl.inference import Inferer
 from src.dl.lightning import SegExperiment
 from src.dl.models import MultiTaskSegModel
@@ -24,11 +23,10 @@ def model(input_size: int) -> pl.LightningModule:
     return lightning_model
 
 
-@pytest.mark.required
 @pytest.mark.parametrize("loader_batch_size", [1, 2])
 @pytest.mark.parametrize("stride_size", [80, 256])
-@pytest.mark.parametrize("patch_size", [(256, 256), (320, 320)])
-@pytest.mark.parametrize("fn_pattern", ["*_l*"])
+@pytest.mark.parametrize("patch_size", [(256, 256)])
+@pytest.mark.parametrize("fn_pattern", ["*_l*", "*_s*"])
 @pytest.mark.parametrize("branch_weights", [
     {"type": False, "sem": False, "aux": True, "inst": False},
 ])
@@ -59,7 +57,7 @@ def test_infer(
         loader_num_workers=1,
         model_batch_size=8,
         fn_pattern=fn_pattern,
-        test_mode=True
+        test_mode=True,
     )
     
     n_images_real = int(np.ceil(inferer.n_images / inferer.loader_batch_size))

@@ -20,8 +20,9 @@ def conv_func(name: str, **kwargs) -> nn.Module:
     -----------
         nn.Module: Initialized nn.Module.
     """
-    assert name in conv["CONV_LOOKUP"].keys(), (
-        f"Illegal conv func given. Allowed ones: {list(conv['CONV_LOOKUP'].keys())}"
+    allowed = list(conv["CONV_LOOKUP"].keys())
+    assert name in allowed, (
+        f"Illegal conv func given. Got: {name}. Allowed: {allowed}"
     )
 
     kwargs = kwargs.copy()
