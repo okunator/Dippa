@@ -155,7 +155,7 @@ class BaseDataset(Dataset, FileHandler):
 
         # gather the augmented data to a dictionary
         res = {
-            k: torch.from_numpy(mask).long()
+            k: torch.from_numpy(mask)
             for k, mask in aug_data.items()
             if k not in ("image")
         }
@@ -179,5 +179,5 @@ class BaseDataset(Dataset, FileHandler):
             np.ndarray: The nuclei border weight map. Shape (H, W) 
         """
         wmap = get_weight_map(inst_map)
-        wmap += 1 # uniform weight for all classes
+        wmap += 1
         return wmap

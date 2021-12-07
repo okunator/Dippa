@@ -100,6 +100,9 @@ class GSONTile:
 
         # drop empty geometries
         gdf = gdf[~gdf.is_empty]
+        
+        # drop geometries that are not polygons
+        gdf = gdf[gdf.geom_type == "Polygon"]
 
         try:
             # add bounding box coords of the polygons to the gdfs

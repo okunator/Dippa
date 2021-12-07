@@ -1,5 +1,6 @@
 import re
 import torch
+import numpy as np
 from torch.utils.data import Dataset
 from typing import Optional, Union, Tuple, List
 from pathlib import Path
@@ -49,7 +50,11 @@ class FolderDataset(Dataset, FileHandler):
                 or equal to this param in their filename. Works with 
                 tiles extracted with histoprep. 
                 See https://github.com/jopo666/HistoPrep 
-            auto_range (bool, default=False):
+            auto_range_y (bool, default=False):
+                Automatically filter tiles that contain ONE tissue 
+                section rather than every redundant tissue section in 
+                the wsi.
+            auto_range_x (bool, default=False):
                 Automatically filter tiles that contain ONE tissue 
                 section rather than every redundant tissue section in 
                 the wsi.
@@ -81,7 +86,7 @@ class FolderDataset(Dataset, FileHandler):
             self.fnames = sorted(folder_path.glob(pattern))
 
         # filter by xy-cooridnates encoded in the filename
-        if xmax is not None:
+        if xmax is not None and not auto_range:
             self.fnames = [
                 f for f in self.fnames 
                 if self._get_xy_coords(f.name)[0] <= xmax
@@ -93,11 +98,21 @@ class FolderDataset(Dataset, FileHandler):
             ]
         
         if auto_range:
-            ymin, ymax = self._get_auto_range(coord="y") # only y-axis for now
-            self.fnames = [
+            ymin, ymax = self._get_auto_range(self.fnames, coord="y")
+            fnamesy = [
                 f for f in self.fnames 
                 if ymin <= self._get_xy_coords(f.name)[1] <= ymax
             ]
+            
+            xmin, xmax = self._get_auto_range(fnamesy, coord="x", section_ix=0)
+            fnamesxy = [
+                f for f in fnamesy 
+                if xmin <= self._get_xy_coords(f.name)[0] <= xmax
+            ]
+            
+            self.fnames = fnamesy
+            if len(fnamesxy) > 0:
+                self.fnames = fnamesxy
 
     def _get_xy_coords(self, fname: str) -> List[int]:
         """
@@ -119,10 +134,12 @@ class FolderDataset(Dataset, FileHandler):
         return xy
 
     def _get_auto_range(
-            self, 
+            self,
+            fnames=List[Path],
             coord: str="y", 
             section_ix: int=0, 
-            section_length: int=6000
+            section_length: int=3000,
+            whitespace: int=6,
         ) -> Tuple[int, int]:
         """
         Automatically extract a range of tiles that contain a section
@@ -132,6 +149,8 @@ class FolderDataset(Dataset, FileHandler):
 
         Args:
         ---------
+            fnames (List[Path]):
+                a list of filenames
             coord (str, default="y"):
                 specify the range in either x- or y direction
             section_ix (int, default=0):
@@ -141,6 +160,8 @@ class FolderDataset(Dataset, FileHandler):
             section_length (int, default=6000):
                 Threshold to concentrate only on tissue sections that
                 are larger than 6000 pixels
+            whitespace (int, default=6):
+                The allowed num of white tiles between tissue sections.
 
         Returns:
         --------
@@ -149,32 +170,39 @@ class FolderDataset(Dataset, FileHandler):
         """
         ix = 1 if coord == "y" else 0
         coords = sorted(
-            set([self._get_xy_coords(f.name)[ix] for f in self.fnames])
+            set([self._get_xy_coords(f.name)[ix] for f in fnames])
         )
-
+  
         try:
+            diffs = list(np.diff(coords, 1))
+            diffs.append(self.tile_size[ix])
+
             splits = []
             split = []
-            for i in range(len(coords)-1):
-                if coords[i + 1] - coords[i] == self.tile_size[ix]:
+
+            for i, d in enumerate(diffs):
+                if d <= self.tile_size[ix]*whitespace:
                     split.append(coords[i])
                 else:
-                    if i < len(coords) - 1:
-                        split.append(coords[i]) 
+                    if i <= len(diffs):
+                        split.append(coords[i])
                     splits.append(split)
                     split = []
+                    
+            splits.append(split)
             
             ret_splits = [
                 split for split in splits 
                 if len(split) >= section_length//self.tile_size[ix]
             ]
             ret_split = ret_splits[section_ix]
+            
             return ret_split[0], ret_split[-1]
         except:
             # if there is only one tissue section, return min and max
-            print(coords)
             start = min(coords, key=lambda x: x[ix])[ix]
             end = max(coords, key=lambda x: x[ix])[ix]
+            
             return start, end
 
     def __len__(self) -> int:

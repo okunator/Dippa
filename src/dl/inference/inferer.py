@@ -231,7 +231,6 @@ class Inferer(FileHandler):
             num_workers=loader_num_workers
         )
 
-        # set apply weights flag for aux branch and prdeictor class
         self.predictor = Predictor(self.model, self.patch_size)
 
         # set the post-processing pipeline. Defaults to 
@@ -259,9 +258,11 @@ class Inferer(FileHandler):
         self._validate_branch_args()
         
         self.branch_args = {
-            f"{k}_map": {"act": a, "apply_weights": w}
-            for (k, a), w in zip(branch_acts.items(), branch_weights.values())
+            f"{k}_map": {"act": a}
+            for k, a in branch_acts.items()
         }
+        for k, val in branch_weights.items():
+            self.branch_args[f"{k}_map"]["apply_weights"] = val
            
     def _get_map_dict(self, val: str=None):
         return {
@@ -666,6 +667,10 @@ class Inferer(FileHandler):
         n_images_real = int(np.ceil(self.n_images / self.loader_batch_size))
         n_chunks = int(np.ceil(len(self.folderset.fnames) / self.n_images))
         loader = self._chunks(iterable=self.dataloader, size=n_images_real)
+        print(f"Inference for total of {len(self.folderset.fnames)} images")
+        
+        if save_dir is not None:
+            print(f"Inference will be run in {n_chunks} chunk(s).")
 
         for _ in range(n_chunks):
             self._infer(next(loader))
@@ -673,7 +678,10 @@ class Inferer(FileHandler):
 
             # save results to files
             if save_dir is not None:
-                for name, inst_map in tqdm(self.out_maps["inst_map"].items(), desc="saving..."):
+                for name, inst_map in tqdm(
+                    self.out_maps["inst_map"].items(),
+                    desc=f"saving to {fformat}..."
+                ):
                     if fformat == "geojson":
                         
                         # parse the offset coords from the inst key
