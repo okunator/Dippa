@@ -123,7 +123,7 @@ def main(params: Dict[str, Any]):
             c.merge(fname=fname_cells.as_posix())
             
             # rm the patch gsons
-            rm_tree(in_dir_cells)
+            # rm_tree(in_dir_cells)
         
         if "sem" in weights.keys():
             in_dir_areas = Path(res_dir / "areas")
@@ -133,7 +133,7 @@ def main(params: Dict[str, Any]):
             a.merge(fname=fname_areas.as_posix())
             
             # rm the patch gsons
-            rm_tree(in_dir_areas)
+            # rm_tree(in_dir_areas)
 
 
 if __name__ == '__main__':

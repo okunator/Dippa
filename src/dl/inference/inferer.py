@@ -313,16 +313,14 @@ class Inferer(FileHandler):
             var: Union[torch.Tensor, None],
             op: Callable,
             **kwargs
-        ) -> Union[torch.Tensor, None]:
+        ) -> torch.Tensor:
         """
         Applies the given torch operation `op` to the given variable 
         `var`. This exists to catch memory errors
         
         Basically, if some cumulative torch operation overflows the GPU 
         memory, this catches the error, detaches the input tensor from 
-        gpu and continues executing the operation on the cpu side. If 
-        the `var` is None or an empty list/string etc. then this returns
-        None for convenience.
+        gpu and continues executing the operation on the cpu side.
 
         Args:
         --------
@@ -334,7 +332,7 @@ class Inferer(FileHandler):
 
         Returns:
         --------
-            torch.Tensor or None: the ouput tensor or None
+            torch.Tensor: the ouput tensor
         """
         
         
