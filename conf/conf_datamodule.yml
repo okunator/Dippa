@@ -1,15 +1,16 @@
 datamodule:
   batch_size: 4
   num_workers: 4
-  dataset_type: hover
-  targets:
-    - sem
-    - type
   weight_map: False
   normalize_input: False
-  rm_overlaps: False
-  augmentations:
+  seg_targets:
+    - type
+    - sem
+  img_transforms:
     - hue_sat
-    - non_rigid
     - blur
+    - non_rigid
+  inst_transforms:
+    - hover
+    - dist
     

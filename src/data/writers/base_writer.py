@@ -1,9 +1,9 @@
 import numpy as np
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Callable
 from abc import ABC, abstractmethod
 
 from src.utils import FileHandler, fix_duplicates
-from ..datasets import rigid_augs_and_crop
+from ..datasets import compose, rigid_transforms, center_crop
 
 
 class BaseWriter(ABC, FileHandler):
@@ -76,14 +76,18 @@ class BaseWriter(ABC, FileHandler):
         ---------
             Tuple: A tuple of nd.arrays of the transformed patches.
         """
-        
+        transforms = compose([
+            rigid_transforms(),
+            center_crop(crop_shape[0], crop_shape[0])
+        ])
+
         imgs, masks = [], []
 
         patches_im = patches_im.astype("uint8")
         for i in range(patches_im.shape[0]):
-            cropped_patches = rigid_augs_and_crop(
+            cropped_patches = transforms(
                 image=patches_im[i],
-                masks=patches_mask[i],
+                masks=[patches_mask[i]],
                 crop_shape=crop_shape
             )
             imgs.append(cropped_patches["image"])

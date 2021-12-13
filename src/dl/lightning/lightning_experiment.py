@@ -312,7 +312,7 @@ class SegExperiment(pl.LightningModule):
         for k, metric in metrics_dict.items():
             branch = k.split("_")[0]
             if metric is not None:
-                act = None if "aux" in branch else "softmax"
+                act = None if branch in ("inst", "type", "sem") else "softmax"
                 ret[k] = metric(
                     preds[f"{branch}_map"], targets[f"{branch}_map"], act
                 )
@@ -332,37 +332,11 @@ class SegExperiment(pl.LightningModule):
         General training step. Runs all the required computations based 
         on the network architecture and other parameters.
         """
-        # Get data
-        x = batch["image"].float()
-        
         # Forward pass
-        soft_masks = self.forward(x)
-        branch_maps = soft_masks.keys()
-        
-        # Targets for the loss
-        targets = {}
-        
-        targets["inst_map"] = None
-        if "inst_map" in branch_maps:
-            targets["inst_map"] = batch["binary_map"].long()
+        soft_masks = self.forward(batch["image"])
 
-        targets["type_map"] = None
-        if "type_map" in branch_maps:
-            targets["type_map"] = batch["type_map"].long()
-
-        targets["sem_map"] = None
-        if "sem_map" in branch_maps:
-            targets["sem_map"] = batch["sem_map"].long()
-
-        targets["aux_map"] = None
-        if "aux_map" in branch_maps:
-            targets["aux_map"] = batch["aux_map"].float()
-            
-        targets["weight"] = None
-        if self.edge_weights:
-            targets["weight_map"] = batch["weight_map"].float()
-        
         # Compute loss
+        targets = {k: val for k, val in batch.items() if k != "image"}
         loss = self.criterion(yhats=soft_masks, targets=targets)
 
         # Compute metrics for monitoring
@@ -426,8 +400,8 @@ class SegExperiment(pl.LightningModule):
                 on_epoch=True, on_step=False
             )
         
-        # If batch_idx = 0, sends outputs to wandb logger
-        if batch_idx in (0, 1, 2):
+        # If batch_idx in (0, 10, 50), sends outputs to wandb logger
+        if batch_idx in (0, 10, 50):
             return soft_masks
         
     def test_step(

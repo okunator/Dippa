@@ -226,7 +226,7 @@ def filter2D(
 def binarize(mask: torch.Tensor) -> torch.Tensor:
     mask[mask > 0] = 1
     
-    return mask.type("torch.ByteTensor")
+    return mask.type("torch.LongTensor")
 
 
 # def count_parameters(model):

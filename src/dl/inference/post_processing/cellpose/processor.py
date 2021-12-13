@@ -1,5 +1,4 @@
 import numpy as np
-from collections import OrderedDict
 from typing import Dict, Tuple
 
 from .post_proc import post_proc_cellpose
@@ -16,7 +15,7 @@ class CellposePostProcessor(PostProcessor):
         """
         Wrapper class to run the CellPose post processing pipeline for 
         networks outputting instance maps, Optional[type maps], 
-        and horizontal & vertical maps.
+        and horizontal & vertical flows.
 
         CellPose:
         https://www.nature.com/articles/s41592-020-01018-x
@@ -30,7 +29,7 @@ class CellposePostProcessor(PostProcessor):
                 threshold prob value. Used if `thresh_method` == "naive"
         """
         super().__init__(thresh_method, thresh)
-        self.flows = OrderedDict()
+        self.flows = None
 
     def post_proc_pipeline(
             self,
@@ -58,17 +57,23 @@ class CellposePostProcessor(PostProcessor):
                                    to a numpy array
         """
         maps = self._threshold_probs(maps)
-        cellpose_out = post_proc_cellpose(maps["aux_map"], maps["inst_map"])
-        maps["inst_map"] = cellpose_out["inst_map"]
+        inst_map = post_proc_cellpose(
+            flow_map=maps["aux_map"],
+            inst_map=maps["inst_map"],
+            return_flows=save_flows
+        )
+        
+        if isinstance(inst_map, tuple):
+            inst_map = inst_map[0]
+            self.flows = inst_map[1]
+            
+        maps["inst_map"] = inst_map
         maps = self._finalize(maps)
 
         res = {
             key: map for key, map in maps.items() 
             if not any([l in key for l in ("probs", "aux")])
         }
-
-        if save_flows:
-            self.flows[maps["fn"]] = cellpose_out["flows"]["flow"]
 
         return res
     

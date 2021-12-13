@@ -52,7 +52,6 @@ class MultiTaskSegModel(BaseMultiTaskSegModel):
                 The types of decoders that are used for this multi-task
                 seg model mapped to the number of output classes from
                 that branch. The keys need to be unique in the dict.
-                Allowed keys: "inst", "type", "aux", "sem"
             model_input_size (int, default=256):
                 The input image size of the model. Assumes that input 
                 images are square patches i.e. H == W.
@@ -131,14 +130,8 @@ class MultiTaskSegModel(BaseMultiTaskSegModel):
         self.dec_attention = dec_attention
         
         dec_branches = OrderedDict(dec_branches)
-        allowed_branches = ["inst", "type", "sem", "aux"]
+        
         given_branches = list(dec_branches.keys())
-        if not all(k in allowed_branches for k in dec_branches.keys()):
-            raise ValueError(f"""
-                Invalid branch type given. Got: {given_branches}.
-                Allowed: {allowed_branches}"""
-            )
-            
         if len(dec_branches) != len(set(dec_branches.keys())):
             raise ValueError(f"""
                 Branch names need to be unique. Got {given_branches}."""

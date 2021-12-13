@@ -12,13 +12,11 @@ from ..downloaders import PANNUKE
 class PannukeDataModule(BaseDataModule):
     def __init__(
             self,
-            target_types: List[str],
-            database_type: str="hdf5",
-            dataset_type: str="hover",
-            augs: List[str]=["hue_sat", "non_rigid", "blur"],
+            seg_targets: List[str],
+            img_transforms: List[str],
+            inst_transforms: List[str],
             normalize: bool=False,
             return_weight_map: bool=False,
-            rm_touching_nuc_borders: bool=False,
             batch_size: int=8,
             num_workers: int=8,
             download_dir: Union[str, Path]=None,
@@ -44,28 +42,24 @@ class PannukeDataModule(BaseDataModule):
 
         Args:
         -----------
-            target_types (List[str]):
-                A list of the targets that are loaded during dataloading
-                process. Allowed values: "inst", "type".
-            database_type (str, default="hdf5"):
-                One of ("zarr", "hdf5"). The files are written in either
-                zarr or hdf5 files that is used by the torch dataloader 
-                during training.
-            dataset_type (str, default="hover"):
-                The dataset type. One of: "hover", "dist", "contour",
-                "basic", "unet"
-            augs (List, default=["hue_sat","non_rigid","blur"])
-                List of augs. Allowed augs: "hue_sat", "rigid",
-                "non_rigid", "blur", "non_spatial", "normalize"
+            seg_targets (List[str]):
+                A list of target map names needed for the loss cfunc.
+                All the segmentation targets that are not in this list
+                are deleted to save memory
+            img_transforms (albu.Compose): 
+                Albumentations.Compose obj (a list of transformations).
+                All the transformations that are applied to the input
+                images and corresponding masks
+            inst_transforms (ApplyEach):
+                ApplyEach obj. (a list of augmentations). All the
+                transformations that are applied to only the instance
+                labelled masks.
             normalize (bool, default=False):
                 If True, channel-wise min-max normalization is applied 
                 to input imgs in the dataloading process
             return_weight_map (bool, default=False):
                 Include a nuclear border weight map in the dataloading
                 process
-            rm_touching_nuc_borders (bool, default=False):
-                If True, the pixels that are touching between distinct
-                nuclear objects are removed from the masks.
             batch_size (int, default=8):
                 Batch size for the dataloader
             num_workers (int, default=8):
@@ -81,10 +75,8 @@ class PannukeDataModule(BaseDataModule):
                 Dippa/patches/pannuke/ folders
             
         """
-        self.database_type = database_type
-        self.suffix = ".h5" if self.database_type == "hdf5" else ".zarr"
-        
-        self.database_dir = Path(PATCH_DIR  / f"{database_type}" / "pannuke")
+        self.suffix = ".h5"
+        self.database_dir = Path(PATCH_DIR  / "hdf5" / "pannuke")
         if database_dir is not None:
             self.database_dir = Path(database_dir)
             
@@ -104,24 +96,15 @@ class PannukeDataModule(BaseDataModule):
         db_test = Path(
             self.database_dir / f"test_pannuke"
         ).with_suffix(self.suffix)
-            
-        # Pannuke data contains inst and type seg masks
-        allowed_targets = ("type", "inst")
-        if not all(t in allowed_targets for t in target_types):
-            raise ValueError(f"""
-                Allowed targets for pannuke dataset: {allowed_targets}. Got:
-                {target_types}."""
-            )
-        
+             
         super().__init__(
             db_train,
             db_test,
-            target_types,
-            dataset_type,
-            augs,
+            seg_targets,
+            img_transforms,
+            inst_transforms,
             normalize,
             return_weight_map,
-            rm_touching_nuc_borders,
             batch_size,
             num_workers
         )
@@ -267,8 +250,8 @@ class PannukeDataModule(BaseDataModule):
                 mask_dir=fold1["mask_train"],
                 save_dir=self.database_dir,
                 phase="train",
-                database_type=self.database_type,
-                classes=self.class_dicts(),
+                database_type="hdf5",
+                classes=self.class_dicts()[0],
                 augment=True,
                 n_copies=3
             )
@@ -279,8 +262,8 @@ class PannukeDataModule(BaseDataModule):
                 mask_dir=fold1["mask_test"],
                 save_dir=self.database_dir,
                 phase="test",
-                database_type=self.database_type,
-                classes=self.class_dicts(),
+                database_type="hdf5",
+                classes=self.class_dicts()[0],
                 augment=False,
                 n_copies=None,
             )

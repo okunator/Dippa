@@ -293,7 +293,7 @@ class Inferer(FileHandler):
         allowed = ("basic")
         if "aux" in self.model.hparams["dec_branches"].keys():
             if self.model.hparams["dataset_type"] == "hover":
-                allowed = ("hover", "cellpose", "basic")
+                allowed = ("hover", "omnipose", "cellpose", "cellpose0", "basic")
             elif self.model.hparams["dataset_type"] == "dist":
                 allowed = ("drfns", "basic")
             elif self.model.hparams["dataset_type"] == "contour":

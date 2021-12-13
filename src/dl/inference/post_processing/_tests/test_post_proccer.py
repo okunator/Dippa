@@ -23,7 +23,7 @@ def _get_samples(target_types: List[str], aux_type: str):
 
 # @pytest.mark.parametrize("method", ["hover", "cellpose", "drfns", "dcan", "dran", "basic"])
 @pytest.mark.filterwarnings("ignore::UserWarning", "ignore::RuntimeWarning")
-@pytest.mark.parametrize("method", ["cellpose", "hover", "basic"])
+@pytest.mark.parametrize("method", ["omnipose", "cellpose", "hover", "basic"])
 @pytest.mark.parametrize("aux_type", ["hover"])
 @pytest.mark.parametrize("thresh_method", ["naive", "argmax", "sauvola", "niblack"])
 @pytest.mark.parametrize("target_types", [

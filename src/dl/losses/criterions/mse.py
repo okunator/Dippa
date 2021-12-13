@@ -47,10 +47,12 @@ class MSE(WeightedBaseLoss):
         ----------
             torch.Tensor: Computed mse loss (scalar or pixelwise matrix)
         """
-        
         target_one_hot = target
         if target.size() != yhat.size():
-            target_one_hot = one_hot(target, yhat.shape[1])
+            if target.dtype == torch.float32:
+                target_one_hot = target.unsqueeze(1)
+            else:
+                target_one_hot = one_hot(target, yhat.shape[1])
 
         mse =  F.mse_loss(yhat, target_one_hot, reduction="none") # (B, C, H, W)
         mse = torch.mean(mse, dim=1) # to (B, H, W)

@@ -5,7 +5,7 @@ from typing import Dict, Optional
 
 try:
     import wandb
-except ImportError as e:
+except ImportError:
     raise ImportError("wandb required. `pip install wandb`")
 
 
@@ -37,7 +37,7 @@ class WandbImageCallback(pl.Callback):
         Logs the inputs and outputs of the model
         at the first validation batch to weights and biases.
         """
-        if batch_idx in (0, 1, 2):
+        if batch_idx in (0, 10, 50):
             log_dict = {
                 "global_step": trainer.global_step,
                 "epoch": trainer.current_epoch

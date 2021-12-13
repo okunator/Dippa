@@ -13,7 +13,9 @@ training:
       - miou
     sem:
       - miou
-    aux:
+    hover:
+      - null
+    dist:
       - null
 
   optimizer:
@@ -31,12 +33,15 @@ training:
     class_weights:
       type: null
       sem: null
-      aux: null
+      hover: null
+      dist: null
     edge_weights:
       type: null
       sem: null
-      aux: null 
+      hover: null
+      dist: null
     branch_losses:
       type: tversky_focal_ssim
       sem: tversky_focal_ssim
-      aux: mse_ssim
+      hover: mse_ssim
+      dist: mse_ssim

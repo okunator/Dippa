@@ -1,14 +1,16 @@
-from .basic.dataset import BasicDataset
-from .unet.dataset import UnetDataset
-from .hover.dataset import HoverDataset
-from .dist.dataset import DistDataset
-from .contour.dataset import ContourDataset
-
-from ._base._augs import (
+from ._transforms._base_transforms import (
     rigid_transforms, non_rigid_transforms, hue_saturation_transforms,
     blur_transforms, non_spatial_transforms, random_crop, center_crop,
-    resize, normalize, to_tensor, compose, rigid_augs_and_crop
+    resize, normalize, to_tensor
 )
+
+from ._transforms._inst_transforms import (
+    hover_transform, cellpose_transform, omnipose_transform, dist_transform,
+    smooth_dist_transform, contour_transform, rm_borders_transform,
+    edgeweight_transform, binarize_transform
+)
+
+from ._transforms._composition import apply_each, compose
 
 
 AUGS_LOOKUP = {
@@ -24,19 +26,24 @@ AUGS_LOOKUP = {
 }
 
 
-DS_LOOKUP = {
-    "basic": "BasicDataset",
-    "hover": "HoverDataset",
-    "dist": "DistDataset",
-    "contour": "ContourDataset",
-    "unet": "UnetDataset"
+AUX_LOOKUP = {
+    "hover": "hover_transform",
+    "cellpose": "cellpose_transform",
+    "omnipose": "omnipose_transform",
+    "dist": "smooth_dist_transform",
+    "contour": "contour_transform",
+    "edge_weight": "edgeweight_transform",
+    "binarize": "binarize_transform",
+    "rm_borders": "rm_borders_transform"
 }
 
 
 __all__ = [
-    "AUGS_LOOKUP", "DS_LOOKUP", "rigid_transforms", "non_rigid_transforms",
+    "AUGS_LOOKUP", "AUX_LOOKUP", "rigid_transforms", "non_rigid_transforms",
     "hue_saturation_transforms", "blur_transforms", "non_spatial_transforms",
-    "random_crop", "center_crop", "resize", "normalize", "ContourDataset",
-    "DistDataset", "HoverDataset", "UnetDataset", "BasicDataset", "to_tensor",
-    "compose", "rigid_augs_and_crop"
+    "random_crop", "center_crop", "resize", "normalize", "to_tensor",
+    "compose", "apply_each", "hover_transform", "cellpose_transform",
+    "omnipose_transform", "dist_transform", "smooth_dist_transform",
+    "contour_transform", "rm_borders_transform", "edgeweight_transform",
+    "binarize_transform"
 ]

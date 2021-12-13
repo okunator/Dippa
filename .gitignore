@@ -11,6 +11,7 @@ datasets/patches/tests/*
 datasets/data/kumar/*
 datasets/data/consep/*
 datasets/data/pannuke/*
+datasets/data/ovca/*
 datasets/data/monusac/*
 datasets/data/sartorius/*
 results/tests/*

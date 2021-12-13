@@ -1,5 +1,4 @@
 import pytorch_lightning as pl
-from copy import deepcopy
 from pathlib import Path
 from typing import List, Optional
 from torch.utils.data import DataLoader
@@ -13,12 +12,12 @@ class BaseDataModule(pl.LightningDataModule, FileHandler):
             self,
             train_db_path: str,
             test_db_path: str,
-            target_types: List[str],
-            dataset_type: str="hover",
-            augs: List[str]=["hue_sat", "non_rigid", "blur"],
+            seg_targets: List[str],
+            img_transforms: List[str],
+            inst_transforms: List[str],
             normalize: bool=False,
             return_weight_map: bool=False,
-            rm_touching_nuc_borders: bool=False,
+            input_size: int=256,
             batch_size: int=8,
             num_workers: int=8
         ) -> None:
@@ -32,24 +31,26 @@ class BaseDataModule(pl.LightningDataModule, FileHandler):
                 Path to the hdf5/zarr train database
             test_db_path (str):
                 Path to the hdf5/zarr test database
-            target_types (List[str]):
-                A list of the targets that are loaded during dataloading
-                process. Allowed values: "inst", "type", "sem".
-            dataset_type (str, default="hover"):
-                The dataset type. One of: "hover", "dist", "contour",
-                "basic", "unet"
-            augs (List, default=["hue_sat","non_rigid","blur"])
-                List of augs. Allowed augs: "hue_sat", "rigid",
-                "non_rigid", "blur", "non_spatial", "normalize"
+            seg_targets (List[str]):
+                A list of target maps needed for the loss computation.
+                All the segmentation targets that are not in this list
+                are deleted to save memory
+            img_transforms (albu.Compose): 
+                Albumentations.Compose obj (a list of transformations).
+                All the transformations that are applied to the input
+                images and corresponding masks
+            inst_transforms (ApplyEach):
+                ApplyEach obj. (a list of augmentations). All the
+                transformations that are applied to only the instance
+                labelled masks.
             normalize (bool, default=False):
                 If True, channel-wise min-max normalization is applied 
                 to input imgs in the dataloading process
             return_weight_map (bool, default=False):
                 If True, a weight map is loaded during dataloading
                 process for weighting nuclear borders.
-            rm_touching_nuc_borders (bool, default=False):
-                If True, the pixels that are touching between distinct
-                nuclear objects are removed from the masks.
+            input_size (int):
+                Size of the height and width of the input images
             batch_size (int, default=8):
                 Batch size for the dataloader
             num_workers (int, default=8):
@@ -61,54 +62,46 @@ class BaseDataModule(pl.LightningDataModule, FileHandler):
         self.db_fname_train = Path(train_db_path)
         self.db_fname_test = Path(test_db_path)
         
-        self.augs = augs
+        self.img_transforms = img_transforms
+        self.inst_transforms = inst_transforms
+        self.seg_targets = seg_targets
+        self.input_size = input_size
         self.norm = normalize
-        self.rm_nuc_borders = rm_touching_nuc_borders
         self.return_weight_map = return_weight_map
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.dataset_type = dataset_type
         
-        self.target_types = deepcopy(target_types)
-                
-        if dataset_type in ("hover", "dist", "contour"):
-            self.target_types.append("aux")
-
     def setup(self, stage: Optional[str] = None) -> None:
         self.trainset = prepare_dataset(
-            fname=self.db_fname_train.as_posix(),
-            name=self.dataset_type,
+            fname=self.db_fname_train,
             phase="train",
-            augs=self.augs,
-            input_size=256,
-            target_types=self.target_types,
+            seg_targets=self.seg_targets,
+            img_transforms=self.img_transforms,
+            inst_transforms=self.inst_transforms,
+            input_size=self.input_size,
             normalize_input=self.norm,
-            return_weight_map = self.return_weight_map,
-            rm_touching_nuc_borders=self.rm_nuc_borders,
+            return_weight_map=self.return_weight_map,
 
         )
         self.validset = prepare_dataset(
-            fname=self.db_fname_train.as_posix(),
-            name=self.dataset_type,
+            fname=self.db_fname_test,
             phase="valid",
-            augs=self.augs,
-            input_size=256,
-            target_types=self.target_types,
+            seg_targets=self.seg_targets,
+            img_transforms=[],
+            inst_transforms=self.inst_transforms,
+            input_size=self.input_size,
             normalize_input=self.norm,
-            return_weight_map = self.return_weight_map,
-            rm_touching_nuc_borders=self.rm_nuc_borders,
-
+            return_weight_map=self.return_weight_map,
         )
         self.testset = prepare_dataset(
-            fname=self.db_fname_train.as_posix(),
-            name=self.dataset_type,
-            phase="test",
-            augs=self.augs,
-            input_size=256,
-            target_types=self.target_types,
+            fname=self.db_fname_test,
+            phase="valid",
+            seg_targets=self.seg_targets,
+            img_transforms=[],
+            inst_transforms=self.inst_transforms,
+            input_size=self.input_size,
             normalize_input=self.norm,
-            return_weight_map = self.return_weight_map,
-            rm_touching_nuc_borders=self.rm_nuc_borders,
+            return_weight_map=self.return_weight_map,
         )
 
     def train_dataloader(self) -> DataLoader:

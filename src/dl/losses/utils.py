@@ -48,7 +48,6 @@ def multitaskloss_func(
             f"Got: {class_weights.keys()} and {names.keys()}"
         )
         
-    
     allowed_seg = mtl['JOINT_SEG_LOSSES']
     allowed_reg = mtl['JOINT_AUX_LOSSES']
 

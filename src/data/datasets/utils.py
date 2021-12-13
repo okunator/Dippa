@@ -1,7 +1,8 @@
-from typing import List, Dict, Union
+from typing import Union, Callable
 from torch.utils.data import Dataset
 from pathlib import Path
 
+from .dataset import SegDataset
 from . import *
 
 
@@ -10,14 +11,13 @@ ds = vars()
 
 def prepare_dataset(
         fname: Union[str, Path],
-        name: str,
         phase: str,
-        augs: List[str],
+        img_transforms: Callable,
+        inst_transforms: Callable,
         input_size: int,
-        target_types: List[str],
-        normalize_input: bool,
-        return_weight_map: bool,
-        rm_touching_nuc_borders: bool,
+        seg_targets: int,
+        normalize_input: bool=False,
+        return_weight_map: bool=False,
     ) -> Dataset:
     """
     Initialize a torch Dataset based on given args.
@@ -27,70 +27,83 @@ def prepare_dataset(
         fname (str or Path):
             The path to the h5/zarr db where the targets and input imgs
             are saved
-        name (str):
-            The name of the dataset type. Use lowercase letters.
-            Allowed: ("hover", "unet", "basic", "contour", "dist")
         phase (str):
             The dataset phase. Allowed: ("train", "test", "valid")
-        augs (List[str]):
-            List of augmentations. Allowed: "rigid", "non_rigid", 
-            "hue_sat", "blur", "non_spatial", "random_crop", 
-            "center_crop", "resize"
+        img_transforms (albu.Compose): 
+            Albumentations.Compose obj (a list of transformations).
+            All the transformations that are applied to the input
+            images and corresponding masks
+        inst_transforms (ApplyEach):
+            ApplyEach obj. (a list of augmentations). All the
+            transformations that are applied to only the instance
+            labelled masks.
         input_size (int):
             Size of the height and width of the input images
-        target_types (List[str]):
-            A list of the targets that are loaded during dataloading
-            process. Allowed values: "inst", "type", "sem".
         normalize_input (bool, default=False):
             apply minmax normalization to input images after 
             transforms
         return_weight_map (bool, default=False):
             Include a nuclear border weight map in the dataloading
             process
-        rm_touching_nuc_borders (bool, default=False):
-            If True, the pixels that are touching between distinct
-            nuclear objects are removed from the masks.
 
     Returns:
     -----------
         Dataset: Initialized torch Dataset.
     """
-    assert Path(fname).exists(), (
-        f"Given `fname`: {fname} does not exists."
-    )
-    
-    allowed_ds = ds["DS_LOOKUP"].keys()
-    assert name in allowed_ds, (
-        f"Illegal dataset name given. Allowed: {allowed_ds}. Got {name}."
-    )
-    
-    allowed_phase = ("train", "test", "valid")
-    assert phase in allowed_phase, (
-        f"Illegal phase given. Allowed: {allowed_phase}. Got {phase}."
-    )
-    
-    if augs is not None:
-        allowed_augs = ds["AUGS_LOOKUP"].keys()
-        assert all(aug in allowed_augs for aug in augs), (
-            f"Illegal augmentation given. Allowed: {allowed_augs}. Got {augs}."
+    if not Path(fname).exists():
+        raise ValueError(
+            f"Given `fname`: {fname} does not exists."
         )
+        
+    allowed_phase = ("train", "test", "valid")
+    if not phase in allowed_phase:
+       raise ValueError(
+            f"Illegal phase given. Allowed: {allowed_phase}. Got {phase}."
+        )
+    
+    if img_transforms is not None:
+        allowed_augs = ds["AUGS_LOOKUP"].keys()
+        if not all(aug in allowed_augs for aug in img_transforms):
+            raise ValueError(f"""
+                Illegal augmentation given in `img_transforms`.
+                Allowed: {allowed_augs}.
+                Got {img_transforms}."""
+            )
+        
+    if inst_transforms is not None:
+        allowed_augs = ds["AUX_LOOKUP"].keys()
+        if not all(aug in allowed_augs for aug in inst_transforms):
+            raise ValueError(f"""
+                Illegal augmentation given in `inst_transforms`.
+                Allowed: {allowed_augs}.
+                Got {inst_transforms}."""
+            )
     
     # init augmentations
     aug_list = []
-    if augs is not None and phase == "train":
+    if img_transforms is not None and phase == "train":
         kwargs={"height": input_size, "width": input_size}
-        aug_list = [ds[ds["AUGS_LOOKUP"][aug]](**kwargs) for aug in augs]
-        
-    aug_list.append(ds["to_tensor"]())
+        aug_list = [
+            ds[ds["AUGS_LOOKUP"][aug]](**kwargs) for aug in img_transforms
+        ]
     aug_list = ds["compose"](aug_list) # to A.Compose
+        
+    # init aux transforms
+    aux_list = []
+    if inst_transforms is not None:
+        aux_list = [
+            ds[ds["AUX_LOOKUP"][aug]]() for aug in inst_transforms
+        ]
     
-    # return dataset
-    key = ds["DS_LOOKUP"][name]
-    return ds[key](
+    if return_weight_map:
+        aux_list.append(ds[ds["AUX_LOOKUP"]["edge_weight"]]())
+    
+    aux_list = ds["apply_each"](aux_list)
+        
+    return SegDataset(
         fname=fname,
-        transforms=aug_list,
-        target_types=target_types,
+        img_transforms=aug_list,
+        inst_transforms=aux_list,
+        seg_targets=seg_targets,
         normalize_input=normalize_input,
-        return_weight_map=return_weight_map,
-        rm_touching_nuc_borders=rm_touching_nuc_borders
     )
