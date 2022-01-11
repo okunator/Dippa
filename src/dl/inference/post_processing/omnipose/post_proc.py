@@ -135,9 +135,12 @@ def get_masks_omnipose(
     newinds = p[:, inds[:, 0], inds[:, 1]].swapaxes(0, 1)
     mask = np.zeros((p.shape[1], p.shape[2]))
     
-    db = DBSCAN(eps=eps, min_samples=3, n_jobs=1).fit(newinds)
-    labels = db.labels_
-    mask[inds[:, 0], inds[:, 1]] = labels + 1
+    try:
+        db = DBSCAN(eps=eps, min_samples=3, n_jobs=1).fit(newinds)
+        labels = db.labels_
+        mask[inds[:, 0], inds[:, 1]] = labels + 1
+    except:
+        pass
     
     return mask.astype("u4")
 
