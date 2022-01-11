@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import List, Dict, Optional
+from typing import Dict, Optional
 
 from .criterions.utils import loss_func
 from . import *

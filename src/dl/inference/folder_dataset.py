@@ -23,6 +23,7 @@ class FolderDataset(Dataset, FileHandler):
         xmax: Optional[int]=None,
         ymax: Optional[int]=None,
         auto_range: bool=False,
+        section_ix: int=0,
         tile_size: Optional[Tuple[int, int]]=(1000, 1000)
     ) -> None:
         """
@@ -50,14 +51,14 @@ class FolderDataset(Dataset, FileHandler):
                 or equal to this param in their filename. Works with 
                 tiles extracted with histoprep. 
                 See https://github.com/jopo666/HistoPrep 
-            auto_range_y (bool, default=False):
+            auto_range (bool, default=False):
                 Automatically filter tiles that contain ONE tissue 
                 section rather than every redundant tissue section in 
                 the wsi.
-            auto_range_x (bool, default=False):
-                Automatically filter tiles that contain ONE tissue 
-                section rather than every redundant tissue section in 
-                the wsi.
+            section_ix (int, default=0):
+                the nth tissue section in the wsi in the direction of 
+                the `coord` param. Starts from 0th index. E.g. If
+                `coord='y'` the 0th index is the upmost tissue section.
             tile_size (Tuple[int, int], optional, default=(1000, 1000)):
                 size of the input tiles in the folder. Optional.
         """
@@ -98,7 +99,10 @@ class FolderDataset(Dataset, FileHandler):
             ]
         
         if auto_range:
-            ymin, ymax = self._get_auto_range(self.fnames, coord="y")
+            ymin, ymax = self._get_auto_range(
+                self.fnames, coord="y", section_ix=section_ix
+            )
+            
             fnamesy = [
                 f for f in self.fnames 
                 if ymin <= self._get_xy_coords(f.name)[1] <= ymax

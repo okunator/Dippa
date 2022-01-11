@@ -162,7 +162,7 @@ class PostProcessor(ABC):
                 )
             except Exception as e:
                 print(e)
-                
+            
         return out_maps
         
     def _finalize(
@@ -267,3 +267,13 @@ class PostProcessor(ABC):
         labels = fill_holes(labels, min_size=10000)
 
         return labels.astype("u4")
+
+    def _get_aux_key(self, keys: List[str]) -> str:
+        """
+        Return the auxilliary output map key.
+        """
+        not_aux = ("type_map", "sem_map", "inst_map", "fn")
+        aux_keys = [k for k in keys if k not in not_aux]
+        
+        return aux_keys[0]
+        

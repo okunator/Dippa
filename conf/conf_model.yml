@@ -1,5 +1,5 @@
 model:
-  input_size: 256
+  input_size: 320
   encoder:
     name: tf_efficientnetv2_l
     depth: 5
@@ -38,5 +38,3 @@ model:
       type: 7
       sem: 5
       hover: 2
-      dist: 1
-    

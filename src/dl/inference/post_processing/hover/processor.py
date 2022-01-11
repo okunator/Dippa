@@ -46,7 +46,8 @@ class HoverNetPostProcessor(PostProcessor):
                                    to a numpy array
         """
         maps = self._threshold_probs(maps)
-        maps["inst_map"] = post_proc_hover(maps["inst_map"], maps["aux_map"])
+        aux_key = self._get_aux_key(list(maps.keys()))
+        maps["inst_map"] = post_proc_hover(maps["inst_map"], maps[aux_key])
         maps = self._finalize(maps)
 
         res = {

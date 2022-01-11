@@ -41,7 +41,7 @@ def default_branch_args(branches: List[str]):
     branch_weights = {}
     branch_acts = {}
     for branch in branches:
-        if branch == "aux":
+        if branch not in ("sem", "type", "inst"):
             branch_weights[branch] = True
             branch_acts[branch] = None
         else:
@@ -89,7 +89,7 @@ def main(params: Dict[str, Any]):
             lightning_model,
             in_data_dir=d,
             gt_mask_dir=params.gt_dir,
-            patch_size=(256, 256),
+            patch_size=(params.patch_size, params.patch_size),
             stride_size=params.stride,
             branch_weights=weights,
             branch_acts=acts,
@@ -102,6 +102,7 @@ def main(params: Dict[str, Any]):
             device=params.device,
             test_mode=False,
             auto_range=bool(params.auto_range),
+            section_ix=params.section_ix,
             n_images=32,
         )
         
@@ -237,6 +238,20 @@ if __name__ == '__main__':
         '--auto_range',
         type=int,
         default=0,
+        help=("..")
+    )
+    
+    parser.add_argument(
+        '--section_ix',
+        type=int,
+        default=0,
+        help=("..")
+    )
+    
+    parser.add_argument(
+        '--patch_size',
+        type=int,
+        default=256,
         help=("..")
     )
     

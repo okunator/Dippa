@@ -12,5 +12,3 @@ datamodule:
     - non_rigid
   inst_transforms:
     - hover
-    - dist
-    

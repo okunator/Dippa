@@ -47,8 +47,9 @@ class DCANPostProcessor(PostProcessor):
                                    to a numpy array
         """
         maps = self._threshold_probs(maps)
+        aux_key = self._get_aux_key(list(maps.keys()))
         maps["inst_map"] = post_proc_dcan(
-            maps["inst_map"], maps["aux_map"].squeeze()
+            maps["inst_map"], maps[aux_key].squeeze()
         )
         maps = self._finalize(maps)
 

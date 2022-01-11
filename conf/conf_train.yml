@@ -15,8 +15,6 @@ training:
       - miou
     hover:
       - null
-    dist:
-      - null
 
   optimizer:
     name: adamp
@@ -34,14 +32,11 @@ training:
       type: null
       sem: null
       hover: null
-      dist: null
     edge_weights:
       type: null
       sem: null
       hover: null
-      dist: null
     branch_losses:
       type: tversky_focal_ssim
       sem: tversky_focal_ssim
       hover: mse_ssim
-      dist: mse_ssim

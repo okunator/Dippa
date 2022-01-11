@@ -49,8 +49,9 @@ class DRFNSPostProcessor(PostProcessor):
                                    to a numpy array
         """
         maps = self._threshold_probs(maps)
+        aux_key = self._get_aux_key(list(maps.keys()))
         maps["inst_map"] = post_proc_drfns(
-            maps["aux_map"].squeeze(), maps["inst_map"]
+            maps[aux_key].squeeze(), maps["inst_map"]
         )
         maps = self._finalize(maps)
 

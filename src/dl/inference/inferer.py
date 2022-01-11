@@ -43,9 +43,8 @@ class Inferer(FileHandler):
         thresh: float=0.5,
         n_images: int=None,
         fn_pattern: str="*",
-        xmax: Optional[int]=None,
-        ymax: Optional[int]=None,
         auto_range: Optional[bool]=False,
+        section_ix: int=0,
         device: str="cuda",
         test_mode: bool=False,
         **kwargs
@@ -127,24 +126,17 @@ class Inferer(FileHandler):
                 A pattern in file names in the in_data_dir. For example,
                 for pannuke dataset you can run inference for only 
                 images of specific tissue e.g. pattern = *_Adrenal_*.
-            xmax (int, optional, default=None):
-                Filters all the file names in the input directory that 
-                contain x-coordinate less than this param in their 
-                filename. I.e. the tiles in the folder need to contain 
-                the x- and y- coordinates (in xy- order) in the filename
-                Example tile filename: "x-45000_y-50000.png".
-            ymax (int, optional, default=None):
-                Filters all the file names in the input directory that 
-                contain y-coord less than this param in their filename. 
-                I.e. the tiles in the folder need to contain the x- and 
-                y- coords (in xy- order) in the filename. Example tile 
-                filename: "x-45000_y-50000.png".
             auto_range (bool, optional, default=False):
                 Automatically filter tiles from a folder to contain 
                 only ONE tissue section rather than every redundant 
                 tissue section in the wsi. The tiles in the folder need 
                 to contain the x- and y-coords (in xy- order) in the 
                 filename. Example tile filename: "x-45000_y-50000.png".
+            section_ix (int, default=0):
+                the nth tissue section in the wsi in the direction of 
+                the `coord` param. Starts from 0th index. E.g. If
+                `coord='y'` the 0th index is the upmost tissue section.
+                Used only if `auto_range == True`
             device (str, default="cuda"):
                 The device of the input and model. One of: "cuda", "cpu"
             test_mode (bool, default=False):
@@ -217,17 +209,16 @@ class Inferer(FileHandler):
 
         # Set dataset & dataloader.
         self.folderset = FolderDataset(
-            self.in_data_dir, 
-            pattern=fn_pattern, 
-            xmax=xmax, 
-            ymax=ymax, 
-            auto_range=auto_range
+            self.in_data_dir,
+            pattern=fn_pattern,
+            auto_range=auto_range,
+            section_ix=section_ix
         )
 
         self.dataloader = DataLoader(
-            self.folderset, 
-            batch_size=loader_batch_size, 
-            shuffle=False, pin_memory=True, 
+            self.folderset,
+            batch_size=loader_batch_size,
+            shuffle=False, pin_memory=True,
             num_workers=loader_num_workers
         )
 
@@ -290,14 +281,23 @@ class Inferer(FileHandler):
         """
         Check that post proc method can be used with current settings
         """
-        allowed = ("basic")
-        if "aux" in self.model.hparams["dec_branches"].keys():
-            if self.model.hparams["dataset_type"] == "hover":
-                allowed = ("hover", "omnipose", "cellpose", "cellpose0", "basic")
-            elif self.model.hparams["dataset_type"] == "dist":
-                allowed = ("drfns", "basic")
-            elif self.model.hparams["dataset_type"] == "contour":
-                allowed = ("dcan", "dran", "basic")
+        allowed = ["basic"]
+        aux_branches = [
+            k for k in self.model.hparams["dec_branches"].keys() 
+            if k not in ("type", "sem", "inst")
+        ]
+        
+        if aux_branches:
+            if "hover" in aux_branches:
+                allowed.extend(["hover", "omnipose", "cellpose", "cellpose0"])
+            elif "cellpose" in aux_branches:
+                allowed.extend(["hover", "omnipose", "cellpose", "cellpose0"])
+            elif "omnipose" in aux_branches:
+                allowed.extend(["hover", "omnipose", "cellpose", "cellpose0"])
+            elif "dist" in aux_branches:
+                allowed.extend(["drfns"])
+            elif "contour" in aux_branches:
+                allowed.extend(["dcan", "dran", "basic"])
             
         if not self.post_proc_method in allowed:
             raise ValueError(f"""

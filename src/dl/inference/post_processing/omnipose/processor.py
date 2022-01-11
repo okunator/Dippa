@@ -57,8 +57,10 @@ class OmniposePostProcessor(PostProcessor):
                                    to a numpy array
         """
         maps = self._threshold_probs(maps)
+        aux_key = self._get_aux_key(list(maps.keys()))
+               
         inst_map = post_proc_omnipose(
-            flow_map=maps["aux_map"],
+            flow_map=maps[aux_key],
             inst_map=maps["inst_map"],
             return_flows=save_flows
         )
