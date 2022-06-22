@@ -3,7 +3,7 @@ tables==3.6.1
 geopandas==0.9.0
 zarr==2.6.1
 geojson==2.5.0
-numpy==1.18.4
+numpy==1.22.0
 pandas==1.1.2
 torch==1.7.0
 torchvision==0.8.0
